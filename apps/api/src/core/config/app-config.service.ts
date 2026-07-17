@@ -1,0 +1,85 @@
+import { Injectable } from '@nestjs/common';
+import { z } from 'zod';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  API_PORT: z.coerce.number().int().default(3001),
+  API_URL: z.string().default('http://localhost:3001'),
+  WEB_URL: z.string().default('http://localhost:3000'),
+  PORTAL_URL: z.string().default('http://localhost:3003'),
+  CORS_ORIGINS: z.string().default('http://localhost:3000,http://localhost:3002,http://localhost:3003'),
+  DATABASE_URL: z.string(),
+  REDIS_URL: z.string().default('redis://localhost:6379'),
+  JWT_PRIVATE_KEY_PATH: z.string().default('.keys/jwt-private.pem'),
+  JWT_PUBLIC_KEY_PATH: z.string().default('.keys/jwt-public.pem'),
+  JWT_ACCESS_TTL: z.string().default('15m'),
+  JWT_REFRESH_TTL: z.string().default('30d'),
+  STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  STORAGE_LOCAL_DIR: z.string().default('./uploads'),
+  SMS_PROVIDER: z.enum(['log', 'eskiz']).default('log'),
+  ESKIZ_EMAIL: z.string().optional(),
+  ESKIZ_PASSWORD: z.string().optional(),
+  ESKIZ_FROM: z.string().default('4546'),
+  TELEGRAM_ENABLED: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  PAYME_MERCHANT_ID: z.string().optional(),
+  PAYME_KEY: z.string().optional(),
+  CLICK_MERCHANT_ID: z.string().optional(),
+  CLICK_SERVICE_ID: z.string().optional(),
+  CLICK_SECRET_KEY: z.string().optional(),
+  UZUM_MERCHANT_ID: z.string().optional(),
+  UZUM_SECRET_KEY: z.string().optional(),
+});
+
+export type Env = z.infer<typeof envSchema>;
+
+/** Repo root (apps/api/../..) — .env and .keys live there. */
+export const REPO_ROOT = resolve(__dirname, '../../../../..');
+
+function readKey(path: string): string {
+  const abs = resolve(REPO_ROOT, path);
+  try {
+    return readFileSync(abs, 'utf8');
+  } catch {
+    throw new Error(
+      `JWT key not found at ${abs}. Run "pnpm keys:generate" from the repo root first.`,
+    );
+  }
+}
+
+@Injectable()
+export class AppConfigService {
+  readonly env: Env;
+  readonly jwtPrivateKey: string;
+  readonly jwtPublicKey: string;
+
+  constructor() {
+    const parsed = envSchema.safeParse(process.env);
+    if (!parsed.success) {
+      const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+      throw new Error(`Invalid environment configuration: ${issues}`);
+    }
+    this.env = parsed.data;
+    this.jwtPrivateKey = readKey(this.env.JWT_PRIVATE_KEY_PATH);
+    this.jwtPublicKey = readKey(this.env.JWT_PUBLIC_KEY_PATH);
+  }
+
+  get isProd(): boolean {
+    return this.env.NODE_ENV === 'production';
+  }
+
+  get corsOrigins(): string[] {
+    return this.env.CORS_ORIGINS.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  get uploadsDir(): string {
+    return resolve(REPO_ROOT, this.env.STORAGE_LOCAL_DIR);
+  }
+}
