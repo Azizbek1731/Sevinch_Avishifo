@@ -1,0 +1,184 @@
+{
+  "title": "Staff",
+  "subtitle": "Staff directory, work schedules, KPI and compensation",
+  "tabs": {
+    "directory": "Directory",
+    "payroll": "Payroll"
+  },
+  "filters": {
+    "searchPlaceholder": "Search by name...",
+    "role": "Role",
+    "allRoles": "All roles",
+    "branch": "Branch",
+    "allBranches": "All branches"
+  },
+  "table": {
+    "fullName": "Full name",
+    "role": "Role",
+    "specialty": "Specialty",
+    "branches": "Branches",
+    "phone": "Phone",
+    "status": "Status"
+  },
+  "empty": {
+    "title": "No staff found",
+    "description": "Staff members are added in the settings section",
+    "noResults": "No results"
+  },
+  "roles": {
+    "SUPER_ADMIN": "Super admin",
+    "CLINIC_OWNER": "Clinic owner",
+    "CLINIC_ADMIN": "Administrator",
+    "DOCTOR": "Doctor",
+    "NURSE": "Nurse",
+    "RECEPTIONIST": "Receptionist",
+    "CASHIER": "Cashier",
+    "LAB_TECH": "Lab technician",
+    "ACCOUNTANT": "Accountant",
+    "PATIENT": "Patient"
+  },
+  "statuses": {
+    "ACTIVE": "Active",
+    "SUSPENDED": "Suspended",
+    "ARCHIVED": "Archived"
+  },
+  "detail": {
+    "back": "Back to staff",
+    "notFound": "Staff member not found",
+    "tabs": {
+      "profile": "Profile",
+      "schedule": "Schedule",
+      "kpi": "KPI",
+      "compensation": "Compensation"
+    }
+  },
+  "profile": {
+    "title": "Staff profile",
+    "specialty": "Specialty",
+    "licenseNo": "License number",
+    "hireDate": "Hire date",
+    "bio": "Bio",
+    "slotMinutes": "Appointment slot length (min)",
+    "slotMinutesHint": "Default slot length used instead of service duration",
+    "saved": "Profile saved"
+  },
+  "schedule": {
+    "title": "Weekly work schedule",
+    "branch": "Branch",
+    "save": "Save",
+    "saved": "Schedule saved",
+    "dayOff": "Day off",
+    "start": "Start",
+    "end": "End",
+    "slot": "Slot (min)",
+    "minutesShort": "min",
+    "addWindow": "Add time window",
+    "removeWindow": "Remove window",
+    "weekdays": {
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday",
+      "7": "Sunday"
+    },
+    "exceptions": {
+      "title": "Exceptions (vacation, sick leave)",
+      "add": "Add exception",
+      "addTitle": "New exception",
+      "type": "Type",
+      "dateFrom": "Start date",
+      "dateTo": "End date",
+      "startTime": "Start time",
+      "endTime": "End time",
+      "note": "Note",
+      "empty": "No exceptions",
+      "added": "Exception added",
+      "deleted": "Exception deleted",
+      "deleteTitle": "Delete exception",
+      "deleteDescription": "The exception will be removed and slots will open again. Continue?",
+      "types": {
+        "VACATION": "Vacation",
+        "SICK_LEAVE": "Sick leave",
+        "DAY_OFF": "Day off",
+        "CUSTOM_HOURS": "Custom hours"
+      }
+    }
+  },
+  "kpi": {
+    "from": "Start date",
+    "to": "End date",
+    "patientsSeen": "Patients seen",
+    "visits": "Visits",
+    "revenue": "Revenue",
+    "avgVisitMin": "Average visit duration",
+    "minutesUnit": "minutes",
+    "noShowRate": "No-show rate",
+    "returningRate": "Returning patient rate",
+    "avgRating": "Average rating"
+  },
+  "compensation": {
+    "type": "Type",
+    "value": "Value",
+    "valuePercent": "Percent (0–100)",
+    "valueAmount": "Amount (UZS)",
+    "scope": "Scope",
+    "scopeAll": "All services",
+    "scopeService": "Service",
+    "scopeCategory": "Category",
+    "service": "Service",
+    "category": "Category",
+    "selectService": "Select a service",
+    "selectCategory": "Select a category",
+    "effectiveFrom": "Effective from",
+    "effectiveTo": "Effective to",
+    "open": "Open",
+    "add": "Add rule",
+    "addTitle": "New compensation rule",
+    "created": "Rule added",
+    "deleted": "Rule deleted",
+    "deleteTitle": "Delete rule",
+    "deleteDescription": "This compensation rule will be deleted. Continue?",
+    "empty": {
+      "title": "No compensation rules",
+      "description": "Configure a salary, revenue percent or per-service fee for the doctor"
+    },
+    "types": {
+      "FIXED_SALARY": "Fixed salary",
+      "REVENUE_PERCENT": "Revenue percent",
+      "PER_SERVICE_FEE": "Per-service fee"
+    }
+  },
+  "payroll": {
+    "period": "Period",
+    "generate": "Calculate",
+    "generated": "Calculated for {count} doctors",
+    "export": "Download XLSX",
+    "doctor": "Doctor",
+    "base": "Base",
+    "bonus": "Bonus",
+    "adjustment": "Adjustment",
+    "total": "Total",
+    "note": "Note",
+    "adjust": "Edit adjustment",
+    "adjustTitle": "Edit adjustment",
+    "adjustSaved": "Adjustment saved",
+    "adjustHint": "Enter a negative amount for a deduction, e.g. -150000",
+    "noBreakdown": "No calculation breakdown",
+    "empty": {
+      "title": "No accruals for this period",
+      "description": "Pick a period and press \"Calculate\""
+    }
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete"
+  },
+  "form": {
+    "required": "Required field",
+    "invalidAmount": "Invalid amount",
+    "invalidNumber": "Invalid value (5–120 minutes)"
+  }
+}

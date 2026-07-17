@@ -1,0 +1,86 @@
+{
+  "title": "Календарь",
+  "subtitle": "Расписание приёмов и записи",
+  "views": {
+    "day": "День",
+    "week": "Неделя"
+  },
+  "today": "Сегодня",
+  "prevPeriod": "Назад",
+  "nextPeriod": "Вперёд",
+  "doctor": "Врач",
+  "allDoctors": "Все врачи",
+  "newAppointment": "Новая запись",
+  "noDoctors": "Врачи не найдены",
+  "noDoctorsDesc": "Сначала добавьте врача в разделе «Сотрудники»",
+  "noAppointments": "Записей нет",
+  "status": {
+    "SCHEDULED": "Запланирован",
+    "CONFIRMED": "Подтверждён",
+    "CHECKED_IN": "Пришёл",
+    "IN_QUEUE": "В очереди",
+    "IN_PROGRESS": "На приёме",
+    "COMPLETED": "Завершён",
+    "NO_SHOW": "Не пришёл",
+    "CANCELLED": "Отменён"
+  },
+  "detail": {
+    "title": "Детали записи",
+    "patient": "Пациент",
+    "doctor": "Врач",
+    "time": "Время",
+    "services": "Услуги",
+    "note": "Заметка",
+    "cancelledReason": "Причина отмены",
+    "confirm": "Подтвердить",
+    "checkIn": "Пришёл",
+    "noShow": "Не пришёл",
+    "cancel": "Отменить",
+    "reschedule": "Перенести",
+    "recurring": "Курс (повтор)"
+  },
+  "form": {
+    "createTitle": "Новая запись",
+    "editTitle": "Перенос записи",
+    "patient": "Пациент",
+    "selectPatient": "Выберите пациента",
+    "searchPatient": "Поиск по имени, телефону или MRN...",
+    "patientNotFound": "Пациент не найден",
+    "doctor": "Врач",
+    "selectDoctor": "Выберите врача",
+    "services": "Услуги",
+    "selectServices": "Выберите услуги",
+    "servicesSelected": "Выбрано услуг: {count}",
+    "minutes": "{count} мин",
+    "date": "Дата",
+    "time": "Время",
+    "slotsHint": "Сначала выберите врача и дату",
+    "loadingSlots": "Загрузка свободного времени...",
+    "noSlots": "На этот день нет свободного времени",
+    "note": "Заметка",
+    "notePlaceholder": "Дополнительная заметка...",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "required": "Обязательное поле"
+  },
+  "reason": {
+    "cancelTitle": "Отмена записи",
+    "noShowTitle": "Пациент не пришёл",
+    "label": "Причина",
+    "placeholder": "Укажите причину...",
+    "submit": "Сохранить"
+  },
+  "recurring": {
+    "title": "Курс (повторяющиеся приёмы)",
+    "description": "Будет создан курс сеансов, повторяющихся в это же время",
+    "sessionsCount": "Количество сеансов",
+    "intervalDays": "Интервал (дней)",
+    "submit": "Создать курс",
+    "result": "Создано записей: {created}, пропущено: {skipped}"
+  },
+  "toasts": {
+    "created": "Запись создана",
+    "updated": "Запись сохранена",
+    "statusChanged": "Статус изменён"
+  }
+}

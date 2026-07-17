@@ -1,0 +1,60 @@
+{
+  "templates": {
+    "title": "Notification templates",
+    "desc": "Configure the message text per event, channel and language",
+    "event": "Event",
+    "channel": "Channel",
+    "locale": "Language",
+    "body": "Message body",
+    "bodyPlaceholder": "Dear '{'patient_name'}', your appointment is at '{'time'}'...",
+    "variablesHint": "Variables",
+    "save": "Save template",
+    "saved": "Template saved",
+    "savedList": "Saved templates",
+    "emptyTitle": "No templates",
+    "emptyDesc": "Default text is used for events without a template",
+    "bodyTooShort": "Message body is too short"
+  },
+  "events": {
+    "APPOINTMENT_CREATED": "Appointment created",
+    "APPOINTMENT_REMINDER_24H": "Appointment reminder (24 hours)",
+    "APPOINTMENT_REMINDER_2H": "Appointment reminder (2 hours)",
+    "APPOINTMENT_CANCELLED": "Appointment cancelled",
+    "QUEUE_TURN_NEAR": "Queue turn is near",
+    "LAB_RESULT_READY": "Lab result ready",
+    "PAYMENT_RECEIPT": "Payment receipt",
+    "BIRTHDAY": "Birthday greeting",
+    "DEBT_REMINDER": "Debt reminder",
+    "FEEDBACK_REQUEST": "Feedback request"
+  },
+  "channels": {
+    "SMS": "SMS",
+    "TELEGRAM": "Telegram",
+    "IN_APP": "In-app"
+  },
+  "locales": {
+    "uz": "Uzbek (Latin)",
+    "uz_Cyrl": "Uzbek (Cyrillic)",
+    "ru": "Russian",
+    "en": "English"
+  },
+  "logs": {
+    "title": "SMS log",
+    "date": "Date",
+    "recipient": "Recipient",
+    "event": "Event",
+    "channel": "Channel",
+    "body": "Body",
+    "status": "Status",
+    "statuses": {
+      "QUEUED": "Queued",
+      "SENT": "Sent",
+      "DELIVERED": "Delivered",
+      "FAILED": "Failed"
+    },
+    "attempts": "Attempts",
+    "allStatuses": "All statuses",
+    "allChannels": "All channels",
+    "empty": "No records found"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "title": "Панель управления",
+  "description": "Показатели за сегодня и аналитика за последние 30 дней",
+  "stats": {
+    "revenue": "Выручка за сегодня",
+    "visits": "Визиты за сегодня",
+    "newPatients": "Новые пациенты",
+    "waiting": "Ожидают в очереди",
+    "openShifts": "Открытые смены: {count}"
+  },
+  "charts": {
+    "revenue30": "Выручка — последние 30 дней",
+    "revenueSeries": "Выручка",
+    "patientFlow": "Новые и повторные пациенты",
+    "new": "Новые",
+    "returning": "Повторные",
+    "sources": "Источники пациентов"
+  },
+  "sources": {
+    "friend_referral": "Рекомендация друга",
+    "doctor_referral": "Направление врача",
+    "instagram": "Instagram",
+    "telegram": "Telegram",
+    "facebook": "Facebook",
+    "google": "Google",
+    "street_banner": "Уличный баннер",
+    "returning": "Повторный пациент",
+    "other": "Другое"
+  },
+  "empty": {
+    "title": "Нет данных",
+    "description": "За выбранный период данные не найдены"
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "title": "Qabulxona",
+  "subtitle": "Bugungi qabullar va jonli navbat",
+  "appointments": {
+    "title": "Bugungi qabullar",
+    "empty": "Bugun uchun qabullar yo'q",
+    "confirm": "Tasdiqlash",
+    "checkIn": "Keldi",
+    "enqueue": "Navbatga qo'shish",
+    "cancel": "Qabulni bekor qilish",
+    "statusChanged": "Qabul holati yangilandi"
+  },
+  "statuses": {
+    "SCHEDULED": "Rejalashtirilgan",
+    "CONFIRMED": "Tasdiqlangan",
+    "CHECKED_IN": "Keldi",
+    "IN_QUEUE": "Navbatda",
+    "IN_PROGRESS": "Qabulda",
+    "COMPLETED": "Yakunlangan",
+    "NO_SHOW": "Kelmadi",
+    "CANCELLED": "Bekor qilingan"
+  },
+  "ticketStatuses": {
+    "WAITING": "Kutmoqda",
+    "CALLED": "Chaqirildi",
+    "IN_ROOM": "Xonada",
+    "DONE": "Yakunlandi",
+    "SKIPPED": "O'tkazib yuborildi"
+  },
+  "priorities": {
+    "NORMAL": "Oddiy",
+    "PRIORITY": "Imtiyozli",
+    "EMERGENCY": "Shoshilinch"
+  },
+  "queue": {
+    "title": "Jonli navbat",
+    "empty": "Navbat bo'sh",
+    "emptyHint": "Bemorni navbatga qo'shish uchun qabulni ro'yxatdan o'tkazing yoki walk-in yozing",
+    "noDoctor": "Shifokorsiz navbat",
+    "groupCounts": "{waiting} kutmoqda · {done} yakunlandi",
+    "priority": "Muhimlik",
+    "priorityChanged": "Talon muhimligi o'zgartirildi",
+    "transfer": "Boshqa shifokorga o'tkazish",
+    "transferred": "Talon boshqa shifokorga o'tkazildi",
+    "skip": "O'tkazib yuborish",
+    "skipped": "Talon o'tkazib yuborildi",
+    "skipConfirmTitle": "Talonni o'tkazib yuborasizmi?",
+    "skipConfirmDesc": "{ticket} — {patient} navbatdan o'tkazib yuboriladi. Keyinroq qayta chaqirish mumkin.",
+    "enqueued": "Bemor navbatga qo'shildi"
+  },
+  "newPatient": {
+    "button": "Yangi bemor",
+    "title": "Yangi bemor (tez ro'yxat)",
+    "subtitle": "Minimal ma'lumot: F.I.Sh., telefon va tug'ilgan sana",
+    "firstName": "Ismi",
+    "lastName": "Familiyasi",
+    "dob": "Tug'ilgan sana",
+    "gender": "Jinsi",
+    "male": "Erkak",
+    "female": "Ayol",
+    "invalidPhone": "Telefon raqami noto'g'ri (+998...)",
+    "duplicatesFound": "O'xshash bemorlar topildi — takror emasligiga ishonch hosil qiling:",
+    "forceCreate": "Baribir yaratish",
+    "created": "Bemor ro'yxatga olindi"
+  },
+  "walkIn": {
+    "button": "Navbatga yozish (walk-in)",
+    "title": "Navbatga yozish (walk-in)",
+    "subtitle": "Bemorni tanlang yoki yangi yarating, shifokor va muhimlikni belgilang",
+    "searchPlaceholder": "Bemor: ism, telefon yoki MRN...",
+    "quickCreate": "Yangi bemor yaratish",
+    "submit": "Navbatga qo'shish",
+    "created": "Bemor navbatga yozildi"
+  },
+  "cancelDialog": {
+    "title": "Qabulni bekor qilish",
+    "subtitle": "Bekor qilish sababini kiriting — bu majburiy",
+    "reason": "Sabab",
+    "reasonPlaceholder": "Masalan: bemor iltimosi bilan...",
+    "confirm": "Bekor qilish"
+  },
+  "transferDialog": {
+    "title": "Boshqa shifokorga o'tkazish",
+    "subtitle": "{ticket} — {patient}",
+    "targetDoctor": "Yangi shifokor",
+    "confirm": "O'tkazish"
+  }
+}

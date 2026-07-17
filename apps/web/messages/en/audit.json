@@ -1,0 +1,32 @@
+{
+  "title": "Audit log",
+  "description": "History of all important actions in the system",
+  "date": "Date",
+  "user": "User",
+  "system": "System",
+  "action": "Action",
+  "entity": "Entity",
+  "diff": "Changes",
+  "ip": "IP address",
+  "from": "From date",
+  "to": "To date",
+  "allEntities": "All entities",
+  "allActions": "All actions",
+  "viewDiff": "View",
+  "before": "Before",
+  "after": "After",
+  "empty": "No records found",
+  "actions": {
+    "CREATE": "Create",
+    "UPDATE": "Update",
+    "DELETE": "Delete",
+    "LOGIN": "Login",
+    "LOGOUT": "Logout",
+    "LOGIN_FAILED": "Failed login",
+    "IMPERSONATE": "Impersonate",
+    "REFUND": "Refund",
+    "EXPORT": "Export",
+    "MERGE": "Merge",
+    "AMEND": "Amend"
+  }
+}

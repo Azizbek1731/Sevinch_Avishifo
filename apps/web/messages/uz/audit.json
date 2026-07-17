@@ -1,0 +1,32 @@
+{
+  "title": "Audit jurnali",
+  "description": "Tizimda bajarilgan barcha muhim amallar tarixi",
+  "date": "Sana",
+  "user": "Foydalanuvchi",
+  "system": "Tizim",
+  "action": "Amal",
+  "entity": "Obyekt",
+  "diff": "O'zgarishlar",
+  "ip": "IP manzil",
+  "from": "Sanadan",
+  "to": "Sanagacha",
+  "allEntities": "Barcha obyektlar",
+  "allActions": "Barcha amallar",
+  "viewDiff": "Ko'rish",
+  "before": "Oldin",
+  "after": "Keyin",
+  "empty": "Yozuvlar topilmadi",
+  "actions": {
+    "CREATE": "Yaratish",
+    "UPDATE": "Yangilash",
+    "DELETE": "O'chirish",
+    "LOGIN": "Kirish",
+    "LOGOUT": "Chiqish",
+    "LOGIN_FAILED": "Muvaffaqiyatsiz kirish",
+    "IMPERSONATE": "Nomidan kirish",
+    "REFUND": "Qaytarish",
+    "EXPORT": "Eksport",
+    "MERGE": "Birlashtirish",
+    "AMEND": "Tuzatish"
+  }
+}

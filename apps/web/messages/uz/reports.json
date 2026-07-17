@@ -1,0 +1,144 @@
+{
+  "title": "Hisobotlar",
+  "description": "Klinika faoliyati bo'yicha tahliliy hisobotlar",
+  "noAccess": "Hisobotlarni ko'rish uchun ruxsat yo'q",
+  "filters": {
+    "today": "Bugun",
+    "week": "Hafta",
+    "month": "Oy",
+    "custom": "Davr tanlash",
+    "groupBy": "Guruhlash",
+    "groupByOptions": {
+      "day": "Kun bo'yicha",
+      "week": "Hafta bo'yicha",
+      "month": "Oy bo'yicha"
+    }
+  },
+  "export": {
+    "xlsx": "XLSX",
+    "success": "Fayl yuklab olindi"
+  },
+  "tabs": {
+    "revenue": "Tushum",
+    "flow": "Bemorlar oqimi",
+    "doctors": "Shifokorlar",
+    "services": "Xizmatlar",
+    "queue": "Navbat",
+    "lab": "Laboratoriya",
+    "shifts": "Smenalar"
+  },
+  "empty": {
+    "title": "Ma'lumot yo'q",
+    "description": "Tanlangan davr uchun ma'lumot topilmadi"
+  },
+  "units": {
+    "minutes": "{value} daq",
+    "hours": "{value} soat"
+  },
+  "revenue": {
+    "chartTitle": "Tushum dinamikasi",
+    "series": "Tushum",
+    "total": "Jami",
+    "dimensions": {
+      "time": "Vaqt",
+      "category": "Kategoriya",
+      "doctor": "Shifokor",
+      "method": "To'lov usuli"
+    }
+  },
+  "methods": {
+    "CASH": "Naqd pul",
+    "CARD": "Karta",
+    "PAYME": "Payme",
+    "CLICK": "Click",
+    "UZUM": "Uzum",
+    "BALANCE": "Balansdan"
+  },
+  "flow": {
+    "chartTitle": "Yangi va qaytgan bemorlar",
+    "new": "Yangi",
+    "returning": "Qaytgan",
+    "peakHours": "Eng band soatlar",
+    "sources": "Bemorlar manbalari",
+    "visitsAt": "{count} ta tashrif"
+  },
+  "sources": {
+    "friend_referral": "Do'st tavsiyasi",
+    "doctor_referral": "Shifokor yo'llanmasi",
+    "instagram": "Instagram",
+    "telegram": "Telegram",
+    "facebook": "Facebook",
+    "google": "Google",
+    "street_banner": "Ko'cha banneri",
+    "returning": "Qaytgan bemor",
+    "other": "Boshqa"
+  },
+  "dow": {
+    "d0": "Yak",
+    "d1": "Du",
+    "d2": "Se",
+    "d3": "Chor",
+    "d4": "Pay",
+    "d5": "Ju",
+    "d6": "Shan"
+  },
+  "doctors": {
+    "columns": {
+      "name": "Shifokor",
+      "patients": "Bemorlar",
+      "visits": "Tashriflar",
+      "revenue": "Tushum",
+      "avgDuration": "O'rtacha qabul vaqti",
+      "noShow": "Kelmaganlar %",
+      "returning": "Qaytganlar %"
+    }
+  },
+  "services": {
+    "chartTitle": "Eng ko'p tushum keltirgan xizmatlar",
+    "series": "Tushum",
+    "columns": {
+      "code": "Kod",
+      "name": "Xizmat",
+      "count": "Soni",
+      "revenue": "Tushum"
+    }
+  },
+  "queue": {
+    "chartTitle": "O'rtacha kutish va xizmat vaqti",
+    "wait": "Kutish",
+    "service": "Xizmat",
+    "perDoctor": "Shifokorlar kesimida",
+    "columns": {
+      "doctor": "Shifokor",
+      "tickets": "Chiptalar",
+      "avgWait": "O'rt. kutish",
+      "avgService": "O'rt. xizmat"
+    }
+  },
+  "lab": {
+    "chartTitle": "Tahlil tayyorlanish vaqti",
+    "series": "O'rtacha vaqt",
+    "perTest": "Tahlillar kesimida",
+    "columns": {
+      "test": "Tahlil",
+      "count": "Soni",
+      "avgHours": "O'rt. vaqt"
+    }
+  },
+  "shifts": {
+    "columns": {
+      "cashier": "Kassir",
+      "status": "Holat",
+      "openedAt": "Ochilgan",
+      "closedAt": "Yopilgan",
+      "opening": "Boshlang'ich kassa",
+      "expected": "Kutilgan",
+      "actual": "Haqiqiy",
+      "difference": "Farq"
+    },
+    "status": {
+      "OPEN": "Ochiq",
+      "CLOSED": "Yopiq"
+    }
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "clinics": {
+    "title": "Klinikalar",
+    "description": "Platformadagi barcha klinikalarni boshqarish",
+    "create": "Klinika",
+    "searchPlaceholder": "Klinika nomi bo'yicha qidirish...",
+    "allStatuses": "Barcha holatlar",
+    "noPlan": "Tarif yo'q",
+    "created": "Klinika yaratildi",
+    "columns": {
+      "name": "Nomi",
+      "status": "Holat",
+      "plan": "Tarif",
+      "branches": "Filiallar",
+      "users": "Foydalanuvchilar",
+      "patients": "Bemorlar",
+      "visits30d": "Tashriflar (30 kun)"
+    },
+    "empty": {
+      "title": "Klinikalar topilmadi",
+      "description": "Qidiruv shartlarini o'zgartirib ko'ring"
+    },
+    "createDialog": {
+      "title": "Yangi klinika yaratish",
+      "clinicSection": "Klinika ma'lumotlari",
+      "ownerSection": "Egasining hisobi",
+      "name": "Nomi",
+      "legalName": "Yuridik nomi",
+      "phone": "Telefon",
+      "email": "Email",
+      "ownerFullName": "F.I.Sh.",
+      "ownerPhone": "Telefon",
+      "ownerEmail": "Email",
+      "password": "Parol"
+    }
+  },
+  "status": {
+    "ACTIVE": "Faol",
+    "SUSPENDED": "To'xtatilgan",
+    "ARCHIVED": "Arxivlangan"
+  },
+  "subscriptionStatus": {
+    "TRIAL": "Sinov",
+    "ACTIVE": "Faol",
+    "PAST_DUE": "To'lov kechikkan",
+    "CANCELLED": "Bekor qilingan"
+  },
+  "detail": {
+    "info": "Ma'lumotlar",
+    "createdAt": "Yaratilgan sana",
+    "backToList": "Ro'yxatga qaytish",
+    "notFound": "Klinika topilmadi",
+    "statusUpdated": "Klinika holati yangilandi",
+    "impersonationMode": "Impersonatsiya rejimi",
+    "plan": {
+      "title": "Obuna tarifi",
+      "current": "Joriy tarif",
+      "select": "Tarifni tanlang",
+      "assign": "Biriktirish",
+      "assigned": "Tarif biriktirildi"
+    },
+    "flags": {
+      "title": "Funksiya kalitlari",
+      "updated": "Funksiya kaliti yangilandi",
+      "lab": "Laboratoriya",
+      "portal": "Bemor portali",
+      "telegram": "Telegram bot",
+      "analytics": "Analitika"
+    },
+    "actions": {
+      "suspend": "To'xtatish",
+      "activate": "Faollashtirish",
+      "impersonate": "Klinikaga kirish"
+    },
+    "suspendConfirm": {
+      "title": "Klinikani to'xtatasizmi?",
+      "description": "{name} klinikasi to'xtatiladi va xodimlari tizimga kira olmaydi."
+    },
+    "activateConfirm": {
+      "title": "Klinikani faollashtirasizmi?",
+      "description": "{name} klinikasi qayta faollashtiriladi va xodimlar tizimga kira oladi."
+    }
+  },
+  "plans": {
+    "title": "Tariflar",
+    "description": "Obuna tariflari va limitlari",
+    "create": "Tarif",
+    "edit": "Tahrirlash",
+    "perMonth": "/ oy",
+    "maxBranches": "Maks. filiallar",
+    "maxUsers": "Maks. foydalanuvchilar",
+    "inactive": "Nofaol",
+    "saved": "Tarif saqlandi",
+    "empty": {
+      "title": "Tariflar yo'q",
+      "description": "Birinchi tarifni yarating"
+    },
+    "dialog": {
+      "createTitle": "Yangi tarif",
+      "editTitle": "Tarifni tahrirlash",
+      "code": "Kod",
+      "name": "Nomi",
+      "price": "Oylik narx (so'm)",
+      "maxBranches": "Maks. filiallar",
+      "maxUsers": "Maks. foydalanuvchilar",
+      "modules": "Modullar"
+    }
+  },
+  "analytics": {
+    "title": "Platforma analitikasi",
+    "description": "Barcha klinikalar bo'yicha umumiy ko'rsatkichlar",
+    "activeClinics": "Faol klinikalar",
+    "totalUsers": "Jami foydalanuvchilar",
+    "totalPatients": "Jami bemorlar",
+    "payments30d": "To'lovlar (30 kun)",
+    "visitsChartTitle": "Tashriflar — so'nggi 30 kun",
+    "visitsSeries": "Tashriflar",
+    "empty": {
+      "title": "Ma'lumot yo'q",
+      "description": "Hozircha tashriflar qayd etilmagan"
+    }
+  },
+  "form": {
+    "required": "Bu maydon majburiy",
+    "invalidPhone": "Telefon raqami noto'g'ri",
+    "invalidEmail": "Email noto'g'ri",
+    "passwordMin": "Parol kamida 8 belgidan iborat bo'lishi kerak",
+    "invalidPrice": "Narx noto'g'ri",
+    "invalidNumber": "Qiymat noto'g'ri"
+  },
+  "actions": {
+    "cancel": "Bekor qilish",
+    "save": "Saqlash"
+  }
+}

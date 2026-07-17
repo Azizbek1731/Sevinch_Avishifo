@@ -1,0 +1,66 @@
+{
+  "title": "Navbat paneli",
+  "description": "Filial navbatlari — jonli ko'rinish",
+  "date": "Sana",
+  "offline": "Aloqa uzildi — har 15 soniyada yangilanadi",
+  "noBranch": "Filial tanlanmagan",
+  "stats": {
+    "waiting": "Kutayotganlar",
+    "avgWait": "O'rtacha kutish",
+    "inRoom": "Xonada",
+    "done": "Bugun qabul qilindi"
+  },
+  "column": {
+    "waitingCount": "{count} ta kutmoqda",
+    "lab": "Laboratoriya",
+    "custom": "Boshqa navbat",
+    "closed": "Yopiq"
+  },
+  "callNext": "Keyingisini chaqirish",
+  "room": "Xona",
+  "roomNumber": "{number}-xona",
+  "noRoom": "Xonasiz",
+  "call": "Chaqirish",
+  "status": {
+    "WAITING": "Kutmoqda",
+    "CALLED": "Chaqirildi",
+    "IN_ROOM": "Xonada",
+    "DONE": "Yakunlandi",
+    "SKIPPED": "O'tkazib yuborildi"
+  },
+  "priority": {
+    "NORMAL": "Oddiy",
+    "PRIORITY": "Imtiyozli",
+    "EMERGENCY": "Shoshilinch"
+  },
+  "actions": {
+    "start": "Qabulni boshlash",
+    "finish": "Yakunlash",
+    "skip": "O'tkazib yuborish",
+    "recall": "Qayta chaqirish",
+    "setPriority": "Muhimlik darajasi",
+    "transfer": "Boshqa shifokorga o'tkazish"
+  },
+  "confirmSkip": {
+    "title": "Talon o'tkazib yuborilsinmi?",
+    "description": "{number} taloni o'tkazib yuboriladi. Keyinchalik uni qayta chaqirish mumkin."
+  },
+  "toast": {
+    "called": "{number} taloni chaqirildi",
+    "started": "Qabul boshlandi",
+    "finished": "Qabul yakunlandi",
+    "skipped": "Talon o'tkazib yuborildi",
+    "recalled": "Talon qayta chaqirildi",
+    "priorityChanged": "Muhimlik darajasi o'zgartirildi",
+    "transferred": "Talon boshqa shifokorga o'tkazildi"
+  },
+  "empty": {
+    "title": "Navbatlar yo'q",
+    "description": "Tanlangan sana uchun bu filialda navbat ochilmagan.",
+    "noTickets": "Talonlar yo'q"
+  },
+  "wait": {
+    "min": "{min} daq",
+    "hourMin": "{h} soat {min} daq"
+  }
+}

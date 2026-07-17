@@ -1,0 +1,34 @@
+{
+  "title": "Dashboard",
+  "description": "Today's key metrics and analytics for the last 30 days",
+  "stats": {
+    "revenue": "Today's revenue",
+    "visits": "Today's visits",
+    "newPatients": "New patients",
+    "waiting": "Waiting in queue",
+    "openShifts": "Open shifts: {count}"
+  },
+  "charts": {
+    "revenue30": "Revenue — last 30 days",
+    "revenueSeries": "Revenue",
+    "patientFlow": "New vs returning patients",
+    "new": "New",
+    "returning": "Returning",
+    "sources": "Patient sources"
+  },
+  "sources": {
+    "friend_referral": "Friend referral",
+    "doctor_referral": "Doctor referral",
+    "instagram": "Instagram",
+    "telegram": "Telegram",
+    "facebook": "Facebook",
+    "google": "Google",
+    "street_banner": "Street banner",
+    "returning": "Returning patient",
+    "other": "Other"
+  },
+  "empty": {
+    "title": "No data",
+    "description": "No data found for the selected period"
+  }
+}

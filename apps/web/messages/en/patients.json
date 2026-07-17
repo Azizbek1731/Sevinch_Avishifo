@@ -1,0 +1,237 @@
+{
+  "title": "Patients",
+  "subtitle": "Patient registry and records",
+  "newPatient": "New patient",
+  "searchPlaceholder": "Search by name, phone or MRN...",
+  "filterTag": "By tag",
+  "allTags": "All tags",
+  "created": "Patient created",
+  "updated": "Patient details saved",
+  "deleted": "Patient deleted",
+  "table": {
+    "mrn": "MRN",
+    "fullName": "Full name",
+    "phone": "Phone",
+    "dob": "Date of birth",
+    "tags": "Tags",
+    "visits": "Visits",
+    "balance": "Balance",
+    "createdAt": "Registered"
+  },
+  "empty": {
+    "title": "No patients yet",
+    "description": "Click \"New patient\" to register the first patient.",
+    "noResults": "Nothing found"
+  },
+  "card": {
+    "ageYears": "{age} y.o.",
+    "debt": "Debt",
+    "edit": "Edit",
+    "merge": "Merge",
+    "delete": "Delete",
+    "deleteTitle": "Delete this patient?",
+    "deleteDesc": "The record of {name} will be archived. This action cannot be undone.",
+    "notFound": "Patient not found",
+    "loadError": "Failed to load data",
+    "backToList": "Back to patient list"
+  },
+  "tabs": {
+    "overview": "Overview",
+    "timeline": "Timeline",
+    "visits": "Visits",
+    "documents": "Documents",
+    "invoices": "Invoices"
+  },
+  "form": {
+    "createTitle": "New patient",
+    "editTitle": "Edit patient",
+    "lastName": "Last name",
+    "firstName": "First name",
+    "middleName": "Middle name",
+    "phone": "Phone",
+    "phoneAlt": "Alt. phone",
+    "dob": "Date of birth",
+    "gender": "Gender",
+    "bloodGroup": "Blood group",
+    "address": "Address",
+    "passportId": "Passport / ID",
+    "allergies": "Allergies",
+    "allergyName": "Allergy name",
+    "add": "Add",
+    "remove": "Remove",
+    "chronicConditions": "Chronic conditions",
+    "conditionPlaceholder": "Condition name",
+    "notes": "Notes",
+    "source": "How did they hear about us",
+    "tags": "Tags",
+    "selectPlaceholder": "Select...",
+    "none": "Not specified",
+    "required": "Required field",
+    "invalidPhone": "Invalid phone number",
+    "cancel": "Cancel",
+    "save": "Save",
+    "create": "Create"
+  },
+  "gender": {
+    "MALE": "Male",
+    "FEMALE": "Female"
+  },
+  "blood": {
+    "A_POS": "A (II) Rh+",
+    "A_NEG": "A (II) Rh-",
+    "B_POS": "B (III) Rh+",
+    "B_NEG": "B (III) Rh-",
+    "AB_POS": "AB (IV) Rh+",
+    "AB_NEG": "AB (IV) Rh-",
+    "O_POS": "O (I) Rh+",
+    "O_NEG": "O (I) Rh-",
+    "UNKNOWN": "Unknown"
+  },
+  "severity": {
+    "low": "Mild",
+    "medium": "Moderate",
+    "high": "Severe"
+  },
+  "sources": {
+    "friend_referral": "Friend referral",
+    "doctor_referral": "Doctor referral",
+    "instagram": "Instagram",
+    "telegram": "Telegram",
+    "facebook": "Facebook",
+    "google": "Google",
+    "street_banner": "Street banner",
+    "returning": "Returning patient",
+    "other": "Other"
+  },
+  "tags": {
+    "VIP": "VIP",
+    "DEBTOR": "Debtor",
+    "STAFF_FAMILY": "Staff family",
+    "INSURANCE": "Insurance",
+    "BLACKLIST": "Blacklist"
+  },
+  "duplicates": {
+    "title": "This patient may already exist",
+    "description": "Similar patients were found. Open an existing record or create a new one anyway.",
+    "open": "Open",
+    "forceCreate": "Create anyway"
+  },
+  "overview": {
+    "demographics": "Personal details",
+    "dob": "Date of birth",
+    "gender": "Gender",
+    "bloodGroup": "Blood group",
+    "phoneAlt": "Alt. phone",
+    "address": "Address",
+    "passport": "Passport / ID",
+    "source": "How did they hear about us",
+    "registeredAt": "Registration date",
+    "allergies": "Allergies",
+    "noAllergies": "No allergies recorded",
+    "chronicConditions": "Chronic conditions",
+    "noChronic": "No chronic conditions recorded",
+    "notes": "Notes",
+    "noNotes": "No notes",
+    "consents": "Consents",
+    "noConsents": "No consents recorded",
+    "consentType": "Consent type",
+    "signedAt": "Signed on",
+    "note": "Note",
+    "addConsent": "Add consent",
+    "consentAdded": "Consent added"
+  },
+  "consentType": {
+    "personal_data": "Personal data processing",
+    "treatment": "Consent to treatment",
+    "other": "Other"
+  },
+  "timeline": {
+    "all": "All",
+    "visit": "Visit",
+    "diagnosis": "Diagnosis",
+    "prescription": "Prescription",
+    "lab": "Lab test",
+    "document": "Document",
+    "payment": "Payment",
+    "empty": "Timeline is empty for now",
+    "loadMore": "Load more",
+    "openVisit": "Open visit"
+  },
+  "visitStatus": {
+    "IN_PROGRESS": "In progress",
+    "COMPLETED": "Completed",
+    "CANCELLED": "Cancelled"
+  },
+  "visits": {
+    "date": "Date",
+    "doctor": "Doctor",
+    "status": "Status",
+    "open": "Open",
+    "empty": "No visits"
+  },
+  "documents": {
+    "uploadTitle": "Upload document",
+    "file": "File",
+    "title": "Title",
+    "category": "Category",
+    "upload": "Upload",
+    "uploaded": "Document uploaded",
+    "deletedDoc": "Document deleted",
+    "deleteTitle": "Delete this document?",
+    "deleteDesc": "The document \"{title}\" will be permanently deleted.",
+    "download": "Download",
+    "empty": "No documents",
+    "prev": "Prev",
+    "next": "Next"
+  },
+  "docCategory": {
+    "ANALYSIS": "Analysis",
+    "IMAGING": "Imaging (US, X-ray)",
+    "DISCHARGE": "Discharge summary",
+    "CONSENT": "Consent",
+    "OTHER": "Other"
+  },
+  "invoices": {
+    "title": "Invoices",
+    "number": "Number",
+    "date": "Date",
+    "total": "Total",
+    "paid": "Paid",
+    "due": "Due",
+    "status": "Status",
+    "empty": "No invoices"
+  },
+  "invoiceStatus": {
+    "DRAFT": "Draft",
+    "ISSUED": "Issued",
+    "PARTIALLY_PAID": "Partially paid",
+    "PAID": "Paid",
+    "CANCELLED": "Cancelled",
+    "REFUNDED": "Refunded"
+  },
+  "balance": {
+    "title": "Balance and transactions",
+    "date": "Date",
+    "type": "Type",
+    "amount": "Amount",
+    "note": "Note",
+    "empty": "No transactions"
+  },
+  "txType": {
+    "DEPOSIT": "Deposit",
+    "WITHDRAWAL": "Withdrawal",
+    "INVOICE_APPLY": "Invoice payment",
+    "REFUND_CREDIT": "Refund credit",
+    "ADJUSTMENT": "Adjustment"
+  },
+  "merge": {
+    "title": "Merge patient records",
+    "description": "Search for a duplicate — all of its records will be moved into {name}.",
+    "searchPlaceholder": "Search by name, phone or MRN...",
+    "selected": "Selected",
+    "warning": "This action cannot be undone!",
+    "summary": "All visits, invoices and documents of {duplicate} will be moved into {primary}, then the duplicate will be archived.",
+    "confirm": "Merge",
+    "merged": "Patients merged"
+  }
+}

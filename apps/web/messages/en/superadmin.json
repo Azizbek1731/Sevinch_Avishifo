@@ -1,0 +1,135 @@
+{
+  "clinics": {
+    "title": "Clinics",
+    "description": "Manage all clinics on the platform",
+    "create": "Clinic",
+    "searchPlaceholder": "Search by clinic name...",
+    "allStatuses": "All statuses",
+    "noPlan": "No plan",
+    "created": "Clinic created",
+    "columns": {
+      "name": "Name",
+      "status": "Status",
+      "plan": "Plan",
+      "branches": "Branches",
+      "users": "Users",
+      "patients": "Patients",
+      "visits30d": "Visits (30 days)"
+    },
+    "empty": {
+      "title": "No clinics found",
+      "description": "Try adjusting your search criteria"
+    },
+    "createDialog": {
+      "title": "Create a new clinic",
+      "clinicSection": "Clinic details",
+      "ownerSection": "Owner account",
+      "name": "Name",
+      "legalName": "Legal name",
+      "phone": "Phone",
+      "email": "Email",
+      "ownerFullName": "Full name",
+      "ownerPhone": "Phone",
+      "ownerEmail": "Email",
+      "password": "Password"
+    }
+  },
+  "status": {
+    "ACTIVE": "Active",
+    "SUSPENDED": "Suspended",
+    "ARCHIVED": "Archived"
+  },
+  "subscriptionStatus": {
+    "TRIAL": "Trial",
+    "ACTIVE": "Active",
+    "PAST_DUE": "Past due",
+    "CANCELLED": "Cancelled"
+  },
+  "detail": {
+    "info": "Details",
+    "createdAt": "Created at",
+    "backToList": "Back to list",
+    "notFound": "Clinic not found",
+    "statusUpdated": "Clinic status updated",
+    "impersonationMode": "Impersonation mode",
+    "plan": {
+      "title": "Subscription plan",
+      "current": "Current plan",
+      "select": "Select a plan",
+      "assign": "Assign",
+      "assigned": "Plan assigned"
+    },
+    "flags": {
+      "title": "Feature flags",
+      "updated": "Feature flag updated",
+      "lab": "Laboratory",
+      "portal": "Patient portal",
+      "telegram": "Telegram bot",
+      "analytics": "Analytics"
+    },
+    "actions": {
+      "suspend": "Suspend",
+      "activate": "Activate",
+      "impersonate": "Log in to clinic"
+    },
+    "suspendConfirm": {
+      "title": "Suspend this clinic?",
+      "description": "{name} will be suspended and its staff will not be able to sign in."
+    },
+    "activateConfirm": {
+      "title": "Activate this clinic?",
+      "description": "{name} will be re-activated and its staff will be able to sign in."
+    }
+  },
+  "plans": {
+    "title": "Plans",
+    "description": "Subscription plans and limits",
+    "create": "Plan",
+    "edit": "Edit",
+    "perMonth": "/ mo",
+    "maxBranches": "Max branches",
+    "maxUsers": "Max users",
+    "inactive": "Inactive",
+    "saved": "Plan saved",
+    "empty": {
+      "title": "No plans yet",
+      "description": "Create your first plan"
+    },
+    "dialog": {
+      "createTitle": "New plan",
+      "editTitle": "Edit plan",
+      "code": "Code",
+      "name": "Name",
+      "price": "Monthly price (UZS)",
+      "maxBranches": "Max branches",
+      "maxUsers": "Max users",
+      "modules": "Modules"
+    }
+  },
+  "analytics": {
+    "title": "Platform analytics",
+    "description": "Aggregate metrics across all clinics",
+    "activeClinics": "Active clinics",
+    "totalUsers": "Total users",
+    "totalPatients": "Total patients",
+    "payments30d": "Payments (30 days)",
+    "visitsChartTitle": "Visits — last 30 days",
+    "visitsSeries": "Visits",
+    "empty": {
+      "title": "No data",
+      "description": "No visits recorded yet"
+    }
+  },
+  "form": {
+    "required": "This field is required",
+    "invalidPhone": "Invalid phone number",
+    "invalidEmail": "Invalid email",
+    "passwordMin": "Password must be at least 8 characters",
+    "invalidPrice": "Invalid price",
+    "invalidNumber": "Invalid value"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "save": "Save"
+  }
+}

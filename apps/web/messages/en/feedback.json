@@ -1,0 +1,36 @@
+{
+  "title": "Feedback",
+  "description": "Patient ratings and comments",
+  "stats": {
+    "avgTitle": "Average rating",
+    "total": "{count} ratings in total",
+    "distributionTitle": "Rating distribution",
+    "perDoctorTitle": "By doctor",
+    "noData": "No data",
+    "columns": {
+      "doctor": "Doctor",
+      "avg": "Average",
+      "count": "Count"
+    }
+  },
+  "filters": {
+    "doctor": "Doctor",
+    "allDoctors": "All doctors",
+    "minRating": "Minimum rating",
+    "anyRating": "Any rating",
+    "stars": "{count} stars and up"
+  },
+  "list": {
+    "anonymous": "Unknown",
+    "doctorLabel": "Doctor",
+    "publicLabel": "Show on portal",
+    "visibilityUpdated": "Visibility updated",
+    "page": "Page {page} / {pageCount} · {total}",
+    "prev": "Prev",
+    "next": "Next",
+    "empty": {
+      "title": "No feedback yet",
+      "description": "No ratings match the selected filters"
+    }
+  }
+}

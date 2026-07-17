@@ -1,0 +1,184 @@
+{
+  "title": "Xodimlar",
+  "subtitle": "Xodimlar ro'yxati, ish jadvallari, KPI va kompensatsiya",
+  "tabs": {
+    "directory": "Xodimlar",
+    "payroll": "Oylik hisob-kitobi"
+  },
+  "filters": {
+    "searchPlaceholder": "Ism bo'yicha qidirish...",
+    "role": "Lavozim",
+    "allRoles": "Barcha lavozimlar",
+    "branch": "Filial",
+    "allBranches": "Barcha filiallar"
+  },
+  "table": {
+    "fullName": "F.I.Sh.",
+    "role": "Lavozim",
+    "specialty": "Mutaxassislik",
+    "branches": "Filiallar",
+    "phone": "Telefon",
+    "status": "Holat"
+  },
+  "empty": {
+    "title": "Xodimlar topilmadi",
+    "description": "Xodimlar sozlamalar bo'limida qo'shiladi",
+    "noResults": "Hech narsa topilmadi"
+  },
+  "roles": {
+    "SUPER_ADMIN": "Super admin",
+    "CLINIC_OWNER": "Klinika egasi",
+    "CLINIC_ADMIN": "Administrator",
+    "DOCTOR": "Shifokor",
+    "NURSE": "Hamshira",
+    "RECEPTIONIST": "Qabulxona xodimi",
+    "CASHIER": "Kassir",
+    "LAB_TECH": "Laborant",
+    "ACCOUNTANT": "Buxgalter",
+    "PATIENT": "Bemor"
+  },
+  "statuses": {
+    "ACTIVE": "Faol",
+    "SUSPENDED": "To'xtatilgan",
+    "ARCHIVED": "Arxivlangan"
+  },
+  "detail": {
+    "back": "Xodimlarga qaytish",
+    "notFound": "Xodim topilmadi",
+    "tabs": {
+      "profile": "Profil",
+      "schedule": "Jadval",
+      "kpi": "KPI",
+      "compensation": "Kompensatsiya"
+    }
+  },
+  "profile": {
+    "title": "Xodim profili",
+    "specialty": "Mutaxassislik",
+    "licenseNo": "Litsenziya raqami",
+    "hireDate": "Ishga qabul sanasi",
+    "bio": "Qisqacha ma'lumot",
+    "slotMinutes": "Qabul davomiyligi (daqiqa)",
+    "slotMinutesHint": "Xizmat davomiyligi o'rniga qo'llanadigan standart slot uzunligi",
+    "saved": "Profil saqlandi"
+  },
+  "schedule": {
+    "title": "Haftalik ish jadvali",
+    "branch": "Filial",
+    "save": "Saqlash",
+    "saved": "Jadval saqlandi",
+    "dayOff": "Dam olish kuni",
+    "start": "Boshlanishi",
+    "end": "Tugashi",
+    "slot": "Slot (daqiqa)",
+    "minutesShort": "daq",
+    "addWindow": "Vaqt oralig'i qo'shish",
+    "removeWindow": "Oraliqni o'chirish",
+    "weekdays": {
+      "1": "Dushanba",
+      "2": "Seshanba",
+      "3": "Chorshanba",
+      "4": "Payshanba",
+      "5": "Juma",
+      "6": "Shanba",
+      "7": "Yakshanba"
+    },
+    "exceptions": {
+      "title": "Istisnolar (ta'til, kasallik)",
+      "add": "Istisno qo'shish",
+      "addTitle": "Yangi istisno",
+      "type": "Turi",
+      "dateFrom": "Boshlanish sanasi",
+      "dateTo": "Tugash sanasi",
+      "startTime": "Boshlanish vaqti",
+      "endTime": "Tugash vaqti",
+      "note": "Izoh",
+      "empty": "Istisnolar yo'q",
+      "added": "Istisno qo'shildi",
+      "deleted": "Istisno o'chirildi",
+      "deleteTitle": "Istisnoni o'chirish",
+      "deleteDescription": "Bu istisno o'chiriladi va slotlar yana ochiladi. Davom etilsinmi?",
+      "types": {
+        "VACATION": "Ta'til",
+        "SICK_LEAVE": "Kasallik varaqasi",
+        "DAY_OFF": "Dam olish kuni",
+        "CUSTOM_HOURS": "Maxsus ish vaqti"
+      }
+    }
+  },
+  "kpi": {
+    "from": "Boshlanish sanasi",
+    "to": "Tugash sanasi",
+    "patientsSeen": "Bemorlar",
+    "visits": "Tashriflar",
+    "revenue": "Tushum",
+    "avgVisitMin": "O'rtacha qabul davomiyligi",
+    "minutesUnit": "daqiqa",
+    "noShowRate": "Kelmaganlik (no-show) ulushi",
+    "returningRate": "Qaytgan bemorlar ulushi",
+    "avgRating": "O'rtacha baho"
+  },
+  "compensation": {
+    "type": "Turi",
+    "value": "Qiymati",
+    "valuePercent": "Foiz (0–100)",
+    "valueAmount": "Summa (so'm)",
+    "scope": "Qamrov",
+    "scopeAll": "Barcha xizmatlar",
+    "scopeService": "Xizmat",
+    "scopeCategory": "Kategoriya",
+    "service": "Xizmat",
+    "category": "Kategoriya",
+    "selectService": "Xizmatni tanlang",
+    "selectCategory": "Kategoriyani tanlang",
+    "effectiveFrom": "Amal qilish boshlanishi",
+    "effectiveTo": "Amal qilish tugashi",
+    "open": "Ochiq",
+    "add": "Qoida qo'shish",
+    "addTitle": "Yangi kompensatsiya qoidasi",
+    "created": "Qoida qo'shildi",
+    "deleted": "Qoida o'chirildi",
+    "deleteTitle": "Qoidani o'chirish",
+    "deleteDescription": "Bu kompensatsiya qoidasi o'chiriladi. Davom etilsinmi?",
+    "empty": {
+      "title": "Kompensatsiya qoidalari yo'q",
+      "description": "Shifokor uchun oylik, foiz yoki xizmat haqini sozlang"
+    },
+    "types": {
+      "FIXED_SALARY": "Qat'iy oylik",
+      "REVENUE_PERCENT": "Tushumdan foiz",
+      "PER_SERVICE_FEE": "Har bir xizmat uchun haq"
+    }
+  },
+  "payroll": {
+    "period": "Davr",
+    "generate": "Hisoblash",
+    "generated": "{count} ta shifokor uchun hisoblandi",
+    "export": "XLSX yuklab olish",
+    "doctor": "Shifokor",
+    "base": "Asosiy",
+    "bonus": "Bonus",
+    "adjustment": "Tuzatish",
+    "total": "Jami",
+    "note": "Izoh",
+    "adjust": "Tuzatish kiritish",
+    "adjustTitle": "Tuzatish kiritish",
+    "adjustSaved": "Tuzatish saqlandi",
+    "adjustHint": "Ushlab qolish uchun manfiy summa kiriting, masalan -150000",
+    "noBreakdown": "Hisob-kitob tafsilotlari yo'q",
+    "empty": {
+      "title": "Bu davr uchun hisob-kitob yo'q",
+      "description": "Davrni tanlab «Hisoblash» tugmasini bosing"
+    }
+  },
+  "actions": {
+    "cancel": "Bekor qilish",
+    "save": "Saqlash",
+    "delete": "O'chirish"
+  },
+  "form": {
+    "required": "Majburiy maydon",
+    "invalidAmount": "Summa noto'g'ri kiritildi",
+    "invalidNumber": "Qiymat noto'g'ri (5–120 daqiqa)"
+  }
+}

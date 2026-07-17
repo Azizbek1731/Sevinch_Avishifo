@@ -1,0 +1,111 @@
+{
+  "title": "Invoices",
+  "subtitle": "Invoices, payments and refunds",
+  "newInvoice": "New invoice",
+  "cols": {
+    "number": "Number",
+    "patient": "Patient",
+    "total": "Total",
+    "paid": "Paid",
+    "due": "Due",
+    "status": "Status",
+    "date": "Date"
+  },
+  "statuses": {
+    "DRAFT": "Draft",
+    "ISSUED": "Issued",
+    "PARTIALLY_PAID": "Partially paid",
+    "PAID": "Paid",
+    "CANCELLED": "Cancelled",
+    "REFUNDED": "Refunded"
+  },
+  "methods": {
+    "CASH": "Cash",
+    "CARD": "Card",
+    "PAYME": "Payme",
+    "CLICK": "Click",
+    "UZUM": "Uzum",
+    "BALANCE": "From balance"
+  },
+  "filters": {
+    "status": "Status",
+    "allStatuses": "All statuses",
+    "from": "From date",
+    "to": "To date",
+    "patient": "Patient"
+  },
+  "empty": {
+    "title": "No invoices found"
+  },
+  "form": {
+    "title": "New invoice",
+    "patient": "Patient",
+    "patientRequired": "Select a patient",
+    "lines": "Services",
+    "service": "Service",
+    "qty": "Qty",
+    "unitPrice": "Price",
+    "discount": "Discount",
+    "lineTotal": "Amount",
+    "addLine": "Add line",
+    "linesInvalid": "Select a service for each line and check the amounts",
+    "totalPreview": "Grand total",
+    "create": "Create",
+    "creating": "Creating...",
+    "created": "Invoice {number} created",
+    "invalidAmount": "Invalid amount"
+  },
+  "pay": {
+    "title": "Payment — {number}",
+    "due": "Due",
+    "amount": "Amount",
+    "method": "Payment method",
+    "submit": "Accept payment",
+    "paying": "Submitting...",
+    "success": "Payment accepted",
+    "viewReceipt": "Open receipt"
+  },
+  "refundDlg": {
+    "title": "Refund — {number}",
+    "paid": "Paid",
+    "amount": "Amount",
+    "method": "Method",
+    "reason": "Reason",
+    "reasonRequired": "Enter a reason (at least 3 characters)",
+    "submit": "Refund",
+    "success": "Refund completed"
+  },
+  "detail": {
+    "title": "Invoice {number}",
+    "issue": "Issue",
+    "pay": "Payment",
+    "refund": "Refund",
+    "cancel": "Cancel",
+    "receipt": "Receipt",
+    "issued": "Invoice issued",
+    "cancelled": "Invoice cancelled",
+    "linesTitle": "Services",
+    "totalsTitle": "Summary",
+    "subtotal": "Subtotal",
+    "paymentsTitle": "Payment history",
+    "noPayments": "No payments",
+    "refundsTitle": "Refunds",
+    "noRefunds": "No refunds",
+    "cancelConfirmTitle": "Cancel this invoice?",
+    "cancelConfirmDesc": "Invoice {number} will be cancelled. This action cannot be undone."
+  },
+  "receipt": {
+    "print": "Print",
+    "taxId": "Tax ID",
+    "receiptNo": "Receipt #",
+    "date": "Date",
+    "patient": "Patient",
+    "cashier": "Cashier",
+    "subtotal": "Subtotal",
+    "discount": "Discount",
+    "total": "TOTAL",
+    "paid": "Paid",
+    "due": "Due",
+    "thanks": "Thank you!"
+  }
+}

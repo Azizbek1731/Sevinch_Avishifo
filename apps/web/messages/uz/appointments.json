@@ -1,0 +1,86 @@
+{
+  "title": "Kalendar",
+  "subtitle": "Qabullar jadvali va yozuvlar",
+  "views": {
+    "day": "Kun",
+    "week": "Hafta"
+  },
+  "today": "Bugun",
+  "prevPeriod": "Oldingi",
+  "nextPeriod": "Keyingi",
+  "doctor": "Shifokor",
+  "allDoctors": "Barcha shifokorlar",
+  "newAppointment": "Yangi qabul",
+  "noDoctors": "Shifokorlar topilmadi",
+  "noDoctorsDesc": "Avval Xodimlar bo'limida shifokor qo'shing",
+  "noAppointments": "Qabullar yo'q",
+  "status": {
+    "SCHEDULED": "Rejalashtirilgan",
+    "CONFIRMED": "Tasdiqlangan",
+    "CHECKED_IN": "Keldi",
+    "IN_QUEUE": "Navbatda",
+    "IN_PROGRESS": "Qabulda",
+    "COMPLETED": "Yakunlangan",
+    "NO_SHOW": "Kelmadi",
+    "CANCELLED": "Bekor qilingan"
+  },
+  "detail": {
+    "title": "Qabul ma'lumotlari",
+    "patient": "Bemor",
+    "doctor": "Shifokor",
+    "time": "Vaqt",
+    "services": "Xizmatlar",
+    "note": "Izoh",
+    "cancelledReason": "Bekor qilish sababi",
+    "confirm": "Tasdiqlash",
+    "checkIn": "Keldi",
+    "noShow": "Kelmadi",
+    "cancel": "Bekor qilish",
+    "reschedule": "Ko'chirish",
+    "recurring": "Kurs (takroriy)"
+  },
+  "form": {
+    "createTitle": "Yangi qabul",
+    "editTitle": "Qabulni ko'chirish",
+    "patient": "Bemor",
+    "selectPatient": "Bemorni tanlang",
+    "searchPatient": "Ism, telefon yoki MRN bo'yicha qidiring...",
+    "patientNotFound": "Bemor topilmadi",
+    "doctor": "Shifokor",
+    "selectDoctor": "Shifokorni tanlang",
+    "services": "Xizmatlar",
+    "selectServices": "Xizmatlarni tanlang",
+    "servicesSelected": "{count} ta xizmat tanlandi",
+    "minutes": "{count} daq",
+    "date": "Sana",
+    "time": "Vaqt",
+    "slotsHint": "Avval shifokor va sanani tanlang",
+    "loadingSlots": "Bo'sh vaqtlar yuklanmoqda...",
+    "noSlots": "Bu kunga bo'sh vaqt yo'q",
+    "note": "Izoh",
+    "notePlaceholder": "Qo'shimcha izoh...",
+    "save": "Saqlash",
+    "cancel": "Bekor qilish",
+    "required": "Majburiy maydon"
+  },
+  "reason": {
+    "cancelTitle": "Qabulni bekor qilish",
+    "noShowTitle": "Bemor kelmadi",
+    "label": "Sabab",
+    "placeholder": "Sababni kiriting...",
+    "submit": "Saqlash"
+  },
+  "recurring": {
+    "title": "Kurs (takroriy qabullar)",
+    "description": "Shu vaqtda takrorlanadigan seanslar kursi yaratiladi",
+    "sessionsCount": "Seanslar soni",
+    "intervalDays": "Interval (kun)",
+    "submit": "Kurs yaratish",
+    "result": "{created} ta qabul yaratildi, {skipped} ta o'tkazib yuborildi"
+  },
+  "toasts": {
+    "created": "Qabul yaratildi",
+    "updated": "Qabul saqlandi",
+    "statusChanged": "Holat o'zgartirildi"
+  }
+}

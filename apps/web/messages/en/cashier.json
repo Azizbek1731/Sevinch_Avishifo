@@ -1,0 +1,65 @@
+{
+  "title": "Cash desk",
+  "subtitle": "Payments, shift and debtors",
+  "shift": {
+    "openBadge": "Shift open",
+    "openedAt": "Opened at",
+    "openingCash": "Opening cash",
+    "cashIn": "Cash in",
+    "cashOut": "Cash out",
+    "expected": "Expected cash",
+    "closedTitle": "Shift closed",
+    "closedDesc": "Open a shift to accept cash payments",
+    "open": "Open shift",
+    "openTitle": "Open shift",
+    "openSuccess": "Shift opened",
+    "close": "Close shift",
+    "closeTitle": "Close shift",
+    "actualCash": "Actual cash in drawer",
+    "note": "Note",
+    "closeSuccess": "Shift closed"
+  },
+  "report": {
+    "title": "Shift report (X/Z)",
+    "closedAt": "Closed at",
+    "openingCash": "Opening cash",
+    "cashIn": "Cash in",
+    "cashOut": "Cash out",
+    "expectedCash": "Expected cash",
+    "actualCash": "Actual cash",
+    "difference": "Difference",
+    "byMethod": "By payment method",
+    "method": "Method",
+    "count": "Count",
+    "amount": "Amount",
+    "print": "Print",
+    "done": "Close"
+  },
+  "tabs": {
+    "pending": "Awaiting payment",
+    "debtors": "Debtors",
+    "deposit": "Deposit"
+  },
+  "pending": {
+    "empty": "No invoices awaiting payment",
+    "emptyDesc": "Issued invoices will appear here",
+    "pay": "Pay"
+  },
+  "debtors": {
+    "patient": "Patient",
+    "phone": "Phone",
+    "oldestInvoice": "Oldest invoice date",
+    "debt": "Debt",
+    "totalDebt": "Total debt",
+    "empty": "No debtors"
+  },
+  "deposit": {
+    "title": "Deposit to patient balance",
+    "patient": "Patient",
+    "currentBalance": "Current balance",
+    "amount": "Amount",
+    "note": "Note",
+    "submit": "Add deposit",
+    "success": "Deposit accepted. New balance: {balance}"
+  }
+}

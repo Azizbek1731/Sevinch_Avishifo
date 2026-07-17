@@ -1,0 +1,144 @@
+{
+  "title": "Reports",
+  "description": "Analytical reports on clinic performance",
+  "noAccess": "You don't have access to reports",
+  "filters": {
+    "today": "Today",
+    "week": "Week",
+    "month": "Month",
+    "custom": "Pick range",
+    "groupBy": "Group by",
+    "groupByOptions": {
+      "day": "By day",
+      "week": "By week",
+      "month": "By month"
+    }
+  },
+  "export": {
+    "xlsx": "XLSX",
+    "success": "File downloaded"
+  },
+  "tabs": {
+    "revenue": "Revenue",
+    "flow": "Patient flow",
+    "doctors": "Doctors",
+    "services": "Services",
+    "queue": "Queue",
+    "lab": "Laboratory",
+    "shifts": "Shifts"
+  },
+  "empty": {
+    "title": "No data",
+    "description": "No data found for the selected period"
+  },
+  "units": {
+    "minutes": "{value} min",
+    "hours": "{value} h"
+  },
+  "revenue": {
+    "chartTitle": "Revenue dynamics",
+    "series": "Revenue",
+    "total": "Total",
+    "dimensions": {
+      "time": "Time",
+      "category": "Category",
+      "doctor": "Doctor",
+      "method": "Payment method"
+    }
+  },
+  "methods": {
+    "CASH": "Cash",
+    "CARD": "Card",
+    "PAYME": "Payme",
+    "CLICK": "Click",
+    "UZUM": "Uzum",
+    "BALANCE": "From balance"
+  },
+  "flow": {
+    "chartTitle": "New vs returning patients",
+    "new": "New",
+    "returning": "Returning",
+    "peakHours": "Peak hours",
+    "sources": "Patient sources",
+    "visitsAt": "{count} visits"
+  },
+  "sources": {
+    "friend_referral": "Friend referral",
+    "doctor_referral": "Doctor referral",
+    "instagram": "Instagram",
+    "telegram": "Telegram",
+    "facebook": "Facebook",
+    "google": "Google",
+    "street_banner": "Street banner",
+    "returning": "Returning patient",
+    "other": "Other"
+  },
+  "dow": {
+    "d0": "Sun",
+    "d1": "Mon",
+    "d2": "Tue",
+    "d3": "Wed",
+    "d4": "Thu",
+    "d5": "Fri",
+    "d6": "Sat"
+  },
+  "doctors": {
+    "columns": {
+      "name": "Doctor",
+      "patients": "Patients",
+      "visits": "Visits",
+      "revenue": "Revenue",
+      "avgDuration": "Avg visit duration",
+      "noShow": "No-show %",
+      "returning": "Returning %"
+    }
+  },
+  "services": {
+    "chartTitle": "Top services by revenue",
+    "series": "Revenue",
+    "columns": {
+      "code": "Code",
+      "name": "Service",
+      "count": "Count",
+      "revenue": "Revenue"
+    }
+  },
+  "queue": {
+    "chartTitle": "Average wait and service time",
+    "wait": "Wait",
+    "service": "Service",
+    "perDoctor": "By doctor",
+    "columns": {
+      "doctor": "Doctor",
+      "tickets": "Tickets",
+      "avgWait": "Avg wait",
+      "avgService": "Avg service"
+    }
+  },
+  "lab": {
+    "chartTitle": "Lab turnaround time",
+    "series": "Average time",
+    "perTest": "By test",
+    "columns": {
+      "test": "Test",
+      "count": "Count",
+      "avgHours": "Avg time"
+    }
+  },
+  "shifts": {
+    "columns": {
+      "cashier": "Cashier",
+      "status": "Status",
+      "openedAt": "Opened",
+      "closedAt": "Closed",
+      "opening": "Opening cash",
+      "expected": "Expected",
+      "actual": "Actual",
+      "difference": "Difference"
+    },
+    "status": {
+      "OPEN": "Open",
+      "CLOSED": "Closed"
+    }
+  }
+}

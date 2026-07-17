@@ -1,0 +1,144 @@
+{
+  "title": "Отчёты",
+  "description": "Аналитические отчёты по работе клиники",
+  "noAccess": "Нет доступа к отчётам",
+  "filters": {
+    "today": "Сегодня",
+    "week": "Неделя",
+    "month": "Месяц",
+    "custom": "Выбрать период",
+    "groupBy": "Группировка",
+    "groupByOptions": {
+      "day": "По дням",
+      "week": "По неделям",
+      "month": "По месяцам"
+    }
+  },
+  "export": {
+    "xlsx": "XLSX",
+    "success": "Файл скачан"
+  },
+  "tabs": {
+    "revenue": "Выручка",
+    "flow": "Поток пациентов",
+    "doctors": "Врачи",
+    "services": "Услуги",
+    "queue": "Очередь",
+    "lab": "Лаборатория",
+    "shifts": "Смены"
+  },
+  "empty": {
+    "title": "Нет данных",
+    "description": "За выбранный период данные не найдены"
+  },
+  "units": {
+    "minutes": "{value} мин",
+    "hours": "{value} ч"
+  },
+  "revenue": {
+    "chartTitle": "Динамика выручки",
+    "series": "Выручка",
+    "total": "Итого",
+    "dimensions": {
+      "time": "Время",
+      "category": "Категория",
+      "doctor": "Врач",
+      "method": "Способ оплаты"
+    }
+  },
+  "methods": {
+    "CASH": "Наличные",
+    "CARD": "Карта",
+    "PAYME": "Payme",
+    "CLICK": "Click",
+    "UZUM": "Uzum",
+    "BALANCE": "С баланса"
+  },
+  "flow": {
+    "chartTitle": "Новые и повторные пациенты",
+    "new": "Новые",
+    "returning": "Повторные",
+    "peakHours": "Пиковые часы",
+    "sources": "Источники пациентов",
+    "visitsAt": "{count} визитов"
+  },
+  "sources": {
+    "friend_referral": "Рекомендация друга",
+    "doctor_referral": "Направление врача",
+    "instagram": "Instagram",
+    "telegram": "Telegram",
+    "facebook": "Facebook",
+    "google": "Google",
+    "street_banner": "Уличный баннер",
+    "returning": "Повторный пациент",
+    "other": "Другое"
+  },
+  "dow": {
+    "d0": "Вс",
+    "d1": "Пн",
+    "d2": "Вт",
+    "d3": "Ср",
+    "d4": "Чт",
+    "d5": "Пт",
+    "d6": "Сб"
+  },
+  "doctors": {
+    "columns": {
+      "name": "Врач",
+      "patients": "Пациенты",
+      "visits": "Визиты",
+      "revenue": "Выручка",
+      "avgDuration": "Средняя длительность",
+      "noShow": "Неявки %",
+      "returning": "Повторные %"
+    }
+  },
+  "services": {
+    "chartTitle": "Топ услуг по выручке",
+    "series": "Выручка",
+    "columns": {
+      "code": "Код",
+      "name": "Услуга",
+      "count": "Кол-во",
+      "revenue": "Выручка"
+    }
+  },
+  "queue": {
+    "chartTitle": "Среднее время ожидания и приёма",
+    "wait": "Ожидание",
+    "service": "Приём",
+    "perDoctor": "В разрезе врачей",
+    "columns": {
+      "doctor": "Врач",
+      "tickets": "Талоны",
+      "avgWait": "Ср. ожидание",
+      "avgService": "Ср. приём"
+    }
+  },
+  "lab": {
+    "chartTitle": "Время выполнения анализов",
+    "series": "Среднее время",
+    "perTest": "В разрезе анализов",
+    "columns": {
+      "test": "Анализ",
+      "count": "Кол-во",
+      "avgHours": "Ср. время"
+    }
+  },
+  "shifts": {
+    "columns": {
+      "cashier": "Кассир",
+      "status": "Статус",
+      "openedAt": "Открыта",
+      "closedAt": "Закрыта",
+      "opening": "Начальная касса",
+      "expected": "Ожидаемая",
+      "actual": "Фактическая",
+      "difference": "Разница"
+    },
+    "status": {
+      "OPEN": "Открыта",
+      "CLOSED": "Закрыта"
+    }
+  }
+}

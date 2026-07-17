@@ -1,0 +1,36 @@
+{
+  "title": "Fikr-mulohazalar",
+  "description": "Bemorlarning baholari va sharhlari",
+  "stats": {
+    "avgTitle": "O'rtacha baho",
+    "total": "Jami {count} ta baho",
+    "distributionTitle": "Baholar taqsimoti",
+    "perDoctorTitle": "Shifokorlar bo'yicha",
+    "noData": "Ma'lumot yo'q",
+    "columns": {
+      "doctor": "Shifokor",
+      "avg": "O'rtacha",
+      "count": "Soni"
+    }
+  },
+  "filters": {
+    "doctor": "Shifokor",
+    "allDoctors": "Barcha shifokorlar",
+    "minRating": "Minimal baho",
+    "anyRating": "Barcha baholar",
+    "stars": "{count} yulduz va undan yuqori"
+  },
+  "list": {
+    "anonymous": "Noma'lum",
+    "doctorLabel": "Shifokor",
+    "publicLabel": "Portalda ko'rsatish",
+    "visibilityUpdated": "Ko'rinish sozlamasi yangilandi",
+    "page": "Sahifa {page} / {pageCount} · {total}",
+    "prev": "Oldingi",
+    "next": "Keyingi",
+    "empty": {
+      "title": "Fikr-mulohazalar yo'q",
+      "description": "Tanlangan filtrlar bo'yicha baholar topilmadi"
+    }
+  }
+}

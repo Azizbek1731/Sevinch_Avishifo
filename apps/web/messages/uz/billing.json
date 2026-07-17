@@ -1,0 +1,111 @@
+{
+  "title": "Hisob-fakturalar",
+  "subtitle": "Hisoblar, to'lovlar va qaytarishlar",
+  "newInvoice": "Yangi hisob",
+  "cols": {
+    "number": "Raqam",
+    "patient": "Bemor",
+    "total": "Jami",
+    "paid": "To'langan",
+    "due": "Qarz",
+    "status": "Holat",
+    "date": "Sana"
+  },
+  "statuses": {
+    "DRAFT": "Qoralama",
+    "ISSUED": "Taqdim etilgan",
+    "PARTIALLY_PAID": "Qisman to'langan",
+    "PAID": "To'langan",
+    "CANCELLED": "Bekor qilingan",
+    "REFUNDED": "Qaytarilgan"
+  },
+  "methods": {
+    "CASH": "Naqd",
+    "CARD": "Karta",
+    "PAYME": "Payme",
+    "CLICK": "Click",
+    "UZUM": "Uzum",
+    "BALANCE": "Balansdan"
+  },
+  "filters": {
+    "status": "Holat",
+    "allStatuses": "Barcha holatlar",
+    "from": "Sanadan",
+    "to": "Sanagacha",
+    "patient": "Bemor"
+  },
+  "empty": {
+    "title": "Hisob-fakturalar topilmadi"
+  },
+  "form": {
+    "title": "Yangi hisob-faktura",
+    "patient": "Bemor",
+    "patientRequired": "Bemorni tanlang",
+    "lines": "Xizmatlar",
+    "service": "Xizmat",
+    "qty": "Soni",
+    "unitPrice": "Narxi",
+    "discount": "Chegirma",
+    "lineTotal": "Summa",
+    "addLine": "Qator qo'shish",
+    "linesInvalid": "Har bir qator uchun xizmat tanlang va summalarni tekshiring",
+    "totalPreview": "Jami summa",
+    "create": "Yaratish",
+    "creating": "Yaratilmoqda...",
+    "created": "Hisob {number} yaratildi",
+    "invalidAmount": "Summa noto'g'ri kiritilgan"
+  },
+  "pay": {
+    "title": "To'lov — {number}",
+    "due": "Qarz",
+    "amount": "Summa",
+    "method": "To'lov usuli",
+    "submit": "To'lovni qabul qilish",
+    "paying": "Yuborilmoqda...",
+    "success": "To'lov qabul qilindi",
+    "viewReceipt": "Chekni ochish"
+  },
+  "refundDlg": {
+    "title": "Qaytarish — {number}",
+    "paid": "To'langan",
+    "amount": "Summa",
+    "method": "Usul",
+    "reason": "Sabab",
+    "reasonRequired": "Sababni kiriting (kamida 3 belgi)",
+    "submit": "Qaytarish",
+    "success": "Pul qaytarildi"
+  },
+  "detail": {
+    "title": "Hisob {number}",
+    "issue": "Taqdim etish",
+    "pay": "To'lov",
+    "refund": "Qaytarish",
+    "cancel": "Bekor qilish",
+    "receipt": "Chek",
+    "issued": "Hisob taqdim etildi",
+    "cancelled": "Hisob bekor qilindi",
+    "linesTitle": "Xizmatlar",
+    "totalsTitle": "Hisob-kitob",
+    "subtotal": "Oraliq jami",
+    "paymentsTitle": "To'lovlar tarixi",
+    "noPayments": "To'lovlar yo'q",
+    "refundsTitle": "Qaytarishlar",
+    "noRefunds": "Qaytarishlar yo'q",
+    "cancelConfirmTitle": "Hisobni bekor qilasizmi?",
+    "cancelConfirmDesc": "{number} hisob-fakturasi bekor qilinadi. Bu amalni ortga qaytarib bo'lmaydi."
+  },
+  "receipt": {
+    "print": "Chop etish",
+    "taxId": "STIR",
+    "receiptNo": "Chek №",
+    "date": "Sana",
+    "patient": "Bemor",
+    "cashier": "Kassir",
+    "subtotal": "Oraliq jami",
+    "discount": "Chegirma",
+    "total": "JAMI",
+    "paid": "To'langan",
+    "due": "Qarz",
+    "thanks": "Xaridingiz uchun rahmat!"
+  }
+}

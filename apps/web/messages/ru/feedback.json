@@ -1,0 +1,36 @@
+{
+  "title": "Отзывы",
+  "description": "Оценки и комментарии пациентов",
+  "stats": {
+    "avgTitle": "Средняя оценка",
+    "total": "Всего {count} оценок",
+    "distributionTitle": "Распределение оценок",
+    "perDoctorTitle": "По врачам",
+    "noData": "Нет данных",
+    "columns": {
+      "doctor": "Врач",
+      "avg": "Средняя",
+      "count": "Кол-во"
+    }
+  },
+  "filters": {
+    "doctor": "Врач",
+    "allDoctors": "Все врачи",
+    "minRating": "Минимальная оценка",
+    "anyRating": "Все оценки",
+    "stars": "{count} звёзд и выше"
+  },
+  "list": {
+    "anonymous": "Неизвестно",
+    "doctorLabel": "Врач",
+    "publicLabel": "Показывать на портале",
+    "visibilityUpdated": "Настройка видимости обновлена",
+    "page": "Страница {page} / {pageCount} · {total}",
+    "prev": "Назад",
+    "next": "Вперёд",
+    "empty": {
+      "title": "Отзывов нет",
+      "description": "По выбранным фильтрам оценки не найдены"
+    }
+  }
+}

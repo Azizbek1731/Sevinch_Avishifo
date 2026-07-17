@@ -1,0 +1,65 @@
+{
+  "title": "Kassa",
+  "subtitle": "To'lovlar, smena va qarzdorlar",
+  "shift": {
+    "openBadge": "Smena ochiq",
+    "openedAt": "Ochilgan vaqt",
+    "openingCash": "Boshlang'ich naqd",
+    "cashIn": "Naqd kirim",
+    "cashOut": "Naqd chiqim",
+    "expected": "Kutilayotgan naqd",
+    "closedTitle": "Smena yopiq",
+    "closedDesc": "Naqd to'lovlarni qabul qilish uchun smenani oching",
+    "open": "Smena ochish",
+    "openTitle": "Smena ochish",
+    "openSuccess": "Smena ochildi",
+    "close": "Smenani yopish",
+    "closeTitle": "Smenani yopish",
+    "actualCash": "Kassadagi haqiqiy naqd",
+    "note": "Izoh",
+    "closeSuccess": "Smena yopildi"
+  },
+  "report": {
+    "title": "Smena hisoboti (X/Z)",
+    "closedAt": "Yopilgan vaqt",
+    "openingCash": "Boshlang'ich naqd",
+    "cashIn": "Naqd kirim",
+    "cashOut": "Naqd chiqim",
+    "expectedCash": "Kutilgan naqd",
+    "actualCash": "Haqiqiy naqd",
+    "difference": "Farq",
+    "byMethod": "To'lov usullari bo'yicha",
+    "method": "Usul",
+    "count": "Soni",
+    "amount": "Summa",
+    "print": "Chop etish",
+    "done": "Yopish"
+  },
+  "tabs": {
+    "pending": "To'lov kutilmoqda",
+    "debtors": "Qarzdorlar",
+    "deposit": "Depozit"
+  },
+  "pending": {
+    "empty": "To'lov kutayotgan hisoblar yo'q",
+    "emptyDesc": "Taqdim etilgan hisob-fakturalar shu yerda ko'rinadi",
+    "pay": "To'lov"
+  },
+  "debtors": {
+    "patient": "Bemor",
+    "phone": "Telefon",
+    "oldestInvoice": "Eng eski hisob sanasi",
+    "debt": "Qarz",
+    "totalDebt": "Umumiy qarz",
+    "empty": "Qarzdorlar yo'q"
+  },
+  "deposit": {
+    "title": "Bemor balansiga depozit",
+    "patient": "Bemor",
+    "currentBalance": "Joriy balans",
+    "amount": "Summa",
+    "note": "Izoh",
+    "submit": "Depozit qo'shish",
+    "success": "Depozit qabul qilindi. Yangi balans: {balance}"
+  }
+}

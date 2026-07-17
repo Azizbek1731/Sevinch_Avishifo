@@ -1,0 +1,66 @@
+{
+  "title": "Queue board",
+  "description": "Branch queues — live view",
+  "date": "Date",
+  "offline": "Connection lost — refreshing every 15 seconds",
+  "noBranch": "No branch selected",
+  "stats": {
+    "waiting": "Waiting",
+    "avgWait": "Avg. wait",
+    "inRoom": "In room",
+    "done": "Seen today"
+  },
+  "column": {
+    "waitingCount": "{count} waiting",
+    "lab": "Laboratory",
+    "custom": "Other queue",
+    "closed": "Closed"
+  },
+  "callNext": "Call next",
+  "room": "Room",
+  "roomNumber": "Room {number}",
+  "noRoom": "No room",
+  "call": "Call",
+  "status": {
+    "WAITING": "Waiting",
+    "CALLED": "Called",
+    "IN_ROOM": "In room",
+    "DONE": "Done",
+    "SKIPPED": "Skipped"
+  },
+  "priority": {
+    "NORMAL": "Normal",
+    "PRIORITY": "Priority",
+    "EMERGENCY": "Emergency"
+  },
+  "actions": {
+    "start": "Start visit",
+    "finish": "Finish",
+    "skip": "Skip",
+    "recall": "Recall",
+    "setPriority": "Priority",
+    "transfer": "Transfer to another doctor"
+  },
+  "confirmSkip": {
+    "title": "Skip this ticket?",
+    "description": "Ticket {number} will be skipped. It can be recalled later."
+  },
+  "toast": {
+    "called": "Ticket {number} called",
+    "started": "Visit started",
+    "finished": "Visit finished",
+    "skipped": "Ticket skipped",
+    "recalled": "Ticket recalled",
+    "priorityChanged": "Priority changed",
+    "transferred": "Ticket transferred to another doctor"
+  },
+  "empty": {
+    "title": "No queues",
+    "description": "No queues are open in this branch for the selected date.",
+    "noTickets": "No tickets"
+  },
+  "wait": {
+    "min": "{min} min",
+    "hourMin": "{h} h {min} min"
+  }
+}

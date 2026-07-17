@@ -1,0 +1,135 @@
+{
+  "clinics": {
+    "title": "Клиники",
+    "description": "Управление всеми клиниками платформы",
+    "create": "Клиника",
+    "searchPlaceholder": "Поиск по названию клиники...",
+    "allStatuses": "Все статусы",
+    "noPlan": "Без тарифа",
+    "created": "Клиника создана",
+    "columns": {
+      "name": "Название",
+      "status": "Статус",
+      "plan": "Тариф",
+      "branches": "Филиалы",
+      "users": "Пользователи",
+      "patients": "Пациенты",
+      "visits30d": "Визиты (30 дней)"
+    },
+    "empty": {
+      "title": "Клиники не найдены",
+      "description": "Попробуйте изменить условия поиска"
+    },
+    "createDialog": {
+      "title": "Создание новой клиники",
+      "clinicSection": "Данные клиники",
+      "ownerSection": "Аккаунт владельца",
+      "name": "Название",
+      "legalName": "Юридическое название",
+      "phone": "Телефон",
+      "email": "Email",
+      "ownerFullName": "Ф.И.О.",
+      "ownerPhone": "Телефон",
+      "ownerEmail": "Email",
+      "password": "Пароль"
+    }
+  },
+  "status": {
+    "ACTIVE": "Активна",
+    "SUSPENDED": "Приостановлена",
+    "ARCHIVED": "В архиве"
+  },
+  "subscriptionStatus": {
+    "TRIAL": "Пробный период",
+    "ACTIVE": "Активна",
+    "PAST_DUE": "Просрочена оплата",
+    "CANCELLED": "Отменена"
+  },
+  "detail": {
+    "info": "Информация",
+    "createdAt": "Дата создания",
+    "backToList": "К списку",
+    "notFound": "Клиника не найдена",
+    "statusUpdated": "Статус клиники обновлён",
+    "impersonationMode": "Режим имперсонации",
+    "plan": {
+      "title": "Тариф подписки",
+      "current": "Текущий тариф",
+      "select": "Выберите тариф",
+      "assign": "Назначить",
+      "assigned": "Тариф назначен"
+    },
+    "flags": {
+      "title": "Функциональные флаги",
+      "updated": "Флаг обновлён",
+      "lab": "Лаборатория",
+      "portal": "Портал пациента",
+      "telegram": "Telegram-бот",
+      "analytics": "Аналитика"
+    },
+    "actions": {
+      "suspend": "Приостановить",
+      "activate": "Активировать",
+      "impersonate": "Войти в клинику"
+    },
+    "suspendConfirm": {
+      "title": "Приостановить клинику?",
+      "description": "Клиника {name} будет приостановлена, её сотрудники не смогут войти в систему."
+    },
+    "activateConfirm": {
+      "title": "Активировать клинику?",
+      "description": "Клиника {name} будет снова активирована, сотрудники смогут войти в систему."
+    }
+  },
+  "plans": {
+    "title": "Тарифы",
+    "description": "Тарифы подписки и лимиты",
+    "create": "Тариф",
+    "edit": "Изменить",
+    "perMonth": "/ мес",
+    "maxBranches": "Макс. филиалов",
+    "maxUsers": "Макс. пользователей",
+    "inactive": "Неактивен",
+    "saved": "Тариф сохранён",
+    "empty": {
+      "title": "Тарифов нет",
+      "description": "Создайте первый тариф"
+    },
+    "dialog": {
+      "createTitle": "Новый тариф",
+      "editTitle": "Изменение тарифа",
+      "code": "Код",
+      "name": "Название",
+      "price": "Цена в месяц (сум)",
+      "maxBranches": "Макс. филиалов",
+      "maxUsers": "Макс. пользователей",
+      "modules": "Модули"
+    }
+  },
+  "analytics": {
+    "title": "Аналитика платформы",
+    "description": "Сводные показатели по всем клиникам",
+    "activeClinics": "Активные клиники",
+    "totalUsers": "Всего пользователей",
+    "totalPatients": "Всего пациентов",
+    "payments30d": "Платежи (30 дней)",
+    "visitsChartTitle": "Визиты — последние 30 дней",
+    "visitsSeries": "Визиты",
+    "empty": {
+      "title": "Нет данных",
+      "description": "Визиты пока не зарегистрированы"
+    }
+  },
+  "form": {
+    "required": "Обязательное поле",
+    "invalidPhone": "Неверный номер телефона",
+    "invalidEmail": "Неверный email",
+    "passwordMin": "Пароль должен содержать не менее 8 символов",
+    "invalidPrice": "Неверная цена",
+    "invalidNumber": "Неверное значение"
+  },
+  "actions": {
+    "cancel": "Отмена",
+    "save": "Сохранить"
+  }
+}

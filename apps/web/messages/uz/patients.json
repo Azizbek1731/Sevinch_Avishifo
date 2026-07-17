@@ -1,0 +1,237 @@
+{
+  "title": "Bemorlar",
+  "subtitle": "Bemorlar reyestri va kartotekasi",
+  "newPatient": "Yangi bemor",
+  "searchPlaceholder": "Ism, telefon yoki MRN bo'yicha qidirish...",
+  "filterTag": "Teg bo'yicha",
+  "allTags": "Barcha teglar",
+  "created": "Bemor yaratildi",
+  "updated": "Bemor ma'lumotlari saqlandi",
+  "deleted": "Bemor o'chirildi",
+  "table": {
+    "mrn": "MRN",
+    "fullName": "F.I.Sh.",
+    "phone": "Telefon",
+    "dob": "Tug'ilgan sana",
+    "tags": "Teglar",
+    "visits": "Tashriflar",
+    "balance": "Balans",
+    "createdAt": "Ro'yxatga olingan"
+  },
+  "empty": {
+    "title": "Hozircha bemorlar yo'q",
+    "description": "Birinchi bemorni ro'yxatga olish uchun \"Yangi bemor\" tugmasini bosing.",
+    "noResults": "Hech narsa topilmadi"
+  },
+  "card": {
+    "ageYears": "{age} yosh",
+    "debt": "Qarz",
+    "edit": "Tahrirlash",
+    "merge": "Birlashtirish",
+    "delete": "O'chirish",
+    "deleteTitle": "Bemorni o'chirishni tasdiqlaysizmi?",
+    "deleteDesc": "{name} kartasi arxivlanadi. Bu amalni ortga qaytarib bo'lmaydi.",
+    "notFound": "Bemor topilmadi",
+    "loadError": "Ma'lumotni yuklab bo'lmadi",
+    "backToList": "Bemorlar ro'yxatiga qaytish"
+  },
+  "tabs": {
+    "overview": "Umumiy",
+    "timeline": "Tarix",
+    "visits": "Tashriflar",
+    "documents": "Hujjatlar",
+    "invoices": "Hisoblar"
+  },
+  "form": {
+    "createTitle": "Yangi bemor",
+    "editTitle": "Bemorni tahrirlash",
+    "lastName": "Familiya",
+    "firstName": "Ism",
+    "middleName": "Otasining ismi",
+    "phone": "Telefon",
+    "phoneAlt": "Qo'shimcha telefon",
+    "dob": "Tug'ilgan sana",
+    "gender": "Jinsi",
+    "bloodGroup": "Qon guruhi",
+    "address": "Manzil",
+    "passportId": "Pasport / ID",
+    "allergies": "Allergiyalar",
+    "allergyName": "Allergiya nomi",
+    "add": "Qo'shish",
+    "remove": "Olib tashlash",
+    "chronicConditions": "Surunkali kasalliklar",
+    "conditionPlaceholder": "Kasallik nomi",
+    "notes": "Izohlar",
+    "source": "Qayerdan bilib keldi",
+    "tags": "Teglar",
+    "selectPlaceholder": "Tanlang...",
+    "none": "Ko'rsatilmagan",
+    "required": "Majburiy maydon",
+    "invalidPhone": "Telefon raqami noto'g'ri",
+    "cancel": "Bekor qilish",
+    "save": "Saqlash",
+    "create": "Yaratish"
+  },
+  "gender": {
+    "MALE": "Erkak",
+    "FEMALE": "Ayol"
+  },
+  "blood": {
+    "A_POS": "A (II) Rh+",
+    "A_NEG": "A (II) Rh-",
+    "B_POS": "B (III) Rh+",
+    "B_NEG": "B (III) Rh-",
+    "AB_POS": "AB (IV) Rh+",
+    "AB_NEG": "AB (IV) Rh-",
+    "O_POS": "O (I) Rh+",
+    "O_NEG": "O (I) Rh-",
+    "UNKNOWN": "Noma'lum"
+  },
+  "severity": {
+    "low": "Yengil",
+    "medium": "O'rtacha",
+    "high": "Og'ir"
+  },
+  "sources": {
+    "friend_referral": "Tanish tavsiyasi",
+    "doctor_referral": "Shifokor yo'llanmasi",
+    "instagram": "Instagram",
+    "telegram": "Telegram",
+    "facebook": "Facebook",
+    "google": "Google",
+    "street_banner": "Ko'cha bannari",
+    "returning": "Qayta murojaat",
+    "other": "Boshqa"
+  },
+  "tags": {
+    "VIP": "VIP",
+    "DEBTOR": "Qarzdor",
+    "STAFF_FAMILY": "Xodim oilasi",
+    "INSURANCE": "Sug'urta",
+    "BLACKLIST": "Qora ro'yxat"
+  },
+  "duplicates": {
+    "title": "Bunday bemor allaqachon bor bo'lishi mumkin",
+    "description": "Quyidagi o'xshash bemorlar topildi. Mavjudini oching yoki baribir yangisini yarating.",
+    "open": "Ochish",
+    "forceCreate": "Baribir yaratish"
+  },
+  "overview": {
+    "demographics": "Shaxsiy ma'lumotlar",
+    "dob": "Tug'ilgan sana",
+    "gender": "Jinsi",
+    "bloodGroup": "Qon guruhi",
+    "phoneAlt": "Qo'shimcha telefon",
+    "address": "Manzil",
+    "passport": "Pasport / ID",
+    "source": "Qayerdan bilib keldi",
+    "registeredAt": "Ro'yxatga olingan sana",
+    "allergies": "Allergiyalar",
+    "noAllergies": "Allergiyalar qayd etilmagan",
+    "chronicConditions": "Surunkali kasalliklar",
+    "noChronic": "Surunkali kasalliklar qayd etilmagan",
+    "notes": "Izohlar",
+    "noNotes": "Izoh yo'q",
+    "consents": "Roziliklar",
+    "noConsents": "Roziliklar qayd etilmagan",
+    "consentType": "Rozilik turi",
+    "signedAt": "Imzolangan sana",
+    "note": "Izoh",
+    "addConsent": "Rozilik qo'shish",
+    "consentAdded": "Rozilik qo'shildi"
+  },
+  "consentType": {
+    "personal_data": "Shaxsiy ma'lumotlarni qayta ishlash",
+    "treatment": "Davolanishga rozilik",
+    "other": "Boshqa"
+  },
+  "timeline": {
+    "all": "Barchasi",
+    "visit": "Tashrif",
+    "diagnosis": "Tashxis",
+    "prescription": "Retsept",
+    "lab": "Tahlil",
+    "document": "Hujjat",
+    "payment": "To'lov",
+    "empty": "Tarix hozircha bo'sh",
+    "loadMore": "Yana yuklash",
+    "openVisit": "Tashrifni ochish"
+  },
+  "visitStatus": {
+    "IN_PROGRESS": "Davom etmoqda",
+    "COMPLETED": "Yakunlangan",
+    "CANCELLED": "Bekor qilingan"
+  },
+  "visits": {
+    "date": "Sana",
+    "doctor": "Shifokor",
+    "status": "Holat",
+    "open": "Ochish",
+    "empty": "Tashriflar yo'q"
+  },
+  "documents": {
+    "uploadTitle": "Hujjat yuklash",
+    "file": "Fayl",
+    "title": "Nomi",
+    "category": "Turkum",
+    "upload": "Yuklash",
+    "uploaded": "Hujjat yuklandi",
+    "deletedDoc": "Hujjat o'chirildi",
+    "deleteTitle": "Hujjatni o'chirishni tasdiqlaysizmi?",
+    "deleteDesc": "\"{title}\" hujjati butunlay o'chiriladi.",
+    "download": "Yuklab olish",
+    "empty": "Hujjatlar yo'q",
+    "prev": "Oldingi",
+    "next": "Keyingi"
+  },
+  "docCategory": {
+    "ANALYSIS": "Tahlil",
+    "IMAGING": "Tasvir (UZI, rentgen)",
+    "DISCHARGE": "Epikriz",
+    "CONSENT": "Rozilik",
+    "OTHER": "Boshqa"
+  },
+  "invoices": {
+    "title": "Hisob-fakturalar",
+    "number": "Raqam",
+    "date": "Sana",
+    "total": "Jami",
+    "paid": "To'langan",
+    "due": "Qoldiq",
+    "status": "Holat",
+    "empty": "Hisob-fakturalar yo'q"
+  },
+  "invoiceStatus": {
+    "DRAFT": "Qoralama",
+    "ISSUED": "Taqdim etilgan",
+    "PARTIALLY_PAID": "Qisman to'langan",
+    "PAID": "To'langan",
+    "CANCELLED": "Bekor qilingan",
+    "REFUNDED": "Qaytarilgan"
+  },
+  "balance": {
+    "title": "Balans va tranzaksiyalar",
+    "date": "Sana",
+    "type": "Turi",
+    "amount": "Summa",
+    "note": "Izoh",
+    "empty": "Tranzaksiyalar yo'q"
+  },
+  "txType": {
+    "DEPOSIT": "Depozit",
+    "WITHDRAWAL": "Yechib olish",
+    "INVOICE_APPLY": "Hisobga o'tkazma",
+    "REFUND_CREDIT": "Qaytarim krediti",
+    "ADJUSTMENT": "Tuzatish"
+  },
+  "merge": {
+    "title": "Bemor kartalarini birlashtirish",
+    "description": "Dublikat bemorni qidiring — uning barcha yozuvlari {name} kartasiga ko'chiriladi.",
+    "searchPlaceholder": "Ism, telefon yoki MRN bo'yicha qidirish...",
+    "selected": "Tanlandi",
+    "warning": "Bu amalni ortga qaytarib bo'lmaydi!",
+    "summary": "{duplicate} kartasidagi barcha tashriflar, hisoblar va hujjatlar {primary} kartasiga o'tkaziladi, so'ng dublikat arxivlanadi.",
+    "confirm": "Birlashtirish",
+    "merged": "Bemorlar birlashtirildi"
+  }
+}

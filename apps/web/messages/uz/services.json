@@ -1,0 +1,147 @@
+{
+  "title": "Xizmatlar va narxlar",
+  "subtitle": "Xizmatlar katalogi, paketlar va chegirma qoidalari",
+  "newService": "Xizmat",
+  "searchPlaceholder": "Kod yoki nom bo'yicha qidirish...",
+  "deactivated": "Xizmat o'chirildi",
+  "deactivateTitle": "Xizmatni o'chirishni tasdiqlaysizmi?",
+  "deactivateDescription": "\"{name}\" xizmati faolsizlantiriladi. U hisob-fakturalar tarixida saqlanib qoladi.",
+  "tabs": {
+    "services": "Xizmatlar",
+    "packages": "Paketlar",
+    "discounts": "Chegirmalar"
+  },
+  "filter": {
+    "all": "Barchasi",
+    "active": "Faol",
+    "inactive": "Nofaol"
+  },
+  "table": {
+    "code": "Kod",
+    "name": "Nomi",
+    "duration": "Davomiylik",
+    "price": "Narx",
+    "active": "Faol",
+    "minutes": "{min} daq."
+  },
+  "rowActions": {
+    "edit": "Tahrirlash",
+    "priceHistory": "Narx tarixi",
+    "deactivate": "O'chirish"
+  },
+  "empty": {
+    "services": "Xizmatlar topilmadi"
+  },
+  "actions": {
+    "delete": "O'chirish",
+    "cancel": "Bekor qilish",
+    "save": "Saqlash"
+  },
+  "kinds": {
+    "CONSULTATION": "Konsultatsiya",
+    "LAB": "Laboratoriya",
+    "ULTRASOUND": "UTT",
+    "PROCEDURE": "Muolaja",
+    "DIAGNOSTICS": "Diagnostika",
+    "OTHER": "Boshqa"
+  },
+  "categories": {
+    "title": "Kategoriyalar",
+    "all": "Barcha xizmatlar",
+    "empty": "Kategoriyalar yo'q",
+    "namePlaceholder": "Kategoriya nomi",
+    "created": "Kategoriya yaratildi",
+    "updated": "Kategoriya saqlandi",
+    "deleted": "Kategoriya o'chirildi",
+    "deleteTitle": "Kategoriyani o'chirishni tasdiqlaysizmi?",
+    "deleteDescription": "\"{name}\" kategoriyasi o'chiriladi."
+  },
+  "form": {
+    "createTitle": "Yangi xizmat",
+    "editTitle": "Xizmatni tahrirlash",
+    "category": "Kategoriya",
+    "selectCategory": "Kategoriyani tanlang",
+    "categoryRequired": "Kategoriyani tanlash shart",
+    "code": "Kod",
+    "duration": "Davomiylik (daq.)",
+    "nameUz": "Nomi (o'zbekcha)",
+    "nameRu": "Nomi (ruscha)",
+    "price": "Boshlang'ich narx (so'm)",
+    "required": "To'ldirilishi shart",
+    "invalidDuration": "Davomiylik noto'g'ri",
+    "invalidPrice": "Narx noto'g'ri kiritildi",
+    "created": "Xizmat yaratildi",
+    "updated": "Xizmat saqlandi"
+  },
+  "prices": {
+    "title": "Narx tarixi — {name}",
+    "price": "Narx",
+    "branch": "Filial",
+    "effectiveFrom": "Boshlanish sanasi",
+    "effectiveTo": "Tugash sanasi",
+    "openEnded": "Amalda",
+    "empty": "Narx tarixi yo'q",
+    "clinicDefault": "Klinika bo'yicha",
+    "newPrice": "Yangi narx",
+    "add": "Qo'shish",
+    "added": "Yangi narx qo'shildi"
+  },
+  "packages": {
+    "new": "Paket",
+    "created": "Paket yaratildi",
+    "updated": "Paket saqlandi",
+    "deleted": "Paket o'chirildi",
+    "inactive": "Nofaol",
+    "deleteTitle": "Paketni o'chirishni tasdiqlaysizmi?",
+    "deleteDescription": "\"{name}\" paketi o'chiriladi.",
+    "empty": {
+      "title": "Hozircha paketlar yo'q",
+      "description": "Bir nechta xizmatni chegirmali narxda birlashtirish uchun paket yarating."
+    },
+    "form": {
+      "createTitle": "Yangi paket",
+      "editTitle": "Paketni tahrirlash",
+      "price": "Paket narxi (so'm)",
+      "items": "Xizmatlar tarkibi",
+      "addItem": "Xizmat qo'shish",
+      "quantity": "Soni",
+      "selectService": "Xizmatni tanlang",
+      "itemsRequired": "Kamida bitta xizmat tanlang",
+      "itemsSum": "Xizmatlar jami: {sum}"
+    }
+  },
+  "discounts": {
+    "new": "Chegirma qoidasi",
+    "created": "Chegirma qoidasi yaratildi",
+    "updated": "Chegirma qoidasi saqlandi",
+    "deleted": "Chegirma qoidasi o'chirildi",
+    "active": "Faol",
+    "inactive": "Nofaol",
+    "empty": "Chegirma qoidalari yo'q",
+    "deleteTitle": "Chegirma qoidasini o'chirishni tasdiqlaysizmi?",
+    "deleteDescription": "\"{name}\" qoidasi o'chiriladi.",
+    "table": {
+      "name": "Nomi",
+      "type": "Turi",
+      "value": "Qiymati",
+      "patientTag": "Bemor tegi",
+      "promoCode": "Promokod",
+      "active": "Holati"
+    },
+    "types": {
+      "PERCENT": "Foiz",
+      "FIXED": "Qat'iy summa"
+    },
+    "form": {
+      "createTitle": "Yangi chegirma qoidasi",
+      "editTitle": "Chegirma qoidasini tahrirlash",
+      "name": "Nomi",
+      "type": "Turi",
+      "valuePercent": "Qiymati (%)",
+      "valueFixed": "Qiymati (so'm)",
+      "patientTag": "Bemor tegi (ixtiyoriy)",
+      "promoCode": "Promokod (ixtiyoriy)",
+      "isActive": "Faol"
+    }
+  }
+}

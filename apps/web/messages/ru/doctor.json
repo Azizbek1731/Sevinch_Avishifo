@@ -1,0 +1,48 @@
+{
+  "title": "Кабинет врача",
+  "subtitle": "Моя очередь и приёмы",
+  "myQueue": "Моя очередь",
+  "callNext": "Вызвать следующего",
+  "calledToast": "Вызван {ticket}",
+  "room": "Кабинет",
+  "noRoom": "Без кабинета",
+  "roomShort": "Кабинет {room}",
+  "start": "Начать",
+  "finish": "Завершить",
+  "skip": "Пропустить",
+  "recall": "Вызвать повторно",
+  "skipped": "Пропущенные",
+  "queueEmpty": "Очередь пуста",
+  "queueEmptyDesc": "Сегодня к вам нет пациентов в очереди",
+  "currentPatient": "Текущий пациент",
+  "noCurrentPatient": "Нет пациента на приёме",
+  "noCurrentPatientDesc": "Вызовите пациента и начните приём",
+  "allergies": "Аллергии",
+  "noAllergies": "Аллергии не отмечены",
+  "chronic": "Хронические заболевания",
+  "lastVisits": "Последние приёмы",
+  "noVisits": "Приёмов нет",
+  "openVisit": "Открыть",
+  "ageYears": "{age} лет",
+  "myVisits": "Мои приёмы",
+  "waiting": "Ожидают",
+  "inRoom": "На приёме",
+  "doneToday": "Завершено сегодня",
+  "status": {
+    "WAITING": "Ожидает",
+    "CALLED": "Вызван",
+    "IN_ROOM": "На приёме",
+    "DONE": "Завершён",
+    "SKIPPED": "Пропущен"
+  },
+  "priority": {
+    "NORMAL": "Обычный",
+    "PRIORITY": "Приоритет",
+    "EMERGENCY": "Экстренный"
+  },
+  "visitStatus": {
+    "IN_PROGRESS": "В процессе",
+    "COMPLETED": "Завершён",
+    "CANCELLED": "Отменён"
+  }
+}

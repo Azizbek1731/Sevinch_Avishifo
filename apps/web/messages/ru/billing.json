@@ -1,0 +1,111 @@
+{
+  "title": "Счета-фактуры",
+  "subtitle": "Счета, оплаты и возвраты",
+  "newInvoice": "Новый счёт",
+  "cols": {
+    "number": "Номер",
+    "patient": "Пациент",
+    "total": "Итого",
+    "paid": "Оплачено",
+    "due": "Долг",
+    "status": "Статус",
+    "date": "Дата"
+  },
+  "statuses": {
+    "DRAFT": "Черновик",
+    "ISSUED": "Выставлен",
+    "PARTIALLY_PAID": "Частично оплачен",
+    "PAID": "Оплачен",
+    "CANCELLED": "Отменён",
+    "REFUNDED": "Возвращён"
+  },
+  "methods": {
+    "CASH": "Наличные",
+    "CARD": "Карта",
+    "PAYME": "Payme",
+    "CLICK": "Click",
+    "UZUM": "Uzum",
+    "BALANCE": "С баланса"
+  },
+  "filters": {
+    "status": "Статус",
+    "allStatuses": "Все статусы",
+    "from": "С даты",
+    "to": "По дату",
+    "patient": "Пациент"
+  },
+  "empty": {
+    "title": "Счета не найдены"
+  },
+  "form": {
+    "title": "Новый счёт-фактура",
+    "patient": "Пациент",
+    "patientRequired": "Выберите пациента",
+    "lines": "Услуги",
+    "service": "Услуга",
+    "qty": "Кол-во",
+    "unitPrice": "Цена",
+    "discount": "Скидка",
+    "lineTotal": "Сумма",
+    "addLine": "Добавить строку",
+    "linesInvalid": "Выберите услугу для каждой строки и проверьте суммы",
+    "totalPreview": "Общая сумма",
+    "create": "Создать",
+    "creating": "Создание...",
+    "created": "Счёт {number} создан",
+    "invalidAmount": "Сумма введена неверно"
+  },
+  "pay": {
+    "title": "Оплата — {number}",
+    "due": "Долг",
+    "amount": "Сумма",
+    "method": "Способ оплаты",
+    "submit": "Принять оплату",
+    "paying": "Отправка...",
+    "success": "Оплата принята",
+    "viewReceipt": "Открыть чек"
+  },
+  "refundDlg": {
+    "title": "Возврат — {number}",
+    "paid": "Оплачено",
+    "amount": "Сумма",
+    "method": "Способ",
+    "reason": "Причина",
+    "reasonRequired": "Укажите причину (минимум 3 символа)",
+    "submit": "Вернуть",
+    "success": "Средства возвращены"
+  },
+  "detail": {
+    "title": "Счёт {number}",
+    "issue": "Выставить",
+    "pay": "Оплата",
+    "refund": "Возврат",
+    "cancel": "Отменить",
+    "receipt": "Чек",
+    "issued": "Счёт выставлен",
+    "cancelled": "Счёт отменён",
+    "linesTitle": "Услуги",
+    "totalsTitle": "Расчёт",
+    "subtotal": "Промежуточный итог",
+    "paymentsTitle": "История оплат",
+    "noPayments": "Оплат нет",
+    "refundsTitle": "Возвраты",
+    "noRefunds": "Возвратов нет",
+    "cancelConfirmTitle": "Отменить счёт?",
+    "cancelConfirmDesc": "Счёт-фактура {number} будет отменён. Это действие необратимо."
+  },
+  "receipt": {
+    "print": "Печать",
+    "taxId": "ИНН",
+    "receiptNo": "Чек №",
+    "date": "Дата",
+    "patient": "Пациент",
+    "cashier": "Кассир",
+    "subtotal": "Промежуточный итог",
+    "discount": "Скидка",
+    "total": "ИТОГО",
+    "paid": "Оплачено",
+    "due": "Долг",
+    "thanks": "Спасибо за покупку!"
+  }
+}

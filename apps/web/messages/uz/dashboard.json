@@ -1,0 +1,34 @@
+{
+  "title": "Boshqaruv paneli",
+  "description": "Bugungi ko'rsatkichlar va so'nggi 30 kunlik tahlil",
+  "stats": {
+    "revenue": "Bugungi tushum",
+    "visits": "Bugungi tashriflar",
+    "newPatients": "Yangi bemorlar",
+    "waiting": "Navbatda kutmoqda",
+    "openShifts": "Ochiq smenalar: {count}"
+  },
+  "charts": {
+    "revenue30": "Tushum — so'nggi 30 kun",
+    "revenueSeries": "Tushum",
+    "patientFlow": "Yangi va qaytgan bemorlar",
+    "new": "Yangi",
+    "returning": "Qaytgan",
+    "sources": "Bemorlar manbalari"
+  },
+  "sources": {
+    "friend_referral": "Do'st tavsiyasi",
+    "doctor_referral": "Shifokor yo'llanmasi",
+    "instagram": "Instagram",
+    "telegram": "Telegram",
+    "facebook": "Facebook",
+    "google": "Google",
+    "street_banner": "Ko'cha banneri",
+    "returning": "Qaytgan bemor",
+    "other": "Boshqa"
+  },
+  "empty": {
+    "title": "Ma'lumot yo'q",
+    "description": "Tanlangan davr uchun ma'lumotlar topilmadi"
+  }
+}

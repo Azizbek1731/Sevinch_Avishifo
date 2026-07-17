@@ -1,0 +1,48 @@
+{
+  "title": "Shifokor kabineti",
+  "subtitle": "Mening navbatim va tashriflar",
+  "myQueue": "Mening navbatim",
+  "callNext": "Keyingisini chaqirish",
+  "calledToast": "{ticket} chaqirildi",
+  "room": "Xona",
+  "noRoom": "Xonasiz",
+  "roomShort": "{room}-xona",
+  "start": "Boshlash",
+  "finish": "Yakunlash",
+  "skip": "O'tkazib yuborish",
+  "recall": "Qayta chaqirish",
+  "skipped": "O'tkazib yuborilganlar",
+  "queueEmpty": "Navbat bo'sh",
+  "queueEmptyDesc": "Bugun sizga navbatda bemor yo'q",
+  "currentPatient": "Joriy bemor",
+  "noCurrentPatient": "Bemor qabulda emas",
+  "noCurrentPatientDesc": "Bemorni chaqiring va qabulni boshlang",
+  "allergies": "Allergiyalar",
+  "noAllergies": "Allergiyalar qayd etilmagan",
+  "chronic": "Surunkali kasalliklar",
+  "lastVisits": "Oxirgi tashriflar",
+  "noVisits": "Tashriflar yo'q",
+  "openVisit": "Ochish",
+  "ageYears": "{age} yosh",
+  "myVisits": "Mening tashriflarim",
+  "waiting": "Kutmoqda",
+  "inRoom": "Qabulda",
+  "doneToday": "Bugun yakunlandi",
+  "status": {
+    "WAITING": "Kutmoqda",
+    "CALLED": "Chaqirildi",
+    "IN_ROOM": "Qabulda",
+    "DONE": "Yakunlandi",
+    "SKIPPED": "O'tkazib yuborildi"
+  },
+  "priority": {
+    "NORMAL": "Oddiy",
+    "PRIORITY": "Imtiyozli",
+    "EMERGENCY": "Shoshilinch"
+  },
+  "visitStatus": {
+    "IN_PROGRESS": "Davom etmoqda",
+    "COMPLETED": "Yakunlangan",
+    "CANCELLED": "Bekor qilingan"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "title": "Doctor cockpit",
+  "subtitle": "My queue and visits",
+  "myQueue": "My queue",
+  "callNext": "Call next",
+  "calledToast": "Called {ticket}",
+  "room": "Room",
+  "noRoom": "No room",
+  "roomShort": "Room {room}",
+  "start": "Start",
+  "finish": "Finish",
+  "skip": "Skip",
+  "recall": "Recall",
+  "skipped": "Skipped",
+  "queueEmpty": "Queue is empty",
+  "queueEmptyDesc": "No patients in your queue today",
+  "currentPatient": "Current patient",
+  "noCurrentPatient": "No patient in the room",
+  "noCurrentPatientDesc": "Call a patient and start the appointment",
+  "allergies": "Allergies",
+  "noAllergies": "No allergies recorded",
+  "chronic": "Chronic conditions",
+  "lastVisits": "Recent visits",
+  "noVisits": "No visits",
+  "openVisit": "Open",
+  "ageYears": "{age} y.o.",
+  "myVisits": "My visits",
+  "waiting": "Waiting",
+  "inRoom": "In room",
+  "doneToday": "Done today",
+  "status": {
+    "WAITING": "Waiting",
+    "CALLED": "Called",
+    "IN_ROOM": "In room",
+    "DONE": "Done",
+    "SKIPPED": "Skipped"
+  },
+  "priority": {
+    "NORMAL": "Normal",
+    "PRIORITY": "Priority",
+    "EMERGENCY": "Emergency"
+  },
+  "visitStatus": {
+    "IN_PROGRESS": "In progress",
+    "COMPLETED": "Completed",
+    "CANCELLED": "Cancelled"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "templates": {
+    "title": "Шаблоны уведомлений",
+    "desc": "Настройте текст сообщения по событию, каналу и языку",
+    "event": "Событие",
+    "channel": "Канал",
+    "locale": "Язык",
+    "body": "Текст сообщения",
+    "bodyPlaceholder": "Уважаемый(ая) '{'patient_name'}', ваш приём в '{'time'}'...",
+    "variablesHint": "Переменные",
+    "save": "Сохранить шаблон",
+    "saved": "Шаблон сохранён",
+    "savedList": "Сохранённые шаблоны",
+    "emptyTitle": "Шаблонов нет",
+    "emptyDesc": "Для событий без шаблона используется стандартный текст",
+    "bodyTooShort": "Текст сообщения слишком короткий"
+  },
+  "events": {
+    "APPOINTMENT_CREATED": "Приём создан",
+    "APPOINTMENT_REMINDER_24H": "Напоминание о приёме (24 часа)",
+    "APPOINTMENT_REMINDER_2H": "Напоминание о приёме (2 часа)",
+    "APPOINTMENT_CANCELLED": "Приём отменён",
+    "QUEUE_TURN_NEAR": "Очередь приближается",
+    "LAB_RESULT_READY": "Результат анализа готов",
+    "PAYMENT_RECEIPT": "Чек об оплате",
+    "BIRTHDAY": "Поздравление с днём рождения",
+    "DEBT_REMINDER": "Напоминание о долге",
+    "FEEDBACK_REQUEST": "Запрос отзыва"
+  },
+  "channels": {
+    "SMS": "SMS",
+    "TELEGRAM": "Telegram",
+    "IN_APP": "В приложении"
+  },
+  "locales": {
+    "uz": "Узбекский (латиница)",
+    "uz_Cyrl": "Узбекский (кириллица)",
+    "ru": "Русский",
+    "en": "Английский"
+  },
+  "logs": {
+    "title": "SMS-журнал",
+    "date": "Дата",
+    "recipient": "Получатель",
+    "event": "Событие",
+    "channel": "Канал",
+    "body": "Текст",
+    "status": "Статус",
+    "statuses": {
+      "QUEUED": "В очереди",
+      "SENT": "Отправлено",
+      "DELIVERED": "Доставлено",
+      "FAILED": "Ошибка"
+    },
+    "attempts": "Попытки",
+    "allStatuses": "Все статусы",
+    "allChannels": "Все каналы",
+    "empty": "Записи не найдены"
+  }
+}

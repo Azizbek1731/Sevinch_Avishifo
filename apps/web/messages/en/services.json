@@ -1,0 +1,147 @@
+{
+  "title": "Services & prices",
+  "subtitle": "Service catalog, packages and discount rules",
+  "newService": "Service",
+  "searchPlaceholder": "Search by code or name...",
+  "deactivated": "Service removed",
+  "deactivateTitle": "Remove this service?",
+  "deactivateDescription": "Service \"{name}\" will be deactivated. It remains in invoice history.",
+  "tabs": {
+    "services": "Services",
+    "packages": "Packages",
+    "discounts": "Discounts"
+  },
+  "filter": {
+    "all": "All",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "table": {
+    "code": "Code",
+    "name": "Name",
+    "duration": "Duration",
+    "price": "Price",
+    "active": "Active",
+    "minutes": "{min} min"
+  },
+  "rowActions": {
+    "edit": "Edit",
+    "priceHistory": "Price history",
+    "deactivate": "Remove"
+  },
+  "empty": {
+    "services": "No services found"
+  },
+  "actions": {
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "save": "Save"
+  },
+  "kinds": {
+    "CONSULTATION": "Consultation",
+    "LAB": "Laboratory",
+    "ULTRASOUND": "Ultrasound",
+    "PROCEDURE": "Procedure",
+    "DIAGNOSTICS": "Diagnostics",
+    "OTHER": "Other"
+  },
+  "categories": {
+    "title": "Categories",
+    "all": "All services",
+    "empty": "No categories yet",
+    "namePlaceholder": "Category name",
+    "created": "Category created",
+    "updated": "Category saved",
+    "deleted": "Category deleted",
+    "deleteTitle": "Delete this category?",
+    "deleteDescription": "Category \"{name}\" will be deleted."
+  },
+  "form": {
+    "createTitle": "New service",
+    "editTitle": "Edit service",
+    "category": "Category",
+    "selectCategory": "Select a category",
+    "categoryRequired": "Category is required",
+    "code": "Code",
+    "duration": "Duration (min)",
+    "nameUz": "Name (Uzbek)",
+    "nameRu": "Name (Russian)",
+    "price": "Initial price (UZS)",
+    "required": "This field is required",
+    "invalidDuration": "Invalid duration",
+    "invalidPrice": "Invalid price",
+    "created": "Service created",
+    "updated": "Service saved"
+  },
+  "prices": {
+    "title": "Price history — {name}",
+    "price": "Price",
+    "branch": "Branch",
+    "effectiveFrom": "Effective from",
+    "effectiveTo": "Effective to",
+    "openEnded": "Current",
+    "empty": "No price history yet",
+    "clinicDefault": "Clinic default",
+    "newPrice": "New price",
+    "add": "Add",
+    "added": "New price added"
+  },
+  "packages": {
+    "new": "Package",
+    "created": "Package created",
+    "updated": "Package saved",
+    "deleted": "Package deleted",
+    "inactive": "Inactive",
+    "deleteTitle": "Delete this package?",
+    "deleteDescription": "Package \"{name}\" will be deleted.",
+    "empty": {
+      "title": "No packages yet",
+      "description": "Create a package to bundle several services at a discounted price."
+    },
+    "form": {
+      "createTitle": "New package",
+      "editTitle": "Edit package",
+      "price": "Package price (UZS)",
+      "items": "Included services",
+      "addItem": "Add service",
+      "quantity": "Qty",
+      "selectService": "Select a service",
+      "itemsRequired": "Select at least one service",
+      "itemsSum": "Items total: {sum}"
+    }
+  },
+  "discounts": {
+    "new": "Discount rule",
+    "created": "Discount rule created",
+    "updated": "Discount rule saved",
+    "deleted": "Discount rule deleted",
+    "active": "Active",
+    "inactive": "Inactive",
+    "empty": "No discount rules yet",
+    "deleteTitle": "Delete this discount rule?",
+    "deleteDescription": "Rule \"{name}\" will be deleted.",
+    "table": {
+      "name": "Name",
+      "type": "Type",
+      "value": "Value",
+      "patientTag": "Patient tag",
+      "promoCode": "Promo code",
+      "active": "Status"
+    },
+    "types": {
+      "PERCENT": "Percent",
+      "FIXED": "Fixed amount"
+    },
+    "form": {
+      "createTitle": "New discount rule",
+      "editTitle": "Edit discount rule",
+      "name": "Name",
+      "type": "Type",
+      "valuePercent": "Value (%)",
+      "valueFixed": "Value (UZS)",
+      "patientTag": "Patient tag (optional)",
+      "promoCode": "Promo code (optional)",
+      "isActive": "Active"
+    }
+  }
+}

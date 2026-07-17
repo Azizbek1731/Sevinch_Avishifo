@@ -1,0 +1,86 @@
+{
+  "title": "Calendar",
+  "subtitle": "Appointment schedule and bookings",
+  "views": {
+    "day": "Day",
+    "week": "Week"
+  },
+  "today": "Today",
+  "prevPeriod": "Previous",
+  "nextPeriod": "Next",
+  "doctor": "Doctor",
+  "allDoctors": "All doctors",
+  "newAppointment": "New appointment",
+  "noDoctors": "No doctors found",
+  "noDoctorsDesc": "Add a doctor in the Staff section first",
+  "noAppointments": "No appointments",
+  "status": {
+    "SCHEDULED": "Scheduled",
+    "CONFIRMED": "Confirmed",
+    "CHECKED_IN": "Checked in",
+    "IN_QUEUE": "In queue",
+    "IN_PROGRESS": "In progress",
+    "COMPLETED": "Completed",
+    "NO_SHOW": "No-show",
+    "CANCELLED": "Cancelled"
+  },
+  "detail": {
+    "title": "Appointment details",
+    "patient": "Patient",
+    "doctor": "Doctor",
+    "time": "Time",
+    "services": "Services",
+    "note": "Note",
+    "cancelledReason": "Cancellation reason",
+    "confirm": "Confirm",
+    "checkIn": "Check in",
+    "noShow": "No-show",
+    "cancel": "Cancel",
+    "reschedule": "Reschedule",
+    "recurring": "Course (recurring)"
+  },
+  "form": {
+    "createTitle": "New appointment",
+    "editTitle": "Reschedule appointment",
+    "patient": "Patient",
+    "selectPatient": "Select a patient",
+    "searchPatient": "Search by name, phone or MRN...",
+    "patientNotFound": "Patient not found",
+    "doctor": "Doctor",
+    "selectDoctor": "Select a doctor",
+    "services": "Services",
+    "selectServices": "Select services",
+    "servicesSelected": "{count} services selected",
+    "minutes": "{count} min",
+    "date": "Date",
+    "time": "Time",
+    "slotsHint": "Select a doctor and date first",
+    "loadingSlots": "Loading free slots...",
+    "noSlots": "No free slots on this day",
+    "note": "Note",
+    "notePlaceholder": "Additional note...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "required": "Required field"
+  },
+  "reason": {
+    "cancelTitle": "Cancel appointment",
+    "noShowTitle": "Patient did not show up",
+    "label": "Reason",
+    "placeholder": "Enter the reason...",
+    "submit": "Save"
+  },
+  "recurring": {
+    "title": "Course (recurring appointments)",
+    "description": "A course of sessions repeating at the same time will be created",
+    "sessionsCount": "Number of sessions",
+    "intervalDays": "Interval (days)",
+    "submit": "Create course",
+    "result": "{created} appointments created, {skipped} skipped"
+  },
+  "toasts": {
+    "created": "Appointment created",
+    "updated": "Appointment saved",
+    "statusChanged": "Status changed"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "templates": {
+    "title": "Bildirishnoma shablonlari",
+    "desc": "Hodisa, kanal va til bo'yicha xabar matnini sozlang",
+    "event": "Hodisa",
+    "channel": "Kanal",
+    "locale": "Til",
+    "body": "Xabar matni",
+    "bodyPlaceholder": "Hurmatli '{'patient_name'}', sizning qabulingiz '{'time'}' da...",
+    "variablesHint": "O'zgaruvchilar",
+    "save": "Shablonni saqlash",
+    "saved": "Shablon saqlandi",
+    "savedList": "Saqlangan shablonlar",
+    "emptyTitle": "Shablonlar yo'q",
+    "emptyDesc": "Shablon saqlanmagan hodisalar uchun standart matn ishlatiladi",
+    "bodyTooShort": "Xabar matni juda qisqa"
+  },
+  "events": {
+    "APPOINTMENT_CREATED": "Qabul yaratildi",
+    "APPOINTMENT_REMINDER_24H": "Qabul eslatmasi (24 soat)",
+    "APPOINTMENT_REMINDER_2H": "Qabul eslatmasi (2 soat)",
+    "APPOINTMENT_CANCELLED": "Qabul bekor qilindi",
+    "QUEUE_TURN_NEAR": "Navbat yaqinlashdi",
+    "LAB_RESULT_READY": "Tahlil natijasi tayyor",
+    "PAYMENT_RECEIPT": "To'lov cheki",
+    "BIRTHDAY": "Tug'ilgan kun tabrigi",
+    "DEBT_REMINDER": "Qarz eslatmasi",
+    "FEEDBACK_REQUEST": "Fikr-mulohaza so'rovi"
+  },
+  "channels": {
+    "SMS": "SMS",
+    "TELEGRAM": "Telegram",
+    "IN_APP": "Ilova ichida"
+  },
+  "locales": {
+    "uz": "O'zbekcha (lotin)",
+    "uz_Cyrl": "Ўзбекча (кирилл)",
+    "ru": "Русский",
+    "en": "English"
+  },
+  "logs": {
+    "title": "SMS jurnali",
+    "date": "Sana",
+    "recipient": "Qabul qiluvchi",
+    "event": "Hodisa",
+    "channel": "Kanal",
+    "body": "Matn",
+    "status": "Holat",
+    "statuses": {
+      "QUEUED": "Navbatda",
+      "SENT": "Yuborildi",
+      "DELIVERED": "Yetkazildi",
+      "FAILED": "Xatolik"
+    },
+    "attempts": "Urinishlar",
+    "allStatuses": "Barcha holatlar",
+    "allChannels": "Barcha kanallar",
+    "empty": "Yozuvlar topilmadi"
+  }
+}

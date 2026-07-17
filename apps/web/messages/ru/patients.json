@@ -1,0 +1,237 @@
+{
+  "title": "Пациенты",
+  "subtitle": "Реестр и картотека пациентов",
+  "newPatient": "Новый пациент",
+  "searchPlaceholder": "Поиск по имени, телефону или MRN...",
+  "filterTag": "По тегу",
+  "allTags": "Все теги",
+  "created": "Пациент создан",
+  "updated": "Данные пациента сохранены",
+  "deleted": "Пациент удалён",
+  "table": {
+    "mrn": "MRN",
+    "fullName": "Ф.И.О.",
+    "phone": "Телефон",
+    "dob": "Дата рождения",
+    "tags": "Теги",
+    "visits": "Визиты",
+    "balance": "Баланс",
+    "createdAt": "Зарегистрирован"
+  },
+  "empty": {
+    "title": "Пациентов пока нет",
+    "description": "Нажмите \"Новый пациент\", чтобы зарегистрировать первого пациента.",
+    "noResults": "Ничего не найдено"
+  },
+  "card": {
+    "ageYears": "{age} лет",
+    "debt": "Долг",
+    "edit": "Редактировать",
+    "merge": "Объединить",
+    "delete": "Удалить",
+    "deleteTitle": "Удалить пациента?",
+    "deleteDesc": "Карта пациента {name} будет архивирована. Это действие нельзя отменить.",
+    "notFound": "Пациент не найден",
+    "loadError": "Не удалось загрузить данные",
+    "backToList": "Вернуться к списку пациентов"
+  },
+  "tabs": {
+    "overview": "Обзор",
+    "timeline": "История",
+    "visits": "Визиты",
+    "documents": "Документы",
+    "invoices": "Счета"
+  },
+  "form": {
+    "createTitle": "Новый пациент",
+    "editTitle": "Редактирование пациента",
+    "lastName": "Фамилия",
+    "firstName": "Имя",
+    "middleName": "Отчество",
+    "phone": "Телефон",
+    "phoneAlt": "Доп. телефон",
+    "dob": "Дата рождения",
+    "gender": "Пол",
+    "bloodGroup": "Группа крови",
+    "address": "Адрес",
+    "passportId": "Паспорт / ID",
+    "allergies": "Аллергии",
+    "allergyName": "Название аллергии",
+    "add": "Добавить",
+    "remove": "Убрать",
+    "chronicConditions": "Хронические заболевания",
+    "conditionPlaceholder": "Название заболевания",
+    "notes": "Заметки",
+    "source": "Откуда узнал о нас",
+    "tags": "Теги",
+    "selectPlaceholder": "Выберите...",
+    "none": "Не указано",
+    "required": "Обязательное поле",
+    "invalidPhone": "Неверный номер телефона",
+    "cancel": "Отмена",
+    "save": "Сохранить",
+    "create": "Создать"
+  },
+  "gender": {
+    "MALE": "Мужской",
+    "FEMALE": "Женский"
+  },
+  "blood": {
+    "A_POS": "A (II) Rh+",
+    "A_NEG": "A (II) Rh-",
+    "B_POS": "B (III) Rh+",
+    "B_NEG": "B (III) Rh-",
+    "AB_POS": "AB (IV) Rh+",
+    "AB_NEG": "AB (IV) Rh-",
+    "O_POS": "O (I) Rh+",
+    "O_NEG": "O (I) Rh-",
+    "UNKNOWN": "Неизвестна"
+  },
+  "severity": {
+    "low": "Лёгкая",
+    "medium": "Средняя",
+    "high": "Тяжёлая"
+  },
+  "sources": {
+    "friend_referral": "Рекомендация знакомых",
+    "doctor_referral": "Направление врача",
+    "instagram": "Instagram",
+    "telegram": "Telegram",
+    "facebook": "Facebook",
+    "google": "Google",
+    "street_banner": "Уличный баннер",
+    "returning": "Повторное обращение",
+    "other": "Другое"
+  },
+  "tags": {
+    "VIP": "VIP",
+    "DEBTOR": "Должник",
+    "STAFF_FAMILY": "Семья сотрудника",
+    "INSURANCE": "Страховка",
+    "BLACKLIST": "Чёрный список"
+  },
+  "duplicates": {
+    "title": "Возможно, такой пациент уже есть",
+    "description": "Найдены похожие пациенты. Откройте существующую карту или всё равно создайте новую.",
+    "open": "Открыть",
+    "forceCreate": "Всё равно создать"
+  },
+  "overview": {
+    "demographics": "Личные данные",
+    "dob": "Дата рождения",
+    "gender": "Пол",
+    "bloodGroup": "Группа крови",
+    "phoneAlt": "Доп. телефон",
+    "address": "Адрес",
+    "passport": "Паспорт / ID",
+    "source": "Откуда узнал о нас",
+    "registeredAt": "Дата регистрации",
+    "allergies": "Аллергии",
+    "noAllergies": "Аллергии не указаны",
+    "chronicConditions": "Хронические заболевания",
+    "noChronic": "Хронические заболевания не указаны",
+    "notes": "Заметки",
+    "noNotes": "Заметок нет",
+    "consents": "Согласия",
+    "noConsents": "Согласия не оформлены",
+    "consentType": "Тип согласия",
+    "signedAt": "Дата подписания",
+    "note": "Комментарий",
+    "addConsent": "Добавить согласие",
+    "consentAdded": "Согласие добавлено"
+  },
+  "consentType": {
+    "personal_data": "Обработка персональных данных",
+    "treatment": "Согласие на лечение",
+    "other": "Другое"
+  },
+  "timeline": {
+    "all": "Все",
+    "visit": "Визит",
+    "diagnosis": "Диагноз",
+    "prescription": "Рецепт",
+    "lab": "Анализ",
+    "document": "Документ",
+    "payment": "Оплата",
+    "empty": "История пока пуста",
+    "loadMore": "Загрузить ещё",
+    "openVisit": "Открыть визит"
+  },
+  "visitStatus": {
+    "IN_PROGRESS": "В процессе",
+    "COMPLETED": "Завершён",
+    "CANCELLED": "Отменён"
+  },
+  "visits": {
+    "date": "Дата",
+    "doctor": "Врач",
+    "status": "Статус",
+    "open": "Открыть",
+    "empty": "Визитов нет"
+  },
+  "documents": {
+    "uploadTitle": "Загрузка документа",
+    "file": "Файл",
+    "title": "Название",
+    "category": "Категория",
+    "upload": "Загрузить",
+    "uploaded": "Документ загружен",
+    "deletedDoc": "Документ удалён",
+    "deleteTitle": "Удалить документ?",
+    "deleteDesc": "Документ \"{title}\" будет удалён безвозвратно.",
+    "download": "Скачать",
+    "empty": "Документов нет",
+    "prev": "Назад",
+    "next": "Вперёд"
+  },
+  "docCategory": {
+    "ANALYSIS": "Анализ",
+    "IMAGING": "Снимок (УЗИ, рентген)",
+    "DISCHARGE": "Эпикриз",
+    "CONSENT": "Согласие",
+    "OTHER": "Другое"
+  },
+  "invoices": {
+    "title": "Счета",
+    "number": "Номер",
+    "date": "Дата",
+    "total": "Итого",
+    "paid": "Оплачено",
+    "due": "Остаток",
+    "status": "Статус",
+    "empty": "Счетов нет"
+  },
+  "invoiceStatus": {
+    "DRAFT": "Черновик",
+    "ISSUED": "Выставлен",
+    "PARTIALLY_PAID": "Частично оплачен",
+    "PAID": "Оплачен",
+    "CANCELLED": "Отменён",
+    "REFUNDED": "Возврат"
+  },
+  "balance": {
+    "title": "Баланс и транзакции",
+    "date": "Дата",
+    "type": "Тип",
+    "amount": "Сумма",
+    "note": "Комментарий",
+    "empty": "Транзакций нет"
+  },
+  "txType": {
+    "DEPOSIT": "Депозит",
+    "WITHDRAWAL": "Снятие",
+    "INVOICE_APPLY": "Оплата счёта",
+    "REFUND_CREDIT": "Кредит возврата",
+    "ADJUSTMENT": "Корректировка"
+  },
+  "merge": {
+    "title": "Объединение карт пациентов",
+    "description": "Найдите дубликат — все его записи будут перенесены в карту {name}.",
+    "searchPlaceholder": "Поиск по имени, телефону или MRN...",
+    "selected": "Выбрано",
+    "warning": "Это действие нельзя отменить!",
+    "summary": "Все визиты, счета и документы карты {duplicate} будут перенесены в карту {primary}, затем дубликат будет архивирован.",
+    "confirm": "Объединить",
+    "merged": "Пациенты объединены"
+  }
+}

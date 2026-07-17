@@ -1,0 +1,88 @@
+{
+  "title": "Reception",
+  "subtitle": "Today's appointments and live queue",
+  "appointments": {
+    "title": "Today's appointments",
+    "empty": "No appointments for today",
+    "confirm": "Confirm",
+    "checkIn": "Check in",
+    "enqueue": "Add to queue",
+    "cancel": "Cancel appointment",
+    "statusChanged": "Appointment status updated"
+  },
+  "statuses": {
+    "SCHEDULED": "Scheduled",
+    "CONFIRMED": "Confirmed",
+    "CHECKED_IN": "Checked in",
+    "IN_QUEUE": "In queue",
+    "IN_PROGRESS": "In progress",
+    "COMPLETED": "Completed",
+    "NO_SHOW": "No-show",
+    "CANCELLED": "Cancelled"
+  },
+  "ticketStatuses": {
+    "WAITING": "Waiting",
+    "CALLED": "Called",
+    "IN_ROOM": "In room",
+    "DONE": "Done",
+    "SKIPPED": "Skipped"
+  },
+  "priorities": {
+    "NORMAL": "Normal",
+    "PRIORITY": "Priority",
+    "EMERGENCY": "Emergency"
+  },
+  "queue": {
+    "title": "Live queue",
+    "empty": "The queue is empty",
+    "emptyHint": "Check in an appointment or add a walk-in to enqueue a patient",
+    "noDoctor": "Queue without doctor",
+    "groupCounts": "{waiting} waiting · {done} done",
+    "priority": "Priority",
+    "priorityChanged": "Ticket priority changed",
+    "transfer": "Transfer to another doctor",
+    "transferred": "Ticket transferred to another doctor",
+    "skip": "Skip",
+    "skipped": "Ticket skipped",
+    "skipConfirmTitle": "Skip this ticket?",
+    "skipConfirmDesc": "{ticket} — {patient} will be skipped in the queue. It can be re-called later.",
+    "enqueued": "Patient added to the queue"
+  },
+  "newPatient": {
+    "button": "New patient",
+    "title": "New patient (fast registration)",
+    "subtitle": "Minimal data: name, phone and date of birth",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "dob": "Date of birth",
+    "gender": "Gender",
+    "male": "Male",
+    "female": "Female",
+    "invalidPhone": "Invalid phone number (+998...)",
+    "duplicatesFound": "Similar patients found — make sure this is not a duplicate:",
+    "forceCreate": "Create anyway",
+    "created": "Patient registered"
+  },
+  "walkIn": {
+    "button": "Enqueue (walk-in)",
+    "title": "Walk-in enqueue",
+    "subtitle": "Pick a patient or create a new one, choose the doctor and priority",
+    "searchPlaceholder": "Patient: name, phone or MRN...",
+    "quickCreate": "Create new patient",
+    "submit": "Add to queue",
+    "created": "Patient enqueued"
+  },
+  "cancelDialog": {
+    "title": "Cancel appointment",
+    "subtitle": "A cancellation reason is required",
+    "reason": "Reason",
+    "reasonPlaceholder": "E.g. at the patient's request...",
+    "confirm": "Cancel appointment"
+  },
+  "transferDialog": {
+    "title": "Transfer to another doctor",
+    "subtitle": "{ticket} — {patient}",
+    "targetDoctor": "New doctor",
+    "confirm": "Transfer"
+  }
+}

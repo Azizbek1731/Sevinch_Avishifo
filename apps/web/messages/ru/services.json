@@ -1,0 +1,147 @@
+{
+  "title": "Услуги и цены",
+  "subtitle": "Каталог услуг, пакеты и правила скидок",
+  "newService": "Услуга",
+  "searchPlaceholder": "Поиск по коду или названию...",
+  "deactivated": "Услуга удалена",
+  "deactivateTitle": "Удалить услугу?",
+  "deactivateDescription": "Услуга \"{name}\" будет деактивирована. Она сохранится в истории счетов.",
+  "tabs": {
+    "services": "Услуги",
+    "packages": "Пакеты",
+    "discounts": "Скидки"
+  },
+  "filter": {
+    "all": "Все",
+    "active": "Активные",
+    "inactive": "Неактивные"
+  },
+  "table": {
+    "code": "Код",
+    "name": "Название",
+    "duration": "Длительность",
+    "price": "Цена",
+    "active": "Активна",
+    "minutes": "{min} мин."
+  },
+  "rowActions": {
+    "edit": "Редактировать",
+    "priceHistory": "История цен",
+    "deactivate": "Удалить"
+  },
+  "empty": {
+    "services": "Услуги не найдены"
+  },
+  "actions": {
+    "delete": "Удалить",
+    "cancel": "Отмена",
+    "save": "Сохранить"
+  },
+  "kinds": {
+    "CONSULTATION": "Консультация",
+    "LAB": "Лаборатория",
+    "ULTRASOUND": "УЗИ",
+    "PROCEDURE": "Процедура",
+    "DIAGNOSTICS": "Диагностика",
+    "OTHER": "Прочее"
+  },
+  "categories": {
+    "title": "Категории",
+    "all": "Все услуги",
+    "empty": "Категорий нет",
+    "namePlaceholder": "Название категории",
+    "created": "Категория создана",
+    "updated": "Категория сохранена",
+    "deleted": "Категория удалена",
+    "deleteTitle": "Удалить категорию?",
+    "deleteDescription": "Категория \"{name}\" будет удалена."
+  },
+  "form": {
+    "createTitle": "Новая услуга",
+    "editTitle": "Редактирование услуги",
+    "category": "Категория",
+    "selectCategory": "Выберите категорию",
+    "categoryRequired": "Необходимо выбрать категорию",
+    "code": "Код",
+    "duration": "Длительность (мин.)",
+    "nameUz": "Название (узбекский)",
+    "nameRu": "Название (русский)",
+    "price": "Начальная цена (сум)",
+    "required": "Обязательное поле",
+    "invalidDuration": "Неверная длительность",
+    "invalidPrice": "Неверная цена",
+    "created": "Услуга создана",
+    "updated": "Услуга сохранена"
+  },
+  "prices": {
+    "title": "История цен — {name}",
+    "price": "Цена",
+    "branch": "Филиал",
+    "effectiveFrom": "Действует с",
+    "effectiveTo": "Действует до",
+    "openEnded": "Действует",
+    "empty": "История цен пуста",
+    "clinicDefault": "По клинике",
+    "newPrice": "Новая цена",
+    "add": "Добавить",
+    "added": "Новая цена добавлена"
+  },
+  "packages": {
+    "new": "Пакет",
+    "created": "Пакет создан",
+    "updated": "Пакет сохранён",
+    "deleted": "Пакет удалён",
+    "inactive": "Неактивен",
+    "deleteTitle": "Удалить пакет?",
+    "deleteDescription": "Пакет \"{name}\" будет удалён.",
+    "empty": {
+      "title": "Пакетов пока нет",
+      "description": "Создайте пакет, чтобы объединить несколько услуг по сниженной цене."
+    },
+    "form": {
+      "createTitle": "Новый пакет",
+      "editTitle": "Редактирование пакета",
+      "price": "Цена пакета (сум)",
+      "items": "Состав услуг",
+      "addItem": "Добавить услугу",
+      "quantity": "Кол-во",
+      "selectService": "Выберите услугу",
+      "itemsRequired": "Выберите хотя бы одну услугу",
+      "itemsSum": "Сумма услуг: {sum}"
+    }
+  },
+  "discounts": {
+    "new": "Правило скидки",
+    "created": "Правило скидки создано",
+    "updated": "Правило скидки сохранено",
+    "deleted": "Правило скидки удалено",
+    "active": "Активно",
+    "inactive": "Неактивно",
+    "empty": "Правил скидок нет",
+    "deleteTitle": "Удалить правило скидки?",
+    "deleteDescription": "Правило \"{name}\" будет удалено.",
+    "table": {
+      "name": "Название",
+      "type": "Тип",
+      "value": "Значение",
+      "patientTag": "Тег пациента",
+      "promoCode": "Промокод",
+      "active": "Статус"
+    },
+    "types": {
+      "PERCENT": "Процент",
+      "FIXED": "Фиксированная сумма"
+    },
+    "form": {
+      "createTitle": "Новое правило скидки",
+      "editTitle": "Редактирование правила скидки",
+      "name": "Название",
+      "type": "Тип",
+      "valuePercent": "Значение (%)",
+      "valueFixed": "Значение (сум)",
+      "patientTag": "Тег пациента (необязательно)",
+      "promoCode": "Промокод (необязательно)",
+      "isActive": "Активно"
+    }
+  }
+}
