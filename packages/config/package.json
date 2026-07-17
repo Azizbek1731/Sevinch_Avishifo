@@ -1,0 +1,12 @@
+{
+  "name": "@avishifo/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared tsconfig/tailwind presets for AviShifo",
+  "files": ["tsconfig", "tailwind"],
+  "scripts": {
+    "build": "echo config: nothing to build",
+    "lint": "echo config: nothing to lint",
+    "typecheck": "echo config: nothing to typecheck"
+  }
+}

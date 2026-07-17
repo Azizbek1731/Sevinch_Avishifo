@@ -1,0 +1,36 @@
+{
+  "name": "avishifo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AviShifo — multi-tenant clinic CRM/HIS for private clinics in Uzbekistan",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,md,json,yml,yaml}\"",
+    "db:migrate": "pnpm --filter @avishifo/api db:migrate",
+    "db:seed": "pnpm --filter @avishifo/api db:seed",
+    "db:studio": "pnpm --filter @avishifo/api db:studio",
+    "keys:generate": "node scripts/generate-keys.mjs",
+    "dev:services": "node scripts/dev-local.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "embedded-postgres": "16.14.0-beta.17",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.2",
+    "redis-memory-server": "^0.17.0",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0"
+  }
+}
