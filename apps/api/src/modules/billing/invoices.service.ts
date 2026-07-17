@@ -1,0 +1,889 @@
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import type {
+  Invoice,
+  InvoiceLine,
+  Payment,
+  Refund,
+  PaymentStatus as DbPaymentStatus,
+} from '@prisma/client';
+import {
+  AuditAction,
+  ErrorCode,
+  NotificationEvent,
+  type AddPaymentInput,
+  type AuthUser,
+  type CreateInvoiceInput,
+  type CreateRefundInput,
+  type InvoiceQueryInput,
+} from '@avishifo/shared';
+import { AppException } from '../../common/app.exception';
+import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
+import { PrismaService } from '../../core/prisma/prisma.service';
+import { TenantContext } from '../../core/prisma/tenant-context';
+import { EventsService } from '../../core/realtime/events.service';
+import { AuditService } from '../../core/audit/audit.service';
+import { SequenceService } from '../../core/sequence/sequence.service';
+import { PricingService } from '../services/pricing.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { FISCALIZATION_SERVICE, type FiscalizationService } from './fiscalization.service';
+
+const DEFAULT_INVOICE_FORMAT = 'INV-{YYYY}-{NNNNNN}';
+
+interface LinePlan {
+  serviceId: string | null;
+  title: Prisma.InputJsonValue;
+  quantity: number;
+  unitPrice: Prisma.Decimal;
+  discount: Prisma.Decimal;
+  lineTotal: Prisma.Decimal;
+  performerUserId: string | null;
+}
+
+/** Payment view returned to provider webhook handlers (Payme state codes). */
+export interface ProviderPaymentView {
+  id: string;
+  invoiceId: string;
+  amount: string;
+  /** Payme-style state: 1 pending, 2 completed, -1 cancelled, -2 cancelled after perform. */
+  state: number;
+  createTime: number;
+  performTime: number;
+}
+
+export type ProviderTxError =
+  | 'invoice_not_found'
+  | 'invalid_state'
+  | 'wrong_amount'
+  | 'tx_not_found'
+  | 'cannot_perform';
+
+export type ProviderTxResult =
+  | { ok: true; payment: ProviderPaymentView }
+  | { ok: false; error: ProviderTxError };
+
+function providerState(status: DbPaymentStatus): number {
+  switch (status) {
+    case 'PENDING':
+      return 1;
+    case 'COMPLETED':
+      return 2;
+    case 'REFUNDED':
+      return -2;
+    case 'FAILED':
+    default:
+      return -1;
+  }
+}
+
+@Injectable()
+export class InvoicesService {
+  private readonly logger = new Logger(InvoicesService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly sequence: SequenceService,
+    private readonly events: EventsService,
+    private readonly audit: AuditService,
+    private readonly pricing: PricingService,
+    private readonly notifications: NotificationsService,
+    @Inject(FISCALIZATION_SERVICE) private readonly fiscalization: FiscalizationService,
+  ) {}
+
+  // ============================================================ mapping
+
+  private mapInvoice(inv: Invoice): Record<string, unknown> {
+    return {
+      id: inv.id,
+      number: inv.number,
+      branchId: inv.branchId,
+      patientId: inv.patientId,
+      visitId: inv.visitId,
+      status: inv.status,
+      subtotal: inv.subtotal.toFixed(2),
+      discountTotal: inv.discountTotal.toFixed(2),
+      total: inv.total.toFixed(2),
+      paidTotal: inv.paidTotal.toFixed(2),
+      due: inv.total.sub(inv.paidTotal).toFixed(2),
+      note: inv.note,
+      issuedAt: inv.issuedAt ? inv.issuedAt.toISOString() : null,
+      createdById: inv.createdById,
+      createdAt: inv.createdAt.toISOString(),
+      updatedAt: inv.updatedAt.toISOString(),
+    };
+  }
+
+  private mapLine(line: InvoiceLine): Record<string, unknown> {
+    return {
+      id: line.id,
+      serviceId: line.serviceId,
+      title: line.title,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice.toFixed(2),
+      discount: line.discount.toFixed(2),
+      lineTotal: line.lineTotal.toFixed(2),
+      performerUserId: line.performerUserId,
+    };
+  }
+
+  private mapPayment(p: Payment): Record<string, unknown> {
+    return {
+      id: p.id,
+      invoiceId: p.invoiceId,
+      branchId: p.branchId,
+      amount: p.amount.toFixed(2),
+      method: p.method,
+      status: p.status,
+      shiftId: p.shiftId,
+      providerTxId: p.providerTxId,
+      receivedById: p.receivedById,
+      paidAt: p.paidAt.toISOString(),
+      createdAt: p.createdAt.toISOString(),
+    };
+  }
+
+  private mapRefund(r: Refund): Record<string, unknown> {
+    return {
+      id: r.id,
+      invoiceId: r.invoiceId,
+      amount: r.amount.toFixed(2),
+      method: r.method,
+      reason: r.reason,
+      shiftId: r.shiftId,
+      createdById: r.createdById,
+      createdAt: r.createdAt.toISOString(),
+    };
+  }
+
+  // ============================================================ numbering
+
+  /**
+   * Sequence-based invoice number from clinic.settings.invoiceNumberFormat.
+   * Supported placeholders: {YYYY} (current year) and {N..N} (zero-padded sequence).
+   */
+  private async nextInvoiceNumber(): Promise<string> {
+    const clinicId = TenantContext.requireClinicId();
+    // prisma.unscoped justified: Clinic is not tenant-auto-scoped; we read only
+    // the current tenant's own row by the context clinicId.
+    const clinic = await this.prisma.unscoped.clinic.findUnique({
+      where: { id: clinicId },
+      select: { settings: true },
+    });
+    const settings =
+      clinic && typeof clinic.settings === 'object' && clinic.settings !== null
+        ? (clinic.settings as Record<string, unknown>)
+        : {};
+    const format =
+      typeof settings.invoiceNumberFormat === 'string' && settings.invoiceNumberFormat.length > 0
+        ? settings.invoiceNumberFormat
+        : DEFAULT_INVOICE_FORMAT;
+    const seq = await this.sequence.next('invoice');
+    return format
+      .replace('{YYYY}', String(new Date().getUTCFullYear()))
+      .replace(/\{(N+)\}/, (_m, ns: string) => String(seq).padStart(ns.length, '0'));
+  }
+
+  // ============================================================ invoices
+
+  async create(dto: CreateInvoiceInput, user: AuthUser): Promise<Record<string, unknown>> {
+    const clinicId = TenantContext.requireClinicId();
+
+    const patient = await this.prisma.db.patient.findFirst({
+      where: { id: dto.patientId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!patient) throw new AppException(ErrorCode.PATIENT_NOT_FOUND, 'Patient not found', 404);
+
+    let visit: { id: string; doctorUserId: string; serviceIds: string[]; titles: Map<string, Prisma.JsonValue> } | null =
+      null;
+    if (dto.visitId) {
+      const row = await this.prisma.db.visit.findFirst({
+        where: { id: dto.visitId, patientId: dto.patientId },
+        include: {
+          appointment: { include: { services: { include: { service: { select: { id: true, name: true } } } } } },
+        },
+      });
+      if (!row) throw new AppException(ErrorCode.VISIT_NOT_FOUND, 'Visit not found', 404);
+      const titles = new Map<string, Prisma.JsonValue>();
+      const serviceIds: string[] = [];
+      for (const s of row.appointment?.services ?? []) {
+        serviceIds.push(s.serviceId);
+        titles.set(s.serviceId, s.service.name);
+      }
+      visit = { id: row.id, doctorUserId: row.doctorUserId, serviceIds, titles };
+    }
+
+    const plans: LinePlan[] = [];
+    if (dto.lines && dto.lines.length > 0) {
+      // Explicit lines (unit prices supplied by the caller, validated by zod).
+      const serviceIds = dto.lines.map((l) => l.serviceId).filter((x): x is string => x !== undefined);
+      const services =
+        serviceIds.length > 0
+          ? await this.prisma.db.service.findMany({
+              where: { id: { in: serviceIds } },
+              select: { id: true, name: true },
+            })
+          : [];
+      const serviceById = new Map(services.map((s) => [s.id, s]));
+      for (const l of dto.lines) {
+        const svc = l.serviceId ? serviceById.get(l.serviceId) : undefined;
+        if (l.serviceId && !svc) {
+          throw new AppException(ErrorCode.NOT_FOUND, 'Service not found', 404, [{ serviceId: l.serviceId }]);
+        }
+        const unitPrice = new Prisma.Decimal(l.unitPrice);
+        const discount = new Prisma.Decimal(l.discount ?? '0');
+        const lineTotal = unitPrice.mul(l.quantity).sub(discount);
+        if (lineTotal.lt(0)) {
+          throw new AppException(ErrorCode.VALIDATION_ERROR, 'Line discount exceeds line amount', 400);
+        }
+        plans.push({
+          serviceId: l.serviceId ?? null,
+          title: (l.title ?? (svc?.name as Prisma.InputJsonValue) ?? '') as Prisma.InputJsonValue,
+          quantity: l.quantity,
+          unitPrice,
+          discount,
+          lineTotal,
+          performerUserId: l.performerUserId ?? visit?.doctorUserId ?? null,
+        });
+      }
+    } else if (visit) {
+      // Lines absent — price the visit's appointment services via PricingService.
+      if (visit.serviceIds.length === 0) {
+        throw new AppException(ErrorCode.VALIDATION_ERROR, 'Visit has no services to invoice', 400);
+      }
+      for (const serviceId of visit.serviceIds) {
+        const price = await this.pricing.getCurrentPrice(serviceId, dto.branchId);
+        if (price === null) {
+          throw new AppException(ErrorCode.VALIDATION_ERROR, 'Service has no current price', 400, [{ serviceId }]);
+        }
+        const unitPrice = new Prisma.Decimal(price);
+        plans.push({
+          serviceId,
+          title: (visit.titles.get(serviceId) ?? '') as Prisma.InputJsonValue,
+          quantity: 1,
+          unitPrice,
+          discount: new Prisma.Decimal(0),
+          lineTotal: unitPrice,
+          performerUserId: visit.doctorUserId,
+        });
+      }
+    }
+    if (plans.length === 0) {
+      throw new AppException(ErrorCode.VALIDATION_ERROR, 'Invoice requires at least one line', 400);
+    }
+
+    const zero = new Prisma.Decimal(0);
+    const subtotal = plans.reduce((acc, p) => acc.add(p.unitPrice.mul(p.quantity)), zero);
+    const discountTotal = plans.reduce((acc, p) => acc.add(p.discount), zero);
+    const total = subtotal.sub(discountTotal);
+
+    const number = await this.nextInvoiceNumber();
+    const invoice = await this.prisma.db.invoice.create({
+      // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
+      data: {
+        clinicId,
+        branchId: dto.branchId,
+        number,
+        patientId: dto.patientId,
+        visitId: dto.visitId ?? null,
+        status: 'DRAFT',
+        subtotal,
+        discountTotal,
+        total,
+        createdById: user.id,
+        lines: {
+          create: plans.map((p) => ({
+            // Nested creates are NOT auto-stamped by the tenant extension.
+            clinicId,
+            serviceId: p.serviceId,
+            title: p.title,
+            quantity: p.quantity,
+            unitPrice: p.unitPrice,
+            discount: p.discount,
+            lineTotal: p.lineTotal,
+            performerUserId: p.performerUserId,
+          })),
+        },
+      },
+      include: { lines: true },
+    });
+
+    await this.audit.log({
+      action: AuditAction.CREATE,
+      entity: 'Invoice',
+      entityId: invoice.id,
+      after: {
+        number: invoice.number,
+        patientId: invoice.patientId,
+        visitId: invoice.visitId,
+        total: invoice.total.toFixed(2),
+        status: invoice.status,
+      },
+    });
+
+    return { ...this.mapInvoice(invoice), lines: invoice.lines.map((l) => this.mapLine(l)) };
+  }
+
+  async list(q: InvoiceQueryInput): Promise<PaginatedResult<Record<string, unknown>>> {
+    const where: Prisma.InvoiceWhereInput = {
+      ...(q.status ? { status: q.status } : {}),
+      ...(q.patientId ? { patientId: q.patientId } : {}),
+      ...(q.branchId ? { branchId: q.branchId } : {}),
+      ...(q.from || q.to
+        ? {
+            createdAt: {
+              ...(q.from ? { gte: new Date(q.from) } : {}),
+              ...(q.to ? { lte: new Date(q.to) } : {}),
+            },
+          }
+        : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.db.invoice.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        ...skipTake(q),
+        include: { patient: { select: { id: true, mrn: true, fullName: true, phone: true } } },
+      }),
+      this.prisma.db.invoice.count({ where }),
+    ]);
+    return paginated(
+      rows.map((r) => ({ ...this.mapInvoice(r), patient: r.patient })),
+      { page: q.page, limit: q.limit, total },
+    );
+  }
+
+  async getById(id: string): Promise<Record<string, unknown>> {
+    const invoice = await this.prisma.db.invoice.findFirst({
+      where: { id },
+      include: {
+        lines: true,
+        payments: { orderBy: { createdAt: 'asc' } },
+        refunds: { orderBy: { createdAt: 'asc' } },
+        patient: { select: { id: true, mrn: true, fullName: true, phone: true } },
+      },
+    });
+    if (!invoice) throw new AppException(ErrorCode.INVOICE_NOT_FOUND, 'Invoice not found', 404);
+    return {
+      ...this.mapInvoice(invoice),
+      patient: invoice.patient,
+      lines: invoice.lines.map((l) => this.mapLine(l)),
+      payments: invoice.payments.map((p) => this.mapPayment(p)),
+      refunds: invoice.refunds.map((r) => this.mapRefund(r)),
+    };
+  }
+
+  async issue(id: string): Promise<Record<string, unknown>> {
+    const invoice = await this.prisma.db.invoice.findFirst({ where: { id } });
+    if (!invoice) throw new AppException(ErrorCode.INVOICE_NOT_FOUND, 'Invoice not found', 404);
+    if (invoice.status !== 'DRAFT') {
+      throw new AppException(ErrorCode.INVOICE_INVALID_STATE, 'Only DRAFT invoices can be issued', 409);
+    }
+    const updated = await this.prisma.db.invoice.update({
+      where: { id },
+      data: { status: 'ISSUED', issuedAt: new Date() },
+    });
+    await this.audit.log({
+      action: AuditAction.UPDATE,
+      entity: 'Invoice',
+      entityId: id,
+      before: { status: invoice.status },
+      after: { status: updated.status },
+    });
+    return this.mapInvoice(updated);
+  }
+
+  async cancel(id: string): Promise<Record<string, unknown>> {
+    const invoice = await this.prisma.db.invoice.findFirst({
+      where: { id },
+      include: { _count: { select: { payments: true } } },
+    });
+    if (!invoice) throw new AppException(ErrorCode.INVOICE_NOT_FOUND, 'Invoice not found', 404);
+    if (invoice._count.payments > 0) {
+      throw new AppException(
+        ErrorCode.INVOICE_INVALID_STATE,
+        'Invoice with payments cannot be cancelled — refund instead',
+        409,
+      );
+    }
+    if (invoice.status !== 'DRAFT' && invoice.status !== 'ISSUED') {
+      throw new AppException(ErrorCode.INVOICE_INVALID_STATE, 'Invoice cannot be cancelled in this state', 409);
+    }
+    const updated = await this.prisma.db.invoice.update({ where: { id }, data: { status: 'CANCELLED' } });
+    await this.audit.log({
+      action: AuditAction.UPDATE,
+      entity: 'Invoice',
+      entityId: id,
+      before: { status: invoice.status },
+      after: { status: 'CANCELLED' },
+    });
+    return this.mapInvoice(updated);
+  }
+
+  // ============================================================ payments
+
+  private async paymentResponse(paymentId: string): Promise<Record<string, unknown>> {
+    const payment = await this.prisma.db.payment.findFirst({ where: { id: paymentId } });
+    if (!payment) throw new AppException(ErrorCode.PAYMENT_FAILED, 'Payment not found after write', 500);
+    const invoice = await this.prisma.db.invoice.findFirst({ where: { id: payment.invoiceId } });
+    if (!invoice) throw new AppException(ErrorCode.INVOICE_NOT_FOUND, 'Invoice not found', 404);
+    return { payment: this.mapPayment(payment), invoice: this.mapInvoice(invoice) };
+  }
+
+  /** Emit realtime + notification + audit side effects after money is applied. */
+  private async afterPaymentApplied(
+    invoice: Invoice,
+    payment: Payment,
+    newPaidTotal: Prisma.Decimal,
+  ): Promise<void> {
+    const clinicId = invoice.clinicId;
+    this.events.toClinic(clinicId, 'invoice.paid', {
+      invoiceId: invoice.id,
+      amount: payment.amount.toFixed(2),
+      branchId: invoice.branchId,
+    });
+    // prisma.unscoped justified: Clinic is not tenant-auto-scoped; own row only.
+    const clinic = await this.prisma.unscoped.clinic.findUnique({
+      where: { id: clinicId },
+      select: { name: true },
+    });
+    try {
+      await this.notifications.enqueueEvent({
+        event: NotificationEvent.PAYMENT_RECEIPT,
+        clinicId,
+        patientId: invoice.patientId,
+        vars: {
+          amount: payment.amount.toFixed(2),
+          invoice_number: invoice.number,
+          clinic_name: clinic?.name ?? '',
+        },
+      });
+    } catch (err) {
+      this.logger.error(`payment receipt notification failed: ${(err as Error).message}`);
+    }
+    await this.audit.log({
+      action: AuditAction.CREATE,
+      entity: 'Payment',
+      entityId: payment.id,
+      after: {
+        invoiceId: invoice.id,
+        amount: payment.amount.toFixed(2),
+        method: payment.method,
+        status: payment.status,
+      },
+    });
+    if (newPaidTotal.gte(invoice.total)) {
+      // Fire-and-forget stub; a real OFD provider may retry via its own queue.
+      this.fiscalization.registerReceipt(invoice.id).catch((err: unknown) => {
+        this.logger.error(`fiscalization failed for invoice ${invoice.id}: ${(err as Error).message}`);
+      });
+    }
+  }
+
+  async addPayment(invoiceId: string, dto: AddPaymentInput, user: AuthUser): Promise<Record<string, unknown>> {
+    // Idempotency pre-check on (clinicId, idempotencyKey).
+    const existing = await this.prisma.db.payment.findFirst({
+      where: { idempotencyKey: dto.idempotencyKey },
+    });
+    if (existing) return this.paymentResponse(existing.id);
+
+    const invoice = await this.prisma.db.invoice.findFirst({ where: { id: invoiceId } });
+    if (!invoice) throw new AppException(ErrorCode.INVOICE_NOT_FOUND, 'Invoice not found', 404);
+    if (invoice.status !== 'ISSUED' && invoice.status !== 'PARTIALLY_PAID') {
+      throw new AppException(
+        ErrorCode.INVOICE_INVALID_STATE,
+        'Payments are accepted only for ISSUED or PARTIALLY_PAID invoices',
+        409,
+      );
+    }
+    const amount = new Prisma.Decimal(dto.amount);
+    if (amount.lte(0)) throw new AppException(ErrorCode.VALIDATION_ERROR, 'Amount must be positive', 400);
+    const due = invoice.total.sub(invoice.paidTotal);
+    if (amount.gt(due)) {
+      throw new AppException(ErrorCode.PAYMENT_EXCEEDS_DUE, 'Payment exceeds the invoice due amount', 422, [
+        { due: due.toFixed(2) },
+      ]);
+    }
+
+    let shiftId: string | null = null;
+    if (dto.method === 'CASH') {
+      const shift = await this.prisma.db.cashierShift.findFirst({
+        where: { cashierUserId: user.id, branchId: invoice.branchId, status: 'OPEN' },
+      });
+      if (!shift) {
+        throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'Open cashier shift required for cash payments', 409);
+      }
+      shiftId = shift.id;
+    }
+
+    const newPaidTotal = invoice.paidTotal.add(amount);
+    const newStatus = newPaidTotal.gte(invoice.total) ? 'PAID' : 'PARTIALLY_PAID';
+
+    let payment: Payment;
+    try {
+      payment = await this.prisma.db.$transaction(async (tx) => {
+        if (dto.method === 'BALANCE') {
+          const patient = await tx.patient.findFirst({
+            where: { id: invoice.patientId },
+            select: { balance: true },
+          });
+          if (!patient || patient.balance.lt(amount)) {
+            throw new AppException(ErrorCode.INSUFFICIENT_BALANCE, 'Insufficient patient balance', 422);
+          }
+          await tx.patient.update({
+            where: { id: invoice.patientId },
+            data: { balance: { decrement: amount } },
+          });
+          await tx.patientBalanceTransaction.create({
+            // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
+            data: {
+              clinicId: invoice.clinicId,
+              patientId: invoice.patientId,
+              type: 'INVOICE_APPLY',
+              amount: amount.neg(),
+              invoiceId: invoice.id,
+              note: `Applied to invoice ${invoice.number}`,
+              createdById: user.id,
+            },
+          });
+        }
+        const created = await tx.payment.create({
+          // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
+          data: {
+            clinicId: invoice.clinicId,
+            branchId: invoice.branchId,
+            invoiceId: invoice.id,
+            amount,
+            method: dto.method,
+            status: 'COMPLETED',
+            shiftId,
+            idempotencyKey: dto.idempotencyKey,
+            receivedById: user.id,
+          },
+        });
+        await tx.invoice.update({
+          where: { id: invoice.id },
+          data: { paidTotal: newPaidTotal, status: newStatus },
+        });
+        return created;
+      });
+    } catch (err) {
+      // Concurrent duplicate with the same idempotency key — return the winner.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const winner = await this.prisma.db.payment.findFirst({
+          where: { idempotencyKey: dto.idempotencyKey },
+        });
+        if (winner) return this.paymentResponse(winner.id);
+      }
+      throw err;
+    }
+
+    await this.afterPaymentApplied(invoice, payment, newPaidTotal);
+    return this.paymentResponse(payment.id);
+  }
+
+  // ============================================================ refunds
+
+  async addRefund(invoiceId: string, dto: CreateRefundInput, user: AuthUser): Promise<Record<string, unknown>> {
+    const invoice = await this.prisma.db.invoice.findFirst({ where: { id: invoiceId } });
+    if (!invoice) throw new AppException(ErrorCode.INVOICE_NOT_FOUND, 'Invoice not found', 404);
+
+    const amount = new Prisma.Decimal(dto.amount);
+    if (amount.lte(0)) throw new AppException(ErrorCode.VALIDATION_ERROR, 'Amount must be positive', 400);
+
+    const agg = await this.prisma.db.refund.aggregate({
+      where: { invoiceId },
+      _sum: { amount: true },
+    });
+    const refundedSum = agg._sum.amount ?? new Prisma.Decimal(0);
+    if (refundedSum.add(amount).gt(invoice.paidTotal)) {
+      throw new AppException(ErrorCode.REFUND_EXCEEDS_PAID, 'Refund exceeds the paid total', 422, [
+        { paidTotal: invoice.paidTotal.toFixed(2), alreadyRefunded: refundedSum.toFixed(2) },
+      ]);
+    }
+
+    let shiftId: string | null = null;
+    if (dto.method === 'CASH') {
+      const shift = await this.prisma.db.cashierShift.findFirst({
+        where: { cashierUserId: user.id, branchId: invoice.branchId, status: 'OPEN' },
+      });
+      if (!shift) {
+        throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'Open cashier shift required for cash refunds', 409);
+      }
+      shiftId = shift.id;
+    }
+
+    const fullyRefunded = refundedSum.add(amount).gte(invoice.paidTotal) && invoice.paidTotal.gt(0);
+    const refund = await this.prisma.db.$transaction(async (tx) => {
+      const created = await tx.refund.create({
+        // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
+        data: {
+          clinicId: invoice.clinicId,
+          invoiceId: invoice.id,
+          amount,
+          method: dto.method,
+          reason: dto.reason,
+          shiftId,
+          createdById: user.id,
+        },
+      });
+      if (fullyRefunded) {
+        await tx.invoice.update({ where: { id: invoice.id }, data: { status: 'REFUNDED' } });
+      }
+      return created;
+    });
+
+    await this.audit.log({
+      action: AuditAction.REFUND,
+      entity: 'Refund',
+      entityId: refund.id,
+      after: {
+        invoiceId: invoice.id,
+        amount: amount.toFixed(2),
+        method: dto.method,
+        reason: dto.reason,
+      },
+    });
+
+    const fresh = await this.prisma.db.invoice.findFirst({ where: { id: invoice.id } });
+    return {
+      refund: this.mapRefund(refund),
+      invoice: fresh ? this.mapInvoice(fresh) : this.mapInvoice(invoice),
+    };
+  }
+
+  // ============================================================ receipt
+
+  /** JSON payload for the 80mm thermal receipt template (frontend renders/prints). */
+  async receipt(id: string): Promise<Record<string, unknown>> {
+    const clinicId = TenantContext.requireClinicId();
+    const invoice = await this.prisma.db.invoice.findFirst({
+      where: { id },
+      include: {
+        lines: true,
+        payments: { where: { status: 'COMPLETED' }, orderBy: { paidAt: 'asc' } },
+        patient: { select: { id: true, mrn: true, fullName: true } },
+      },
+    });
+    if (!invoice) throw new AppException(ErrorCode.INVOICE_NOT_FOUND, 'Invoice not found', 404);
+    // prisma.unscoped justified: clinic letterhead — Clinic is not tenant-auto-scoped,
+    // we read only the current tenant's own row via the context clinicId.
+    const clinic = await this.prisma.unscoped.clinic.findUnique({
+      where: { id: clinicId },
+      select: { name: true, legalName: true, taxId: true, logoUrl: true, phone: true, address: true },
+    });
+    const branch = await this.prisma.db.branch.findFirst({
+      where: { id: invoice.branchId },
+      select: { name: true, address: true, phone: true },
+    });
+    return {
+      clinic: clinic ?? null,
+      branch: branch ?? null,
+      invoice: this.mapInvoice(invoice),
+      patient: invoice.patient,
+      lines: invoice.lines.map((l) => this.mapLine(l)),
+      payments: invoice.payments.map((p) => this.mapPayment(p)),
+      totals: {
+        subtotal: invoice.subtotal.toFixed(2),
+        discountTotal: invoice.discountTotal.toFixed(2),
+        total: invoice.total.toFixed(2),
+        paidTotal: invoice.paidTotal.toFixed(2),
+        due: invoice.total.sub(invoice.paidTotal).toFixed(2),
+      },
+      printedAt: new Date().toISOString(),
+    };
+  }
+
+  // ============================================================ provider webhooks
+  // Webhooks arrive pre-tenant (no auth context): invoices/payments are located
+  // via prisma.unscoped by their provider-facing keys, then all writes run inside
+  // TenantContext.run({ clinicId }) of the located row (spec §M8) — justified.
+
+  private providerView(p: Payment): ProviderPaymentView {
+    return {
+      id: p.id,
+      invoiceId: p.invoiceId,
+      amount: p.amount.toFixed(2),
+      state: providerState(p.status),
+      createTime: p.createdAt.getTime(),
+      performTime: p.status === 'COMPLETED' || p.status === 'REFUNDED' ? p.paidAt.getTime() : 0,
+    };
+  }
+
+  /** CheckPerformTransaction / pre-create validation. */
+  async providerCheckInvoice(
+    invoiceNumber: string,
+    amount: string,
+  ): Promise<{ ok: true } | { ok: false; error: ProviderTxError }> {
+    // prisma.unscoped justified: pre-tenant webhook lookup by invoice number.
+    const invoice = await this.prisma.unscoped.invoice.findFirst({ where: { number: invoiceNumber } });
+    if (!invoice) return { ok: false, error: 'invoice_not_found' };
+    if (invoice.status !== 'ISSUED' && invoice.status !== 'PARTIALLY_PAID') {
+      return { ok: false, error: 'invalid_state' };
+    }
+    let dec: Prisma.Decimal;
+    try {
+      dec = new Prisma.Decimal(amount);
+    } catch {
+      return { ok: false, error: 'wrong_amount' };
+    }
+    if (dec.lte(0) || dec.gt(invoice.total.sub(invoice.paidTotal))) {
+      return { ok: false, error: 'wrong_amount' };
+    }
+    return { ok: true };
+  }
+
+  /** Payme CreateTransaction / Click prepare — idempotent on providerTxId. */
+  async providerCreateTransaction(i: {
+    method: 'PAYME' | 'CLICK' | 'UZUM';
+    providerTxId: string;
+    invoiceNumber: string;
+    amount: string;
+  }): Promise<ProviderTxResult> {
+    if (i.providerTxId === '') return { ok: false, error: 'tx_not_found' };
+    // prisma.unscoped justified: pre-tenant webhook idempotency lookup by providerTxId.
+    const existing = await this.prisma.unscoped.payment.findFirst({
+      where: { providerTxId: i.providerTxId, method: i.method },
+    });
+    if (existing) return { ok: true, payment: this.providerView(existing) };
+
+    // prisma.unscoped justified: pre-tenant webhook lookup by invoice number.
+    const invoice = await this.prisma.unscoped.invoice.findFirst({ where: { number: i.invoiceNumber } });
+    if (!invoice) return { ok: false, error: 'invoice_not_found' };
+    if (invoice.status !== 'ISSUED' && invoice.status !== 'PARTIALLY_PAID') {
+      return { ok: false, error: 'invalid_state' };
+    }
+    let amount: Prisma.Decimal;
+    try {
+      amount = new Prisma.Decimal(i.amount);
+    } catch {
+      return { ok: false, error: 'wrong_amount' };
+    }
+    if (amount.lte(0) || amount.gt(invoice.total.sub(invoice.paidTotal))) {
+      return { ok: false, error: 'wrong_amount' };
+    }
+
+    const payment = await TenantContext.run({ clinicId: invoice.clinicId }, () =>
+      this.prisma.db.payment.create({
+        // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
+        data: {
+          clinicId: invoice.clinicId,
+          branchId: invoice.branchId,
+          invoiceId: invoice.id,
+          amount,
+          method: i.method,
+          status: 'PENDING',
+          providerTxId: i.providerTxId,
+        },
+      }),
+    );
+    return { ok: true, payment: this.providerView(payment) };
+  }
+
+  /** Payme PerformTransaction / Click complete — idempotent on providerTxId. */
+  async providerPerformTransaction(i: {
+    method: 'PAYME' | 'CLICK' | 'UZUM';
+    providerTxId: string;
+  }): Promise<ProviderTxResult> {
+    // prisma.unscoped justified: pre-tenant webhook lookup by providerTxId.
+    const payment = await this.prisma.unscoped.payment.findFirst({
+      where: { providerTxId: i.providerTxId, method: i.method },
+    });
+    if (!payment) return { ok: false, error: 'tx_not_found' };
+    if (payment.status === 'COMPLETED') return { ok: true, payment: this.providerView(payment) };
+    if (payment.status !== 'PENDING') return { ok: false, error: 'cannot_perform' };
+
+    return TenantContext.run({ clinicId: payment.clinicId }, async () => {
+      const invoice = await this.prisma.db.invoice.findFirst({ where: { id: payment.invoiceId } });
+      if (!invoice || (invoice.status !== 'ISSUED' && invoice.status !== 'PARTIALLY_PAID')) {
+        return { ok: false as const, error: 'cannot_perform' as const };
+      }
+      if (payment.amount.gt(invoice.total.sub(invoice.paidTotal))) {
+        return { ok: false as const, error: 'cannot_perform' as const };
+      }
+      const newPaidTotal = invoice.paidTotal.add(payment.amount);
+      const newStatus = newPaidTotal.gte(invoice.total) ? 'PAID' : 'PARTIALLY_PAID';
+      const updated = await this.prisma.db.$transaction(async (tx) => {
+        const perf = await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'COMPLETED', paidAt: new Date() },
+        });
+        await tx.invoice.update({
+          where: { id: invoice.id },
+          data: { paidTotal: newPaidTotal, status: newStatus },
+        });
+        return perf;
+      });
+      await this.afterPaymentApplied(invoice, updated, newPaidTotal);
+      return { ok: true as const, payment: this.providerView(updated) };
+    });
+  }
+
+  /** Payme CancelTransaction / Click error rollback. */
+  async providerCancelTransaction(i: {
+    method: 'PAYME' | 'CLICK' | 'UZUM';
+    providerTxId: string;
+    reason?: string;
+  }): Promise<ProviderTxResult> {
+    // prisma.unscoped justified: pre-tenant webhook lookup by providerTxId.
+    const payment = await this.prisma.unscoped.payment.findFirst({
+      where: { providerTxId: i.providerTxId, method: i.method },
+    });
+    if (!payment) return { ok: false, error: 'tx_not_found' };
+    if (payment.status === 'FAILED' || payment.status === 'REFUNDED') {
+      return { ok: true, payment: this.providerView(payment) };
+    }
+
+    return TenantContext.run({ clinicId: payment.clinicId }, async () => {
+      if (payment.status === 'PENDING') {
+        const cancelled = await this.prisma.db.payment.update({
+          where: { id: payment.id },
+          data: { status: 'FAILED' },
+        });
+        return { ok: true as const, payment: this.providerView(cancelled) };
+      }
+      // COMPLETED → roll the money back off the invoice.
+      const invoice = await this.prisma.db.invoice.findFirst({ where: { id: payment.invoiceId } });
+      if (!invoice) return { ok: false as const, error: 'cannot_perform' as const };
+      const newPaidTotal = invoice.paidTotal.sub(payment.amount);
+      const newStatus = newPaidTotal.lte(0) ? 'ISSUED' : 'PARTIALLY_PAID';
+      const cancelled = await this.prisma.db.$transaction(async (tx) => {
+        const upd = await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'REFUNDED' },
+        });
+        await tx.invoice.update({
+          where: { id: invoice.id },
+          data: { paidTotal: newPaidTotal.lt(0) ? new Prisma.Decimal(0) : newPaidTotal, status: newStatus },
+        });
+        return upd;
+      });
+      await this.audit.log({
+        action: AuditAction.REFUND,
+        entity: 'Payment',
+        entityId: payment.id,
+        after: {
+          invoiceId: invoice.id,
+          amount: payment.amount.toFixed(2),
+          method: payment.method,
+          reason: i.reason ?? 'provider cancellation',
+        },
+        clinicId: payment.clinicId,
+      });
+      return { ok: true as const, payment: this.providerView(cancelled) };
+    });
+  }
+
+  /** Payme CheckTransaction. */
+  async providerGetTransaction(i: {
+    method: 'PAYME' | 'CLICK' | 'UZUM';
+    providerTxId: string;
+  }): Promise<ProviderTxResult> {
+    // prisma.unscoped justified: pre-tenant webhook lookup by providerTxId.
+    const payment = await this.prisma.unscoped.payment.findFirst({
+      where: { providerTxId: i.providerTxId, method: i.method },
+    });
+    if (!payment) return { ok: false, error: 'tx_not_found' };
+    return { ok: true, payment: this.providerView(payment) };
+  }
+}
