@@ -1,0 +1,11 @@
+{
+  "extends": "@avishifo/config/tsconfig/base.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "noEmit": true,
+    // Seed data is generated from fixed-size literal arrays; index access is safe.
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["seed.ts", "seed-data"]
+}
