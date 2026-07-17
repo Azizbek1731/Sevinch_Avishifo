@@ -1,0 +1,200 @@
+import { UserRole } from './enums';
+
+/**
+ * Granular permission strings (`module.action`). Roles are bundles of these;
+ * per-user overrides (grant/revoke) are applied on top (see User.permissionOverrides).
+ */
+export const PERMISSIONS = [
+  // Patients (M3)
+  'patients.read',
+  'patients.write',
+  'patients.delete',
+  'patients.merge',
+  'patients.export',
+  'patients.documents.write',
+  // Appointments (M4)
+  'appointments.read',
+  'appointments.write',
+  'appointments.cancel',
+  // Queue (M5)
+  'queue.read',
+  'queue.manage', // add walk-in, reorder, transfer, priority
+  'queue.call', // doctor actions: call/start/finish/skip/recall
+  // Visits / EHR (M6)
+  'visits.read',
+  'visits.read.all', // branch-wide, not only own patients
+  'visits.write',
+  'visits.amend',
+  // Services & pricing (M7)
+  'services.read',
+  'services.write',
+  // Billing (M8)
+  'invoices.read',
+  'invoices.write',
+  'invoices.cancel',
+  'payments.create',
+  'refunds.create',
+  'shifts.manage',
+  'debts.read',
+  'expenses.read',
+  'expenses.write',
+  // Lab (M9)
+  'lab.orders.read',
+  'lab.orders.write',
+  'lab.results.write',
+  'lab.results.approve',
+  // Reports (M12)
+  'reports.read',
+  'reports.export',
+  // Staff & schedules (M11)
+  'staff.read',
+  'staff.write',
+  'schedules.read',
+  'schedules.write',
+  'payroll.read',
+  'payroll.write',
+  // Clinic administration (M2)
+  'clinic.settings.read',
+  'clinic.settings.write',
+  'branches.write',
+  'users.read',
+  'users.write',
+  // Notifications (M13)
+  'notifications.templates.read',
+  'notifications.templates.write',
+  'notifications.send',
+  // Feedback (M15)
+  'feedback.read',
+  // Audit (M16)
+  'audit.read',
+  // Platform / super-admin (M17)
+  'platform.clinics.read',
+  'platform.clinics.write',
+  'platform.plans.write',
+  'platform.analytics.read',
+  'platform.impersonate',
+] as const;
+
+export type Permission = (typeof PERMISSIONS)[number];
+
+const ALL_CLINIC_PERMISSIONS = PERMISSIONS.filter((p) => !p.startsWith('platform.'));
+
+/** Default permission bundle per role (spec §5). */
+export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
+  [UserRole.SUPER_ADMIN]: PERMISSIONS,
+  [UserRole.CLINIC_OWNER]: ALL_CLINIC_PERMISSIONS,
+  [UserRole.CLINIC_ADMIN]: [
+    'patients.read',
+    'patients.write',
+    'patients.merge',
+    'patients.export',
+    'patients.documents.write',
+    'appointments.read',
+    'appointments.write',
+    'appointments.cancel',
+    'queue.read',
+    'queue.manage',
+    'visits.read',
+    'visits.read.all',
+    'services.read',
+    'services.write',
+    'invoices.read',
+    'debts.read',
+    'expenses.read',
+    'lab.orders.read',
+    'reports.read',
+    'reports.export',
+    'staff.read',
+    'staff.write',
+    'schedules.read',
+    'schedules.write',
+    'clinic.settings.read',
+    'users.read',
+    'users.write',
+    'notifications.templates.read',
+    'notifications.templates.write',
+    'feedback.read',
+  ],
+  [UserRole.DOCTOR]: [
+    'patients.read',
+    'appointments.read',
+    'queue.read',
+    'queue.call',
+    'visits.read',
+    'visits.write',
+    'visits.amend',
+    'services.read',
+    'lab.orders.read',
+    'lab.orders.write',
+    'schedules.read',
+    'payroll.read', // own KPI/accruals only (object-level check in service)
+  ],
+  [UserRole.NURSE]: [
+    'patients.read',
+    'appointments.read',
+    'queue.read',
+    'visits.read',
+    'visits.write', // vitals entry; service restricts to vitals-level edits
+    'services.read',
+    'schedules.read',
+  ],
+  [UserRole.RECEPTIONIST]: [
+    'patients.read',
+    'patients.write',
+    'patients.documents.write',
+    'appointments.read',
+    'appointments.write',
+    'appointments.cancel',
+    'queue.read',
+    'queue.manage',
+    'services.read',
+    'invoices.read',
+    'invoices.write',
+    'schedules.read',
+  ],
+  [UserRole.CASHIER]: [
+    'patients.read',
+    'invoices.read',
+    'invoices.write',
+    'invoices.cancel',
+    'payments.create',
+    'refunds.create',
+    'shifts.manage',
+    'debts.read',
+    'services.read',
+  ],
+  [UserRole.LAB_TECH]: [
+    'patients.read',
+    'queue.read',
+    'lab.orders.read',
+    'lab.orders.write',
+    'lab.results.write',
+    'lab.results.approve',
+    'services.read',
+  ],
+  [UserRole.ACCOUNTANT]: [
+    'invoices.read',
+    'debts.read',
+    'expenses.read',
+    'expenses.write',
+    'reports.read',
+    'reports.export',
+    'payroll.read',
+    'payroll.write',
+    'services.read',
+    'shifts.manage',
+  ],
+  [UserRole.PATIENT]: [],
+};
+
+export function permissionsForRole(
+  role: UserRole,
+  overrides?: { grant?: readonly string[]; revoke?: readonly string[] },
+): Permission[] {
+  const base = new Set<Permission>(ROLE_PERMISSIONS[role] ?? []);
+  for (const p of overrides?.grant ?? []) {
+    if ((PERMISSIONS as readonly string[]).includes(p)) base.add(p as Permission);
+  }
+  for (const p of overrides?.revoke ?? []) base.delete(p as Permission);
+  return [...base];
+}
