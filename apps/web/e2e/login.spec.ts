@@ -17,6 +17,27 @@ test('owner logs in and lands on the dashboard', async ({ page }) => {
   await expect(page.getByText('Markaziy filial').first()).toBeVisible({ timeout: 15_000 });
 });
 
+test('session survives a page reload and a locale switch (no logout)', async ({ page }) => {
+  await page.goto('/uz/login');
+  await page.locator('input#identifier').fill('owner@shifomed.uz');
+  await page.locator('input#password').fill('Demo123!');
+  await page.locator('button[type="submit"]').click();
+  await page.waitForURL('**/uz/dashboard', { timeout: 15_000 });
+
+  // Reload (F5) — the httpOnly refresh cookie must restore the session, not log out.
+  await page.reload({ waitUntil: 'networkidle' });
+  await expect(page).toHaveURL(/\/uz\/dashboard/);
+  await expect(page.getByText('Markaziy filial').first()).toBeVisible({ timeout: 15_000 });
+
+  // Same-session locale switch (client navigation via the language menu) must
+  // keep the user signed in on the same screen.
+  await page.locator('header button').last().click();
+  await page.getByText('Русский').click();
+  await expect(page).toHaveURL(/\/ru\/dashboard/, { timeout: 15_000 });
+  await expect(page).not.toHaveURL(/\/login/);
+  await expect(page.getByText('Markaziy filial').first()).toBeVisible({ timeout: 15_000 });
+});
+
 test('wrong password shows a friendly error, not "Server error"', async ({ page }) => {
   await page.goto('/uz/login');
   await page.getByLabel(/telefon yoki email/i).fill('owner@shifomed.uz');

@@ -67,6 +67,8 @@ async function refreshAccessToken(): Promise<string | null> {
         const res = await fetch(buildUrl('/auth/refresh'), {
           method: 'POST',
           credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
         });
         const json = (await res.json()) as ApiResponse<{ accessToken: string }>;
         if (res.ok && json.success) {

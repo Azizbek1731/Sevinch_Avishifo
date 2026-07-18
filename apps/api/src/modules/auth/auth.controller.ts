@@ -23,7 +23,7 @@ import {
 } from './auth.service';
 import { TokenService } from './token.service';
 import { REFRESH_COOKIE } from './token.service';
-import { ChangePasswordDto, LoginDto, RefreshDto, RequestPasswordResetDto, ResetPasswordWithOtpDto } from './dto/auth.dto';
+import { ChangePasswordDto, LoginDto, RequestPasswordResetDto, ResetPasswordWithOtpDto } from './dto/auth.dto';
 
 const AUTH_THROTTLE = { default: { limit: 10, ttl: 60_000 } };
 
@@ -55,11 +55,15 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(200)
   async refresh(
-    @Body() dto: RefreshDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ accessToken: string }> {
-    const presented = this.readRefreshCookie(req) ?? dto.refreshToken;
+    // Token normally rides in the httpOnly cookie; the body is an optional
+    // fallback for non-browser clients. No DTO/validation here — an empty body
+    // (the browser's usual case) must not be rejected.
+    const bodyToken = (req.body as { refreshToken?: unknown } | undefined)?.refreshToken;
+    const presented =
+      this.readRefreshCookie(req) ?? (typeof bodyToken === 'string' ? bodyToken : undefined);
     const { accessToken, refreshToken } = await this.auth.refresh(presented);
     this.setRefreshCookie(res, refreshToken);
     return { accessToken };

@@ -43,3 +43,7 @@ test-results/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Next.js local env (never deploy — server uses same-origin)
+apps/*/.env.local
+apps/*/.env.production.local
