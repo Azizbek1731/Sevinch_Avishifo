@@ -12,8 +12,6 @@ import type { CashierShiftRow, ReportFilters } from '../api';
 import { useCashierShiftsReport } from '../hooks';
 import { ExportButton } from './export-button';
 
-const SHIFT_STATUSES = new Set(['OPEN', 'CLOSED']);
-
 export function ShiftsTab({ filters }: { filters: ReportFilters }) {
   const t = useTranslations('reports');
   const query = useCashierShiftsReport(filters);
@@ -29,16 +27,7 @@ export function ShiftsTab({ filters }: { filters: ReportFilters }) {
       {
         accessorKey: 'status',
         header: t('shifts.columns.status'),
-        cell: ({ row }) => (
-          <StatusBadge
-            status={row.original.status}
-            label={
-              SHIFT_STATUSES.has(row.original.status)
-                ? t(`shifts.status.${row.original.status}`)
-                : row.original.status
-            }
-          />
-        ),
+        cell: ({ row }) => <StatusBadge status={row.original.status} group="shift" />,
       },
       {
         accessorKey: 'openedAt',

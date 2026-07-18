@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { useCreatePatient } from '../hooks';
 import type { DuplicateCandidate, PatientHit } from '../api';
 
@@ -46,6 +47,7 @@ export interface NewPatientDialogProps {
 export function NewPatientDialog({ open, onOpenChange, onCreated }: NewPatientDialogProps) {
   const t = useTranslations('reception');
   const tc = useTranslations('common');
+  const enumLabel = useEnumLabel();
   const createMutation = useCreatePatient();
   const [candidates, setCandidates] = useState<DuplicateCandidate[]>([]);
 
@@ -158,8 +160,10 @@ export function NewPatientDialog({ open, onOpenChange, onCreated }: NewPatientDi
                   <SelectValue placeholder={tc('select')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={Gender.MALE}>{t('newPatient.male')}</SelectItem>
-                  <SelectItem value={Gender.FEMALE}>{t('newPatient.female')}</SelectItem>
+                  <SelectItem value={Gender.MALE}>{enumLabel('gender', Gender.MALE)}</SelectItem>
+                  <SelectItem value={Gender.FEMALE}>
+                    {enumLabel('gender', Gender.FEMALE)}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

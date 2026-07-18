@@ -176,9 +176,7 @@ export function ClinicDetailView({ clinicId }: { clinicId: string }) {
           <CardContent className="space-y-3">
             <InfoRow
               label={t('clinics.columns.status')}
-              value={
-                <StatusBadge status={clinic.status} label={t(`status.${clinic.status}` as never)} />
-              }
+              value={<StatusBadge status={clinic.status} group="clinic" />}
             />
             <InfoRow label={t('clinics.createDialog.phone')} value={clinic.phone ?? '—'} />
             <InfoRow label={t('clinics.createDialog.email')} value={clinic.email ?? '—'} />
@@ -202,12 +200,7 @@ export function ClinicDetailView({ clinicId }: { clinicId: string }) {
             {clinic.subscription ? (
               <InfoRow
                 label={t('clinics.columns.status')}
-                value={
-                  <StatusBadge
-                    status={clinic.subscription.status}
-                    label={t(`subscriptionStatus.${clinic.subscription.status}` as never)}
-                  />
-                }
+                value={<StatusBadge status={clinic.subscription.status} group="subscription" />}
               />
             ) : null}
             {canWrite ? (

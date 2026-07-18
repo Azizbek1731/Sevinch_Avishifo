@@ -26,6 +26,7 @@ export const MESSAGE_NAMESPACES = [
   'feedback',
   'audit',
   'superadmin',
+  'statuses',
 ] as const;
 
 export default getRequestConfig(async ({ requestLocale }) => {

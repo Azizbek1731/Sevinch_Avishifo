@@ -48,6 +48,7 @@
   "unit": "Birlik",
   "refLow": "Quyi",
   "refHigh": "Yuqori",
+  "refYears": "yosh",
   "parametersInvalid": "Parametrlarni to'g'ri to'ldiring (nomi majburiy, chegaralar raqam bo'lishi kerak)",
   "valuesRequired": "Kamida bitta qiymat kiriting",
   "value": "Qiymat",

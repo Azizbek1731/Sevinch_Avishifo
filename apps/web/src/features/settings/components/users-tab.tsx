@@ -26,6 +26,7 @@ import {
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DataTable } from '@/components/data-table';
 import { StatusBadge } from '@/components/status-badge';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { settingsApi, type UserRow } from '../api';
 import { useApiErrorToast, useHasPermission } from '../hooks';
 import { PermissionsDialog } from './permissions-dialog';
@@ -37,6 +38,7 @@ const STATUS_VALUES = Object.values(UserStatus);
 
 export function UsersTab() {
   const t = useTranslations('settings');
+  const enumLabel = useEnumLabel();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
   const canWrite = useHasPermission('users.write');
@@ -96,17 +98,12 @@ export function UsersTab() {
       {
         accessorKey: 'role',
         header: t('users.role'),
-        cell: ({ row }) => t(`users.roles.${row.original.role}` as never),
+        cell: ({ row }) => enumLabel('role', row.original.role),
       },
       {
         accessorKey: 'status',
         header: t('users.status'),
-        cell: ({ row }) => (
-          <StatusBadge
-            status={row.original.status}
-            label={t(`users.statuses.${row.original.status}` as never)}
-          />
-        ),
+        cell: ({ row }) => <StatusBadge status={row.original.status} group="user" />,
       },
       {
         id: 'overrides',
@@ -185,7 +182,7 @@ export function UsersTab() {
           ]
         : []),
     ],
-    [t, canWrite],
+    [t, canWrite, enumLabel],
   );
 
   const meta = usersQuery.data?.meta;
@@ -219,7 +216,7 @@ export function UsersTab() {
             <SelectItem value={ALL}>{t('users.allRoles')}</SelectItem>
             {STAFF_ROLES.map((r) => (
               <SelectItem key={r} value={r}>
-                {t(`users.roles.${r}` as never)}
+                {enumLabel('role', r)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -238,7 +235,7 @@ export function UsersTab() {
             <SelectItem value={ALL}>{t('users.allStatuses')}</SelectItem>
             {STATUS_VALUES.map((s) => (
               <SelectItem key={s} value={s}>
-                {t(`users.statuses.${s}` as never)}
+                {enumLabel('user', s)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -280,7 +277,7 @@ export function UsersTab() {
         title={t('users.statusConfirmTitle')}
         description={t('users.statusConfirmDesc', {
           name: statusChange?.user.fullName ?? '',
-          status: statusChange ? t(`users.statuses.${statusChange.status}` as never) : '',
+          status: statusChange ? enumLabel('user', statusChange.status) : '',
         })}
         confirmLabel={t('form.confirm')}
         cancelLabel={t('form.cancel')}

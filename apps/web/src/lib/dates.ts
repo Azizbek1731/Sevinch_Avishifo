@@ -1,9 +1,9 @@
 import { format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
-import { uz, ru, enUS } from 'date-fns/locale';
+import { uz, uzCyrl, ru, enUS } from 'date-fns/locale';
 import { TIMEZONE } from '@avishifo/shared';
 
-const localeMap = { uz, ru, en: enUS } as const;
+const localeMap = { uz, 'uz-Cyrl': uzCyrl, ru, en: enUS } as const;
 
 /** Format a UTC ISO string / Date in Asia/Tashkent. */
 export function formatTz(

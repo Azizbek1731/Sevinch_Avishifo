@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EmptyState } from '@/components/empty-state';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import {
   parseWorkingHours,
   settingsApi,
@@ -25,6 +26,7 @@ import { RoomDialog } from './room-dialog';
 
 function RoomsList({ branch, canWrite }: { branch: BranchRow; canWrite: boolean }) {
   const t = useTranslations('settings');
+  const enumLabel = useEnumLabel();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
   const [roomDialogOpen, setRoomDialogOpen] = useState(false);
@@ -82,7 +84,7 @@ function RoomsList({ branch, canWrite }: { branch: BranchRow; canWrite: boolean 
             <li key={room.id} className="flex items-center gap-2 px-3 py-2 text-sm">
               <span className="font-medium">{room.number}</span>
               {room.name ? <span className="text-muted-foreground">{room.name}</span> : null}
-              <Badge variant="outline">{t(`rooms.types.${room.type}` as never)}</Badge>
+              <Badge variant="outline">{enumLabel('roomType', room.type)}</Badge>
               {room.specialties.length > 0 ? (
                 <span className="truncate text-xs text-muted-foreground">
                   {room.specialties.join(', ')}

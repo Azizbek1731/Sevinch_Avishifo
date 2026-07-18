@@ -30,7 +30,6 @@ export interface CalendarColumn {
 
 interface CalendarGridProps {
   columns: CalendarColumn[];
-  statusLabel: (status: AppointmentStatus) => string;
   /** Click on an empty slot → prefill the create dialog. Omit to disable. */
   onSlotClick?: (column: CalendarColumn, time: string) => void;
   onAppointmentClick: (appointment: Appointment) => void;
@@ -123,12 +122,7 @@ function layoutColumn(appointments: Appointment[]): BlockLayout[] {
   return out;
 }
 
-export function CalendarGrid({
-  columns,
-  statusLabel,
-  onSlotClick,
-  onAppointmentClick,
-}: CalendarGridProps) {
+export function CalendarGrid({ columns, onSlotClick, onAppointmentClick }: CalendarGridProps) {
   const hours = Array.from({ length: GRID_END_HOUR - GRID_START_HOUR }, (_, i) => GRID_START_HOUR + i);
   const nowMin = minutesOfDay(new Date().toISOString());
   const showNowLine = nowMin > START_MIN && nowMin < END_MIN;
@@ -263,7 +257,7 @@ export function CalendarGrid({
                       <p className="text-xs">
                         {formatTime(a.startAt)}–{formatTime(a.endAt)} · {a.doctor.fullName}
                       </p>
-                      <StatusBadge status={a.status} label={statusLabel(a.status)} />
+                      <StatusBadge status={a.status} group="appointment" />
                     </TooltipContent>
                   </Tooltip>
                 ))}

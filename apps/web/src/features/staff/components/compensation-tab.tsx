@@ -12,6 +12,7 @@ import { DataTable } from '@/components/data-table';
 import { EmptyState } from '@/components/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { formatDate } from '@/lib/dates';
 import { staffApi, type CompensationRuleRow } from '../api';
 import {
@@ -25,6 +26,7 @@ import { CompensationRuleDialog } from './compensation-rule-dialog';
 
 export function CompensationTab({ userId }: { userId: string }) {
   const t = useTranslations('staff');
+  const enumLabel = useEnumLabel();
   const can = usePermissions();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
@@ -64,7 +66,7 @@ export function CompensationTab({ userId }: { userId: string }) {
         header: t('compensation.type'),
         cell: ({ row }) => (
           <Badge variant="secondary">
-            {t(`compensation.types.${row.original.type}` as never)}
+            {enumLabel('compensation', row.original.type)}
           </Badge>
         ),
       },
@@ -138,7 +140,7 @@ export function CompensationTab({ userId }: { userId: string }) {
           ] satisfies ColumnDef<CompensationRuleRow>[])
         : []),
     ],
-    [t, canWrite, serviceName, categoryName],
+    [t, canWrite, serviceName, categoryName, enumLabel],
   );
 
   return (

@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { todayTashkent } from '@/lib/dates';
 import { emptyToUndefined, staffApi } from '../api';
 import { useApiErrorToast } from '../hooks';
@@ -48,6 +49,7 @@ export interface ExceptionDialogProps {
 
 export function ExceptionDialog({ userId, open, onOpenChange }: ExceptionDialogProps) {
   const t = useTranslations('staff');
+  const enumLabel = useEnumLabel();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
 
@@ -104,7 +106,7 @@ export function ExceptionDialog({ userId, open, onOpenChange }: ExceptionDialogP
               <SelectContent>
                 {EXCEPTION_TYPES.map((ty) => (
                   <SelectItem key={ty} value={ty}>
-                    {t(`schedule.exceptions.types.${ty}` as never)}
+                    {enumLabel('exception', ty)}
                   </SelectItem>
                 ))}
               </SelectContent>

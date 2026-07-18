@@ -1,0 +1,60 @@
+{
+  "templates": {
+    "title": "Билдиришнома шаблонлари",
+    "desc": "Ҳодиса, канал ва тил бўйича хабар матнини созланг",
+    "event": "Ҳодиса",
+    "channel": "Канал",
+    "locale": "Тил",
+    "body": "Хабар матни",
+    "bodyPlaceholder": "Ҳурматли ъ{'patient_name'}ъ, сизнинг қабулингиз ъ{'time'}ъ да...",
+    "variablesHint": "Ўзгарувчилар",
+    "save": "Шаблонни сақлаш",
+    "saved": "Шаблон сақланди",
+    "savedList": "Сақланган шаблонлар",
+    "emptyTitle": "Шаблонлар йўқ",
+    "emptyDesc": "Шаблон сақланмаган ҳодисалар учун стандарт матн ишлатилади",
+    "bodyTooShort": "Хабар матни жуда қисқа"
+  },
+  "events": {
+    "APPOINTMENT_CREATED": "Қабул яратилди",
+    "APPOINTMENT_REMINDER_24H": "Қабул эслатмаси (24 соат)",
+    "APPOINTMENT_REMINDER_2H": "Қабул эслатмаси (2 соат)",
+    "APPOINTMENT_CANCELLED": "Қабул бекор қилинди",
+    "QUEUE_TURN_NEAR": "Навбат яқинлашди",
+    "LAB_RESULT_READY": "Таҳлил натижаси тайёр",
+    "PAYMENT_RECEIPT": "Тўлов чеки",
+    "BIRTHDAY": "Туғилган кун табриги",
+    "DEBT_REMINDER": "Қарз эслатмаси",
+    "FEEDBACK_REQUEST": "Фикр-мулоҳаза сўрови"
+  },
+  "channels": {
+    "SMS": "SMS",
+    "TELEGRAM": "Telegram",
+    "IN_APP": "Илова ичида"
+  },
+  "locales": {
+    "uz": "Ўзбекча (лотин)",
+    "uz_Cyrl": "Ўзбекча (кирилл)",
+    "ru": "Русский",
+    "en": "Энглиш"
+  },
+  "logs": {
+    "title": "SMS журнали",
+    "date": "Сана",
+    "recipient": "Қабул қилувчи",
+    "event": "Ҳодиса",
+    "channel": "Канал",
+    "body": "Матн",
+    "status": "Ҳолат",
+    "statuses": {
+      "QUEUED": "Навбатда",
+      "SENT": "Юборилди",
+      "DELIVERED": "Етказилди",
+      "FAILED": "Хатолик"
+    },
+    "attempts": "Уринишлар",
+    "allStatuses": "Барча ҳолатлар",
+    "allChannels": "Барча каналлар",
+    "empty": "Ёзувлар топилмади"
+  }
+}

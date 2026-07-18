@@ -1,0 +1,237 @@
+{
+  "title": "Беморлар",
+  "subtitle": "Беморлар реестри ва картотекаси",
+  "newPatient": "Янги бемор",
+  "searchPlaceholder": "Исм, телефон ёки MRN бўйича қидириш...",
+  "filterTag": "Тег бўйича",
+  "allTags": "Барча теглар",
+  "created": "Бемор яратилди",
+  "updated": "Бемор маълумотлари сақланди",
+  "deleted": "Бемор ўчирилди",
+  "table": {
+    "mrn": "MRN",
+    "fullName": "Ф.И.Ш.",
+    "phone": "Телефон",
+    "dob": "Туғилган сана",
+    "tags": "Теглар",
+    "visits": "Ташрифлар",
+    "balance": "Баланс",
+    "createdAt": "Рўйхатга олинган"
+  },
+  "empty": {
+    "title": "Ҳозирча беморлар йўқ",
+    "description": "Биринчи беморни рўйхатга олиш учун \"Янги бемор\" тугмасини босинг.",
+    "noResults": "Ҳеч нарса топилмади"
+  },
+  "card": {
+    "ageYears": "{age} ёш",
+    "debt": "Қарз",
+    "edit": "Таҳрирлаш",
+    "merge": "Бирлаштириш",
+    "delete": "Ўчириш",
+    "deleteTitle": "Беморни ўчиришни тасдиқлайсизми?",
+    "deleteDesc": "{name} картаси архивланади. Бу амални ортга қайтариб бўлмайди.",
+    "notFound": "Бемор топилмади",
+    "loadError": "Маълумотни юклаб бўлмади",
+    "backToList": "Беморлар рўйхатига қайтиш"
+  },
+  "tabs": {
+    "overview": "Умумий",
+    "timeline": "Тарих",
+    "visits": "Ташрифлар",
+    "documents": "Ҳужжатлар",
+    "invoices": "Ҳисоблар"
+  },
+  "form": {
+    "createTitle": "Янги бемор",
+    "editTitle": "Беморни таҳрирлаш",
+    "lastName": "Фамилия",
+    "firstName": "Исм",
+    "middleName": "Отасининг исми",
+    "phone": "Телефон",
+    "phoneAlt": "Қўшимча телефон",
+    "dob": "Туғилган сана",
+    "gender": "Жинси",
+    "bloodGroup": "Қон гуруҳи",
+    "address": "Манзил",
+    "passportId": "Паспорт / ID",
+    "allergies": "Аллергиялар",
+    "allergyName": "Аллергия номи",
+    "add": "Қўшиш",
+    "remove": "Олиб ташлаш",
+    "chronicConditions": "Сурункали касалликлар",
+    "conditionPlaceholder": "Касаллик номи",
+    "notes": "Изоҳлар",
+    "source": "Қаердан билиб келди",
+    "tags": "Теглар",
+    "selectPlaceholder": "Танланг...",
+    "none": "Кўрсатилмаган",
+    "required": "Мажбурий майдон",
+    "invalidPhone": "Телефон рақами нотўғри",
+    "cancel": "Бекор қилиш",
+    "save": "Сақлаш",
+    "create": "Яратиш"
+  },
+  "gender": {
+    "MALE": "Эркак",
+    "FEMALE": "Аёл"
+  },
+  "blood": {
+    "A_POS": "А (ИИ) Rh+",
+    "A_NEG": "А (ИИ) Рҳ-",
+    "B_POS": "Б (ИИИ) Rh+",
+    "B_NEG": "Б (ИИИ) Рҳ-",
+    "AB_POS": "АБ (ИВ) Rh+",
+    "AB_NEG": "АБ (ИВ) Рҳ-",
+    "O_POS": "О (И) Rh+",
+    "O_NEG": "О (И) Рҳ-",
+    "UNKNOWN": "Номаълум"
+  },
+  "severity": {
+    "low": "Енгил",
+    "medium": "Ўртача",
+    "high": "Оғир"
+  },
+  "sources": {
+    "friend_referral": "Таниш тавсияси",
+    "doctor_referral": "Шифокор йўлланмаси",
+    "instagram": "Instagram",
+    "telegram": "Telegram",
+    "facebook": "Facebook",
+    "google": "Google",
+    "street_banner": "Кўча баннари",
+    "returning": "Қайта мурожаат",
+    "other": "Бошқа"
+  },
+  "tags": {
+    "VIP": "ВИП",
+    "DEBTOR": "Қарздор",
+    "STAFF_FAMILY": "Ходим оиласи",
+    "INSURANCE": "Суғурта",
+    "BLACKLIST": "Қора рўйхат"
+  },
+  "duplicates": {
+    "title": "Бундай бемор аллақачон бор бўлиши мумкин",
+    "description": "Қуйидаги ўхшаш беморлар топилди. Мавжудини очинг ёки барибир янгисини яратинг.",
+    "open": "Очиш",
+    "forceCreate": "Барибир яратиш"
+  },
+  "overview": {
+    "demographics": "Шахсий маълумотлар",
+    "dob": "Туғилган сана",
+    "gender": "Жинси",
+    "bloodGroup": "Қон гуруҳи",
+    "phoneAlt": "Қўшимча телефон",
+    "address": "Манзил",
+    "passport": "Паспорт / ID",
+    "source": "Қаердан билиб келди",
+    "registeredAt": "Рўйхатга олинган сана",
+    "allergies": "Аллергиялар",
+    "noAllergies": "Аллергиялар қайд этилмаган",
+    "chronicConditions": "Сурункали касалликлар",
+    "noChronic": "Сурункали касалликлар қайд этилмаган",
+    "notes": "Изоҳлар",
+    "noNotes": "Изоҳ йўқ",
+    "consents": "Розиликлар",
+    "noConsents": "Розиликлар қайд этилмаган",
+    "consentType": "Розилик тури",
+    "signedAt": "Имзоланган сана",
+    "note": "Изоҳ",
+    "addConsent": "Розилик қўшиш",
+    "consentAdded": "Розилик қўшилди"
+  },
+  "consentType": {
+    "personal_data": "Шахсий маълумотларни қайта ишлаш",
+    "treatment": "Даволанишга розилик",
+    "other": "Бошқа"
+  },
+  "timeline": {
+    "all": "Барчаси",
+    "visit": "Ташриф",
+    "diagnosis": "Ташхис",
+    "prescription": "Рецепт",
+    "lab": "Таҳлил",
+    "document": "Ҳужжат",
+    "payment": "Тўлов",
+    "empty": "Тарих ҳозирча бўш",
+    "loadMore": "Яна юклаш",
+    "openVisit": "Ташрифни очиш"
+  },
+  "visitStatus": {
+    "IN_PROGRESS": "Давом этмоқда",
+    "COMPLETED": "Якунланган",
+    "CANCELLED": "Бекор қилинган"
+  },
+  "visits": {
+    "date": "Сана",
+    "doctor": "Шифокор",
+    "status": "Ҳолат",
+    "open": "Очиш",
+    "empty": "Ташрифлар йўқ"
+  },
+  "documents": {
+    "uploadTitle": "Ҳужжат юклаш",
+    "file": "Файл",
+    "title": "Номи",
+    "category": "Туркум",
+    "upload": "Юклаш",
+    "uploaded": "Ҳужжат юкланди",
+    "deletedDoc": "Ҳужжат ўчирилди",
+    "deleteTitle": "Ҳужжатни ўчиришни тасдиқлайсизми?",
+    "deleteDesc": "\"{title}\" ҳужжати бутунлай ўчирилади.",
+    "download": "Юклаб олиш",
+    "empty": "Ҳужжатлар йўқ",
+    "prev": "Олдинги",
+    "next": "Кейинги"
+  },
+  "docCategory": {
+    "ANALYSIS": "Таҳлил",
+    "IMAGING": "Тасвир (УЗИ, рентген)",
+    "DISCHARGE": "Эпикриз",
+    "CONSENT": "Розилик",
+    "OTHER": "Бошқа"
+  },
+  "invoices": {
+    "title": "Ҳисоб-фактуралар",
+    "number": "Рақам",
+    "date": "Сана",
+    "total": "Жами",
+    "paid": "Тўланган",
+    "due": "Қолдиқ",
+    "status": "Ҳолат",
+    "empty": "Ҳисоб-фактуралар йўқ"
+  },
+  "invoiceStatus": {
+    "DRAFT": "Қоралама",
+    "ISSUED": "Тақдим этилган",
+    "PARTIALLY_PAID": "Қисман тўланган",
+    "PAID": "Тўланган",
+    "CANCELLED": "Бекор қилинган",
+    "REFUNDED": "Қайтарилган"
+  },
+  "balance": {
+    "title": "Баланс ва транзаксиялар",
+    "date": "Сана",
+    "type": "Тури",
+    "amount": "Сумма",
+    "note": "Изоҳ",
+    "empty": "Транзаксиялар йўқ"
+  },
+  "txType": {
+    "DEPOSIT": "Депозит",
+    "WITHDRAWAL": "Ечиб олиш",
+    "INVOICE_APPLY": "Ҳисобга ўтказма",
+    "REFUND_CREDIT": "Қайтарим кредити",
+    "ADJUSTMENT": "Тузатиш"
+  },
+  "merge": {
+    "title": "Бемор карталарини бирлаштириш",
+    "description": "Дубликат беморни қидиринг — унинг барча ёзувлари {name} картасига кўчирилади.",
+    "searchPlaceholder": "Исм, телефон ёки MRN бўйича қидириш...",
+    "selected": "Танланди",
+    "warning": "Бу амални ортга қайтариб бўлмайди!",
+    "summary": "{duplicate} картасидаги барча ташрифлар, ҳисоблар ва ҳужжатлар {primary} картасига ўтказилади, сўнг дубликат архивланади.",
+    "confirm": "Бирлаштириш",
+    "merged": "Беморлар бирлаштирилди"
+  }
+}

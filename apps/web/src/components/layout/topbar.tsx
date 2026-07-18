@@ -38,6 +38,7 @@ interface InboxResponse {
 
 function NotificationBell() {
   const t = useTranslations('common');
+  const tNav = useTranslations('nav');
   const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: ['notifications', 'inbox'],
@@ -53,7 +54,7 @@ function NotificationBell() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+        <Button variant="ghost" size="icon" className="relative" aria-label={tNav("notifications")}>
           <Bell className="h-5 w-5" />
           {unread > 0 ? (
             <Badge className="absolute -right-1 -top-1 h-5 min-w-5 justify-center rounded-full px-1 text-[10px]">
@@ -179,13 +180,20 @@ export function Topbar() {
             <DropdownMenuLabel className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
               <Globe className="h-3.5 w-3.5" /> {tAuth('language')}
             </DropdownMenuLabel>
-            {(['uz', 'ru', 'en'] as const).map((l) => (
+            {(
+              [
+                ['uz', "O'zbekcha (lotin)"],
+                ['uz-Cyrl', 'Ўзбекча (кирилл)'],
+                ['ru', 'Русский'],
+                ['en', 'English'],
+              ] as const
+            ).map(([l, name]) => (
               <DropdownMenuItem
                 key={l}
                 className={l === locale ? 'font-semibold' : ''}
                 onClick={() => router.replace(pathname, { locale: l })}
               >
-                {l === 'uz' ? "O'zbekcha" : l === 'ru' ? 'Русский' : 'English'}
+                {name}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />

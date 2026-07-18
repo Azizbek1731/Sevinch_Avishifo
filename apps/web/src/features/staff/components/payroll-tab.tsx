@@ -20,6 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { todayTashkent } from '@/lib/dates';
 import { parseBreakdown, staffApi, type PayrollAccrualRow } from '../api';
 import { useApiErrorToast, usePayrollAccruals, usePermissions } from '../hooks';
@@ -27,6 +28,7 @@ import { AccrualAdjustDialog } from './accrual-adjust-dialog';
 
 export function PayrollTab() {
   const t = useTranslations('staff');
+  const enumLabel = useEnumLabel();
   const can = usePermissions();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
@@ -184,7 +186,7 @@ export function PayrollTab() {
                                 >
                                   <span>
                                     <span className="font-medium">
-                                      {t(`compensation.types.${line.ruleType}` as never)}
+                                      {enumLabel('compensation', line.ruleType)}
                                     </span>
                                     <span className="text-muted-foreground"> · {line.basis}</span>
                                   </span>

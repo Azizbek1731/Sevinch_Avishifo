@@ -1,0 +1,170 @@
+{
+  "appointment": {
+    "SCHEDULED": "Rejalashtirilgan",
+    "CONFIRMED": "Tasdiqlangan",
+    "CHECKED_IN": "Keldi",
+    "IN_QUEUE": "Navbatda",
+    "IN_PROGRESS": "Qabulda",
+    "COMPLETED": "Yakunlangan",
+    "NO_SHOW": "Kelmadi",
+    "CANCELLED": "Bekor qilingan"
+  },
+  "ticket": {
+    "WAITING": "Kutmoqda",
+    "CALLED": "Chaqirildi",
+    "IN_ROOM": "Xonada",
+    "DONE": "Yakunlandi",
+    "SKIPPED": "O'tkazib yuborildi"
+  },
+  "visit": {
+    "IN_PROGRESS": "Davom etmoqda",
+    "COMPLETED": "Yakunlangan",
+    "CANCELLED": "Bekor qilingan"
+  },
+  "invoice": {
+    "DRAFT": "Qoralama",
+    "ISSUED": "Taqdim etilgan",
+    "PARTIALLY_PAID": "Qisman to'langan",
+    "PAID": "To'langan",
+    "CANCELLED": "Bekor qilingan",
+    "REFUNDED": "Qaytarilgan"
+  },
+  "payment": {
+    "PENDING": "Kutilmoqda",
+    "COMPLETED": "Bajarildi",
+    "FAILED": "Xato",
+    "REFUNDED": "Qaytarilgan"
+  },
+  "lab": {
+    "ORDERED": "Buyurtma qilingan",
+    "SPECIMEN_COLLECTED": "Namuna olindi",
+    "IN_PROGRESS": "Jarayonda",
+    "RESULTED": "Natija kiritildi",
+    "APPROVED": "Tasdiqlangan",
+    "DELIVERED": "Topshirildi",
+    "CANCELLED": "Bekor qilingan"
+  },
+  "shift": {
+    "OPEN": "Ochiq",
+    "CLOSED": "Yopiq"
+  },
+  "user": {
+    "ACTIVE": "Faol",
+    "SUSPENDED": "Bloklangan",
+    "ARCHIVED": "Arxivlangan"
+  },
+  "clinic": {
+    "ACTIVE": "Faol",
+    "SUSPENDED": "To'xtatilgan",
+    "ARCHIVED": "Arxivlangan"
+  },
+  "subscription": {
+    "TRIAL": "Sinov",
+    "ACTIVE": "Faol",
+    "PAST_DUE": "Muddati o'tgan",
+    "CANCELLED": "Bekor qilingan"
+  },
+  "priority": {
+    "NORMAL": "Oddiy",
+    "PRIORITY": "Imtiyozli",
+    "EMERGENCY": "Shoshilinch"
+  },
+  "role": {
+    "SUPER_ADMIN": "Super-admin",
+    "CLINIC_OWNER": "Direktor",
+    "CLINIC_ADMIN": "Administrator",
+    "DOCTOR": "Shifokor",
+    "NURSE": "Hamshira",
+    "RECEPTIONIST": "Qabulxona",
+    "CASHIER": "Kassir",
+    "LAB_TECH": "Laborant",
+    "ACCOUNTANT": "Buxgalter",
+    "PATIENT": "Bemor"
+  },
+  "method": {
+    "CASH": "Naqd",
+    "CARD": "Karta (terminal)",
+    "PAYME": "Payme",
+    "CLICK": "Click",
+    "UZUM": "Uzum",
+    "BALANCE": "Balansdan"
+  },
+  "channel": {
+    "SMS": "SMS",
+    "TELEGRAM": "Telegram",
+    "IN_APP": "Ilova ichida"
+  },
+  "notification": {
+    "QUEUED": "Navbatda",
+    "SENT": "Yuborildi",
+    "DELIVERED": "Yetkazildi",
+    "FAILED": "Xato"
+  },
+  "gender": {
+    "MALE": "Erkak",
+    "FEMALE": "Ayol"
+  },
+  "roomType": {
+    "CONSULTATION": "Konsultatsiya",
+    "PROCEDURE": "Muolaja",
+    "LAB": "Laboratoriya",
+    "ULTRASOUND": "UTT",
+    "XRAY": "Rentgen",
+    "TREATMENT": "Davolash",
+    "OTHER": "Boshqa"
+  },
+  "serviceKind": {
+    "CONSULTATION": "Konsultatsiya",
+    "LAB": "Laboratoriya",
+    "ULTRASOUND": "UTT",
+    "PROCEDURE": "Muolaja",
+    "DIAGNOSTICS": "Diagnostika",
+    "OTHER": "Boshqa"
+  },
+  "discount": {
+    "PERCENT": "Foiz",
+    "FIXED": "Qat'iy summa"
+  },
+  "compensation": {
+    "FIXED_SALARY": "Qat'iy oylik",
+    "REVENUE_PERCENT": "Tushumdan foiz",
+    "PER_SERVICE_FEE": "Xizmat uchun haq"
+  },
+  "exception": {
+    "VACATION": "Ta'til",
+    "SICK_LEAVE": "Kasallik varaqasi",
+    "DAY_OFF": "Dam olish kuni",
+    "CUSTOM_HOURS": "Maxsus soatlar"
+  },
+  "documentCategory": {
+    "ANALYSIS": "Tahlil",
+    "IMAGING": "Tasvir (UTT/rentgen)",
+    "DISCHARGE": "Epikriz",
+    "CONSENT": "Rozilik",
+    "OTHER": "Boshqa"
+  },
+  "audit": {
+    "CREATE": "Yaratish",
+    "UPDATE": "O'zgartirish",
+    "DELETE": "O'chirish",
+    "LOGIN": "Kirish",
+    "LOGOUT": "Chiqish",
+    "LOGIN_FAILED": "Muvaffaqiyatsiz kirish",
+    "IMPERSONATE": "Impersonatsiya",
+    "REFUND": "Qaytarish",
+    "EXPORT": "Eksport",
+    "MERGE": "Birlashtirish",
+    "AMEND": "Tuzatish"
+  },
+  "bloodGroup": {
+    "A_POS": "A (II) Rh+",
+    "A_NEG": "A (II) Rh−",
+    "B_POS": "B (III) Rh+",
+    "B_NEG": "B (III) Rh−",
+    "AB_POS": "AB (IV) Rh+",
+    "AB_NEG": "AB (IV) Rh−",
+    "O_POS": "O (I) Rh+",
+    "O_NEG": "O (I) Rh−",
+    "UNKNOWN": "Noma'lum"
+  }
+}

@@ -21,6 +21,7 @@ import { EmptyState } from '@/components/empty-state';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { StatusBadge } from '@/components/status-badge';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { useSocket, useSocketEvent } from '@/hooks/use-socket';
 import { Link, useRouter } from '@/i18n/routing';
 import { formatTz } from '@/lib/dates';
@@ -53,6 +54,7 @@ function TicketRow({
   canAct: boolean;
 }) {
   const t = useTranslations('doctor');
+  const enumLabel = useEnumLabel();
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
       <div className="flex min-w-0 items-center gap-3">
@@ -60,14 +62,11 @@ function TicketRow({
         <div className="min-w-0">
           <p className="truncate font-medium">{ticket.patientName}</p>
           <div className="flex items-center gap-1.5">
-            <StatusBadge
-              status={ticket.status}
-              label={t(`status.${ticket.status}` as never)}
-            />
+            <StatusBadge status={ticket.status} group="ticket" />
             {ticket.priority !== 'NORMAL' ? (
               <StatusBadge
                 status={ticket.priority === 'EMERGENCY' ? 'CANCELLED' : 'IN_QUEUE'}
-                label={t(`priority.${ticket.priority}` as never)}
+                label={enumLabel('priority', ticket.priority)}
               />
             ) : null}
             {ticket.roomNumber ? (
@@ -237,12 +236,7 @@ export function DoctorCockpit() {
     {
       accessorKey: 'status',
       header: tCommon('status'),
-      cell: ({ row }) => (
-        <StatusBadge
-          status={row.original.status}
-          label={t(`visitStatus.${row.original.status}` as never)}
-        />
-      ),
+      cell: ({ row }) => <StatusBadge status={row.original.status} group="visit" />,
     },
     {
       id: 'actions',

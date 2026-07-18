@@ -253,7 +253,6 @@ export function AppointmentsCalendar() {
       ) : (
         <CalendarGrid
           columns={columns}
-          statusLabel={(s) => t(`status.${s}`)}
           onSlotClick={
             canWrite
               ? (col, time) =>

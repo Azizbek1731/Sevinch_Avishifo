@@ -25,6 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { StatusBadge } from '@/components/status-badge';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { useQueueSnapshot, useSetTicketPriority, useSkipTicket } from '../hooks';
 import { TransferTicketDialog } from './transfer-ticket-dialog';
 
@@ -71,6 +72,7 @@ function groupByDoctor(tickets: QueueTicketPayload[]): DoctorGroup[] {
 export function QueuePanel() {
   const t = useTranslations('reception');
   const tc = useTranslations('common');
+  const enumLabel = useEnumLabel();
   const permissions = useAuthStore((s) => s.user?.permissions);
   const canManage = Boolean(permissions?.includes('queue.manage'));
   const canSkip = Boolean(permissions?.includes('queue.call'));
@@ -128,16 +130,13 @@ export function QueuePanel() {
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{ticket.patientName}</p>
                           <div className="mt-0.5 flex items-center gap-1.5">
-                            <StatusBadge
-                              status={ticket.status}
-                              label={t(`ticketStatuses.${ticket.status}`)}
-                            />
+                            <StatusBadge status={ticket.status} group="ticket" />
                             {ticket.priority !== TicketPriority.NORMAL ? (
                               <Badge
                                 variant="outline"
                                 className={cn('font-medium', PRIORITY_CLASSES[ticket.priority])}
                               >
-                                {t(`priorities.${ticket.priority}`)}
+                                {enumLabel('priority', ticket.priority)}
                               </Badge>
                             ) : null}
                           </div>
@@ -174,7 +173,7 @@ export function QueuePanel() {
                                     }
                                   >
                                     <Flag className="mr-2 h-4 w-4" />
-                                    {t(`priorities.${p}`)}
+                                    {enumLabel('priority', p)}
                                   </DropdownMenuItem>
                                 ))}
                                 <DropdownMenuSeparator />

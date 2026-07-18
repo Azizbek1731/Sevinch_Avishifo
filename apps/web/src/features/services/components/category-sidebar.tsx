@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { servicesApi, type ServiceCategoryRow } from '../api';
 import { useApiErrorToast, useCanWriteServices } from '../hooks';
 
@@ -38,6 +39,7 @@ interface CategoryFormRowProps {
 
 function CategoryFormRow({ draft, onChange, onSave, onCancel, saving }: CategoryFormRowProps) {
   const t = useTranslations('services');
+  const enumLabel = useEnumLabel();
   return (
     <div className="space-y-2 rounded-md border p-2">
       <Input
@@ -62,7 +64,7 @@ function CategoryFormRow({ draft, onChange, onSave, onCancel, saving }: Category
         <SelectContent>
           {Object.values(ServiceKind).map((k) => (
             <SelectItem key={k} value={k}>
-              {t(`kinds.${k}`)}
+              {enumLabel('serviceKind', k)}
             </SelectItem>
           ))}
         </SelectContent>
@@ -86,6 +88,7 @@ export interface CategorySidebarProps {
 
 export function CategorySidebar({ selectedId, onSelect }: CategorySidebarProps) {
   const t = useTranslations('services');
+  const enumLabel = useEnumLabel();
   const queryClient = useQueryClient();
   const errorToast = useApiErrorToast();
   const canWrite = useCanWriteServices();
@@ -207,7 +210,9 @@ export function CategorySidebar({ selectedId, onSelect }: CategorySidebarProps) 
                   >
                     {cat.name}
                   </span>
-                  <span className="text-xs text-muted-foreground">{t(`kinds.${cat.kind}`)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {enumLabel('serviceKind', cat.kind)}
+                  </span>
                 </button>
                 {canWrite ? (
                   <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">

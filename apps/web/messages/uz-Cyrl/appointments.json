@@ -1,0 +1,86 @@
+{
+  "title": "Календар",
+  "subtitle": "Қабуллар жадвали ва ёзувлар",
+  "views": {
+    "day": "Кун",
+    "week": "Ҳафта"
+  },
+  "today": "Бугун",
+  "prevPeriod": "Олдинги",
+  "nextPeriod": "Кейинги",
+  "doctor": "Шифокор",
+  "allDoctors": "Барча шифокорлар",
+  "newAppointment": "Янги қабул",
+  "noDoctors": "Шифокорлар топилмади",
+  "noDoctorsDesc": "Аввал Ходимлар бўлимида шифокор қўшинг",
+  "noAppointments": "Қабуллар йўқ",
+  "status": {
+    "SCHEDULED": "Режалаштирилган",
+    "CONFIRMED": "Тасдиқланган",
+    "CHECKED_IN": "Келди",
+    "IN_QUEUE": "Навбатда",
+    "IN_PROGRESS": "Қабулда",
+    "COMPLETED": "Якунланган",
+    "NO_SHOW": "Келмади",
+    "CANCELLED": "Бекор қилинган"
+  },
+  "detail": {
+    "title": "Қабул маълумотлари",
+    "patient": "Бемор",
+    "doctor": "Шифокор",
+    "time": "Вақт",
+    "services": "Хизматлар",
+    "note": "Изоҳ",
+    "cancelledReason": "Бекор қилиш сабаби",
+    "confirm": "Тасдиқлаш",
+    "checkIn": "Келди",
+    "noShow": "Келмади",
+    "cancel": "Бекор қилиш",
+    "reschedule": "Кўчириш",
+    "recurring": "Курс (такрорий)"
+  },
+  "form": {
+    "createTitle": "Янги қабул",
+    "editTitle": "Қабулни кўчириш",
+    "patient": "Бемор",
+    "selectPatient": "Беморни танланг",
+    "searchPatient": "Исм, телефон ёки MRN бўйича қидиринг...",
+    "patientNotFound": "Бемор топилмади",
+    "doctor": "Шифокор",
+    "selectDoctor": "Шифокорни танланг",
+    "services": "Хизматлар",
+    "selectServices": "Хизматларни танланг",
+    "servicesSelected": "{count} та хизмат танланди",
+    "minutes": "{count} дақ",
+    "date": "Сана",
+    "time": "Вақт",
+    "slotsHint": "Аввал шифокор ва санани танланг",
+    "loadingSlots": "Бўш вақтлар юкланмоқда...",
+    "noSlots": "Бу кунга бўш вақт йўқ",
+    "note": "Изоҳ",
+    "notePlaceholder": "Қўшимча изоҳ...",
+    "save": "Сақлаш",
+    "cancel": "Бекор қилиш",
+    "required": "Мажбурий майдон"
+  },
+  "reason": {
+    "cancelTitle": "Қабулни бекор қилиш",
+    "noShowTitle": "Бемор келмади",
+    "label": "Сабаб",
+    "placeholder": "Сабабни киритинг...",
+    "submit": "Сақлаш"
+  },
+  "recurring": {
+    "title": "Курс (такрорий қабуллар)",
+    "description": "Шу вақтда такрорланадиган сеанслар курси яратилади",
+    "sessionsCount": "Сеанслар сони",
+    "intervalDays": "Интервал (кун)",
+    "submit": "Курс яратиш",
+    "result": "{created} та қабул яратилди, {skipped} та ўтказиб юборилди"
+  },
+  "toasts": {
+    "created": "Қабул яратилди",
+    "updated": "Қабул сақланди",
+    "statusChanged": "Ҳолат ўзгартирилди"
+  }
+}

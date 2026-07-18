@@ -41,7 +41,7 @@ export function PatientSummary({ ticket }: { ticket: QueueTicketPayload | null }
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-lg">{t('currentPatient')}</CardTitle>
-          <StatusBadge status={ticket.status} label={t(`status.${ticket.status}` as never)} />
+          <StatusBadge status={ticket.status} group="ticket" />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

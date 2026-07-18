@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { usePermissions, useStaffMember } from '../hooks';
 import { CompensationTab } from './compensation-tab';
 import { KpiTab } from './kpi-tab';
@@ -18,6 +19,7 @@ import { ScheduleTab } from './schedule-tab';
 
 export function StaffDetail({ userId }: { userId: string }) {
   const t = useTranslations('staff');
+  const enumLabel = useEnumLabel();
   const can = usePermissions();
   const query = useStaffMember(userId);
 
@@ -67,8 +69,8 @@ export function StaffDetail({ userId }: { userId: string }) {
         title={member.fullName}
         description={member.specialty ?? undefined}
       >
-        <Badge variant="secondary">{t(`roles.${member.role}` as never)}</Badge>
-        <StatusBadge status={member.status} label={t(`statuses.${member.status}` as never)} />
+        <Badge variant="secondary">{enumLabel('role', member.role)}</Badge>
+        <StatusBadge status={member.status} group="user" />
       </PageHeader>
 
       <Tabs defaultValue="profile">

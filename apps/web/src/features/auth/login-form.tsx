@@ -19,6 +19,19 @@ interface LoginResponse {
   accessToken: string;
 }
 
+/** Demo/staging helper — hidden when NEXT_PUBLIC_DEMO_LOGINS="false". */
+const SHOW_DEMO = process.env.NEXT_PUBLIC_DEMO_LOGINS !== 'false';
+
+const DEMO_ACCOUNTS = [
+  { roleKey: 'role.CLINIC_OWNER', identifier: 'owner@shifomed.uz', password: 'Demo123!' },
+  { roleKey: 'role.CLINIC_ADMIN', identifier: 'admin@shifomed.uz', password: 'Demo123!' },
+  { roleKey: 'role.DOCTOR', identifier: 'kardiolog@shifomed.uz', password: 'Demo123!' },
+  { roleKey: 'role.RECEPTIONIST', identifier: 'qabul1@shifomed.uz', password: 'Demo123!' },
+  { roleKey: 'role.CASHIER', identifier: 'kassir@shifomed.uz', password: 'Demo123!' },
+  { roleKey: 'role.LAB_TECH', identifier: 'labor@shifomed.uz', password: 'Demo123!' },
+  { roleKey: 'role.SUPER_ADMIN', identifier: 'admin@avishifo.uz', password: 'Admin123!' },
+] as const;
+
 interface MeResponse {
   user: AuthUser;
   clinic: ClinicInfo | null;
@@ -28,6 +41,7 @@ interface MeResponse {
 export function LoginForm() {
   const t = useTranslations('auth');
   const tErr = useTranslations('errors');
+  const tStatus = useTranslations('statuses');
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -90,6 +104,32 @@ export function LoginForm() {
             {form.formState.isSubmitting ? t('loggingIn') : t('login')}
           </Button>
         </form>
+
+        {SHOW_DEMO ? (
+          <details className="mt-6 rounded-lg border bg-muted/40 p-3 text-sm">
+            <summary className="cursor-pointer select-none font-medium text-muted-foreground">
+              {t('demoAccounts')}
+            </summary>
+            <div className="mt-3 grid gap-1.5">
+              {DEMO_ACCOUNTS.map((acc) => (
+                <button
+                  key={acc.identifier}
+                  type="button"
+                  className="flex items-center justify-between rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent"
+                  onClick={() => {
+                    form.setValue('identifier', acc.identifier);
+                    form.setValue('password', acc.password);
+                    setServerError(null);
+                  }}
+                >
+                  <span className="font-medium">{tStatus(acc.roleKey as never)}</span>
+                  <span className="text-xs text-muted-foreground">{acc.identifier}</span>
+                </button>
+              ))}
+              <p className="mt-1 px-2 text-xs text-muted-foreground">{t('demoDisplayHint')}</p>
+            </div>
+          </details>
+        ) : null}
       </CardContent>
     </Card>
   );

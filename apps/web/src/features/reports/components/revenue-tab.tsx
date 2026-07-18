@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/empty-state';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import type { ReportFilters, RevenueDimension } from '../api';
 import { useRevenueReport } from '../hooks';
 import {
@@ -37,6 +38,7 @@ const KNOWN_METHODS = new Set<string>(Object.values(PaymentMethod));
 
 export function RevenueTab({ filters }: { filters: ReportFilters }) {
   const t = useTranslations('reports');
+  const enumLabel = useEnumLabel();
   const [dimension, setDimension] = useState<RevenueDimension>('time');
   const query = useRevenueReport(filters, dimension);
 
@@ -48,11 +50,11 @@ export function RevenueTab({ filters }: { filters: ReportFilters }) {
         bucket: r.bucket,
         name:
           dimension === 'method' && KNOWN_METHODS.has(r.bucket)
-            ? t(`methods.${r.bucket}`)
+            ? enumLabel('method', r.bucket)
             : r.bucket,
         amount: Number(r.amount),
       })),
-    [rows, dimension, t],
+    [rows, dimension, enumLabel],
   );
 
   const total = useMemo(() => chartData.reduce((sum, r) => sum + r.amount, 0), [chartData]);

@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { useAuthStore } from '@/stores/auth-store';
 import { emptyToUndefined, settingsApi, type UserRow } from '../api';
 import { useApiErrorToast } from '../hooks';
@@ -55,6 +56,7 @@ function phoneToUndefined(value: unknown): string | undefined {
 
 export function UserDialog({ open, onOpenChange, user }: UserDialogProps) {
   const t = useTranslations('settings');
+  const enumLabel = useEnumLabel();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
   const branches = useAuthStore((s) => s.branches);
@@ -200,7 +202,7 @@ export function UserDialog({ open, onOpenChange, user }: UserDialogProps) {
                 <SelectContent>
                   {STAFF_ROLES.map((r) => (
                     <SelectItem key={r} value={r}>
-                      {t(`users.roles.${r}` as never)}
+                      {enumLabel('role', r)}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { emptyToUndefined, settingsApi, type RoomRow } from '../api';
 import { useApiErrorToast } from '../hooks';
 
@@ -47,6 +48,7 @@ function toSpecialties(value: unknown): string[] {
 
 export function RoomDialog({ open, onOpenChange, branchId, room }: RoomDialogProps) {
   const t = useTranslations('settings');
+  const enumLabel = useEnumLabel();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
   const isEdit = room !== null;
@@ -123,7 +125,7 @@ export function RoomDialog({ open, onOpenChange, branchId, room }: RoomDialogPro
               <SelectContent>
                 {ROOM_TYPES.map((rt) => (
                   <SelectItem key={rt} value={rt}>
-                    {t(`rooms.types.${rt}` as never)}
+                    {enumLabel('roomType', rt)}
                   </SelectItem>
                 ))}
               </SelectContent>

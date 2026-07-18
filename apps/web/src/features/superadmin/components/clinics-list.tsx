@@ -19,6 +19,7 @@ import {
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { superadminApi, type ClinicListItem } from '../api';
 import { usePermission } from '../hooks';
 import { CreateClinicDialog } from './create-clinic-dialog';
@@ -27,6 +28,7 @@ const ALL_STATUSES = 'ALL';
 
 export function ClinicsListView() {
   const t = useTranslations('superadmin');
+  const enumLabel = useEnumLabel();
   const can = usePermission();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ClinicStatus | null>(null);
@@ -56,12 +58,7 @@ export function ClinicsListView() {
       {
         accessorKey: 'status',
         header: t('clinics.columns.status'),
-        cell: ({ row }) => (
-          <StatusBadge
-            status={row.original.status}
-            label={t(`status.${row.original.status}` as never)}
-          />
-        ),
+        cell: ({ row }) => <StatusBadge status={row.original.status} group="clinic" />,
       },
       {
         id: 'plan',
@@ -132,7 +129,7 @@ export function ClinicsListView() {
             <SelectItem value={ALL_STATUSES}>{t('clinics.allStatuses')}</SelectItem>
             {Object.values(ClinicStatus).map((s) => (
               <SelectItem key={s} value={s}>
-                {t(`status.${s}` as never)}
+                {enumLabel('clinic', s)}
               </SelectItem>
             ))}
           </SelectContent>

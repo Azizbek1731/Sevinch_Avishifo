@@ -1,0 +1,135 @@
+{
+  "clinics": {
+    "title": "Клиникалар",
+    "description": "Платформадаги барча клиникаларни бошқариш",
+    "create": "Клиника",
+    "searchPlaceholder": "Клиника номи бўйича қидириш...",
+    "allStatuses": "Барча ҳолатлар",
+    "noPlan": "Тариф йўқ",
+    "created": "Клиника яратилди",
+    "columns": {
+      "name": "Номи",
+      "status": "Ҳолат",
+      "plan": "Тариф",
+      "branches": "Филиаллар",
+      "users": "Фойдаланувчилар",
+      "patients": "Беморлар",
+      "visits30d": "Ташрифлар (30 кун)"
+    },
+    "empty": {
+      "title": "Клиникалар топилмади",
+      "description": "Қидирув шартларини ўзгартириб кўринг"
+    },
+    "createDialog": {
+      "title": "Янги клиника яратиш",
+      "clinicSection": "Клиника маълумотлари",
+      "ownerSection": "Эгасининг ҳисоби",
+      "name": "Номи",
+      "legalName": "Юридик номи",
+      "phone": "Телефон",
+      "email": "Email",
+      "ownerFullName": "Ф.И.Ш.",
+      "ownerPhone": "Телефон",
+      "ownerEmail": "Email",
+      "password": "Парол"
+    }
+  },
+  "status": {
+    "ACTIVE": "Фаол",
+    "SUSPENDED": "Тўхтатилган",
+    "ARCHIVED": "Архивланган"
+  },
+  "subscriptionStatus": {
+    "TRIAL": "Синов",
+    "ACTIVE": "Фаол",
+    "PAST_DUE": "Тўлов кечиккан",
+    "CANCELLED": "Бекор қилинган"
+  },
+  "detail": {
+    "info": "Маълумотлар",
+    "createdAt": "Яратилган сана",
+    "backToList": "Рўйхатга қайтиш",
+    "notFound": "Клиника топилмади",
+    "statusUpdated": "Клиника ҳолати янгиланди",
+    "impersonationMode": "Имперсонация режими",
+    "plan": {
+      "title": "Обуна тарифи",
+      "current": "Жорий тариф",
+      "select": "Тарифни танланг",
+      "assign": "Бириктириш",
+      "assigned": "Тариф бириктирилди"
+    },
+    "flags": {
+      "title": "Функсия калитлари",
+      "updated": "Функсия калити янгиланди",
+      "lab": "Лаборатория",
+      "portal": "Бемор портали",
+      "telegram": "Telegram бот",
+      "analytics": "Аналитика"
+    },
+    "actions": {
+      "suspend": "Тўхтатиш",
+      "activate": "Фаоллаштириш",
+      "impersonate": "Клиникага кириш"
+    },
+    "suspendConfirm": {
+      "title": "Клиникани тўхтатасизми?",
+      "description": "{name} клиникаси тўхтатилади ва ходимлари тизимга кира олмайди."
+    },
+    "activateConfirm": {
+      "title": "Клиникани фаоллаштирасизми?",
+      "description": "{name} клиникаси қайта фаоллаштирилади ва ходимлар тизимга кира олади."
+    }
+  },
+  "plans": {
+    "title": "Тарифлар",
+    "description": "Обуна тарифлари ва лимитлари",
+    "create": "Тариф",
+    "edit": "Таҳрирлаш",
+    "perMonth": "/ ой",
+    "maxBranches": "Макс. филиаллар",
+    "maxUsers": "Макс. фойдаланувчилар",
+    "inactive": "Нофаол",
+    "saved": "Тариф сақланди",
+    "empty": {
+      "title": "Тарифлар йўқ",
+      "description": "Биринчи тарифни яратинг"
+    },
+    "dialog": {
+      "createTitle": "Янги тариф",
+      "editTitle": "Тарифни таҳрирлаш",
+      "code": "Код",
+      "name": "Номи",
+      "price": "Ойлик нарх (сўм)",
+      "maxBranches": "Макс. филиаллар",
+      "maxUsers": "Макс. фойдаланувчилар",
+      "modules": "Модуллар"
+    }
+  },
+  "analytics": {
+    "title": "Платформа аналитикаси",
+    "description": "Барча клиникалар бўйича умумий кўрсаткичлар",
+    "activeClinics": "Фаол клиникалар",
+    "totalUsers": "Жами фойдаланувчилар",
+    "totalPatients": "Жами беморлар",
+    "payments30d": "Тўловлар (30 кун)",
+    "visitsChartTitle": "Ташрифлар — сўнгги 30 кун",
+    "visitsSeries": "Ташрифлар",
+    "empty": {
+      "title": "Маълумот йўқ",
+      "description": "Ҳозирча ташрифлар қайд этилмаган"
+    }
+  },
+  "form": {
+    "required": "Бу майдон мажбурий",
+    "invalidPhone": "Телефон рақами нотўғри",
+    "invalidEmail": "Email нотўғри",
+    "passwordMin": "Парол камида 8 белгидан иборат бўлиши керак",
+    "invalidPrice": "Нарх нотўғри",
+    "invalidNumber": "Қиймат нотўғри"
+  },
+  "actions": {
+    "cancel": "Бекор қилиш",
+    "save": "Сақлаш"
+  }
+}

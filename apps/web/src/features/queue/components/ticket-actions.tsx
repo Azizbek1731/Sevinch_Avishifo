@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { useTicketAction } from '../hooks';
 
 export interface TransferTarget {
@@ -45,6 +46,7 @@ export interface TicketActionsProps {
 export function TicketActions({ ticket, canCall, canManage, transferTargets }: TicketActionsProps) {
   const t = useTranslations('queue');
   const tCommon = useTranslations('common');
+  const enumLabel = useEnumLabel();
   const action = useTicketAction();
   const [skipOpen, setSkipOpen] = React.useState(false);
 
@@ -130,7 +132,7 @@ export function TicketActions({ ticket, canCall, canManage, transferTargets }: T
                   >
                     {Object.values(TicketPriority).map((p) => (
                       <DropdownMenuRadioItem key={p} value={p}>
-                        {t(`priority.${p}`)}
+                        {enumLabel('priority', p)}
                       </DropdownMenuRadioItem>
                     ))}
                   </DropdownMenuRadioGroup>

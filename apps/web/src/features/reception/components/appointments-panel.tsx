@@ -84,7 +84,7 @@ export function AppointmentsPanel() {
                     <span className="font-mono text-sm font-semibold tabular-nums">
                       {formatTime(a.startAt)}–{formatTime(a.endAt)}
                     </span>
-                    <StatusBadge status={a.status} label={t(`statuses.${a.status}`)} />
+                    <StatusBadge status={a.status} group="appointment" />
                   </div>
                   <p className="mt-1 truncate text-sm font-medium">{a.patient.fullName}</p>
                   <p className="truncate text-xs text-muted-foreground">

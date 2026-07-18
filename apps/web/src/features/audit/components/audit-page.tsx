@@ -16,6 +16,7 @@ import {
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { formatTz } from '@/lib/dates';
 import { auditApi, splitDiff, type AuditLogRow } from '../api';
 
@@ -67,6 +68,7 @@ function DiffCell({ diff }: { diff: unknown }) {
 
 export function AuditPage() {
   const t = useTranslations('audit');
+  const enumLabel = useEnumLabel();
 
   const [page, setPage] = useState(1);
   const [entity, setEntity] = useState<string>(ALL);
@@ -123,7 +125,7 @@ export function AuditPage() {
         cell: ({ row }) => (
           <StatusBadge
             status={ACTION_TONES[row.original.action] ?? 'DRAFT'}
-            label={t(`actions.${row.original.action}` as never)}
+            label={enumLabel('audit', row.original.action)}
           />
         ),
       },
@@ -153,7 +155,7 @@ export function AuditPage() {
           row.original.ip ? <span className="font-mono text-xs">{row.original.ip}</span> : '—',
       },
     ],
-    [t],
+    [t, enumLabel],
   );
 
   const meta = logsQuery.data?.meta;
@@ -201,7 +203,7 @@ export function AuditPage() {
               <SelectItem value={ALL}>{t('allActions')}</SelectItem>
               {ACTION_VALUES.map((a) => (
                 <SelectItem key={a} value={a}>
-                  {t(`actions.${a}` as never)}
+                  {enumLabel('audit', a)}
                 </SelectItem>
               ))}
             </SelectContent>

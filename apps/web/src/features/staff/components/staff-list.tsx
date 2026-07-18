@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { useAuthStore } from '@/stores/auth-store';
 import type { StaffMember } from '../api';
 import { usePermissions, useStaffList } from '../hooks';
@@ -41,6 +42,7 @@ const STAFF_ROLES: UserRole[] = [
 
 function StaffDirectory() {
   const t = useTranslations('staff');
+  const enumLabel = useEnumLabel();
   const router = useRouter();
   const branches = useAuthStore((s) => s.branches);
 
@@ -81,7 +83,7 @@ function StaffDirectory() {
         header: t('table.role'),
         cell: ({ row }) => (
           <Badge variant="secondary" className="text-xs">
-            {t(`roles.${row.original.role}` as never)}
+            {enumLabel('role', row.original.role)}
           </Badge>
         ),
       },
@@ -116,15 +118,10 @@ function StaffDirectory() {
       {
         accessorKey: 'status',
         header: t('table.status'),
-        cell: ({ row }) => (
-          <StatusBadge
-            status={row.original.status}
-            label={t(`statuses.${row.original.status}` as never)}
-          />
-        ),
+        cell: ({ row }) => <StatusBadge status={row.original.status} group="user" />,
       },
     ],
-    [t],
+    [t, enumLabel],
   );
 
   const showEmpty =
@@ -156,7 +153,7 @@ function StaffDirectory() {
             <SelectItem value={ALL}>{t('filters.allRoles')}</SelectItem>
             {STAFF_ROLES.map((r) => (
               <SelectItem key={r} value={r}>
-                {t(`roles.${r}` as never)}
+                {enumLabel('role', r)}
               </SelectItem>
             ))}
           </SelectContent>

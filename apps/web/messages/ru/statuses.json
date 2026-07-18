@@ -1,0 +1,170 @@
+{
+  "appointment": {
+    "SCHEDULED": "Запланирован",
+    "CONFIRMED": "Подтверждён",
+    "CHECKED_IN": "Пришёл",
+    "IN_QUEUE": "В очереди",
+    "IN_PROGRESS": "На приёме",
+    "COMPLETED": "Завершён",
+    "NO_SHOW": "Не пришёл",
+    "CANCELLED": "Отменён"
+  },
+  "ticket": {
+    "WAITING": "Ожидает",
+    "CALLED": "Вызван",
+    "IN_ROOM": "В кабинете",
+    "DONE": "Завершён",
+    "SKIPPED": "Пропущен"
+  },
+  "visit": {
+    "IN_PROGRESS": "Идёт приём",
+    "COMPLETED": "Завершён",
+    "CANCELLED": "Отменён"
+  },
+  "invoice": {
+    "DRAFT": "Черновик",
+    "ISSUED": "Выставлен",
+    "PARTIALLY_PAID": "Частично оплачен",
+    "PAID": "Оплачен",
+    "CANCELLED": "Отменён",
+    "REFUNDED": "Возвращён"
+  },
+  "payment": {
+    "PENDING": "Ожидает",
+    "COMPLETED": "Выполнен",
+    "FAILED": "Ошибка",
+    "REFUNDED": "Возвращён"
+  },
+  "lab": {
+    "ORDERED": "Заказан",
+    "SPECIMEN_COLLECTED": "Образец взят",
+    "IN_PROGRESS": "В работе",
+    "RESULTED": "Результат внесён",
+    "APPROVED": "Утверждён",
+    "DELIVERED": "Выдан",
+    "CANCELLED": "Отменён"
+  },
+  "shift": {
+    "OPEN": "Открыта",
+    "CLOSED": "Закрыта"
+  },
+  "user": {
+    "ACTIVE": "Активен",
+    "SUSPENDED": "Заблокирован",
+    "ARCHIVED": "В архиве"
+  },
+  "clinic": {
+    "ACTIVE": "Активна",
+    "SUSPENDED": "Приостановлена",
+    "ARCHIVED": "В архиве"
+  },
+  "subscription": {
+    "TRIAL": "Пробный",
+    "ACTIVE": "Активна",
+    "PAST_DUE": "Просрочена",
+    "CANCELLED": "Отменена"
+  },
+  "priority": {
+    "NORMAL": "Обычный",
+    "PRIORITY": "Приоритет",
+    "EMERGENCY": "Срочный"
+  },
+  "role": {
+    "SUPER_ADMIN": "Супер-админ",
+    "CLINIC_OWNER": "Директор",
+    "CLINIC_ADMIN": "Администратор",
+    "DOCTOR": "Врач",
+    "NURSE": "Медсестра",
+    "RECEPTIONIST": "Регистратура",
+    "CASHIER": "Кассир",
+    "LAB_TECH": "Лаборант",
+    "ACCOUNTANT": "Бухгалтер",
+    "PATIENT": "Пациент"
+  },
+  "method": {
+    "CASH": "Наличные",
+    "CARD": "Карта (терминал)",
+    "PAYME": "Payme",
+    "CLICK": "Click",
+    "UZUM": "Uzum",
+    "BALANCE": "С баланса"
+  },
+  "channel": {
+    "SMS": "SMS",
+    "TELEGRAM": "Telegram",
+    "IN_APP": "В приложении"
+  },
+  "notification": {
+    "QUEUED": "В очереди",
+    "SENT": "Отправлено",
+    "DELIVERED": "Доставлено",
+    "FAILED": "Ошибка"
+  },
+  "gender": {
+    "MALE": "Мужской",
+    "FEMALE": "Женский"
+  },
+  "roomType": {
+    "CONSULTATION": "Консультация",
+    "PROCEDURE": "Процедурная",
+    "LAB": "Лаборатория",
+    "ULTRASOUND": "УЗИ",
+    "XRAY": "Рентген",
+    "TREATMENT": "Лечение",
+    "OTHER": "Другое"
+  },
+  "serviceKind": {
+    "CONSULTATION": "Консультация",
+    "LAB": "Лаборатория",
+    "ULTRASOUND": "УЗИ",
+    "PROCEDURE": "Процедура",
+    "DIAGNOSTICS": "Диагностика",
+    "OTHER": "Другое"
+  },
+  "discount": {
+    "PERCENT": "Процент",
+    "FIXED": "Фикс. сумма"
+  },
+  "compensation": {
+    "FIXED_SALARY": "Фикс. оклад",
+    "REVENUE_PERCENT": "Процент от выручки",
+    "PER_SERVICE_FEE": "Плата за услугу"
+  },
+  "exception": {
+    "VACATION": "Отпуск",
+    "SICK_LEAVE": "Больничный",
+    "DAY_OFF": "Выходной",
+    "CUSTOM_HOURS": "Особые часы"
+  },
+  "documentCategory": {
+    "ANALYSIS": "Анализ",
+    "IMAGING": "Снимок (УЗИ/рентген)",
+    "DISCHARGE": "Эпикриз",
+    "CONSENT": "Согласие",
+    "OTHER": "Другое"
+  },
+  "audit": {
+    "CREATE": "Создание",
+    "UPDATE": "Изменение",
+    "DELETE": "Удаление",
+    "LOGIN": "Вход",
+    "LOGOUT": "Выход",
+    "LOGIN_FAILED": "Неудачный вход",
+    "IMPERSONATE": "Имперсонация",
+    "REFUND": "Возврат",
+    "EXPORT": "Экспорт",
+    "MERGE": "Объединение",
+    "AMEND": "Поправка"
+  },
+  "bloodGroup": {
+    "A_POS": "A (II) Rh+",
+    "A_NEG": "A (II) Rh−",
+    "B_POS": "B (III) Rh+",
+    "B_NEG": "B (III) Rh−",
+    "AB_POS": "AB (IV) Rh+",
+    "AB_NEG": "AB (IV) Rh−",
+    "O_POS": "O (I) Rh+",
+    "O_NEG": "O (I) Rh−",
+    "UNKNOWN": "Неизвестна"
+  }
+}

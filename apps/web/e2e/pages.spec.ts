@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './test-base';
 
 /**
  * Live-stack sanity sweep: after login, every main screen must render without

@@ -10,7 +10,7 @@ Multi-tenant SaaS klinika boshqaruv tizimi (practice management + yengil EHR) �
 avishifo/
 ├── apps/
 │   ├── api/        NestJS 11 + Prisma 6 + PostgreSQL 16 + Redis 7 + Socket.IO + BullMQ  (port 3001)
-│   ├── web/        Next.js 15 — xodimlar paneli + super-admin (uz/ru/en)               (port 3000)
+│   ├── web/        Next.js 15 — xodimlar paneli + super-admin (uz/uz-Cyrl/ru/en)       (port 3000)
 │   ├── display/    Next.js — TV navbat ekrani (fullscreen, TTS)                        (port 3002)
 │   └── portal/     Next.js — bemor portali + onlayn yozilish (OTP)                     (port 3003)
 ├── packages/
@@ -78,7 +78,9 @@ pnpm --filter @avishifo/portal dev     # Portal   → http://localhost:3003
 | Laborant | `labor@shifomed.uz` | `labor@nurklinika.uz` |
 | **Super-admin (platforma)** | `admin@avishifo.uz` | — |
 
-Telefon orqali ham kirish mumkin (masalan `+998901000001`). To'liq demo ssenariy (klik-yo'llar): [docs/DEMO.md](docs/DEMO.md).
+Telefon orqali ham kirish mumkin (masalan `+998901000001`). Login sahifasida **«Demo hisoblar»** paneli bor — rolni bosing, forma o'zi to'ladi (`NEXT_PUBLIC_DEMO_LOGINS=false` bilan o'chiriladi). To'liq demo ssenariy: [docs/DEMO.md](docs/DEMO.md).
+
+**Til:** panel 4 tilda — O'zbekcha (lotin, standart), Ўзбекча (кирилл), Русский, English. Til foydalanuvchi menyusidan (yuqori o'ng burchak) almashtiriladi.
 
 ### TV-ekranni ulash
 
@@ -132,5 +134,5 @@ dropdb avishifo_restore_test
 
 - Inventar/dorixona (M10) — sxema tayyor, endpoint/UI keyingi bosqichda (spec Phase 4).
 - Payme/Click/Uzum — sandbox rejimda; jonli merchant kaliti talab qiladi. Uzum provayderi strukturaviy stub.
-- uz-Cyrl lokalizatsiya — kalitlar tuzilmasi tayyor, tarjimalar kiritilmagan (uz-Latn/ru/en to'liq).
+- uz-Cyrl tarjimalar avtomatik transliteratsiya qilingan (`scripts/uz-latin-to-cyrillic.mjs`) — matnlar tushunarli, ammo tahririy sayqal berish mumkin.
 - AviRadiology integratsiyasi — interfeys nuqtasi rejalashtirilgan (Phase 4), hali implement qilinmagan.

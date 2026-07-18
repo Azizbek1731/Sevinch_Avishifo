@@ -1,0 +1,170 @@
+{
+  "appointment": {
+    "SCHEDULED": "Scheduled",
+    "CONFIRMED": "Confirmed",
+    "CHECKED_IN": "Checked in",
+    "IN_QUEUE": "In queue",
+    "IN_PROGRESS": "In progress",
+    "COMPLETED": "Completed",
+    "NO_SHOW": "No-show",
+    "CANCELLED": "Cancelled"
+  },
+  "ticket": {
+    "WAITING": "Waiting",
+    "CALLED": "Called",
+    "IN_ROOM": "In room",
+    "DONE": "Done",
+    "SKIPPED": "Skipped"
+  },
+  "visit": {
+    "IN_PROGRESS": "In progress",
+    "COMPLETED": "Completed",
+    "CANCELLED": "Cancelled"
+  },
+  "invoice": {
+    "DRAFT": "Draft",
+    "ISSUED": "Issued",
+    "PARTIALLY_PAID": "Partially paid",
+    "PAID": "Paid",
+    "CANCELLED": "Cancelled",
+    "REFUNDED": "Refunded"
+  },
+  "payment": {
+    "PENDING": "Pending",
+    "COMPLETED": "Completed",
+    "FAILED": "Failed",
+    "REFUNDED": "Refunded"
+  },
+  "lab": {
+    "ORDERED": "Ordered",
+    "SPECIMEN_COLLECTED": "Specimen collected",
+    "IN_PROGRESS": "In progress",
+    "RESULTED": "Resulted",
+    "APPROVED": "Approved",
+    "DELIVERED": "Delivered",
+    "CANCELLED": "Cancelled"
+  },
+  "shift": {
+    "OPEN": "Open",
+    "CLOSED": "Closed"
+  },
+  "user": {
+    "ACTIVE": "Active",
+    "SUSPENDED": "Suspended",
+    "ARCHIVED": "Archived"
+  },
+  "clinic": {
+    "ACTIVE": "Active",
+    "SUSPENDED": "Suspended",
+    "ARCHIVED": "Archived"
+  },
+  "subscription": {
+    "TRIAL": "Trial",
+    "ACTIVE": "Active",
+    "PAST_DUE": "Past due",
+    "CANCELLED": "Cancelled"
+  },
+  "priority": {
+    "NORMAL": "Normal",
+    "PRIORITY": "Priority",
+    "EMERGENCY": "Emergency"
+  },
+  "role": {
+    "SUPER_ADMIN": "Super admin",
+    "CLINIC_OWNER": "Director",
+    "CLINIC_ADMIN": "Administrator",
+    "DOCTOR": "Doctor",
+    "NURSE": "Nurse",
+    "RECEPTIONIST": "Receptionist",
+    "CASHIER": "Cashier",
+    "LAB_TECH": "Lab technician",
+    "ACCOUNTANT": "Accountant",
+    "PATIENT": "Patient"
+  },
+  "method": {
+    "CASH": "Cash",
+    "CARD": "Card (terminal)",
+    "PAYME": "Payme",
+    "CLICK": "Click",
+    "UZUM": "Uzum",
+    "BALANCE": "From balance"
+  },
+  "channel": {
+    "SMS": "SMS",
+    "TELEGRAM": "Telegram",
+    "IN_APP": "In-app"
+  },
+  "notification": {
+    "QUEUED": "Queued",
+    "SENT": "Sent",
+    "DELIVERED": "Delivered",
+    "FAILED": "Failed"
+  },
+  "gender": {
+    "MALE": "Male",
+    "FEMALE": "Female"
+  },
+  "roomType": {
+    "CONSULTATION": "Consultation",
+    "PROCEDURE": "Procedure",
+    "LAB": "Laboratory",
+    "ULTRASOUND": "Ultrasound",
+    "XRAY": "X-ray",
+    "TREATMENT": "Treatment",
+    "OTHER": "Other"
+  },
+  "serviceKind": {
+    "CONSULTATION": "Consultation",
+    "LAB": "Laboratory",
+    "ULTRASOUND": "Ultrasound",
+    "PROCEDURE": "Procedure",
+    "DIAGNOSTICS": "Diagnostics",
+    "OTHER": "Other"
+  },
+  "discount": {
+    "PERCENT": "Percent",
+    "FIXED": "Fixed amount"
+  },
+  "compensation": {
+    "FIXED_SALARY": "Fixed salary",
+    "REVENUE_PERCENT": "Revenue percent",
+    "PER_SERVICE_FEE": "Per-service fee"
+  },
+  "exception": {
+    "VACATION": "Vacation",
+    "SICK_LEAVE": "Sick leave",
+    "DAY_OFF": "Day off",
+    "CUSTOM_HOURS": "Custom hours"
+  },
+  "documentCategory": {
+    "ANALYSIS": "Analysis",
+    "IMAGING": "Imaging (US/X-ray)",
+    "DISCHARGE": "Discharge summary",
+    "CONSENT": "Consent",
+    "OTHER": "Other"
+  },
+  "audit": {
+    "CREATE": "Create",
+    "UPDATE": "Update",
+    "DELETE": "Delete",
+    "LOGIN": "Login",
+    "LOGOUT": "Logout",
+    "LOGIN_FAILED": "Failed login",
+    "IMPERSONATE": "Impersonation",
+    "REFUND": "Refund",
+    "EXPORT": "Export",
+    "MERGE": "Merge",
+    "AMEND": "Amendment"
+  },
+  "bloodGroup": {
+    "A_POS": "A (II) Rh+",
+    "A_NEG": "A (II) Rh−",
+    "B_POS": "B (III) Rh+",
+    "B_NEG": "B (III) Rh−",
+    "AB_POS": "AB (IV) Rh+",
+    "AB_NEG": "AB (IV) Rh−",
+    "O_POS": "O (I) Rh+",
+    "O_NEG": "O (I) Rh−",
+    "UNKNOWN": "Unknown"
+  }
+}

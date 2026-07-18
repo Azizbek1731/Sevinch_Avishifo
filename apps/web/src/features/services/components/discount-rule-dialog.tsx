@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { emptyToUndefined, sanitizeMoney, servicesApi, type DiscountRuleRow } from '../api';
 import { useApiErrorToast } from '../hooks';
 
@@ -41,6 +42,7 @@ export interface DiscountRuleDialogProps {
 
 export function DiscountRuleDialog({ open, onOpenChange, rule }: DiscountRuleDialogProps) {
   const t = useTranslations('services');
+  const enumLabel = useEnumLabel();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
   const isEdit = rule !== null;
@@ -123,7 +125,7 @@ export function DiscountRuleDialog({ open, onOpenChange, rule }: DiscountRuleDia
                 <SelectContent>
                   {Object.values(DiscountType).map((dt) => (
                     <SelectItem key={dt} value={dt}>
-                      {t(`discounts.types.${dt}`)}
+                      {enumLabel('discount', dt)}
                     </SelectItem>
                   ))}
                 </SelectContent>

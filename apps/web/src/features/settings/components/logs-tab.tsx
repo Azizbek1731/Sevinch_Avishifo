@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { DataTable } from '@/components/data-table';
 import { StatusBadge } from '@/components/status-badge';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { formatTz } from '@/lib/dates';
 import { settingsApi, type NotificationLogRow } from '../api';
 
@@ -23,6 +24,7 @@ const CHANNEL_VALUES = Object.values(NotificationChannel);
 
 export function LogsTab() {
   const t = useTranslations('notifications');
+  const enumLabel = useEnumLabel();
 
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<string>(ALL);
@@ -65,7 +67,7 @@ export function LogsTab() {
       {
         accessorKey: 'channel',
         header: t('logs.channel'),
-        cell: ({ row }) => t(`channels.${row.original.channel}` as never),
+        cell: ({ row }) => enumLabel('channel', row.original.channel),
       },
       {
         accessorKey: 'body',
@@ -81,10 +83,7 @@ export function LogsTab() {
         header: t('logs.status'),
         cell: ({ row }) => (
           <div className="space-y-0.5">
-            <StatusBadge
-              status={row.original.status}
-              label={t(`logs.statuses.${row.original.status}` as never)}
-            />
+            <StatusBadge status={row.original.status} group="notification" />
             {row.original.error ? (
               <p className="max-w-48 truncate text-xs text-destructive">{row.original.error}</p>
             ) : null}
@@ -96,7 +95,7 @@ export function LogsTab() {
         header: t('logs.attempts'),
       },
     ],
-    [t],
+    [t, enumLabel],
   );
 
   const meta = logsQuery.data?.meta;
@@ -118,7 +117,7 @@ export function LogsTab() {
             <SelectItem value={ALL}>{t('logs.allStatuses')}</SelectItem>
             {STATUS_VALUES.map((s) => (
               <SelectItem key={s} value={s}>
-                {t(`logs.statuses.${s}` as never)}
+                {enumLabel('notification', s)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -137,7 +136,7 @@ export function LogsTab() {
             <SelectItem value={ALL}>{t('logs.allChannels')}</SelectItem>
             {CHANNEL_VALUES.map((c) => (
               <SelectItem key={c} value={c}>
-                {t(`channels.${c}` as never)}
+                {enumLabel('channel', c)}
               </SelectItem>
             ))}
           </SelectContent>

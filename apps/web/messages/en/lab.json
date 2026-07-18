@@ -48,6 +48,7 @@
   "unit": "Unit",
   "refLow": "Low",
   "refHigh": "High",
+  "refYears": "y",
   "parametersInvalid": "Fill in the parameters correctly (name is required, range bounds must be numbers)",
   "valuesRequired": "Enter at least one value",
   "value": "Value",

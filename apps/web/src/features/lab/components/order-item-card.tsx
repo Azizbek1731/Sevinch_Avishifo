@@ -17,8 +17,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { useEnterResults } from '../hooks';
-import { flagClass, flagMark, localizedName, referenceText, type UiLocale } from '../lib';
+import {
+  flagClass,
+  flagMark,
+  localizedName,
+  referenceText,
+  type ReferenceTextLabels,
+  type UiLocale,
+} from '../lib';
 import type { LabOrderItem } from '../types';
 
 export function OrderItemCard({
@@ -33,6 +41,11 @@ export function OrderItemCard({
 }) {
   const t = useTranslations('lab');
   const locale = useLocale() as UiLocale;
+  const enumLabel = useEnumLabel();
+  const refLabels: ReferenceTextLabels = {
+    genderLabel: (g) => enumLabel('gender', g),
+    yearsSuffix: t('refYears'),
+  };
   const enterResults = useEnterResults();
 
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -99,7 +112,7 @@ export function OrderItemCard({
                       {param.unit ?? '—'}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {referenceText(param.referenceRanges)}
+                      {referenceText(param.referenceRanges, refLabels)}
                     </TableCell>
                     <TableCell>
                       {flag ? (

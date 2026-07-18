@@ -1,0 +1,170 @@
+{
+  "appointment": {
+    "SCHEDULED": "Режалаштирилган",
+    "CONFIRMED": "Тасдиқланган",
+    "CHECKED_IN": "Келди",
+    "IN_QUEUE": "Навбатда",
+    "IN_PROGRESS": "Қабулда",
+    "COMPLETED": "Якунланган",
+    "NO_SHOW": "Келмади",
+    "CANCELLED": "Бекор қилинган"
+  },
+  "ticket": {
+    "WAITING": "Кутмоқда",
+    "CALLED": "Чақирилди",
+    "IN_ROOM": "Хонада",
+    "DONE": "Якунланди",
+    "SKIPPED": "Ўтказиб юборилди"
+  },
+  "visit": {
+    "IN_PROGRESS": "Давом этмоқда",
+    "COMPLETED": "Якунланган",
+    "CANCELLED": "Бекор қилинган"
+  },
+  "invoice": {
+    "DRAFT": "Қоралама",
+    "ISSUED": "Тақдим этилган",
+    "PARTIALLY_PAID": "Қисман тўланган",
+    "PAID": "Тўланган",
+    "CANCELLED": "Бекор қилинган",
+    "REFUNDED": "Қайтарилган"
+  },
+  "payment": {
+    "PENDING": "Кутилмоқда",
+    "COMPLETED": "Бажарилди",
+    "FAILED": "Хато",
+    "REFUNDED": "Қайтарилган"
+  },
+  "lab": {
+    "ORDERED": "Буюртма қилинган",
+    "SPECIMEN_COLLECTED": "Намуна олинди",
+    "IN_PROGRESS": "Жараёнда",
+    "RESULTED": "Натижа киритилди",
+    "APPROVED": "Тасдиқланган",
+    "DELIVERED": "Топширилди",
+    "CANCELLED": "Бекор қилинган"
+  },
+  "shift": {
+    "OPEN": "Очиқ",
+    "CLOSED": "Ёпиқ"
+  },
+  "user": {
+    "ACTIVE": "Фаол",
+    "SUSPENDED": "Блокланган",
+    "ARCHIVED": "Архивланган"
+  },
+  "clinic": {
+    "ACTIVE": "Фаол",
+    "SUSPENDED": "Тўхтатилган",
+    "ARCHIVED": "Архивланган"
+  },
+  "subscription": {
+    "TRIAL": "Синов",
+    "ACTIVE": "Фаол",
+    "PAST_DUE": "Муддати ўтган",
+    "CANCELLED": "Бекор қилинган"
+  },
+  "priority": {
+    "NORMAL": "Оддий",
+    "PRIORITY": "Имтиёзли",
+    "EMERGENCY": "Шошилинч"
+  },
+  "role": {
+    "SUPER_ADMIN": "Супер-админ",
+    "CLINIC_OWNER": "Директор",
+    "CLINIC_ADMIN": "Администратор",
+    "DOCTOR": "Шифокор",
+    "NURSE": "Ҳамшира",
+    "RECEPTIONIST": "Қабулхона",
+    "CASHIER": "Кассир",
+    "LAB_TECH": "Лаборант",
+    "ACCOUNTANT": "Бухгалтер",
+    "PATIENT": "Бемор"
+  },
+  "method": {
+    "CASH": "Нақд",
+    "CARD": "Карта (терминал)",
+    "PAYME": "Payme",
+    "CLICK": "Click",
+    "UZUM": "Uzum",
+    "BALANCE": "Балансдан"
+  },
+  "channel": {
+    "SMS": "SMS",
+    "TELEGRAM": "Telegram",
+    "IN_APP": "Илова ичида"
+  },
+  "notification": {
+    "QUEUED": "Навбатда",
+    "SENT": "Юборилди",
+    "DELIVERED": "Етказилди",
+    "FAILED": "Хато"
+  },
+  "gender": {
+    "MALE": "Эркак",
+    "FEMALE": "Аёл"
+  },
+  "roomType": {
+    "CONSULTATION": "Консултация",
+    "PROCEDURE": "Муолажа",
+    "LAB": "Лаборатория",
+    "ULTRASOUND": "УТТ",
+    "XRAY": "Рентген",
+    "TREATMENT": "Даволаш",
+    "OTHER": "Бошқа"
+  },
+  "serviceKind": {
+    "CONSULTATION": "Консултация",
+    "LAB": "Лаборатория",
+    "ULTRASOUND": "УТТ",
+    "PROCEDURE": "Муолажа",
+    "DIAGNOSTICS": "Диагностика",
+    "OTHER": "Бошқа"
+  },
+  "discount": {
+    "PERCENT": "Фоиз",
+    "FIXED": "Қатъий сумма"
+  },
+  "compensation": {
+    "FIXED_SALARY": "Қатъий ойлик",
+    "REVENUE_PERCENT": "Тушумдан фоиз",
+    "PER_SERVICE_FEE": "Хизмат учун ҳақ"
+  },
+  "exception": {
+    "VACATION": "Таътил",
+    "SICK_LEAVE": "Касаллик варақаси",
+    "DAY_OFF": "Дам олиш куни",
+    "CUSTOM_HOURS": "Махсус соатлар"
+  },
+  "documentCategory": {
+    "ANALYSIS": "Таҳлил",
+    "IMAGING": "Тасвир (УТТ/рентген)",
+    "DISCHARGE": "Эпикриз",
+    "CONSENT": "Розилик",
+    "OTHER": "Бошқа"
+  },
+  "audit": {
+    "CREATE": "Яратиш",
+    "UPDATE": "Ўзгартириш",
+    "DELETE": "Ўчириш",
+    "LOGIN": "Кириш",
+    "LOGOUT": "Чиқиш",
+    "LOGIN_FAILED": "Муваффақияциз кириш",
+    "IMPERSONATE": "Имперсонация",
+    "REFUND": "Қайтариш",
+    "EXPORT": "Экспорт",
+    "MERGE": "Бирлаштириш",
+    "AMEND": "Тузатиш"
+  },
+  "bloodGroup": {
+    "A_POS": "А (ИИ) Rh+",
+    "A_NEG": "А (ИИ) Rh−",
+    "B_POS": "Б (ИИИ) Rh+",
+    "B_NEG": "Б (ИИИ) Rh−",
+    "AB_POS": "АБ (ИВ) Rh+",
+    "AB_NEG": "АБ (ИВ) Rh−",
+    "O_POS": "О (И) Rh+",
+    "O_NEG": "О (И) Rh−",
+    "UNKNOWN": "Номаълум"
+  }
+}

@@ -10,6 +10,7 @@ import {
 } from '@avishifo/shared';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/status-badge';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { cn } from '@/lib/utils';
 import { TicketActions, type TransferTarget } from './ticket-actions';
 
@@ -32,6 +33,7 @@ export interface TicketCardProps {
 
 export function TicketCard({ ticket, now, canCall, canManage, transferTargets }: TicketCardProps) {
   const t = useTranslations('queue');
+  const enumLabel = useEnumLabel();
 
   const showWait =
     ticket.status === TicketStatus.WAITING || ticket.status === TicketStatus.CALLED;
@@ -63,7 +65,7 @@ export function TicketCard({ ticket, now, canCall, canManage, transferTargets }:
               variant={ticket.priority === TicketPriority.EMERGENCY ? 'destructive' : 'secondary'}
               className="text-[10px]"
             >
-              {t(`priority.${ticket.priority}`)}
+              {enumLabel('priority', ticket.priority)}
             </Badge>
           ) : null}
           <TicketActions
@@ -76,7 +78,7 @@ export function TicketCard({ ticket, now, canCall, canManage, transferTargets }:
       </div>
       <p className="mt-1.5 truncate text-sm font-medium">{ticket.patientName}</p>
       <div className="mt-2 flex items-center justify-between gap-2">
-        <StatusBadge status={ticket.status} label={t(`status.${ticket.status}`)} />
+        <StatusBadge status={ticket.status} group="ticket" />
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
           {ticket.roomNumber ? (
             <>

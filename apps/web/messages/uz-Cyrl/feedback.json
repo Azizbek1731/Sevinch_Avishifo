@@ -1,0 +1,36 @@
+{
+  "title": "Фикр-мулоҳазалар",
+  "description": "Беморларнинг баҳолари ва шарҳлари",
+  "stats": {
+    "avgTitle": "Ўртача баҳо",
+    "total": "Жами {count} та баҳо",
+    "distributionTitle": "Баҳолар тақсимоти",
+    "perDoctorTitle": "Шифокорлар бўйича",
+    "noData": "Маълумот йўқ",
+    "columns": {
+      "doctor": "Шифокор",
+      "avg": "Ўртача",
+      "count": "Сони"
+    }
+  },
+  "filters": {
+    "doctor": "Шифокор",
+    "allDoctors": "Барча шифокорлар",
+    "minRating": "Минимал баҳо",
+    "anyRating": "Барча баҳолар",
+    "stars": "{count} юлдуз ва ундан юқори"
+  },
+  "list": {
+    "anonymous": "Номаълум",
+    "doctorLabel": "Шифокор",
+    "publicLabel": "Порталда кўрсатиш",
+    "visibilityUpdated": "Кўриниш созламаси янгиланди",
+    "page": "Саҳифа {page} / {pageCount} · {total}",
+    "prev": "Олдинги",
+    "next": "Кейинги",
+    "empty": {
+      "title": "Фикр-мулоҳазалар йўқ",
+      "description": "Танланган филтрлар бўйича баҳолар топилмади"
+    }
+  }
+}

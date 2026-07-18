@@ -1,0 +1,111 @@
+{
+  "title": "Ҳисоб-фактуралар",
+  "subtitle": "Ҳисоблар, тўловлар ва қайтаришлар",
+  "newInvoice": "Янги ҳисоб",
+  "cols": {
+    "number": "Рақам",
+    "patient": "Бемор",
+    "total": "Жами",
+    "paid": "Тўланган",
+    "due": "Қарз",
+    "status": "Ҳолат",
+    "date": "Сана"
+  },
+  "statuses": {
+    "DRAFT": "Қоралама",
+    "ISSUED": "Тақдим этилган",
+    "PARTIALLY_PAID": "Қисман тўланган",
+    "PAID": "Тўланган",
+    "CANCELLED": "Бекор қилинган",
+    "REFUNDED": "Қайтарилган"
+  },
+  "methods": {
+    "CASH": "Нақд",
+    "CARD": "Карта",
+    "PAYME": "Payme",
+    "CLICK": "Click",
+    "UZUM": "Uzum",
+    "BALANCE": "Балансдан"
+  },
+  "filters": {
+    "status": "Ҳолат",
+    "allStatuses": "Барча ҳолатлар",
+    "from": "Санадан",
+    "to": "Санагача",
+    "patient": "Бемор"
+  },
+  "empty": {
+    "title": "Ҳисоб-фактуралар топилмади"
+  },
+  "form": {
+    "title": "Янги ҳисоб-фактура",
+    "patient": "Бемор",
+    "patientRequired": "Беморни танланг",
+    "lines": "Хизматлар",
+    "service": "Хизмат",
+    "qty": "Сони",
+    "unitPrice": "Нархи",
+    "discount": "Чегирма",
+    "lineTotal": "Сумма",
+    "addLine": "Қатор қўшиш",
+    "linesInvalid": "Ҳар бир қатор учун хизмат танланг ва суммаларни текширинг",
+    "totalPreview": "Жами сумма",
+    "create": "Яратиш",
+    "creating": "Яратилмоқда...",
+    "created": "Ҳисоб {number} яратилди",
+    "invalidAmount": "Сумма нотўғри киритилган"
+  },
+  "pay": {
+    "title": "Тўлов — {number}",
+    "due": "Қарз",
+    "amount": "Сумма",
+    "method": "Тўлов усули",
+    "submit": "Тўловни қабул қилиш",
+    "paying": "Юборилмоқда...",
+    "success": "Тўлов қабул қилинди",
+    "viewReceipt": "Чекни очиш"
+  },
+  "refundDlg": {
+    "title": "Қайтариш — {number}",
+    "paid": "Тўланган",
+    "amount": "Сумма",
+    "method": "Усул",
+    "reason": "Сабаб",
+    "reasonRequired": "Сабабни киритинг (камида 3 белги)",
+    "submit": "Қайтариш",
+    "success": "Пул қайтарилди"
+  },
+  "detail": {
+    "title": "Ҳисоб {number}",
+    "issue": "Тақдим этиш",
+    "pay": "Тўлов",
+    "refund": "Қайтариш",
+    "cancel": "Бекор қилиш",
+    "receipt": "Чек",
+    "issued": "Ҳисоб тақдим этилди",
+    "cancelled": "Ҳисоб бекор қилинди",
+    "linesTitle": "Хизматлар",
+    "totalsTitle": "Ҳисоб-китоб",
+    "subtotal": "Оралиқ жами",
+    "paymentsTitle": "Тўловлар тарихи",
+    "noPayments": "Тўловлар йўқ",
+    "refundsTitle": "Қайтаришлар",
+    "noRefunds": "Қайтаришлар йўқ",
+    "cancelConfirmTitle": "Ҳисобни бекор қиласизми?",
+    "cancelConfirmDesc": "{number} ҳисоб-фактураси бекор қилинади. Бу амални ортга қайтариб бўлмайди."
+  },
+  "receipt": {
+    "print": "Чоп этиш",
+    "taxId": "СТИР",
+    "receiptNo": "Чек №",
+    "date": "Сана",
+    "patient": "Бемор",
+    "cashier": "Кассир",
+    "subtotal": "Оралиқ жами",
+    "discount": "Чегирма",
+    "total": "ЖАМИ",
+    "paid": "Тўланган",
+    "due": "Қарз",
+    "thanks": "Харидингиз учун раҳмат!"
+  }
+}

@@ -9,13 +9,26 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/empty-state';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { useLabPrintPayload } from '../hooks';
-import { flagClass, flagMark, localizedName, referenceText, type UiLocale } from '../lib';
+import {
+  flagClass,
+  flagMark,
+  localizedName,
+  referenceText,
+  type ReferenceTextLabels,
+  type UiLocale,
+} from '../lib';
 
 export function LabOrderPrint({ id }: { id: string }) {
   const t = useTranslations('lab');
   const tc = useTranslations('common');
   const locale = useLocale() as UiLocale;
+  const enumLabel = useEnumLabel();
+  const refLabels: ReferenceTextLabels = {
+    genderLabel: (g) => enumLabel('gender', g),
+    yearsSuffix: t('refYears'),
+  };
   const printQuery = useLabPrintPayload(id);
 
   if (printQuery.isLoading) {
@@ -138,7 +151,7 @@ export function LabOrderPrint({ id }: { id: string }) {
                       </td>
                       <td className="py-1.5 pr-2 text-muted-foreground">{param.unit ?? ''}</td>
                       <td className="py-1.5 pr-2 text-muted-foreground">
-                        {referenceText(param.referenceRanges)}
+                        {referenceText(param.referenceRanges, refLabels)}
                       </td>
                       <td className={cn('py-1.5 font-bold', value ? flagClass(value.flag) : '')}>
                         {value ? flagMark(value.flag) : ''}

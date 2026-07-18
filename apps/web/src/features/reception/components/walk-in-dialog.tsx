@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { useCreateWalkIn, useDoctors, usePatientSearch } from '../hooks';
 import type { PatientHit } from '../api';
 import { NewPatientDialog } from './new-patient-dialog';
@@ -50,6 +51,7 @@ export interface WalkInDialogProps {
 export function WalkInDialog({ open, onOpenChange }: WalkInDialogProps) {
   const t = useTranslations('reception');
   const tc = useTranslations('common');
+  const enumLabel = useEnumLabel();
   const branchId = useAuthStore((s) => s.activeBranchId);
   const canCreatePatient = useAuthStore((s) =>
     Boolean(s.user?.permissions.includes('patients.write')),
@@ -193,11 +195,11 @@ export function WalkInDialog({ open, onOpenChange }: WalkInDialogProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={TicketPriority.NORMAL}>{t('priorities.NORMAL')}</SelectItem>
-                <SelectItem value={TicketPriority.PRIORITY}>{t('priorities.PRIORITY')}</SelectItem>
-                <SelectItem value={TicketPriority.EMERGENCY}>
-                  {t('priorities.EMERGENCY')}
-                </SelectItem>
+                {Object.values(TicketPriority).map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {enumLabel('priority', p)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

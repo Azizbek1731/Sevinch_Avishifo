@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { settingsApi, type UserRow } from '../api';
 import { useApiErrorToast } from '../hooks';
 
@@ -47,6 +48,7 @@ const GROUPS: { module: string; permissions: Permission[] }[] = (() => {
 
 export function PermissionsDialog({ open, onOpenChange, user }: PermissionsDialogProps) {
   const t = useTranslations('settings');
+  const enumLabel = useEnumLabel();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
 
@@ -105,7 +107,7 @@ export function PermissionsDialog({ open, onOpenChange, user }: PermissionsDialo
           <DialogTitle>{t('permissions.title', { name: user?.fullName ?? '' })}</DialogTitle>
           <DialogDescription>
             {t('permissions.desc', {
-              role: user ? t(`users.roles.${user.role}` as never) : '',
+              role: user ? enumLabel('role', user.role) : '',
             })}
           </DialogDescription>
         </DialogHeader>

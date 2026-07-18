@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { formatUZS } from '@avishifo/shared';
 import { Link } from '@/i18n/routing';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { EmptyState } from '@/components/empty-state';
 import { StatusBadge } from '@/components/status-badge';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,7 @@ const str = (d: Record<string, unknown>, k: string): string | null =>
 
 function ItemDetails({ item }: { item: TimelineItem }) {
   const t = useTranslations('patients');
+  const enumLabel = useEnumLabel();
   const d = item.data;
 
   if (item.type === 'visit') {
@@ -59,7 +61,7 @@ function ItemDetails({ item }: { item: TimelineItem }) {
     return (
       <p className="text-sm text-muted-foreground">
         {amount ? formatUZS(amount) : null}
-        {method ? ` · ${method}` : null}
+        {method ? ` · ${enumLabel('method', method)}` : null}
       </p>
     );
   }

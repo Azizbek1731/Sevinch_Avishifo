@@ -1,0 +1,144 @@
+{
+  "title": "Ҳисоботлар",
+  "description": "Клиника фаолияти бўйича таҳлилий ҳисоботлар",
+  "noAccess": "Ҳисоботларни кўриш учун рухсат йўқ",
+  "filters": {
+    "today": "Бугун",
+    "week": "Ҳафта",
+    "month": "Ой",
+    "custom": "Давр танлаш",
+    "groupBy": "Гуруҳлаш",
+    "groupByOptions": {
+      "day": "Кун бўйича",
+      "week": "Ҳафта бўйича",
+      "month": "Ой бўйича"
+    }
+  },
+  "export": {
+    "xlsx": "XLSX",
+    "success": "Файл юклаб олинди"
+  },
+  "tabs": {
+    "revenue": "Тушум",
+    "flow": "Беморлар оқими",
+    "doctors": "Шифокорлар",
+    "services": "Хизматлар",
+    "queue": "Навбат",
+    "lab": "Лаборатория",
+    "shifts": "Сменалар"
+  },
+  "empty": {
+    "title": "Маълумот йўқ",
+    "description": "Танланган давр учун маълумот топилмади"
+  },
+  "units": {
+    "minutes": "{value} дақ",
+    "hours": "{value} соат"
+  },
+  "revenue": {
+    "chartTitle": "Тушум динамикаси",
+    "series": "Тушум",
+    "total": "Жами",
+    "dimensions": {
+      "time": "Вақт",
+      "category": "Категория",
+      "doctor": "Шифокор",
+      "method": "Тўлов усули"
+    }
+  },
+  "methods": {
+    "CASH": "Нақд пул",
+    "CARD": "Карта",
+    "PAYME": "Payme",
+    "CLICK": "Click",
+    "UZUM": "Uzum",
+    "BALANCE": "Балансдан"
+  },
+  "flow": {
+    "chartTitle": "Янги ва қайтган беморлар",
+    "new": "Янги",
+    "returning": "Қайтган",
+    "peakHours": "Энг банд соатлар",
+    "sources": "Беморлар манбалари",
+    "visitsAt": "{count} та ташриф"
+  },
+  "sources": {
+    "friend_referral": "Дўст тавсияси",
+    "doctor_referral": "Шифокор йўлланмаси",
+    "instagram": "Instagram",
+    "telegram": "Telegram",
+    "facebook": "Facebook",
+    "google": "Google",
+    "street_banner": "Кўча баннери",
+    "returning": "Қайтган бемор",
+    "other": "Бошқа"
+  },
+  "dow": {
+    "d0": "Як",
+    "d1": "Ду",
+    "d2": "Се",
+    "d3": "Чор",
+    "d4": "Пай",
+    "d5": "Жу",
+    "d6": "Шан"
+  },
+  "doctors": {
+    "columns": {
+      "name": "Шифокор",
+      "patients": "Беморлар",
+      "visits": "Ташрифлар",
+      "revenue": "Тушум",
+      "avgDuration": "Ўртача қабул вақти",
+      "noShow": "Келмаганлар %",
+      "returning": "Қайтганлар %"
+    }
+  },
+  "services": {
+    "chartTitle": "Энг кўп тушум келтирган хизматлар",
+    "series": "Тушум",
+    "columns": {
+      "code": "Код",
+      "name": "Хизмат",
+      "count": "Сони",
+      "revenue": "Тушум"
+    }
+  },
+  "queue": {
+    "chartTitle": "Ўртача кутиш ва хизмат вақти",
+    "wait": "Кутиш",
+    "service": "Хизмат",
+    "perDoctor": "Шифокорлар кесимида",
+    "columns": {
+      "doctor": "Шифокор",
+      "tickets": "Чипталар",
+      "avgWait": "Ўрт. кутиш",
+      "avgService": "Ўрт. хизмат"
+    }
+  },
+  "lab": {
+    "chartTitle": "Таҳлил тайёрланиш вақти",
+    "series": "Ўртача вақт",
+    "perTest": "Таҳлиллар кесимида",
+    "columns": {
+      "test": "Таҳлил",
+      "count": "Сони",
+      "avgHours": "Ўрт. вақт"
+    }
+  },
+  "shifts": {
+    "columns": {
+      "cashier": "Кассир",
+      "status": "Ҳолат",
+      "openedAt": "Очилган",
+      "closedAt": "Ёпилган",
+      "opening": "Бошланғич касса",
+      "expected": "Кутилган",
+      "actual": "Ҳақиқий",
+      "difference": "Фарқ"
+    },
+    "status": {
+      "OPEN": "Очиқ",
+      "CLOSED": "Ёпиқ"
+    }
+  }
+}

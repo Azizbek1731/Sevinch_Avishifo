@@ -65,7 +65,7 @@ export function AppointmentDetailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {t('detail.title')}
-            <StatusBadge status={a.status} label={t(`status.${a.status}`)} />
+            <StatusBadge status={a.status} group="appointment" />
           </DialogTitle>
         </DialogHeader>
 

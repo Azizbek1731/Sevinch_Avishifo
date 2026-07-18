@@ -87,10 +87,7 @@ export function VisitForm({ visitId }: { visitId: string }) {
                 {visit.patient.phone ? ` · ${visit.patient.phone}` : ''}
               </p>
             </div>
-            <StatusBadge
-              status={visit.status}
-              label={t(`statusLabels.${visit.status}` as never)}
-            />
+            <StatusBadge status={visit.status} group="visit" />
           </div>
           {allergies.length > 0 ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3">

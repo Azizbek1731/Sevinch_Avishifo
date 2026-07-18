@@ -1,0 +1,48 @@
+{
+  "title": "Шифокор кабинети",
+  "subtitle": "Менинг навбатим ва ташрифлар",
+  "myQueue": "Менинг навбатим",
+  "callNext": "Кейингисини чақириш",
+  "calledToast": "{ticket} чақирилди",
+  "room": "Хона",
+  "noRoom": "Хонасиз",
+  "roomShort": "{room}-хона",
+  "start": "Бошлаш",
+  "finish": "Якунлаш",
+  "skip": "Ўтказиб юбориш",
+  "recall": "Қайта чақириш",
+  "skipped": "Ўтказиб юборилганлар",
+  "queueEmpty": "Навбат бўш",
+  "queueEmptyDesc": "Бугун сизга навбатда бемор йўқ",
+  "currentPatient": "Жорий бемор",
+  "noCurrentPatient": "Бемор қабулда эмас",
+  "noCurrentPatientDesc": "Беморни чақиринг ва қабулни бошланг",
+  "allergies": "Аллергиялар",
+  "noAllergies": "Аллергиялар қайд этилмаган",
+  "chronic": "Сурункали касалликлар",
+  "lastVisits": "Охирги ташрифлар",
+  "noVisits": "Ташрифлар йўқ",
+  "openVisit": "Очиш",
+  "ageYears": "{age} ёш",
+  "myVisits": "Менинг ташрифларим",
+  "waiting": "Кутмоқда",
+  "inRoom": "Қабулда",
+  "doneToday": "Бугун якунланди",
+  "status": {
+    "WAITING": "Кутмоқда",
+    "CALLED": "Чақирилди",
+    "IN_ROOM": "Қабулда",
+    "DONE": "Якунланди",
+    "SKIPPED": "Ўтказиб юборилди"
+  },
+  "priority": {
+    "NORMAL": "Оддий",
+    "PRIORITY": "Имтиёзли",
+    "EMERGENCY": "Шошилинч"
+  },
+  "visitStatus": {
+    "IN_PROGRESS": "Давом этмоқда",
+    "COMPLETED": "Якунланган",
+    "CANCELLED": "Бекор қилинган"
+  }
+}

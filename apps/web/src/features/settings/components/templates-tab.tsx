@@ -25,6 +25,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { EmptyState } from '@/components/empty-state';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { settingsApi } from '../api';
 import { useApiErrorToast, useHasPermission } from '../hooks';
 
@@ -35,6 +36,7 @@ const VARIABLES = ['{{patient_name}}', '{{time}}', '{{doctor_name}}', '{{clinic_
 
 export function TemplatesTab() {
   const t = useTranslations('notifications');
+  const enumLabel = useEnumLabel();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
   const canWrite = useHasPermission('notifications.templates.write');
@@ -110,7 +112,7 @@ export function TemplatesTab() {
                 <SelectContent>
                   {CHANNELS.map((c) => (
                     <SelectItem key={c} value={c}>
-                      {t(`channels.${c}` as never)}
+                      {enumLabel('channel', c)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -201,7 +203,7 @@ export function TemplatesTab() {
                   >
                     <span className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm font-medium">{t(`events.${tpl.event}` as never)}</span>
-                      <Badge variant="outline">{t(`channels.${tpl.channel}` as never)}</Badge>
+                      <Badge variant="outline">{enumLabel('channel', tpl.channel)}</Badge>
                       <Badge variant="outline">
                         {t(`locales.${tpl.locale.replace('-', '_')}` as never)}
                       </Badge>

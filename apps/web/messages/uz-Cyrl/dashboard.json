@@ -1,0 +1,34 @@
+{
+  "title": "Бошқарув панели",
+  "description": "Бугунги кўрсаткичлар ва сўнгги 30 кунлик таҳлил",
+  "stats": {
+    "revenue": "Бугунги тушум",
+    "visits": "Бугунги ташрифлар",
+    "newPatients": "Янги беморлар",
+    "waiting": "Навбатда кутмоқда",
+    "openShifts": "Очиқ сменалар: {count}"
+  },
+  "charts": {
+    "revenue30": "Тушум — сўнгги 30 кун",
+    "revenueSeries": "Тушум",
+    "patientFlow": "Янги ва қайтган беморлар",
+    "new": "Янги",
+    "returning": "Қайтган",
+    "sources": "Беморлар манбалари"
+  },
+  "sources": {
+    "friend_referral": "Дўст тавсияси",
+    "doctor_referral": "Шифокор йўлланмаси",
+    "instagram": "Instagram",
+    "telegram": "Telegram",
+    "facebook": "Facebook",
+    "google": "Google",
+    "street_banner": "Кўча баннери",
+    "returning": "Қайтган бемор",
+    "other": "Бошқа"
+  },
+  "empty": {
+    "title": "Маълумот йўқ",
+    "description": "Танланган давр учун маълумотлар топилмади"
+  }
+}

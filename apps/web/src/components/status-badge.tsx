@@ -1,6 +1,9 @@
+'use client';
+
 import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useEnumLabel, useStatusLabel, type EnumGroup } from '@/hooks/use-enum-label';
 
 type StatusTone = 'green' | 'blue' | 'amber' | 'red' | 'gray';
 
@@ -49,16 +52,24 @@ const STATUS_TONES: Record<string, StatusTone> = {
 
 export interface StatusBadgeProps {
   status: string;
-  /** Overrides the rendered text; defaults to the raw status string. */
+  /**
+   * Enum group in the `statuses` namespace for exact translation (e.g.
+   * 'invoice'). Without it, the label resolves via a sensible group order.
+   */
+  group?: EnumGroup;
+  /** Overrides the rendered text; defaults to the localized status label. */
   label?: string;
   className?: string;
 }
 
-export function StatusBadge({ status, label, className }: StatusBadgeProps) {
+export function StatusBadge({ status, group, label, className }: StatusBadgeProps) {
+  const enumLabel = useEnumLabel();
+  const statusLabel = useStatusLabel();
   const tone: StatusTone = STATUS_TONES[status] ?? 'gray';
+  const text = label ?? (group ? enumLabel(group, status) : statusLabel(status));
   return (
     <Badge variant="outline" className={cn('font-medium', TONE_CLASSES[tone], className)}>
-      {label ?? status}
+      {text}
     </Badge>
   );
 }

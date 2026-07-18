@@ -17,12 +17,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DataTable } from '@/components/data-table';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { servicesApi, type DiscountRuleRow } from '../api';
 import { useApiErrorToast, useCanWriteServices } from '../hooks';
 import { DiscountRuleDialog } from './discount-rule-dialog';
 
 export function DiscountsTab() {
   const t = useTranslations('services');
+  const enumLabel = useEnumLabel();
   const queryClient = useQueryClient();
   const errorToast = useApiErrorToast();
   const canWrite = useCanWriteServices();
@@ -57,7 +59,7 @@ export function DiscountsTab() {
       {
         id: 'type',
         header: t('discounts.table.type'),
-        cell: ({ row }) => t(`discounts.types.${row.original.type}`),
+        cell: ({ row }) => enumLabel('discount', row.original.type),
       },
       {
         id: 'value',
@@ -134,7 +136,7 @@ export function DiscountsTab() {
           ) : null,
       },
     ],
-    [t, canWrite],
+    [t, canWrite, enumLabel],
   );
 
   return (

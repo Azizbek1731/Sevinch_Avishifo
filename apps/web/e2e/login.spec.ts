@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test-base';
 
 /**
  * Regression for the "Server error. Try again later" login bug:

@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { formatDate } from '@/lib/dates';
 import { useAuthStore } from '@/stores/auth-store';
 import { staffApi, type ScheduleExceptionRow } from '../api';
@@ -41,6 +42,7 @@ function emptyWeek(): Record<number, EditWindow[]> {
 
 export function ScheduleTab({ userId }: { userId: string }) {
   const t = useTranslations('staff');
+  const enumLabel = useEnumLabel();
   const can = usePermissions();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
@@ -281,7 +283,7 @@ export function ScheduleTab({ userId }: { userId: string }) {
                 >
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <Badge variant="secondary">
-                      {t(`schedule.exceptions.types.${ex.type}` as never)}
+                      {enumLabel('exception', ex.type)}
                     </Badge>
                     <span className="whitespace-nowrap">
                       {formatDate(ex.dateFrom)}

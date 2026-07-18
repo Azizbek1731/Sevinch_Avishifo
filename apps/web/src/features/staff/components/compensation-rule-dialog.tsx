@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useEnumLabel } from '@/hooks/use-enum-label';
 import { tashkentToUtcIso, todayTashkent } from '@/lib/dates';
 import { sanitizeMoney, staffApi } from '../api';
 import {
@@ -56,6 +57,7 @@ export function CompensationRuleDialog({
   onOpenChange,
 }: CompensationRuleDialogProps) {
   const t = useTranslations('staff');
+  const enumLabel = useEnumLabel();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
 
@@ -130,7 +132,7 @@ export function CompensationRuleDialog({
               <SelectContent>
                 {COMPENSATION_TYPES.map((ty) => (
                   <SelectItem key={ty} value={ty}>
-                    {t(`compensation.types.${ty}` as never)}
+                    {enumLabel('compensation', ty)}
                   </SelectItem>
                 ))}
               </SelectContent>
