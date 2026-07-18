@@ -1,36 +1,61 @@
 import type { QueueTicketPayload, TicketPriority } from '@avishifo/shared';
 import { shortDoctorName } from '@/lib/format';
 
-const PRIORITY_COLOR: Record<TicketPriority, string> = {
-  EMERGENCY: 'text-red-400',
-  PRIORITY: 'text-amber-300',
-  NORMAL: 'text-white',
+const PRIORITY_STYLE: Record<TicketPriority, { row: string; num: string; badge: string | null }> = {
+  EMERGENCY: {
+    row: 'border-red-500/40 bg-red-500/10',
+    num: 'text-red-300',
+    badge: 'Shoshilinch',
+  },
+  PRIORITY: {
+    row: 'border-amber-400/40 bg-amber-400/10',
+    num: 'text-amber-200',
+    badge: 'Imtiyozli',
+  },
+  NORMAL: { row: 'border-white/8 bg-white/[0.03]', num: 'text-white', badge: null },
 };
 
-/** Right column: the next waiting tickets (number + doctor short name). */
+/** Right column: the next waiting tickets (rank + number + doctor). */
 export function WaitingList({ tickets }: { tickets: QueueTicketPayload[] }) {
   return (
     <div className="flex h-full flex-col">
-      <h2 className="mb-6 text-4xl font-bold uppercase tracking-widest text-slate-400">Navbatda</h2>
+      <div className="mb-6 flex items-center gap-3">
+        <span className="h-8 w-1.5 rounded-full bg-brand" />
+        <h2 className="text-3xl font-bold uppercase tracking-[0.2em] text-slate-300">Keyingi navbat</h2>
+      </div>
+
       {tickets.length === 0 ? (
-        <p className="text-3xl text-slate-600">Navbat bo&apos;sh</p>
+        <div className="flex flex-1 items-center justify-center rounded-3xl border border-white/5 bg-white/[0.02]">
+          <p className="text-3xl font-medium text-slate-600">Navbat bo&apos;sh</p>
+        </div>
       ) : (
-        <ul className="flex flex-col gap-4 overflow-hidden">
-          {tickets.map((ticket) => (
-            <li
-              key={ticket.id}
-              className="flex items-baseline justify-between rounded-2xl bg-slate-900 px-6 py-4"
-            >
-              <span
-                className={`text-5xl font-extrabold tabular-nums ${PRIORITY_COLOR[ticket.priority]}`}
+        <ul className="flex flex-col gap-3.5">
+          {tickets.map((ticket, index) => {
+            const style = PRIORITY_STYLE[ticket.priority];
+            return (
+              <li
+                key={ticket.id}
+                className={`animate-enter flex items-center gap-4 rounded-2xl border px-5 py-4 ${style.row}`}
               >
-                {ticket.ticketNumber}
-              </span>
-              <span className="ml-4 truncate text-2xl text-slate-400">
-                {shortDoctorName(ticket.doctorName)}
-              </span>
-            </li>
-          ))}
+                <span className="w-9 shrink-0 text-center text-2xl font-bold tabular-nums text-slate-600">
+                  {index + 1}
+                </span>
+                <span className={`text-5xl font-black tabular-nums ${style.num}`}>
+                  {ticket.ticketNumber}
+                </span>
+                <div className="ml-auto flex flex-col items-end gap-1 overflow-hidden">
+                  {style.badge ? (
+                    <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-sm font-semibold uppercase tracking-wide text-slate-200">
+                      {style.badge}
+                    </span>
+                  ) : null}
+                  <span className="max-w-[13rem] truncate text-xl text-slate-400">
+                    {shortDoctorName(ticket.doctorName)}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

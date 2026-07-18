@@ -2,32 +2,75 @@
 
 import { useEffect, useState } from 'react';
 
-function formatTashkentTime(date: Date): string {
+const WEEKDAYS_UZ = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
+const MONTHS_UZ = [
+  'yanvar',
+  'fevral',
+  'mart',
+  'aprel',
+  'may',
+  'iyun',
+  'iyul',
+  'avgust',
+  'sentabr',
+  'oktabr',
+  'noyabr',
+  'dekabr',
+];
+
+function tashkentParts(date: Date): { time: string; day: string; weekday: string } {
   try {
-    return new Intl.DateTimeFormat('en-GB', {
+    const fmt = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Asia/Tashkent',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      weekday: 'short',
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
       hour12: false,
-    }).format(date);
+    });
+    const map = new Map(fmt.formatToParts(date).map((p) => [p.type, p.value]));
+    const time = `${map.get('hour')}:${map.get('minute')}:${map.get('second')}`;
+    const d = Number(map.get('day'));
+    const m = Number(map.get('month')) - 1;
+    // Recompute weekday index in Tashkent from a stable Date to localize in Uzbek.
+    const tzDate = new Date(
+      `${map.get('year')}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}T00:00:00Z`,
+    );
+    const weekday = WEEKDAYS_UZ[tzDate.getUTCDay()] ?? '';
+    const day = `${d}-${MONTHS_UZ[m] ?? ''}`;
+    return { time, day, weekday };
   } catch {
-    // Very old TV browsers without full timezone data: fall back to device time.
-    const pad = (value: number): string => String(value).padStart(2, '0');
-    return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    const pad = (v: number): string => String(v).padStart(2, '0');
+    return {
+      time: `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`,
+      day: '',
+      weekday: '',
+    };
   }
 }
 
-/** Live HH:mm:ss clock in Asia/Tashkent. */
+/** Live clock + Uzbek date, Asia/Tashkent. */
 export function Clock() {
-  const [time, setTime] = useState('--:--:--');
+  const [parts, setParts] = useState({ time: '--:--:--', day: '', weekday: '' });
 
   useEffect(() => {
-    const tick = (): void => setTime(formatTashkentTime(new Date()));
+    const tick = (): void => setParts(tashkentParts(new Date()));
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
   }, []);
 
-  return <div className="font-mono text-4xl font-semibold tabular-nums text-slate-100">{time}</div>;
+  return (
+    <div className="text-right leading-none">
+      <div className="font-mono text-5xl font-bold tabular-nums text-white">{parts.time}</div>
+      {parts.day ? (
+        <div className="mt-1.5 text-lg font-medium text-slate-400">
+          {parts.weekday}, {parts.day}
+        </div>
+      ) : null}
+    </div>
+  );
 }
