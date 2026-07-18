@@ -122,7 +122,8 @@ export default function BoardPage() {
   }, [lastCalledId, tickets, active]);
 
   const count = active.length;
-  const tileSize: TileSize = count === 1 ? 'hero' : count === 2 ? 'xl' : count <= 4 ? 'lg' : 'md';
+  const tileSize: TileSize =
+    count === 1 ? 'hero' : count === 2 ? 'xl' : count <= 4 ? 'lg' : count <= 6 ? 'md' : 'sm';
   const gridCols =
     count === 1 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-3';
 
