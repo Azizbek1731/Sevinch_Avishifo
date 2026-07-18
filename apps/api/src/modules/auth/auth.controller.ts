@@ -134,7 +134,7 @@ export class AuthController {
     return {
       httpOnly: true,
       sameSite: 'lax',
-      secure: this.config.isProd,
+      secure: this.config.cookieSecure,
       // Scoped to the auth endpoints only — the browser never sends the refresh
       // token to any other route.
       path: '/api/v1/auth',

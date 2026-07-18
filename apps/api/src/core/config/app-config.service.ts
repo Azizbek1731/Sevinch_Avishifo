@@ -18,6 +18,9 @@ const envSchema = z.object({
   JWT_REFRESH_TTL: z.string().default('30d'),
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   STORAGE_LOCAL_DIR: z.string().default('./uploads'),
+  // Refresh-cookie Secure flag. Default follows NODE_ENV (prod → secure).
+  // Set "false" only for a plain-HTTP deployment (e.g. IP demo before TLS).
+  COOKIE_SECURE: z.enum(['true', 'false']).optional(),
   SMS_PROVIDER: z.enum(['log', 'eskiz']).default('log'),
   ESKIZ_EMAIL: z.string().optional(),
   ESKIZ_PASSWORD: z.string().optional(),
@@ -71,6 +74,12 @@ export class AppConfigService {
 
   get isProd(): boolean {
     return this.env.NODE_ENV === 'production';
+  }
+
+  /** Whether the refresh cookie carries the Secure flag (HTTPS-only). */
+  get cookieSecure(): boolean {
+    if (this.env.COOKIE_SECURE) return this.env.COOKIE_SECURE === 'true';
+    return this.isProd;
   }
 
   get corsOrigins(): string[] {

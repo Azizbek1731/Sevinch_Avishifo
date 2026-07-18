@@ -5,7 +5,13 @@ import type { ClientToServerEvents, ServerToClientEvents } from '@avishifo/share
 
 export type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:3001';
+/** Same-origin by default (nginx proxies /socket.io → backend); override with NEXT_PUBLIC_WS_URL. */
+function resolveWsOrigin(): string {
+  const env = process.env.NEXT_PUBLIC_WS_URL;
+  if (env && env.length > 0) return env;
+  if (typeof window !== 'undefined') return window.location.origin;
+  return 'http://localhost:3001';
+}
 
 let socket: AppSocket | null = null;
 let currentToken: string | null = null;
@@ -18,7 +24,7 @@ export function getSocket(accessToken: string): AppSocket {
     socket = null;
   }
   currentToken = accessToken;
-  socket = io(WS_URL, {
+  socket = io(resolveWsOrigin(), {
     auth: { token: accessToken },
     transports: ['websocket', 'polling'],
     reconnection: true,

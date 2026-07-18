@@ -3,7 +3,21 @@
 import type { ApiMeta, ApiResponse, ErrorCode } from '@avishifo/shared';
 import { useAuthStore } from '@/stores/auth-store';
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+/**
+ * API origin. Priority:
+ *   1. NEXT_PUBLIC_API_URL (explicit — separate-domain deployments)
+ *   2. same origin as the page (behind nginx: /api → backend) — works on any
+ *      domain/IP with a single build, no rebuild per environment
+ *   3. localhost:3001 (SSR / dev fallback)
+ */
+function resolveApiOrigin(): string {
+  const env = process.env.NEXT_PUBLIC_API_URL;
+  if (env && env.length > 0) return env;
+  if (typeof window !== 'undefined') return window.location.origin;
+  return 'http://localhost:3001';
+}
+
+export const API_URL = resolveApiOrigin();
 
 export class ApiError extends Error {
   constructor(
@@ -34,7 +48,7 @@ interface FetchOptions {
 }
 
 function buildUrl(path: string, query?: Query): string {
-  const url = new URL(`/api/v1${path}`, API_URL);
+  const url = new URL(`/api/v1${path}`, resolveApiOrigin());
   if (query) {
     for (const [k, v] of Object.entries(query)) {
       if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v));

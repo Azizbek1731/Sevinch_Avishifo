@@ -2,7 +2,15 @@
 
 import type { ApiMeta, ApiResponse, ErrorCode } from '@avishifo/shared';
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+/** Same-origin by default (nginx proxies /api → backend); override with NEXT_PUBLIC_API_URL. */
+function resolveApiOrigin(): string {
+  const env = process.env.NEXT_PUBLIC_API_URL;
+  if (env && env.length > 0) return env;
+  if (typeof window !== 'undefined') return window.location.origin;
+  return 'http://localhost:3001';
+}
+
+export const API_URL = resolveApiOrigin();
 
 export const TOKEN_STORAGE_KEY = 'avishifo_portal_token';
 
@@ -48,7 +56,7 @@ export interface ApiResult<T> {
 }
 
 function buildUrl(path: string, query?: QueryParams): string {
-  const url = new URL(`/api/v1${path}`, API_URL);
+  const url = new URL(`/api/v1${path}`, resolveApiOrigin());
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined && value !== null && value !== '') {
