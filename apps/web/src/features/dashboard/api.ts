@@ -57,20 +57,40 @@ export const dashboardApi = {
     return res.data;
   },
   revenue: async ({ from, to, branchId }: RangeParams): Promise<RevenuePoint[]> => {
-    const res = await api.get<RevenuePoint[]>('/reports/revenue', {
+    // API wraps rows: { dimension, groupBy, rows: [{ bucket, amount }] }
+    const res = await api.get<{ rows: RevenuePoint[] }>('/reports/revenue', {
       from,
       to,
       groupBy: 'day',
       branchId: branchId ?? undefined,
     });
-    return res.data;
+    return res.data.rows ?? [];
   },
   patientFlow: async ({ from, to, branchId }: RangeParams): Promise<PatientFlowReport> => {
-    const res = await api.get<PatientFlowReport>('/reports/patient-flow', {
+    // API row fields: newCount/returningCount; peakHours is an object map — adapt here.
+    const res = await api.get<{
+      newVsReturning: Array<{
+        bucket: string;
+        newCount: number;
+        returningCount: number;
+        visitsCount: number;
+      }>;
+      sources: SourceCount[];
+    }>('/reports/patient-flow', {
       from,
       to,
       branchId: branchId ?? undefined,
     });
-    return res.data;
+    const rows = res.data.newVsReturning ?? [];
+    return {
+      newVsReturning: rows.map((r) => ({
+        bucket: r.bucket,
+        new: r.newCount,
+        returning: r.returningCount,
+      })),
+      visitsCount: rows.map((r) => ({ bucket: r.bucket, count: r.visitsCount })),
+      peakHours: [],
+      sources: res.data.sources ?? [],
+    };
   },
 };

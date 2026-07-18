@@ -16,9 +16,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 interface LoginResponse {
   user: AuthUser;
+  accessToken: string;
+}
+
+interface MeResponse {
+  user: AuthUser;
   clinic: ClinicInfo | null;
   branches: BranchInfo[];
-  accessToken: string;
 }
 
 export function LoginForm() {
@@ -37,7 +41,10 @@ export function LoginForm() {
     setServerError(null);
     try {
       const res = await api.post<LoginResponse>('/auth/login', values, undefined);
-      setSession(res.data);
+      // Login returns only { user, accessToken }; clinic + branches come from /auth/me.
+      useAuthStore.getState().setAccessToken(res.data.accessToken);
+      const me = await api.get<MeResponse>('/auth/me');
+      setSession({ ...me.data, accessToken: res.data.accessToken });
       router.replace(res.data.user.role === 'SUPER_ADMIN' ? '/platform/clinics' : '/dashboard');
     } catch (err) {
       if (err instanceof ApiError) setServerError(tErr(err.code as never));
