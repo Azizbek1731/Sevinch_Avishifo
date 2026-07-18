@@ -67,28 +67,20 @@ certbot 90 kunda avtomatik yangilaydi (systemd timer o'rnatiladi).
 
 ## Yangi versiyani chiqarish (lokal kompyuterdan)
 
-```bash
-rsync -az --delete \
-  --exclude .git --exclude node_modules --exclude .next --exclude dist --exclude .turbo \
-  --exclude .local-run --exclude uploads --exclude .env --exclude .keys \
-  --exclude test-results --exclude playwright-report \
-  -e "ssh -i ~/avishifo.pem" ./ ubuntu@16.16.120.67:/home/ubuntu/avishifo/
+Eng oson — deploy skripti (rsync qayta-urinish + **toza build** + restart + tekshiruv):
 
-ssh -i ~/avishifo.pem ubuntu@16.16.120.67 '
-  cd /home/ubuntu/avishifo &&
-  pnpm install --frozen-lockfile &&
-  pnpm --filter @avishifo/api db:generate &&
-  (cd apps/api && npx prisma migrate deploy) &&
-  export NODE_OPTIONS=--max-old-space-size=1536 &&
-  pnpm --filter @avishifo/shared build &&
-  pnpm --filter @avishifo/api build &&
-  pnpm --filter @avishifo/web build &&
-  pnpm --filter @avishifo/display build &&
-  pnpm --filter @avishifo/portal build &&
-  pm2 restart all --update-env'
+```bash
+./scripts/deploy.sh            # sync + clean-build + restart
+./scripts/deploy.sh --migrate  # sxema o'zgargan bo'lsa migratsiya bilan
 ```
 
+Skript nega **toza build** (`rm -rf dist .next`) qiladi: rsync SSH uzilishida
+yarim ko'chishi yoki `nest`/`next` incremental keshi eski `dist`/`.next`ni saqlab
+qolib, o'zgarishsiz eski bundle deploy bo'lishi mumkin (bir marta shunday bo'ldi).
+Toza build buni butunlay yo'q qiladi.
+
 2GB RAMda buildlar KETMA-KET (turbo-parallel emas). Swap OOM'dan himoya qiladi.
+Bu server aloqasi vaqti-vaqti uziladi — skript rsync'ni 5 marta qayta urinadi.
 
 ## Bir serverda BIR NECHA loyiha (kelajakdagi loyihalaringiz uchun)
 
