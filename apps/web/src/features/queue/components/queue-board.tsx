@@ -53,7 +53,7 @@ export function QueueBoard() {
     <div className="space-y-6">
       <PageHeader title={t('title')} description={t('description')}>
         {!connected ? (
-          <span className="flex items-center gap-1.5 text-xs text-destructive">
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-warning/15 px-2.5 py-1 text-xs font-medium text-warning-foreground dark:text-warning">
             <WifiOff className="h-3.5 w-3.5" />
             {t('offline')}
           </span>

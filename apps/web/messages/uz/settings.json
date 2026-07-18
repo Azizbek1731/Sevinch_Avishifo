@@ -110,10 +110,18 @@
   },
   "display": {
     "title": "TV displey tokeni — {branch}",
-    "desc": "Tokenni navbat displeyi ilovasiga kiriting. Har safar yangi token yaratiladi.",
+    "desc": "Navbat displeyini filial televizoriga ulang.",
+    "steps": {
+      "s1": "Filial televizorida brauzerni oching.",
+      "s2": "Ushbu QR kodni skanerlang (yoki pastdagi manzilni kiriting).",
+      "s3": "Displey avtomatik ishga tushadi."
+    },
+    "qrAlt": "Displey manzili uchun QR kod",
     "tokenLabel": "Token",
     "urlLabel": "Displey manzili",
-    "urlHint": "Ushbu manzilni filialdagi TV brauzerida oching",
+    "urlHint": "Skanerlay olmasangiz, ushbu manzilni TV brauzerida qo'lda kiriting.",
+    "showToken": "Tokenni ko'rsatish",
+    "tokenValidity": "Token taxminan 1 yil amal qiladi.",
     "copied": "Nusxalandi",
     "copyFailed": "Nusxalab bo'lmadi"
   },

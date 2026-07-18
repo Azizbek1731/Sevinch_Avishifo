@@ -62,5 +62,8 @@
   "wait": {
     "min": "{min} daq",
     "hourMin": "{h} soat {min} daq"
+  },
+  "card": {
+    "waiting": "kutmoqda {time}"
   }
 }

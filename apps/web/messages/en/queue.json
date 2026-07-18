@@ -62,5 +62,8 @@
   "wait": {
     "min": "{min} min",
     "hourMin": "{h} h {min} min"
+  },
+  "card": {
+    "waiting": "waiting {time}"
   }
 }

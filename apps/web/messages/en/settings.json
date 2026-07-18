@@ -110,10 +110,18 @@
   },
   "display": {
     "title": "TV display token — {branch}",
-    "desc": "Enter the token in the queue display app. A new token is issued each time.",
+    "desc": "Connect the queue display to the branch TV.",
+    "steps": {
+      "s1": "Open the browser on the branch TV.",
+      "s2": "Scan this QR code (or type the address below).",
+      "s3": "The display starts automatically."
+    },
+    "qrAlt": "QR code for the display URL",
     "tokenLabel": "Token",
     "urlLabel": "Display URL",
-    "urlHint": "Open this URL in the branch TV browser",
+    "urlHint": "If you can't scan, type this address in the TV browser manually.",
+    "showToken": "Show token",
+    "tokenValidity": "The token is valid for about 1 year.",
     "copied": "Copied",
     "copyFailed": "Failed to copy"
   },

@@ -2,9 +2,12 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
+import { Ticket, Users } from 'lucide-react';
 import { QueueKind, TicketStatus, type QueueTicketPayload } from '@avishifo/shared';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/empty-state';
+import { cn } from '@/lib/utils';
 import type { QueueListItem } from '../api';
 import { CallNextButton } from './call-next-button';
 import { TicketCard } from './ticket-card';
@@ -57,29 +60,43 @@ export function QueueColumn({
         : t('column.custom');
 
   return (
-    <Card className="flex w-80 shrink-0 flex-col">
-      <CardHeader className="space-y-3 pb-3">
+    <Card
+      className={cn('flex w-80 shrink-0 flex-col', !queue.isOpen && 'opacity-80')}
+    >
+      <CardHeader className="gap-3 space-y-0 p-4 pb-3">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-1.5">
             <CardTitle className="truncate text-base">{name}</CardTitle>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {t('column.waitingCount', { count: waitingCount })}
-              {!queue.isOpen ? ` · ${t('column.closed')}` : ''}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <Badge variant="outline" className="h-5 px-1.5 font-mono text-[11px] font-medium">
+                {queue.prefix}
+              </Badge>
+              {!queue.isOpen ? (
+                <span className="text-xs text-muted-foreground">{t('column.closed')}</span>
+              ) : null}
+            </div>
           </div>
-          <Badge variant="outline" className="shrink-0 font-mono">
-            {queue.prefix}
+          <Badge
+            variant="outline"
+            aria-label={t('column.waitingCount', { count: waitingCount })}
+            className={cn(
+              'shrink-0 gap-1 tabular-nums',
+              waitingCount > 0
+                ? 'border-transparent bg-warning/15 text-warning-foreground dark:text-warning'
+                : 'text-muted-foreground',
+            )}
+          >
+            <Users className="h-3.5 w-3.5" />
+            {waitingCount}
           </Badge>
         </div>
         {canCall && isToday ? (
           <CallNextButton queueId={queue.id} disabled={waitingCount === 0 || !queue.isOpen} />
         ) : null}
       </CardHeader>
-      <CardContent className="flex flex-col gap-2 pt-0">
+      <CardContent className="flex flex-col gap-2 p-4 pt-0">
         {tickets.length === 0 ? (
-          <p className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-            {t('empty.noTickets')}
-          </p>
+          <EmptyState icon={Ticket} title={t('empty.noTickets')} className="px-3 py-8" />
         ) : (
           tickets.map((ticket) => (
             <TicketCard
