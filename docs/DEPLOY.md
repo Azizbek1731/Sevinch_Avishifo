@@ -100,13 +100,18 @@ Bitta EC2 ko'p loyihaga xizmat qila oladi — nginx `server_name` bo'yicha ajrat
    Yana loyiha qo'shsangiz **instansiyani kattalashtiring** (t3.small→medium),
    aks holda OOM/sekinlashuv bo'ladi.
 
+## Holat
+
+- ✅ **HTTPS yoqilgan** — Let's Encrypt, `crm/tv.crm/bemor.crm.avilab.uz`, avto-yangilanadi.
+  HTTP → HTTPS (301) redirect. `COOKIE_SECURE=true`.
+- ✅ Same-origin, 4 pm2 protsess, autostart, DNS ulangan.
+
 ## Xavfsizlik — jonli foydalanishdan oldin SHART
 
 1. **Demo parollarni almashtiring** — `Demo123!`/`Admin123!` README'da ochiq.
    Panel → Sozlamalar → Xodimlar.
 2. Login demo-panelini o'chiring: `.env`da `NEXT_PUBLIC_DEMO_LOGINS=false` →
    web'ni qayta build + `pm2 restart avishifo-web`.
-3. **HTTPS** (yuqorida) — hozir yalang HTTP; parollar shifrsiz ketmoqda.
-4. **Backup cron** (README'dagi pg_dump) hali yo'q — jonli ma'lumotlardan oldin yoqing.
-5. **O'zRQ-547**: server Shvetsiyada — haqiqiy bemor ma'lumoti uchun O'zbekiston
+3. **Backup cron** (README'dagi pg_dump) hali yo'q — jonli ma'lumotlardan oldin yoqing.
+4. **O'zRQ-547**: server Shvetsiyada — haqiqiy bemor ma'lumoti uchun O'zbekiston
    hostingi shart (bu server demo/sinov uchun).
