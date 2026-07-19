@@ -41,6 +41,7 @@ export interface StaffDirectoryItem {
   photoUrl: string | null;
   bio: string | null;
   slotMinutes: number | null;
+  defaultRoomId: string | null;
   branches: Array<{ id: string; name: string }>;
   createdAt: string;
 }
@@ -53,6 +54,7 @@ export interface StaffProfileResponse {
   photoUrl: string | null;
   bio: string | null;
   slotMinutes: number | null;
+  defaultRoomId: string | null;
   updatedAt: string;
 }
 
@@ -138,6 +140,7 @@ function mapProfile(p: StaffProfile): StaffProfileResponse {
     photoUrl: p.photoUrl,
     bio: p.bio,
     slotMinutes: p.slotMinutes,
+    defaultRoomId: p.defaultRoomId,
     updatedAt: p.updatedAt.toISOString(),
   };
 }
@@ -210,6 +213,7 @@ export class StaffService {
       photoUrl: u.staffProfile?.photoUrl ?? null,
       bio: u.staffProfile?.bio ?? null,
       slotMinutes: u.staffProfile?.slotMinutes ?? null,
+      defaultRoomId: u.staffProfile?.defaultRoomId ?? null,
       branches: u.branches.map((b) => ({
         id: b.branchId,
         name: branchName.get(b.branchId) ?? '',
@@ -226,12 +230,22 @@ export class StaffService {
     await this.requireStaffUser(userId);
     const before = await this.prisma.db.staffProfile.findFirst({ where: { userId } });
 
+    // Validate the room belongs to this clinic (tenant-scoped find) before linking.
+    if (input.defaultRoomId) {
+      const room = await this.prisma.db.room.findFirst({
+        where: { id: input.defaultRoomId },
+        select: { id: true },
+      });
+      if (!room) throw new AppException(ErrorCode.NOT_FOUND, 'Xona topilmadi', 404);
+    }
+
     const fields = {
       specialty: input.specialty,
       licenseNo: input.licenseNo,
       hireDate: input.hireDate ? new Date(`${input.hireDate}T00:00:00.000Z`) : undefined,
       bio: input.bio,
       slotMinutes: input.slotMinutes,
+      defaultRoomId: input.defaultRoomId,
     };
 
     const profile = await this.prisma.db.staffProfile.upsert({

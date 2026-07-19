@@ -1,7 +1,7 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -11,8 +11,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { emptyToUndefined, staffApi, type StaffMember } from '../api';
 import { useApiErrorToast, usePermissions } from '../hooks';
+
+const NO_ROOM = '__none__';
 
 export function ProfileTab({ member }: { member: StaffMember }) {
   const t = useTranslations('staff');
@@ -20,6 +29,8 @@ export function ProfileTab({ member }: { member: StaffMember }) {
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
   const canWrite = can('staff.write');
+
+  const isDoctor = member.role === 'DOCTOR';
 
   const form = useForm<UpsertStaffProfileInput>({
     resolver: zodResolver(upsertStaffProfileSchema),
@@ -29,7 +40,24 @@ export function ProfileTab({ member }: { member: StaffMember }) {
       hireDate: member.hireDate ?? undefined,
       bio: member.bio ?? undefined,
       slotMinutes: member.slotMinutes ?? undefined,
+      defaultRoomId: member.defaultRoomId ?? null,
     },
+  });
+
+  // Rooms across the doctor's branch(es) — for the "default room" selector.
+  const roomsQ = useQuery({
+    queryKey: ['staff-rooms', member.branches.map((b) => b.id)],
+    queryFn: async () => {
+      const perBranch = await Promise.all(
+        member.branches.map((b) =>
+          staffApi
+            .branchRooms(b.id)
+            .then((r) => r.data.filter((rm) => rm.isActive).map((rm) => ({ ...rm, branchName: b.name }))),
+        ),
+      );
+      return perBranch.flat();
+    },
+    enabled: isDoctor && member.branches.length > 0,
   });
 
   const mutation = useMutation({
@@ -98,6 +126,38 @@ export function ProfileTab({ member }: { member: StaffMember }) {
                 <p className="text-xs text-muted-foreground">{t('profile.slotMinutesHint')}</p>
               )}
             </div>
+
+            {isDoctor ? (
+              <div className="space-y-2">
+                <Label htmlFor="profile-room">{t('profile.defaultRoom')}</Label>
+                <Controller
+                  control={form.control}
+                  name="defaultRoomId"
+                  render={({ field }) => (
+                    <Select
+                      disabled={!canWrite}
+                      value={field.value ?? NO_ROOM}
+                      onValueChange={(v) => field.onChange(v === NO_ROOM ? null : v)}
+                    >
+                      <SelectTrigger id="profile-room">
+                        <SelectValue placeholder={t('profile.defaultRoomNone')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_ROOM}>{t('profile.defaultRoomNone')}</SelectItem>
+                        {(roomsQ.data ?? []).map((room) => (
+                          <SelectItem key={room.id} value={room.id}>
+                            {room.number}-xona
+                            {room.name ? ` · ${room.name}` : ''}
+                            {member.branches.length > 1 ? ` (${room.branchName})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <p className="text-xs text-muted-foreground">{t('profile.defaultRoomHint')}</p>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-2">

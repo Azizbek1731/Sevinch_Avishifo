@@ -14,7 +14,8 @@
     "waitingCount": "{count} waiting",
     "lab": "Laboratory",
     "custom": "Other queue",
-    "closed": "Closed"
+    "closed": "Closed",
+    "room": "Room {number}"
   },
   "callNext": "Call next",
   "room": "Room",

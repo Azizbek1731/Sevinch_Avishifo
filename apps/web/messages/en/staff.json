@@ -60,7 +60,10 @@
     "bio": "Bio",
     "slotMinutes": "Appointment slot length (min)",
     "slotMinutesHint": "Default slot length used instead of service duration",
-    "saved": "Profile saved"
+    "saved": "Profile saved",
+    "defaultRoom": "Default room",
+    "defaultRoomNone": "No room selected",
+    "defaultRoomHint": "Shown when the doctor calls the next patient"
   },
   "schedule": {
     "title": "Weekly work schedule",

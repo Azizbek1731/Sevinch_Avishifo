@@ -29,8 +29,16 @@ export interface StaffMember {
   photoUrl: string | null;
   bio: string | null;
   slotMinutes: number | null;
+  defaultRoomId: string | null;
   branches: Array<{ id: string; name: string }>;
   createdAt: string;
+}
+
+export interface BranchRoom {
+  id: string;
+  number: string;
+  name: string | null;
+  isActive: boolean;
 }
 
 export interface StaffListQuery {
@@ -50,6 +58,7 @@ export interface StaffProfileResponse {
   photoUrl: string | null;
   bio: string | null;
   slotMinutes: number | null;
+  defaultRoomId: string | null;
   updatedAt: string;
 }
 
@@ -188,6 +197,8 @@ export const staffApi = {
     api.get<StaffMember[]>('/staff', { ...q }),
   upsertProfile: (userId: string, body: UpsertStaffProfileInput) =>
     api.put<StaffProfileResponse>(`/staff/${userId}/profile`, body),
+  branchRooms: (branchId: string): Promise<ApiResult<BranchRoom[]>> =>
+    api.get<BranchRoom[]>(`/branches/${branchId}/rooms`),
 
   // schedule
   getSchedule: (userId: string, branchId?: string): Promise<ApiResult<DoctorScheduleResponse>> =>

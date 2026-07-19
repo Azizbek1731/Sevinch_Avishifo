@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import { Ticket, Users } from 'lucide-react';
+import { DoorClosed, Ticket, Users } from 'lucide-react';
 import { QueueKind, TicketStatus, type QueueTicketPayload } from '@avishifo/shared';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,9 +65,15 @@ export function QueueColumn({
     >
       <CardHeader className="gap-3 space-y-0 p-4 pb-3">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 space-y-1.5">
+          <div className="min-w-0 space-y-1">
             <CardTitle className="truncate text-base">{name}</CardTitle>
-            <div className="flex items-center gap-1.5">
+            {queue.kind === QueueKind.DOCTOR && queue.doctorRoomNumber ? (
+              <p className="flex items-center gap-1 text-sm font-medium text-primary">
+                <DoorClosed className="h-3.5 w-3.5" />
+                {t('column.room', { number: queue.doctorRoomNumber })}
+              </p>
+            ) : null}
+            <div className="flex items-center gap-1.5 pt-0.5">
               <Badge variant="outline" className="h-5 px-1.5 font-mono text-[11px] font-medium">
                 {queue.prefix}
               </Badge>

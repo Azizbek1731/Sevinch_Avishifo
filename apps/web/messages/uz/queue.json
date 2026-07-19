@@ -14,7 +14,8 @@
     "waitingCount": "{count} ta kutmoqda",
     "lab": "Laboratoriya",
     "custom": "Boshqa navbat",
-    "closed": "Yopiq"
+    "closed": "Yopiq",
+    "room": "{number}-xona"
   },
   "callNext": "Keyingisini chaqirish",
   "room": "Xona",

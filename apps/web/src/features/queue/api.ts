@@ -8,6 +8,7 @@ export interface QueueListItem {
   kind: QueueKind;
   doctorUserId: string | null;
   doctorName: string | null;
+  doctorRoomNumber: string | null;
   prefix: string;
   date: string; // "YYYY-MM-DD"
   lastNumber: number;

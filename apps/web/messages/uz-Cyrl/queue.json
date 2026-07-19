@@ -14,7 +14,8 @@
     "waitingCount": "{count} та кутмоқда",
     "lab": "Лаборатория",
     "custom": "Бошқа навбат",
-    "closed": "Ёпиқ"
+    "closed": "Ёпиқ",
+    "room": "{number}-хона"
   },
   "callNext": "Кейингисини чақириш",
   "room": "Хона",

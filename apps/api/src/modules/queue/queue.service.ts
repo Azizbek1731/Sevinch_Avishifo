@@ -49,6 +49,8 @@ export interface QueueListItem {
   kind: QueueKind;
   doctorUserId: string | null;
   doctorName: string | null;
+  /** The doctor's assigned consultation room number, shown on the queue board. */
+  doctorRoomNumber: string | null;
   prefix: string;
   date: string; // "YYYY-MM-DD"
   lastNumber: number;
@@ -164,10 +166,21 @@ export class QueueService {
       throw new AppException(ErrorCode.TICKET_NOT_FOUND, 'No waiting tickets in this queue', 404);
     }
 
-    const roomNumber = await this.roomNumberOf(opts.roomId ?? null);
+    // Default to the doctor's assigned room when the caller didn't pick one, so
+    // the ticket + TV display always show a room number.
+    let roomId = opts.roomId ?? null;
+    if (!roomId && queue.doctorUserId) {
+      const profile = await this.prisma.db.staffProfile.findFirst({
+        where: { userId: queue.doctorUserId },
+        select: { defaultRoomId: true },
+      });
+      roomId = profile?.defaultRoomId ?? null;
+    }
+
+    const roomNumber = await this.roomNumberOf(roomId);
     const updated = await this.prisma.db.queueTicket.update({
       where: { id: next.id },
-      data: { status: TicketStatus.CALLED, calledAt: new Date(), roomId: opts.roomId ?? null },
+      data: { status: TicketStatus.CALLED, calledAt: new Date(), roomId },
       include: ticketInclude,
     });
 
@@ -395,7 +408,12 @@ export class QueueService {
       },
       orderBy: [{ kind: 'asc' }, { prefix: 'asc' }],
       include: {
-        doctor: { select: { fullName: true } },
+        doctor: {
+          select: {
+            fullName: true,
+            staffProfile: { select: { defaultRoom: { select: { number: true } } } },
+          },
+        },
         tickets: { include: ticketInclude, orderBy: { position: 'asc' } },
       },
     });
@@ -406,6 +424,7 @@ export class QueueService {
       kind: q.kind,
       doctorUserId: q.doctorUserId,
       doctorName: q.doctor?.fullName ?? null,
+      doctorRoomNumber: q.doctor?.staffProfile?.defaultRoom?.number ?? null,
       prefix: q.prefix,
       date: q.date.toISOString().slice(0, 10),
       lastNumber: q.lastNumber,

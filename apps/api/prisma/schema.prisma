@@ -391,7 +391,8 @@ model Room {
   createdAt   DateTime @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @db.Timestamptz(6)
 
-  branch Branch @relation(fields: [branchId], references: [id])
+  branch          Branch         @relation(fields: [branchId], references: [id])
+  defaultForStaff StaffProfile[] @relation("StaffDefaultRoom")
 
   @@unique([branchId, number])
   @@index([clinicId, branchId])
@@ -457,10 +458,14 @@ model StaffProfile {
   bio        String?
   /// Default appointment slot length in minutes (overrides service duration)
   slotMinutes Int?
+  /// Doctor's default consultation room — shown on the queue board and used as
+  /// the room when the doctor calls the next patient without picking one.
+  defaultRoomId String?
   createdAt  DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt  DateTime  @updatedAt @db.Timestamptz(6)
 
-  user User @relation(fields: [userId], references: [id])
+  user        User  @relation(fields: [userId], references: [id])
+  defaultRoom Room? @relation("StaffDefaultRoom", fields: [defaultRoomId], references: [id])
 
   @@index([clinicId])
 }

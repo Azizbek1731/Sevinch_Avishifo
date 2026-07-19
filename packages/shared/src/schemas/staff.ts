@@ -9,6 +9,8 @@ export const upsertStaffProfileSchema = z.object({
   bio: z.string().optional(),
   /** Default appointment slot length (overrides service duration). */
   slotMinutes: z.number().int().min(5).max(120).optional(),
+  /** Doctor's default consultation room (null clears it). */
+  defaultRoomId: idSchema.nullable().optional(),
 });
 export type UpsertStaffProfileInput = z.infer<typeof upsertStaffProfileSchema>;
 

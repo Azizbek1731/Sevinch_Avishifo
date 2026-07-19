@@ -60,7 +60,10 @@
     "bio": "Qisqacha ma'lumot",
     "slotMinutes": "Qabul davomiyligi (daqiqa)",
     "slotMinutesHint": "Xizmat davomiyligi o'rniga qo'llanadigan standart slot uzunligi",
-    "saved": "Profil saqlandi"
+    "saved": "Profil saqlandi",
+    "defaultRoom": "Doimiy xona",
+    "defaultRoomNone": "Xona tanlanmagan",
+    "defaultRoomHint": "Shifokor navbatni chaqirganda shu xona ko'rsatiladi"
   },
   "schedule": {
     "title": "Haftalik ish jadvali",
