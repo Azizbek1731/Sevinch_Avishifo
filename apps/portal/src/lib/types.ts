@@ -69,13 +69,62 @@ export interface PortalAppointment {
   status: AppointmentStatus;
 }
 
-/** GET /portal/me/visits */
+export interface PortalDiagnosis {
+  code: string;
+  nameUz: string;
+  nameRu: string;
+  nameEn: string | null;
+  isPrimary: boolean;
+}
+
+/** GET /portal/me/visits (list) */
 export interface PortalVisit {
   id: string;
-  date: string;
+  clinicId: string;
   clinicName: string;
   doctorName: string;
-  diagnoses: string[];
+  doctorSpecialty: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  diagnoses: PortalDiagnosis[];
+  prescriptionCount: number;
+}
+
+export interface PortalVitals {
+  heightCm: number | null;
+  weightKg: number | null;
+  bpSystolic: number | null;
+  bpDiastolic: number | null;
+  pulseBpm: number | null;
+  temperatureC: number | null;
+  spo2: number | null;
+}
+
+export interface PortalPrescription {
+  drugName: string;
+  dosage: string | null;
+  frequency: string | null;
+  durationDays: number | null;
+  instructions: string | null;
+}
+
+/** GET /portal/me/visits/:id (full medical-history detail) */
+export interface PortalVisitDetail {
+  id: string;
+  clinicName: string;
+  doctorName: string;
+  doctorSpecialty: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  nextVisitAt: string | null;
+  subjective: string | null;
+  objective: string | null;
+  assessment: string | null;
+  plan: string | null;
+  vitals: PortalVitals | null;
+  diagnoses: Array<PortalDiagnosis & { note: string | null }>;
+  prescriptions: PortalPrescription[];
+  referrals: Array<{ type: string; targetSpecialty: string | null }>;
 }
 
 /** GET /portal/me/lab-results */

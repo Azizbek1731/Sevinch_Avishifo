@@ -10,6 +10,7 @@ import { useSession } from '@/stores/session';
 const LINKS = [
   { href: '/', label: 'Bosh sahifa' },
   { href: '/me/appointments', label: 'Qabullarim' },
+  { href: '/me/visits', label: 'Kasallik tarixi' },
   { href: '/me/results', label: 'Natijalarim' },
   { href: '/me/invoices', label: 'Hisoblarim' },
 ] as const;

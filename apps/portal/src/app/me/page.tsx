@@ -9,7 +9,6 @@ import {
   FlaskConical,
   IdCard,
   ReceiptText,
-  Star,
   Stethoscope,
 } from 'lucide-react';
 import { api, errorMessage } from '@/lib/api';
@@ -22,6 +21,7 @@ import { SectionCard } from '@/components/section-card';
 
 const QUICK_LINKS = [
   { href: '/me/appointments', label: 'Qabullarim', icon: CalendarDays },
+  { href: '/me/visits', label: 'Kasallik tarixi', icon: Stethoscope },
   { href: '/me/results', label: 'Natijalarim', icon: FlaskConical },
   { href: '/me/invoices', label: 'Hisoblarim', icon: ReceiptText },
 ] as const;
@@ -48,7 +48,7 @@ export default function CabinetPage() {
       <h1 className="text-2xl font-bold">Kabinet</h1>
 
       {/* Quick links */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {QUICK_LINKS.map((link) => (
           <Link
             key={link.href}
@@ -101,42 +101,53 @@ export default function CabinetPage() {
           ))}
       </SectionCard>
 
-      {/* Visit history */}
-      <SectionCard title="Tashriflar tarixi">
+      {/* Visit history (medical records) */}
+      <SectionCard
+        title="Kasallik tarixi"
+        action={
+          visitsQ.data !== undefined && visitsQ.data.length > 0 ? (
+            <Link href="/me/visits" className="text-sm font-medium text-brand hover:underline">
+              Barchasi
+            </Link>
+          ) : undefined
+        }
+      >
         {visitsQ.isPending && <PageLoader />}
         {visitsQ.isError && <p className="text-sm text-red-600">{errorMessage(visitsQ.error)}</p>}
         {visitsQ.data !== undefined &&
           (visitsQ.data.length === 0 ? (
             <EmptyState
               icon={<Stethoscope className="h-10 w-10" />}
-              title="Tashriflar hali yo'q"
+              title="Kasallik tarixi hali bo'sh"
+              description="Shifokor tekshiruvidan so'ng shu yerda ko'rinadi"
             />
           ) : (
             <ul className="divide-y divide-slate-100">
-              {visitsQ.data.map((visit) => (
-                <li key={visit.id} className="py-3 first:pt-0 last:pb-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium">{visit.doctorName}</p>
-                      <p className="text-sm text-slate-500">
-                        {visit.clinicName} · {formatDate(visit.date)}
-                      </p>
-                      {visit.diagnoses.length > 0 && (
-                        <p className="mt-1 text-sm text-slate-600">
-                          Tashxis: {visit.diagnoses.join(', ')}
-                        </p>
-                      )}
-                    </div>
+              {visitsQ.data.slice(0, 5).map((visit) => {
+                const primary =
+                  visit.diagnoses.find((d) => d.isPrimary) ?? visit.diagnoses[0] ?? null;
+                return (
+                  <li key={visit.id}>
                     <Link
-                      href={`/feedback?visitId=${visit.id}`}
-                      className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-amber-600 transition hover:bg-amber-50"
+                      href={`/me/visits/${visit.id}`}
+                      className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
                     >
-                      <Star className="h-3.5 w-3.5" />
-                      Baholash
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{visit.doctorName}</p>
+                        <p className="truncate text-sm text-slate-500">
+                          {visit.clinicName} · {formatDate(visit.completedAt ?? visit.startedAt)}
+                        </p>
+                        {primary !== null && (
+                          <p className="mt-1 line-clamp-1 text-sm text-slate-600">
+                            Tashxis: {primary.nameUz}
+                          </p>
+                        )}
+                      </div>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
                     </Link>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           ))}
       </SectionCard>

@@ -24,6 +24,7 @@ import {
   type PortalLabOrderDto,
   type PortalPatientCardDto,
   type PortalVisitDto,
+  type PortalVisitDetailDto,
 } from './portal.service';
 import { PortalAppointmentsQueryDto, PortalBookDto, PortalCancelAppointmentDto, PortalFeedbackDto, PortalListQueryDto, PortalRequestOtpDto, PortalSlotsQueryDto, PortalVerifyOtpDto } from './dto';
 
@@ -114,6 +115,15 @@ export class PortalController {
     @Query() query: PortalListQueryDto,
   ): Promise<PaginatedResult<PortalVisitDto>> {
     return this.portal.meVisits(phone, query);
+  }
+
+  @Get('me/visits/:id')
+  @UseGuards(PortalAuthGuard)
+  meVisitDetail(
+    @PortalPhone() phone: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<PortalVisitDetailDto> {
+    return this.portal.meVisitDetail(phone, id);
   }
 
   @Get('me/lab-results')

@@ -122,6 +122,7 @@ export interface PortalVisitDto {
   clinicId: string;
   clinicName: string;
   doctorName: string;
+  doctorSpecialty: string | null;
   startedAt: string;
   completedAt: string | null;
   diagnoses: Array<{
@@ -131,6 +132,47 @@ export interface PortalVisitDto {
     nameEn: string | null;
     isPrimary: boolean;
   }>;
+  prescriptionCount: number;
+}
+
+export interface PortalVisitDetailDto {
+  id: string;
+  clinicName: string;
+  doctorName: string;
+  doctorSpecialty: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  nextVisitAt: string | null;
+  /** SOAP notes as written by the doctor (patient-readable summary of the exam). */
+  subjective: string | null;
+  objective: string | null;
+  assessment: string | null;
+  plan: string | null;
+  vitals: {
+    heightCm: number | null;
+    weightKg: number | null;
+    bpSystolic: number | null;
+    bpDiastolic: number | null;
+    pulseBpm: number | null;
+    temperatureC: number | null;
+    spo2: number | null;
+  } | null;
+  diagnoses: Array<{
+    code: string;
+    nameUz: string;
+    nameRu: string;
+    nameEn: string | null;
+    isPrimary: boolean;
+    note: string | null;
+  }>;
+  prescriptions: Array<{
+    drugName: string;
+    dosage: string | null;
+    frequency: string | null;
+    durationDays: number | null;
+    instructions: string | null;
+  }>;
+  referrals: Array<{ type: string; targetSpecialty: string | null }>;
 }
 
 export interface PortalLabOrderDto {
@@ -620,13 +662,14 @@ export class PortalService {
           clinicId: true,
           startedAt: true,
           completedAt: true,
-          doctor: { select: { fullName: true } },
+          doctor: { select: { fullName: true, staffProfile: { select: { specialty: true } } } },
           diagnoses: {
             select: {
               isPrimary: true,
               icd10: { select: { code: true, nameUz: true, nameRu: true, nameEn: true } },
             },
           },
+          _count: { select: { prescriptions: true } },
         },
         orderBy: { startedAt: 'desc' },
         skip,
@@ -642,6 +685,7 @@ export class PortalService {
         clinicId: v.clinicId,
         clinicName: clinicNames.get(v.clinicId) ?? '',
         doctorName: v.doctor.fullName,
+        doctorSpecialty: v.doctor.staffProfile?.specialty ?? null,
         startedAt: v.startedAt.toISOString(),
         completedAt: v.completedAt ? v.completedAt.toISOString() : null,
         diagnoses: v.diagnoses.map((d) => ({
@@ -651,9 +695,101 @@ export class PortalService {
           nameEn: d.icd10.nameEn,
           isPrimary: d.isPrimary,
         })),
+        prescriptionCount: v._count.prescriptions,
       })),
       { page: query.page, limit: query.limit, total },
     );
+  }
+
+  /** Full medical-history detail for one completed visit the patient owns (by verified phone). */
+  async meVisitDetail(phone: string, visitId: string): Promise<PortalVisitDetailDto> {
+    // Unscoped (justified): patient-owned record located by verified phone + id.
+    const v = await this.prisma.unscoped.visit.findFirst({
+      where: { id: visitId, status: VisitStatus.COMPLETED, patient: { phone, deletedAt: null } },
+      select: {
+        id: true,
+        clinicId: true,
+        startedAt: true,
+        completedAt: true,
+        nextVisitAt: true,
+        subjective: true,
+        objective: true,
+        assessmentNote: true,
+        plan: true,
+        doctor: { select: { fullName: true, staffProfile: { select: { specialty: true } } } },
+        vitals: {
+          select: {
+            heightCm: true,
+            weightKg: true,
+            bpSystolic: true,
+            bpDiastolic: true,
+            pulseBpm: true,
+            temperatureC: true,
+            spo2: true,
+          },
+        },
+        diagnoses: {
+          select: {
+            isPrimary: true,
+            note: true,
+            icd10: { select: { code: true, nameUz: true, nameRu: true, nameEn: true } },
+          },
+        },
+        prescriptions: {
+          select: {
+            drugName: true,
+            dosage: true,
+            frequency: true,
+            durationDays: true,
+            instructions: true,
+          },
+        },
+        referrals: { select: { type: true, targetSpecialty: true } },
+      },
+    });
+    if (!v) throw new AppException(ErrorCode.VISIT_NOT_FOUND, 'Tashrif topilmadi', 404);
+
+    const clinicName = (await this.clinicNames([v.clinicId])).get(v.clinicId) ?? '';
+    return {
+      id: v.id,
+      clinicName,
+      doctorName: v.doctor.fullName,
+      doctorSpecialty: v.doctor.staffProfile?.specialty ?? null,
+      startedAt: v.startedAt.toISOString(),
+      completedAt: v.completedAt ? v.completedAt.toISOString() : null,
+      nextVisitAt: v.nextVisitAt ? v.nextVisitAt.toISOString() : null,
+      subjective: v.subjective,
+      objective: v.objective,
+      assessment: v.assessmentNote,
+      plan: v.plan,
+      vitals: v.vitals
+        ? {
+            heightCm: v.vitals.heightCm,
+            weightKg: v.vitals.weightKg,
+            bpSystolic: v.vitals.bpSystolic,
+            bpDiastolic: v.vitals.bpDiastolic,
+            pulseBpm: v.vitals.pulseBpm,
+            temperatureC: v.vitals.temperatureC,
+            spo2: v.vitals.spo2,
+          }
+        : null,
+      diagnoses: v.diagnoses.map((d) => ({
+        code: d.icd10.code,
+        nameUz: d.icd10.nameUz,
+        nameRu: d.icd10.nameRu,
+        nameEn: d.icd10.nameEn,
+        isPrimary: d.isPrimary,
+        note: d.note,
+      })),
+      prescriptions: v.prescriptions.map((r) => ({
+        drugName: r.drugName,
+        dosage: r.dosage,
+        frequency: r.frequency,
+        durationDays: r.durationDays,
+        instructions: r.instructions,
+      })),
+      referrals: v.referrals.map((r) => ({ type: r.type, targetSpecialty: r.targetSpecialty })),
+    };
   }
 
   async meLabResults(phone: string, query: PageQuery): Promise<PaginatedResult<PortalLabOrderDto>> {
