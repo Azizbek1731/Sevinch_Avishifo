@@ -50,7 +50,8 @@ export interface InvoiceListItem extends InvoiceSummary {
 export interface InvoiceLine {
   id: string;
   serviceId: string | null;
-  title: string | null;
+  /** Snapshot of the service name at billing time: string or { uz, ru, en }. */
+  title: import('@/lib/localized').Localizable;
   quantity: number;
   unitPrice: MoneyString;
   discount: MoneyString;

@@ -1,11 +1,12 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { ArrowLeft, Printer, ReceiptText } from 'lucide-react';
 import { formatUZS } from '@avishifo/shared';
 import { Link } from '@/i18n/routing';
 import { formatTz } from '@/lib/dates';
+import { localizedText } from '@/lib/localized';
 import { useAuthStore } from '@/stores/auth-store';
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import { billingApi } from '../api';
 
 export function ReceiptView({ id }: { id: string }) {
   const t = useTranslations('billing');
+  const locale = useLocale();
   const tc = useTranslations('common');
   const user = useAuthStore((s) => s.user);
 
@@ -94,7 +96,7 @@ export function ReceiptView({ id }: { id: string }) {
           <div className="space-y-1">
             {data.lines.map((l) => (
               <div key={l.id}>
-                <p>{l.title ?? ''}</p>
+                <p>{localizedText(l.title, locale)}</p>
                 <div className="flex justify-between">
                   <span>
                     {l.quantity} x {formatUZS(l.unitPrice, { withCurrency: false })}

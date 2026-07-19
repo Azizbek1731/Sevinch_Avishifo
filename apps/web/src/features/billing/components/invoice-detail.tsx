@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { ArrowLeft, Ban, BadgeCheck, Banknote, ReceiptText, Undo2 } from 'lucide-react';
 import { compareMoney, formatUZS } from '@avishifo/shared';
 import { Link } from '@/i18n/routing';
 import { formatTz } from '@/lib/dates';
+import { localizedText } from '@/lib/localized';
 import { useSocketEvent } from '@/hooks/use-socket';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
@@ -32,6 +33,7 @@ import { RefundDialog } from './refund-dialog';
 
 export function InvoiceDetailView({ id }: { id: string }) {
   const t = useTranslations('billing');
+  const locale = useLocale();
   const tc = useTranslations('common');
   const can = usePermission();
   const errorToast = useApiErrorToast();
@@ -160,7 +162,7 @@ export function InvoiceDetailView({ id }: { id: string }) {
               <TableBody>
                 {inv.lines.map((l) => (
                   <TableRow key={l.id}>
-                    <TableCell>{l.title ?? '—'}</TableCell>
+                    <TableCell>{localizedText(l.title, locale) || '—'}</TableCell>
                     <TableCell className="text-right">{l.quantity}</TableCell>
                     <TableCell className="text-right">{formatUZS(l.unitPrice)}</TableCell>
                     <TableCell className="text-right">{formatUZS(l.discount)}</TableCell>
