@@ -30,6 +30,8 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
+  /** Bot @username (without @) — used to build t.me deep links for web linking. */
+  TELEGRAM_BOT_USERNAME: z.string().optional(),
   PAYME_MERCHANT_ID: z.string().optional(),
   PAYME_KEY: z.string().optional(),
   CLICK_MERCHANT_ID: z.string().optional(),

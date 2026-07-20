@@ -112,6 +112,38 @@ export const api = {
     apiFetch<T>(path, { method: 'POST', body, anonymous: opts?.anonymous }),
 };
 
+/**
+ * Authenticated binary download: the file endpoints require the bearer token,
+ * so a plain <a href> won't work — fetch the blob with the header, then save it.
+ */
+export async function downloadFile(path: string, fileName: string): Promise<void> {
+  const token = getToken();
+  let res: Response;
+  try {
+    res = await fetch(buildUrl(path), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+  } catch {
+    throw new ApiError('NETWORK_ERROR', 'Tarmoq xatosi. Internet aloqasini tekshiring.', 0);
+  }
+  if (!res.ok) {
+    if (res.status === 401) {
+      clearToken();
+      if (typeof window !== 'undefined') window.location.assign('/login');
+    }
+    throw new ApiError('INTERNAL_ERROR', `Yuklab olishda xatolik (${res.status})`, res.status);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 /** Uzbek messages for known error codes (fallback: server message). */
 const CODE_MESSAGES: Partial<Record<ErrorCode | 'NETWORK_ERROR', string>> = {
   NETWORK_ERROR: 'Tarmoq xatosi. Internet aloqasini tekshiring.',

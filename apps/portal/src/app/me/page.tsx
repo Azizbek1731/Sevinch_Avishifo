@@ -6,15 +6,19 @@ import {
   Building2,
   CalendarDays,
   ChevronRight,
+  FileText,
   FlaskConical,
   IdCard,
   ReceiptText,
   Stethoscope,
 } from 'lucide-react';
+import { formatPhone } from '@avishifo/shared';
 import { api, errorMessage } from '@/lib/api';
 import type { PortalPatientCard, PortalVisit } from '@/lib/types';
 import { formatDate } from '@/lib/dates';
 import { useRequireAuth } from '@/hooks/use-require-auth';
+import { useProfile } from '@/hooks/use-profile';
+import { Avatar } from '@/components/avatar';
 import { EmptyState } from '@/components/empty-state';
 import { PageLoader } from '@/components/spinner';
 import { SectionCard } from '@/components/section-card';
@@ -23,11 +27,14 @@ const QUICK_LINKS = [
   { href: '/me/appointments', label: 'Qabullarim', icon: CalendarDays },
   { href: '/me/visits', label: 'Kasallik tarixi', icon: Stethoscope },
   { href: '/me/results', label: 'Natijalarim', icon: FlaskConical },
+  { href: '/me/documents', label: 'Hujjatlarim', icon: FileText },
   { href: '/me/invoices', label: 'Hisoblarim', icon: ReceiptText },
 ] as const;
 
 export default function CabinetPage() {
   const authStatus = useRequireAuth();
+
+  const profileQ = useProfile(authStatus === 'authed');
 
   const cardsQ = useQuery({
     queryKey: ['portal-me'],
@@ -47,8 +54,26 @@ export default function CabinetPage() {
     <div className="space-y-5">
       <h1 className="text-2xl font-bold">Kabinet</h1>
 
+      {/* Profile summary → full profile */}
+      <Link href="/me/profile" className="block">
+        <SectionCard className="transition hover:border-brand">
+          <div className="flex items-center gap-4">
+            <Avatar name={profileQ.data?.fullName || profileQ.data?.phone || 'A'} size="md" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold text-slate-900">
+                {profileQ.data?.fullName || 'Profilingiz'}
+              </p>
+              <p className="truncate text-sm text-slate-500">
+                {profileQ.data ? formatPhone(profileQ.data.phone) : 'Profilni to‘ldiring'}
+              </p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+          </div>
+        </SectionCard>
+      </Link>
+
       {/* Quick links */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {QUICK_LINKS.map((link) => (
           <Link
             key={link.href}

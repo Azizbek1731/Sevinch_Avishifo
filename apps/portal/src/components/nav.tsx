@@ -12,7 +12,9 @@ const LINKS = [
   { href: '/me/appointments', label: 'Qabullarim' },
   { href: '/me/visits', label: 'Kasallik tarixi' },
   { href: '/me/results', label: 'Natijalarim' },
+  { href: '/me/documents', label: 'Hujjatlarim' },
   { href: '/me/invoices', label: 'Hisoblarim' },
+  { href: '/me/profile', label: 'Profil' },
 ] as const;
 
 export function Nav() {

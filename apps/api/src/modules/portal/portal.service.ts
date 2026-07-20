@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
-import { randomInt, randomUUID } from 'node:crypto';
-import type { Prisma } from '@prisma/client';
+import { randomBytes, randomInt, randomUUID } from 'node:crypto';
+import type { Readable } from 'node:stream';
+import type { Gender as DbGender, Locale as DbLocale, Prisma } from '@prisma/client';
 import {
   AppointmentStatus,
   AuditAction,
@@ -16,6 +17,7 @@ import {
   normalizePhone,
   type PortalCancelAppointmentInput,
   type PortalRequestOtpInput,
+  type PortalUpdateProfileInput,
   type PortalVerifyOtpInput,
 } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
@@ -28,6 +30,9 @@ import { AppointmentsService } from '../appointments/appointments.service';
 import { SlotsService } from '../appointments/slots.service';
 import { type FreeSlot } from '../appointments/slots.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SmsChannel } from '../notifications/channels/sms.channel';
+import { StorageService } from '../../core/storage/storage.service';
+import { AppConfigService } from '../../core/config/app-config.service';
 import type {
   PortalAppointmentsQueryInput,
   PortalBookExtendedInput,
@@ -39,8 +44,40 @@ const OTP_TTL_MINUTES = 5;
 const OTP_MAX_ATTEMPTS = 5;
 const PORTAL_TOKEN_TTL = '30d';
 const CANCEL_MIN_MS = 2 * 3_600_000; // cancellation cutoff: 2h before start
+const LINK_TOKEN_TTL_MINUTES = 15; // Telegram web-link deep-link token lifetime
 
 const ARGON2_OPTS: argon2.Options = { type: argon2.argon2id };
+
+/**
+ * The shared Locale enum uses the value "uz-Cyrl", but Prisma's client enum
+ * member is "uz_Cyrl" (the @map target). Convert at the DB boundary both ways.
+ */
+const SHARED_TO_DB_LOCALE: Record<string, DbLocale> = {
+  uz: 'uz',
+  'uz-Cyrl': 'uz_Cyrl',
+  ru: 'ru',
+  en: 'en',
+};
+const DB_TO_SHARED_LOCALE: Record<string, string> = {
+  uz: 'uz',
+  uz_Cyrl: 'uz-Cyrl',
+  ru: 'ru',
+  en: 'en',
+};
+
+/** Typed patch for the durable portal account (scalar-only, no phone). */
+interface ProfilePatch {
+  firstName?: string;
+  lastName?: string;
+  email?: string | null;
+  dob?: Date;
+  gender?: DbGender;
+  preferredLocale?: DbLocale;
+  notifyAppointments?: boolean;
+  notifyResults?: boolean;
+  notifyPayments?: boolean;
+  notifyPromos?: boolean;
+}
 
 /** "+998901234567" → "+998 90*****67" — keep PHI out of log lines. */
 function maskPhone(phone: string): string {
@@ -214,6 +251,55 @@ export interface PortalInvoiceDto {
   createdAt: string;
 }
 
+export interface PortalTelegramStatusDto {
+  linked: boolean;
+  username: string | null;
+  linkedAt: string | null;
+  /** Bot @username for building the t.me deep link, null if not configured. */
+  botUsername: string | null;
+  enabled: boolean;
+}
+
+export interface PortalProfileDto {
+  phone: string;
+  firstName: string | null;
+  lastName: string | null;
+  fullName: string;
+  email: string | null;
+  /** "YYYY-MM-DD" or null. */
+  dob: string | null;
+  gender: string | null;
+  preferredLocale: string;
+  phoneVerified: boolean;
+  memberSince: string;
+  telegram: PortalTelegramStatusDto;
+  prefs: {
+    appointments: boolean;
+    results: boolean;
+    payments: boolean;
+    promos: boolean;
+  };
+  clinics: PortalPatientCardDto[];
+  stats: {
+    upcomingAppointments: number;
+    visits: number;
+    documents: number;
+    labResults: number;
+  };
+}
+
+export interface PortalDocumentDto {
+  id: string;
+  clinicId: string;
+  clinicName: string;
+  category: string;
+  title: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
 /**
  * Patient-facing portal API (spec §M14): OTP login, public clinic catalog,
  * online booking and the personal cabinet.
@@ -235,6 +321,9 @@ export class PortalService {
     private readonly appointments: AppointmentsService,
     private readonly slots: SlotsService,
     private readonly notifications: NotificationsService,
+    private readonly sms: SmsChannel,
+    private readonly storage: StorageService,
+    private readonly config: AppConfigService,
   ) {}
 
   // ------------------------------------------------------------------- auth
@@ -260,13 +349,23 @@ export class PortalService {
       },
     });
 
-    // Log-mode SMS delivery (spec §M14): the portal must not depend on the
-    // notification channels. Phone is masked to keep PHI out of logs.
-    this.logger.log(`[PORTAL OTP → ${maskPhone(phone)}]: ${code} (expires in ${OTP_TTL_MINUTES}m)`);
+    // Real SMS delivery via the Eskiz channel (falls back to app-log when
+    // SMS_PROVIDER=log, where SmsChannel prints the full message for dev).
+    const message = `AviShifo tasdiqlash kodi: ${code}. Uni hech kimga bermang. Kod ${OTP_TTL_MINUTES} daqiqa amal qiladi.`;
+    try {
+      await this.sms.send(phone, message);
+    } catch (err) {
+      // Delivery failure must neither leak provider internals nor block the
+      // flow — the code is stored and the patient can request a new one.
+      this.logger.error(`OTP SMS delivery failed for ${maskPhone(phone)}: ${String(err)}`);
+    }
+    this.logger.log(`[PORTAL OTP → ${maskPhone(phone)}] issued (expires in ${OTP_TTL_MINUTES}m)`);
     return { requested: true };
   }
 
-  async verifyOtp(input: PortalVerifyOtpInput): Promise<{ accessToken: string; phone: string }> {
+  async verifyOtp(
+    input: PortalVerifyOtpInput,
+  ): Promise<{ accessToken: string; phone: string; isNew: boolean }> {
     const phone = normalizePhone(input.phone);
     if (!phone) {
       throw new AppException(ErrorCode.VALIDATION_ERROR, 'Invalid phone number', 400);
@@ -301,11 +400,280 @@ export class PortalService {
       data: { usedAt: new Date() },
     });
 
+    // Upsert the durable portal account and mark the phone verified. This makes
+    // "registered patient" a first-class, persisted concept (not just a token).
+    const account = await this.prisma.unscoped.portalAccount.upsert({
+      where: { phone },
+      update: { phoneVerifiedAt: new Date(), lastLoginAt: new Date() },
+      create: { phone, phoneVerifiedAt: new Date(), lastLoginAt: new Date() },
+      select: { firstName: true, lastName: true },
+    });
+
+    // "New" = the account has no profile name yet and no existing patient card
+    // to borrow one from → the UI routes to the registration/profile step.
+    let profileComplete = Boolean(account.firstName && account.lastName);
+    if (!profileComplete) {
+      const card = await this.prisma.unscoped.patient.findFirst({
+        where: { phone, deletedAt: null },
+        select: { id: true },
+      });
+      profileComplete = Boolean(card);
+    }
+
     const accessToken = await this.jwt.signAsync(
       { typ: 'portal', sub: phone, sid: randomUUID() },
       { expiresIn: PORTAL_TOKEN_TTL },
     );
-    return { accessToken, phone };
+    return { accessToken, phone, isNew: !profileComplete };
+  }
+
+  // ---------------------------------------------------------------- profile
+
+  /** Full portal profile: account fields, cross-clinic cards, cabinet stats and Telegram status. */
+  async getProfile(phone: string): Promise<PortalProfileDto> {
+    // Ensure a durable account exists (a token can only be minted post-verify,
+    // so upsert is defensive against pre-account tokens from older sessions).
+    const account = await this.prisma.unscoped.portalAccount.upsert({
+      where: { phone },
+      update: {},
+      create: { phone, phoneVerifiedAt: new Date() },
+    });
+
+    const patients = await this.ownPatients(phone);
+    const patientIds = patients.map((p) => p.id);
+    const clinicNames = await this.clinicNames(patients.map((p) => p.clinicId));
+
+    const [upcomingAppointments, visits, documents, labResults] = await Promise.all([
+      patientIds.length
+        ? this.prisma.unscoped.appointment.count({
+            where: {
+              patientId: { in: patientIds },
+              startAt: { gte: new Date() },
+              status: { in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED] },
+            },
+          })
+        : 0,
+      patientIds.length
+        ? this.prisma.unscoped.visit.count({
+            where: { patientId: { in: patientIds }, status: VisitStatus.COMPLETED },
+          })
+        : 0,
+      patientIds.length
+        ? this.prisma.unscoped.patientDocument.count({ where: { patientId: { in: patientIds } } })
+        : 0,
+      patientIds.length
+        ? this.prisma.unscoped.labOrder.count({
+            where: {
+              patientId: { in: patientIds },
+              status: { in: [LabOrderStatus.APPROVED, LabOrderStatus.DELIVERED] },
+            },
+          })
+        : 0,
+    ]);
+
+    const fullName =
+      [account.lastName, account.firstName].filter(Boolean).join(' ') ||
+      patients[0]?.fullName ||
+      '';
+
+    return {
+      phone,
+      firstName: account.firstName,
+      lastName: account.lastName,
+      fullName,
+      email: account.email,
+      dob: account.dob ? account.dob.toISOString().slice(0, 10) : null,
+      gender: account.gender,
+      preferredLocale: DB_TO_SHARED_LOCALE[account.preferredLocale] ?? 'uz',
+      phoneVerified: Boolean(account.phoneVerifiedAt),
+      memberSince: account.createdAt.toISOString(),
+      telegram: {
+        linked: Boolean(account.telegramChatId),
+        username: account.telegramUsername,
+        linkedAt: account.telegramLinkedAt ? account.telegramLinkedAt.toISOString() : null,
+        botUsername: (this.config.env.TELEGRAM_BOT_USERNAME || null),
+        enabled: this.config.env.TELEGRAM_ENABLED,
+      },
+      prefs: {
+        appointments: account.notifyAppointments,
+        results: account.notifyResults,
+        payments: account.notifyPayments,
+        promos: account.notifyPromos,
+      },
+      clinics: patients.map((p) => ({
+        clinicId: p.clinicId,
+        clinicName: clinicNames.get(p.clinicId) ?? '',
+        patientId: p.id,
+        mrn: p.mrn,
+        fullName: p.fullName,
+      })),
+      stats: { upcomingAppointments, visits, documents, labResults },
+    };
+  }
+
+  /** Update the portal profile (also serves registration name capture). */
+  async updateProfile(phone: string, input: PortalUpdateProfileInput): Promise<PortalProfileDto> {
+    const patch: ProfilePatch = {};
+    if (input.firstName !== undefined) patch.firstName = input.firstName;
+    if (input.lastName !== undefined) patch.lastName = input.lastName;
+    if (input.email !== undefined) patch.email = input.email === '' ? null : input.email;
+    if (input.dob !== undefined) patch.dob = new Date(`${input.dob}T00:00:00.000Z`);
+    if (input.gender !== undefined) patch.gender = input.gender as DbGender;
+    if (input.preferredLocale !== undefined) {
+      patch.preferredLocale = SHARED_TO_DB_LOCALE[input.preferredLocale] ?? 'uz';
+    }
+    if (input.notifyAppointments !== undefined) patch.notifyAppointments = input.notifyAppointments;
+    if (input.notifyResults !== undefined) patch.notifyResults = input.notifyResults;
+    if (input.notifyPayments !== undefined) patch.notifyPayments = input.notifyPayments;
+    if (input.notifyPromos !== undefined) patch.notifyPromos = input.notifyPromos;
+
+    await this.prisma.unscoped.portalAccount.upsert({
+      where: { phone },
+      update: patch,
+      create: { phone, phoneVerifiedAt: new Date(), ...patch },
+    });
+    return this.getProfile(phone);
+  }
+
+  // -------------------------------------------------------------- documents
+
+  /** Documents (receipts, prescriptions, scans, analysis PDFs) across the patient's cards. */
+  async getDocuments(
+    phone: string,
+    query: PageQuery,
+  ): Promise<PaginatedResult<PortalDocumentDto>> {
+    const patients = await this.ownPatients(phone);
+    const patientIds = patients.map((p) => p.id);
+    if (patientIds.length === 0) {
+      return paginated([], { page: query.page, limit: query.limit, total: 0 });
+    }
+    const where: Prisma.PatientDocumentWhereInput = { patientId: { in: patientIds } };
+    const { skip, take } = skipTake(query);
+
+    // Unscoped (justified): patient-owned records across clinics by verified phone.
+    const [rows, total] = await Promise.all([
+      this.prisma.unscoped.patientDocument.findMany({
+        where,
+        select: {
+          id: true,
+          clinicId: true,
+          category: true,
+          title: true,
+          fileName: true,
+          mimeType: true,
+          sizeBytes: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.unscoped.patientDocument.count({ where }),
+    ]);
+
+    const clinicNames = await this.clinicNames(rows.map((r) => r.clinicId));
+    return paginated(
+      rows.map((d) => ({
+        id: d.id,
+        clinicId: d.clinicId,
+        clinicName: clinicNames.get(d.clinicId) ?? '',
+        category: d.category,
+        title: d.title,
+        fileName: d.fileName,
+        mimeType: d.mimeType,
+        sizeBytes: d.sizeBytes,
+        createdAt: d.createdAt.toISOString(),
+      })),
+      { page: query.page, limit: query.limit, total },
+    );
+  }
+
+  /** Stream one owned document for download; ownership proven by verified phone. */
+  async downloadDocument(
+    phone: string,
+    docId: string,
+  ): Promise<{ stream: Readable; mimeType: string; fileName: string }> {
+    const patients = await this.ownPatients(phone);
+    const patientIds = patients.map((p) => p.id);
+    const doc = patientIds.length
+      ? await this.prisma.unscoped.patientDocument.findFirst({
+          where: { id: docId, patientId: { in: patientIds } },
+          select: { fileKey: true, mimeType: true, fileName: true },
+        })
+      : null;
+    if (!doc) throw new AppException(ErrorCode.NOT_FOUND, 'Hujjat topilmadi', 404);
+    return {
+      stream: this.storage.getStream(doc.fileKey),
+      mimeType: doc.mimeType,
+      fileName: doc.fileName,
+    };
+  }
+
+  // --------------------------------------------------------------- telegram
+
+  async getTelegramStatus(phone: string): Promise<PortalTelegramStatusDto> {
+    const account = await this.prisma.unscoped.portalAccount.findUnique({
+      where: { phone },
+      select: { telegramChatId: true, telegramUsername: true, telegramLinkedAt: true },
+    });
+    return {
+      linked: Boolean(account?.telegramChatId),
+      username: account?.telegramUsername ?? null,
+      linkedAt: account?.telegramLinkedAt ? account.telegramLinkedAt.toISOString() : null,
+      botUsername: (this.config.env.TELEGRAM_BOT_USERNAME || null),
+      enabled: this.config.env.TELEGRAM_ENABLED,
+    };
+  }
+
+  /** Mint a one-time deep-link token; the patient opens t.me/<bot>?start=<token>. */
+  async createTelegramLinkToken(
+    phone: string,
+  ): Promise<{ token: string; deepLink: string | null; botUsername: string | null; enabled: boolean }> {
+    const token = randomBytes(24).toString('base64url');
+    await this.prisma.unscoped.portalLinkToken.create({
+      data: {
+        token,
+        phone,
+        purpose: 'telegram_link',
+        expiresAt: new Date(Date.now() + LINK_TOKEN_TTL_MINUTES * 60_000),
+      },
+    });
+    const botUsername = (this.config.env.TELEGRAM_BOT_USERNAME || null);
+    return {
+      token,
+      deepLink: botUsername ? `https://t.me/${botUsername}?start=${token}` : null,
+      botUsername,
+      enabled: this.config.env.TELEGRAM_ENABLED,
+    };
+  }
+
+  async unlinkTelegram(phone: string): Promise<{ linked: false }> {
+    const account = await this.prisma.unscoped.portalAccount.findUnique({
+      where: { phone },
+      select: { telegramChatId: true },
+    });
+    await this.prisma.unscoped.portalAccount
+      .update({
+        where: { phone },
+        data: { telegramChatId: null, telegramUsername: null, telegramLinkedAt: null },
+      })
+      .catch(() => undefined);
+    if (account?.telegramChatId) {
+      // Deactivate outbound routing links for this chat across clinics.
+      await this.prisma.unscoped.telegramLink.updateMany({
+        where: { chatId: account.telegramChatId },
+        data: { isActive: false },
+      });
+    }
+    return { linked: false };
+  }
+
+  /** Public runtime hints for the portal UI (no auth). */
+  getPublicConfig(): { telegramBotUsername: string | null; telegramEnabled: boolean } {
+    return {
+      telegramBotUsername: (this.config.env.TELEGRAM_BOT_USERNAME || null),
+      telegramEnabled: this.config.env.TELEGRAM_ENABLED,
+    };
   }
 
   // --------------------------------------------------------- public catalog

@@ -31,7 +31,8 @@ const RESEND_SECONDS = 60;
 interface OtpLoginFormProps {
   /** Normalized or raw phone to prefill. */
   initialPhone?: string;
-  onSuccess: (token: string, phone: string) => void;
+  /** `isNew` is true when the verified phone has no profile name / patient card yet. */
+  onSuccess: (token: string, phone: string, isNew: boolean) => void;
 }
 
 /** Two-step phone → OTP login. Reused by /login and inline in the booking wizard. */
@@ -77,14 +78,16 @@ export function OtpLoginForm({ initialPhone, onSuccess }: OtpLoginFormProps) {
   const verifyOtp = useMutation({
     mutationFn: async (values: PortalVerifyOtpInput) => {
       const body = portalVerifyOtpSchema.parse(values);
-      const res = await api.post<{ accessToken: string }>('/portal/auth/verify', body, {
-        anonymous: true,
-      });
-      return res.data.accessToken;
+      const res = await api.post<{ accessToken: string; isNew: boolean }>(
+        '/portal/auth/verify',
+        body,
+        { anonymous: true },
+      );
+      return res.data;
     },
-    onSuccess: (token, values) => {
+    onSuccess: (data, values) => {
       toast.success('Xush kelibsiz!');
-      onSuccess(token, values.phone);
+      onSuccess(data.accessToken, values.phone, data.isNew);
     },
     onError: (error) => toast.error(errorMessage(error)),
   });

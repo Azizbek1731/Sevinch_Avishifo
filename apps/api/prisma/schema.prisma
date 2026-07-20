@@ -501,18 +501,62 @@ model AuthSession {
   @@index([userId])
 }
 
-/// Phone OTP codes (portal login, password reset).
+/// Phone OTP codes (portal login/registration, password reset).
 model OtpCode {
   id        String   @id @default(uuid(7))
   phone     String
   codeHash  String
-  purpose   String // portal_login | password_reset
+  purpose   String // portal_login | portal_register | password_reset
   attempts  Int      @default(0)
   expiresAt DateTime @db.Timestamptz(6)
   usedAt    DateTime? @db.Timestamptz(6)
   createdAt DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([phone, purpose])
+}
+
+/// Durable patient portal account (platform-level, keyed by phone). One phone
+/// maps to N per-clinic Patient cards; this row holds the cross-clinic profile,
+/// Telegram link and notification preferences shown in the patient's cabinet.
+/// Verification state is persisted here (phoneVerifiedAt) instead of only in a
+/// short-lived token, so a "registered" patient is a first-class concept.
+model PortalAccount {
+  id               String    @id @default(uuid(7))
+  phone            String    @unique
+  firstName        String?
+  lastName         String?
+  email            String?
+  dob              DateTime? @db.Date
+  gender           Gender?
+  preferredLocale  Locale    @default(uz)
+  phoneVerifiedAt  DateTime? @db.Timestamptz(6)
+  /// Linked Telegram chat (bound via web deep-link token or in-bot contact share).
+  telegramChatId   String?   @unique
+  telegramUsername String?
+  telegramLinkedAt DateTime? @db.Timestamptz(6)
+  /// Notification opt-ins (per event family).
+  notifyAppointments Boolean @default(true)
+  notifyResults      Boolean @default(true)
+  notifyPayments     Boolean @default(true)
+  notifyPromos       Boolean @default(false)
+  lastLoginAt      DateTime? @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(6)
+}
+
+/// Short-lived token that links a Telegram chat to a portal account from the
+/// web app: the portal mints one, the patient opens t.me/<bot>?start=<token>,
+/// and the bot consumes it to bind chatId ↔ phone (no contact-share needed).
+model PortalLinkToken {
+  id        String    @id @default(uuid(7))
+  token     String    @unique
+  phone     String
+  purpose   String    @default("telegram_link")
+  expiresAt DateTime  @db.Timestamptz(6)
+  usedAt    DateTime? @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([phone])
 }
 
 // ============================================================ PATIENTS

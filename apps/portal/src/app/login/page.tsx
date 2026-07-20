@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { OtpLoginForm } from '@/components/otp-login-form';
 import { PageLoader } from '@/components/spinner';
@@ -20,6 +21,12 @@ function LoginContent() {
   const next = safeNext(searchParams.get('next'));
   const initialPhone = searchParams.get('phone') ?? undefined;
 
+  const registerParams = new URLSearchParams();
+  if (initialPhone !== undefined) registerParams.set('phone', initialPhone);
+  const nextRaw = searchParams.get('next');
+  if (nextRaw !== null) registerParams.set('next', nextRaw);
+  const registerHref = `/register${registerParams.toString() ? `?${registerParams.toString()}` : ''}`;
+
   useEffect(() => {
     if (status === 'authed') router.replace(next);
   }, [status, next, router]);
@@ -35,12 +42,20 @@ function LoginContent() {
       <SectionCard>
         <OtpLoginForm
           initialPhone={initialPhone}
-          onSuccess={(token, phone) => {
+          onSuccess={(token, phone, isNew) => {
             login(phone, token);
-            router.replace(next);
+            // Brand-new patient (no name/card yet): land on the profile page,
+            // which prompts them to complete their details.
+            router.replace(isNew ? '/me/profile' : next);
           }}
         />
       </SectionCard>
+      <p className="mt-4 text-center text-sm text-slate-500">
+        Akkauntingiz yo‘qmi?{' '}
+        <Link href={registerHref} className="font-medium text-brand hover:underline">
+          Ro‘yxatdan o‘tish
+        </Link>
+      </p>
     </div>
   );
 }

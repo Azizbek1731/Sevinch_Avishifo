@@ -6,6 +6,7 @@ import {
   portalBookSchema,
   portalCancelAppointmentSchema,
   portalRequestOtpSchema,
+  portalUpdateProfileSchema,
   portalVerifyOtpSchema,
   slotsQuerySchema,
 } from '@avishifo/shared';
@@ -13,6 +14,7 @@ import {
 export class PortalRequestOtpDto extends createZodDto(portalRequestOtpSchema) {}
 export class PortalVerifyOtpDto extends createZodDto(portalVerifyOtpSchema) {}
 export class PortalCancelAppointmentDto extends createZodDto(portalCancelAppointmentSchema) {}
+export class PortalUpdateProfileDto extends createZodDto(portalUpdateProfileSchema) {}
 
 /**
  * Local extension of the shared booking schema (spec §M14): names are needed

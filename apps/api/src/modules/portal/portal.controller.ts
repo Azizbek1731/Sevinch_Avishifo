@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -20,13 +21,16 @@ import {
   type PortalAppointmentDto,
   type PortalBookingResultDto,
   type PortalClinicDto,
+  type PortalDocumentDto,
   type PortalInvoiceDto,
   type PortalLabOrderDto,
   type PortalPatientCardDto,
+  type PortalProfileDto,
+  type PortalTelegramStatusDto,
   type PortalVisitDto,
   type PortalVisitDetailDto,
 } from './portal.service';
-import { PortalAppointmentsQueryDto, PortalBookDto, PortalCancelAppointmentDto, PortalFeedbackDto, PortalListQueryDto, PortalRequestOtpDto, PortalSlotsQueryDto, PortalVerifyOtpDto } from './dto';
+import { PortalAppointmentsQueryDto, PortalBookDto, PortalCancelAppointmentDto, PortalFeedbackDto, PortalListQueryDto, PortalRequestOtpDto, PortalSlotsQueryDto, PortalUpdateProfileDto, PortalVerifyOtpDto } from './dto';
 
 const OTP_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
 
@@ -53,11 +57,19 @@ export class PortalController {
   @Post('auth/verify')
   @Throttle(OTP_THROTTLE)
   @HttpCode(200)
-  verify(@Body() dto: PortalVerifyOtpDto): Promise<{ accessToken: string; phone: string }> {
+  verify(
+    @Body() dto: PortalVerifyOtpDto,
+  ): Promise<{ accessToken: string; phone: string; isNew: boolean }> {
     return this.portal.verifyOtp(dto);
   }
 
   // --------------------------------------------------------- public catalog
+
+  /** Runtime hints (Telegram bot username / enabled) for the portal UI. */
+  @Get('config')
+  config(): { telegramBotUsername: string | null; telegramEnabled: boolean } {
+    return this.portal.getPublicConfig();
+  }
 
   @Get('clinics/:clinicId')
   getClinic(@Param('clinicId', ParseUUIDPipe) clinicId: string): Promise<PortalClinicDto> {
@@ -142,6 +154,72 @@ export class PortalController {
     @Query() query: PortalListQueryDto,
   ): Promise<PaginatedResult<PortalInvoiceDto>> {
     return this.portal.meInvoices(phone, query);
+  }
+
+  // ---------------------------------------------------------------- profile
+
+  @Get('me/profile')
+  @UseGuards(PortalAuthGuard)
+  profile(@PortalPhone() phone: string): Promise<PortalProfileDto> {
+    return this.portal.getProfile(phone);
+  }
+
+  @Post('me/profile')
+  @UseGuards(PortalAuthGuard)
+  @HttpCode(200)
+  updateProfile(
+    @PortalPhone() phone: string,
+    @Body() dto: PortalUpdateProfileDto,
+  ): Promise<PortalProfileDto> {
+    return this.portal.updateProfile(phone, dto);
+  }
+
+  // -------------------------------------------------------------- documents
+
+  @Get('me/documents')
+  @UseGuards(PortalAuthGuard)
+  meDocuments(
+    @PortalPhone() phone: string,
+    @Query() query: PortalListQueryDto,
+  ): Promise<PaginatedResult<PortalDocumentDto>> {
+    return this.portal.getDocuments(phone, query);
+  }
+
+  @Get('me/documents/:id/download')
+  @UseGuards(PortalAuthGuard)
+  async downloadDocument(
+    @PortalPhone() phone: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<StreamableFile> {
+    const { stream, mimeType, fileName } = await this.portal.downloadDocument(phone, id);
+    return new StreamableFile(stream, {
+      type: mimeType,
+      disposition: `attachment; filename="${encodeURIComponent(fileName)}"`,
+    });
+  }
+
+  // --------------------------------------------------------------- telegram
+
+  @Get('me/telegram')
+  @UseGuards(PortalAuthGuard)
+  telegramStatus(@PortalPhone() phone: string): Promise<PortalTelegramStatusDto> {
+    return this.portal.getTelegramStatus(phone);
+  }
+
+  @Post('me/telegram/link')
+  @UseGuards(PortalAuthGuard)
+  @HttpCode(200)
+  telegramLink(
+    @PortalPhone() phone: string,
+  ): Promise<{ token: string; deepLink: string | null; botUsername: string | null; enabled: boolean }> {
+    return this.portal.createTelegramLinkToken(phone);
+  }
+
+  @Post('me/telegram/unlink')
+  @UseGuards(PortalAuthGuard)
+  @HttpCode(200)
+  telegramUnlink(@PortalPhone() phone: string): Promise<{ linked: false }> {
+    return this.portal.unlinkTelegram(phone);
   }
 
   @Post('feedback')

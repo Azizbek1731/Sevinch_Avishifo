@@ -159,3 +159,65 @@ export interface PortalInvoice {
   paidTotal: MoneyString;
   status: InvoiceStatus;
 }
+
+/** Telegram link status (part of the profile). */
+export interface PortalTelegramStatus {
+  linked: boolean;
+  username: string | null;
+  linkedAt: string | null;
+  /** Bot @username for building the t.me deep link (null if not configured). */
+  botUsername: string | null;
+  enabled: boolean;
+}
+
+export interface PortalNotificationPrefs {
+  appointments: boolean;
+  results: boolean;
+  payments: boolean;
+  promos: boolean;
+}
+
+/** GET /portal/me/profile */
+export interface PortalProfile {
+  phone: string;
+  firstName: string | null;
+  lastName: string | null;
+  fullName: string;
+  email: string | null;
+  /** "YYYY-MM-DD" or null. */
+  dob: string | null;
+  gender: string | null;
+  preferredLocale: string;
+  phoneVerified: boolean;
+  memberSince: string;
+  telegram: PortalTelegramStatus;
+  prefs: PortalNotificationPrefs;
+  clinics: PortalPatientCard[];
+  stats: {
+    upcomingAppointments: number;
+    visits: number;
+    documents: number;
+    labResults: number;
+  };
+}
+
+/** GET /portal/me/documents */
+export interface PortalDocument {
+  id: string;
+  clinicId: string;
+  clinicName: string;
+  category: string;
+  title: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+/** POST /portal/me/telegram/link */
+export interface PortalTelegramLinkToken {
+  token: string;
+  deepLink: string | null;
+  botUsername: string | null;
+  enabled: boolean;
+}
