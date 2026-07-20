@@ -6,7 +6,16 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Lock, LockOpen, Printer, Wallet } from 'lucide-react';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Banknote,
+  CreditCard,
+  Lock,
+  LockOpen,
+  Printer,
+  Wallet,
+} from 'lucide-react';
 import {
   closeShiftSchema,
   formatUZS,
@@ -97,78 +106,142 @@ export function ShiftPanel() {
 
   return (
     <>
-      <Card className={shift ? 'border-success/40 bg-success/5' : 'border-warning/40 bg-warning/5'}>
-        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-          {shift ? (
-            <>
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/15">
-                  <LockOpen className="h-5 w-5 text-success" />
+      {shift ? (
+        <div className="space-y-3">
+          {/* Shift status strip */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-success/40 bg-success/5 px-4 py-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-success/15">
+                <LockOpen className="h-4 w-4 text-success" />
+              </div>
+              <div className="text-sm">
+                <span className="font-semibold">{t('shift.openBadge')}</span>
+                <span className="ml-2 text-muted-foreground">
+                  {t('shift.openedAt')}: {formatTz(shift.openedAt)}
+                </span>
+              </div>
+            </div>
+            {canManage ? (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  closeForm.reset({ actualCash: '', note: '' });
+                  setCloseDlg(true);
+                }}
+              >
+                <Lock className="mr-1 h-4 w-4" />
+                {t('shift.close')}
+              </Button>
+            ) : null}
+          </div>
+
+          {/* Two registers: cash drawer vs non-cash transfers */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {/* Naqd kassa */}
+            <Card className="border-emerald-500/30 bg-emerald-500/[0.04]">
+              <CardContent className="space-y-3 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                  <Banknote className="h-4 w-4" />
+                  {t('registers.cash')}
                 </div>
                 <div>
-                  <p className="font-semibold">{t('shift.openBadge')}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {t('shift.openedAt')}: {formatTz(shift.openedAt)}
+                  <p className="text-3xl font-bold tabular-nums">
+                    {formatUZS(shift.expectedCashSoFar)}
                   </p>
+                  <p className="text-xs text-muted-foreground">{t('registers.inDrawer')}</p>
                 </div>
+                <div className="grid grid-cols-3 gap-2 border-t pt-2 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t('shift.openingCash')}</p>
+                    <p className="font-medium tabular-nums">
+                      {formatUZS(shift.openingCash, { withCurrency: false })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <ArrowDownLeft className="h-3 w-3 text-emerald-600" />
+                      {t('shift.cashIn')}
+                    </p>
+                    <p className="font-medium tabular-nums text-emerald-600">
+                      {formatUZS(shift.cashIn, { withCurrency: false })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <ArrowUpRight className="h-3 w-3 text-destructive" />
+                      {t('shift.cashOut')}
+                    </p>
+                    <p className="font-medium tabular-nums text-destructive">
+                      {formatUZS(shift.cashOut, { withCurrency: false })}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* O'tkazma kassa */}
+            <Card className="border-primary/30 bg-primary/[0.04]">
+              <CardContent className="space-y-3 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                  <CreditCard className="h-4 w-4" />
+                  {t('registers.transfer')}
+                </div>
+                <div>
+                  <p className="text-3xl font-bold tabular-nums">
+                    {formatUZS(shift.transferTotal)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{t('registers.received')}</p>
+                </div>
+                {shift.transferByMethod.length > 0 ? (
+                  <div className="space-y-1 border-t pt-2 text-sm">
+                    {shift.transferByMethod.map((row) => (
+                      <div key={row.method} className="flex items-center justify-between gap-2">
+                        <span className="text-muted-foreground">
+                          {tb(`methods.${row.method}`)}
+                          <span className="ml-1 text-xs">({row.count})</span>
+                        </span>
+                        <span className="font-medium tabular-nums">
+                          {formatUZS(row.amount, { withCurrency: false })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="border-t pt-2 text-sm text-muted-foreground">
+                    {t('registers.noTransfer')}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      ) : (
+        <Card className="border-warning/40 bg-warning/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warning/15">
+                <Wallet className="h-5 w-5 text-warning-foreground dark:text-warning" />
               </div>
-              <div className="flex flex-wrap items-center gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">{t('shift.openingCash')}</p>
-                  <p className="font-semibold">{formatUZS(shift.openingCash)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">{t('shift.cashIn')}</p>
-                  <p className="font-semibold">{formatUZS(shift.cashIn)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">{t('shift.cashOut')}</p>
-                  <p className="font-semibold">{formatUZS(shift.cashOut)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">{t('shift.expected')}</p>
-                  <p className="font-semibold">{formatUZS(shift.expectedCashSoFar)}</p>
-                </div>
-                {canManage ? (
-                  <Button
-                    variant="destructive"
-                    onClick={() => {
-                      closeForm.reset({ actualCash: '', note: '' });
-                      setCloseDlg(true);
-                    }}
-                  >
-                    <Lock className="mr-1 h-4 w-4" />
-                    {t('shift.close')}
-                  </Button>
-                ) : null}
+              <div>
+                <p className="font-semibold">{t('shift.closedTitle')}</p>
+                <p className="text-sm text-muted-foreground">{t('shift.closedDesc')}</p>
               </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warning/15">
-                  <Wallet className="h-5 w-5 text-warning-foreground dark:text-warning" />
-                </div>
-                <div>
-                  <p className="font-semibold">{t('shift.closedTitle')}</p>
-                  <p className="text-sm text-muted-foreground">{t('shift.closedDesc')}</p>
-                </div>
-              </div>
-              {canManage ? (
-                <Button
-                  onClick={() => {
-                    openForm.reset({ openingCash: '0' });
-                    setOpenDlg(true);
-                  }}
-                >
-                  <LockOpen className="mr-1 h-4 w-4" />
-                  {t('shift.open')}
-                </Button>
-              ) : null}
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </div>
+            {canManage ? (
+              <Button
+                onClick={() => {
+                  openForm.reset({ openingCash: '0' });
+                  setOpenDlg(true);
+                }}
+              >
+                <LockOpen className="mr-1 h-4 w-4" />
+                {t('shift.open')}
+              </Button>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Open shift dialog */}
       <Dialog open={openDlg} onOpenChange={setOpenDlg}>

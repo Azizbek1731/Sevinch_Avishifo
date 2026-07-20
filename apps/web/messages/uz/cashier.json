@@ -61,5 +61,12 @@
     "note": "Izoh",
     "submit": "Depozit qo'shish",
     "success": "Depozit qabul qilindi. Yangi balans: {balance}"
+  },
+  "registers": {
+    "cash": "Naqd kassa",
+    "transfer": "O'tkazma kassa",
+    "inDrawer": "Kassada (kutilayotgan naqd)",
+    "received": "Smena davomida qabul qilindi",
+    "noTransfer": "Hozircha o'tkazma to'lovlar yo'q"
   }
 }

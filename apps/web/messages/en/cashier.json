@@ -61,5 +61,12 @@
     "note": "Note",
     "submit": "Add deposit",
     "success": "Deposit accepted. New balance: {balance}"
+  },
+  "registers": {
+    "cash": "Cash register",
+    "transfer": "Transfer register",
+    "inDrawer": "In drawer (expected cash)",
+    "received": "Received this shift",
+    "noTransfer": "No transfer payments yet"
   }
 }

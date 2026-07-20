@@ -108,6 +108,9 @@ export interface CurrentShift extends CashierShift {
   cashIn: MoneyString;
   cashOut: MoneyString;
   expectedCashSoFar: MoneyString;
+  /** Non-cash ("o'tkazma") total received during the shift, and its breakdown. */
+  transferTotal: MoneyString;
+  transferByMethod: Array<{ method: PaymentMethod; amount: MoneyString; count: number }>;
 }
 
 export interface ShiftHistoryItem extends CashierShift {
