@@ -8,6 +8,7 @@ import { LandingFeatures } from './components/landing-features';
 import { LandingHighlight } from './components/landing-highlight';
 import { LandingRoles } from './components/landing-roles';
 import { LandingBenefits } from './components/landing-benefits';
+import { LandingPricing } from './components/landing-pricing';
 import { LandingFinalCta } from './components/landing-final-cta';
 import { LandingFooter } from './components/landing-footer';
 
@@ -39,6 +40,7 @@ export function LandingPage() {
         <LandingHighlight />
         <LandingRoles />
         <LandingBenefits />
+        <LandingPricing />
         <LandingFinalCta />
       </main>
       <LandingFooter />

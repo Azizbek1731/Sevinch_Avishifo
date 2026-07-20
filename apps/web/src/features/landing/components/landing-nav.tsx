@@ -9,6 +9,7 @@ const NAV_LINKS: ReadonlyArray<{ href: string; key: string }> = [
   { href: '#features', key: 'nav.features' },
   { href: '#queue', key: 'nav.queue' },
   { href: '#why', key: 'nav.why' },
+  { href: '#pricing', key: 'nav.pricing' },
 ];
 
 /** Sticky, blurred top navigation with brand, section links, locale + primary CTA. */

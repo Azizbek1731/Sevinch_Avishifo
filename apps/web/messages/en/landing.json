@@ -8,7 +8,8 @@
     "queue": "Live queue",
     "why": "Why AviShifo",
     "login": "Sign in",
-    "language": "Language"
+    "language": "Language",
+    "pricing": "Pricing"
   },
   "hero": {
     "badge": "Cloud platform for clinics in Uzbekistan",
@@ -38,10 +39,22 @@
     }
   },
   "stats": {
-    "modules": { "value": "10+", "label": "modules" },
-    "languages": { "value": "4", "label": "languages" },
-    "realtime": { "value": "Real-time", "label": "live queue" },
-    "uptime": { "value": "24/7", "label": "in the cloud" }
+    "modules": {
+      "value": "10+",
+      "label": "modules"
+    },
+    "languages": {
+      "value": "4",
+      "label": "languages"
+    },
+    "realtime": {
+      "value": "Real-time",
+      "label": "live queue"
+    },
+    "uptime": {
+      "value": "24/7",
+      "label": "in the cloud"
+    }
   },
   "features": {
     "title": "Everything your clinic needs",
@@ -184,5 +197,52 @@
   },
   "cta": {
     "dashboard": "Go to dashboard"
+  },
+  "pricing": {
+    "title": "Choose the plan that fits",
+    "subtitle": "Sized to your clinic — change anytime",
+    "popular": "Popular",
+    "som": "UZS",
+    "perMonth": "mo",
+    "cta": "Get started",
+    "note": "All plans include a 14-day free trial. For large networks, contact us for a custom offer.",
+    "tiers": {
+      "starter": {
+        "name": "Starter",
+        "tagline": "For small clinics and single offices",
+        "features": [
+          "1 branch",
+          "Up to 10 staff",
+          "Live queue + TV screen",
+          "Patient card & EHR",
+          "Cashier & payments",
+          "Patient portal & online booking"
+        ]
+      },
+      "standard": {
+        "name": "Standard",
+        "tagline": "For growing clinics",
+        "features": [
+          "Up to 3 branches",
+          "Up to 30 staff",
+          "Everything in Starter",
+          "Laboratory module",
+          "SMS + Telegram notifications",
+          "Advanced reports"
+        ]
+      },
+      "pro": {
+        "name": "Pro",
+        "tagline": "For networks and large centers",
+        "features": [
+          "Up to 10 branches",
+          "Up to 100 staff",
+          "Everything in Standard",
+          "Full analytics dashboard",
+          "Priority support",
+          "Payme / Click / Uzum online payments"
+        ]
+      }
+    }
   }
 }

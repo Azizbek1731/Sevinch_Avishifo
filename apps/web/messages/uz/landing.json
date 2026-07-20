@@ -8,7 +8,8 @@
     "queue": "Jonli navbat",
     "why": "Nega AviShifo",
     "login": "Tizimga kirish",
-    "language": "Til"
+    "language": "Til",
+    "pricing": "Narxlar"
   },
   "hero": {
     "badge": "O'zbekiston klinikalari uchun bulutli platforma",
@@ -38,10 +39,22 @@
     }
   },
   "stats": {
-    "modules": { "value": "10+", "label": "modul" },
-    "languages": { "value": "4", "label": "til" },
-    "realtime": { "value": "Real-time", "label": "jonli navbat" },
-    "uptime": { "value": "24/7", "label": "bulutli ishlash" }
+    "modules": {
+      "value": "10+",
+      "label": "modul"
+    },
+    "languages": {
+      "value": "4",
+      "label": "til"
+    },
+    "realtime": {
+      "value": "Real-time",
+      "label": "jonli navbat"
+    },
+    "uptime": {
+      "value": "24/7",
+      "label": "bulutli ishlash"
+    }
   },
   "features": {
     "title": "Klinika uchun kerakli hamma narsa",
@@ -184,5 +197,52 @@
   },
   "cta": {
     "dashboard": "Boshqaruv paneliga o'tish"
+  },
+  "pricing": {
+    "title": "Sizga mos tarifni tanlang",
+    "subtitle": "Klinikangiz o'lchamiga qarab — istalgan vaqt o'zgartirasiz",
+    "popular": "Ommabop",
+    "som": "so'm",
+    "perMonth": "oy",
+    "cta": "Boshlash",
+    "note": "Barcha tariflar 14 kunlik bepul sinov bilan. Katta tarmoq uchun individual taklif — biz bilan bog'laning.",
+    "tiers": {
+      "starter": {
+        "name": "Starter",
+        "tagline": "Kichik klinika va kabinetlar uchun",
+        "features": [
+          "1 filial",
+          "10 tagacha xodim",
+          "Jonli navbat + TV ekran",
+          "Bemor kartasi va EHR",
+          "Kassa va to'lovlar",
+          "Bemor portali va onlayn yozilish"
+        ]
+      },
+      "standard": {
+        "name": "Standard",
+        "tagline": "O'sib borayotgan klinikalar uchun",
+        "features": [
+          "3 filialgacha",
+          "30 tagacha xodim",
+          "Starter'dagi barcha imkoniyatlar",
+          "Laboratoriya moduli",
+          "SMS + Telegram bildirishnomalar",
+          "Kengaytirilgan hisobotlar"
+        ]
+      },
+      "pro": {
+        "name": "Pro",
+        "tagline": "Tarmoqlar va yirik markazlar uchun",
+        "features": [
+          "10 filialgacha",
+          "100 tagacha xodim",
+          "Standard'dagi barcha imkoniyatlar",
+          "To'liq analitika paneli",
+          "Ustuvor qo'llab-quvvatlash",
+          "Payme / Click / Uzum onlayn to'lovlar"
+        ]
+      }
+    }
   }
 }
