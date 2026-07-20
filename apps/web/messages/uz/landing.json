@@ -1,0 +1,188 @@
+{
+  "meta": {
+    "title": "AviShifo — Klinikalar uchun zamonaviy CRM va HIS",
+    "description": "O'zbekistondagi xususiy klinikalar uchun ko'p filialli bulutli boshqaruv tizimi: jonli navbat, bemor kartasi, kassa, laboratoriya, SMS va Telegram bildirishnomalari."
+  },
+  "nav": {
+    "features": "Imkoniyatlar",
+    "queue": "Jonli navbat",
+    "why": "Nega AviShifo",
+    "login": "Tizimga kirish",
+    "language": "Til"
+  },
+  "hero": {
+    "badge": "O'zbekiston klinikalari uchun bulutli platforma",
+    "title": "Klinikangizni <hl>bitta tizimda</hl> boshqaring",
+    "subtitle": "Jonli navbatdan tortib bemor kartasi, kassa va analitikagacha — AviShifo xususiy klinikalar uchun to'liq bulutli boshqaruv platformasi.",
+    "ctaPrimary": "Bepul boshlash",
+    "ctaSecondary": "Imkoniyatlar",
+    "trust": {
+      "multiBranch": "Ko'p filialli",
+      "realtime": "Real-time navbat",
+      "messaging": "SMS + Telegram",
+      "payments": "Payme / Click / Uzum"
+    },
+    "preview": {
+      "title": "Jonli navbat",
+      "branch": "Chilonzor filiali",
+      "live": "Jonli",
+      "nowServing": "Hozir qabulda",
+      "waiting": "Kutayotganlar",
+      "room": "{n}-xona",
+      "doctorCardio": "Kardiolog",
+      "doctorTherapist": "Terapevt",
+      "statWaiting": "Kutayotgan",
+      "statAvgWait": "O'rtacha kutish",
+      "minutes": "daq",
+      "toast": "To'lov qabul qilindi"
+    }
+  },
+  "stats": {
+    "modules": { "value": "10+", "label": "modul" },
+    "languages": { "value": "4", "label": "til" },
+    "realtime": { "value": "Real-time", "label": "jonli navbat" },
+    "uptime": { "value": "24/7", "label": "bulutli ishlash" }
+  },
+  "features": {
+    "title": "Klinika uchun kerakli hamma narsa",
+    "subtitle": "Qabuldan to'lovgacha bo'lgan har bir jarayon uchun yagona tizim.",
+    "items": {
+      "queue": {
+        "title": "Jonli navbat",
+        "desc": "WebSocket asosidagi real-time navbat va kutish zali uchun TV ekran."
+      },
+      "ehr": {
+        "title": "Bemor kartasi va EHR",
+        "desc": "SOAP tuzilmasi, ICD-10 tashxislar, retseptlar va to'liq tibbiy tarix."
+      },
+      "appointments": {
+        "title": "Qabullar va kalendar",
+        "desc": "Shifokorlar jadvali, onlayn yozilish va avtomatik eslatmalar."
+      },
+      "cashier": {
+        "title": "Kassa va to'lovlar",
+        "desc": "Payme, Click, Uzum, naqd va terminal; kassir smenalari va hisob-kitob."
+      },
+      "lab": {
+        "title": "Laboratoriya",
+        "desc": "Tahlil buyurtmalari, natijalar va me'yordan chetlanishlarni avtomatik belgilash."
+      },
+      "notifications": {
+        "title": "SMS va Telegram",
+        "desc": "Eskiz.uz SMS va Telegram bot orqali eslatma hamda bildirishnomalar."
+      },
+      "analytics": {
+        "title": "Analitika va hisobotlar",
+        "desc": "Daromad, bemor oqimi va shifokor samaradorligi bo'yicha jonli hisobotlar."
+      },
+      "portal": {
+        "title": "Bemor portali",
+        "desc": "Onlayn yozilish, natijalar va tibbiy tarixga bemor uchun qulay kirish."
+      }
+    }
+  },
+  "highlight": {
+    "badge": "Asosiy modul",
+    "title": "Jonli navbat va TV ekran",
+    "subtitle": "Sahifani yangilamasdan ishlaydigan real-time navbat. Kutish zalidagi TV ekranlar bemorlarni ovozli e'lon bilan chaqiradi.",
+    "points": {
+      "zeroRefresh": {
+        "title": "Nol yangilanish",
+        "desc": "Navbat WebSocket orqali bir zumda yangilanadi — sahifani qayta yuklash shart emas."
+      },
+      "tv": {
+        "title": "Kutish zali ekrani",
+        "desc": "Katta raqamlar, xona nomeri va klinika brendi bilan to'liq ekranli displey."
+      },
+      "voice": {
+        "title": "Ovozli e'lon",
+        "desc": "«Bemor A-013, 5-xonaga marhamat» — o'zbek va rus tilida avtomatik chaqiruv."
+      },
+      "priority": {
+        "title": "Ustuvorlik va o'tkazish",
+        "desc": "Navbatsiz bemorlar, shifokorlar o'rtasida o'tkazish va qayta chaqirish."
+      }
+    },
+    "preview": {
+      "screen": "TV EKRAN",
+      "nowServing": "HOZIR QABULDA",
+      "next": "Keyingi",
+      "announce": "Bemor A-013, 5-xonaga marhamat"
+    }
+  },
+  "roles": {
+    "title": "Har bir rol uchun alohida ish o'rni",
+    "subtitle": "AviShifo klinikangizdagi har bir xodim uchun moslashtirilgan.",
+    "items": {
+      "director": {
+        "title": "Direktor",
+        "desc": "Umumiy analitika, daromad va filiallar nazorati."
+      },
+      "doctor": {
+        "title": "Shifokor",
+        "desc": "Navbat, qabul, tashxis va retseptlar."
+      },
+      "reception": {
+        "title": "Qabulxona",
+        "desc": "Ro'yxatga olish, yozilish va navbat boshqaruvi."
+      },
+      "cashier": {
+        "title": "Kassir",
+        "desc": "To'lovlar, smenalar va qarzlar nazorati."
+      },
+      "lab": {
+        "title": "Laborant",
+        "desc": "Tahlil buyurtmalari va natijalarni kiritish."
+      }
+    }
+  },
+  "benefits": {
+    "title": "Nega aynan AviShifo?",
+    "subtitle": "O'zbekiston klinikalari uchun maxsus qurilgan zamonaviy platforma.",
+    "items": {
+      "security": {
+        "title": "Xavfsizlik va izolyatsiya",
+        "desc": "Har bir klinika ma'lumotlari to'liq ajratilgan — tenant izolyatsiyasi bilan himoyalangan."
+      },
+      "local": {
+        "title": "O'zbekiston uchun",
+        "desc": "UZS valyutasi, +998 raqamlar va Asia/Tashkent vaqt mintaqasiga moslangan."
+      },
+      "fast": {
+        "title": "Tez ishga tushirish",
+        "desc": "Bulutli yechim — o'rnatish shart emas, bir necha daqiqada ishni boshlang."
+      },
+      "multilang": {
+        "title": "Ko'p tillilik",
+        "desc": "O'zbek (lotin va kirill), rus hamda ingliz tillari — xodim va bemor uchun qulay."
+      }
+    }
+  },
+  "finalCta": {
+    "title": "Klinikangizni raqamlashtiring",
+    "subtitle": "Bugun AviShifo bilan boshlang — qog'oz navbatlar va tarqoq jadvallarni unuting.",
+    "button": "Bepul boshlash",
+    "note": "Kredit karta talab qilinmaydi"
+  },
+  "footer": {
+    "tagline": "Xususiy klinikalar uchun zamonaviy boshqaruv platformasi.",
+    "productTitle": "Mahsulot",
+    "companyTitle": "Kompaniya",
+    "legalTitle": "Huquqiy",
+    "links": {
+      "features": "Imkoniyatlar",
+      "queue": "Jonli navbat",
+      "pricing": "Narxlar",
+      "login": "Tizimga kirish",
+      "about": "Biz haqimizda",
+      "contact": "Aloqa",
+      "docs": "Hujjatlar",
+      "privacy": "Maxfiylik siyosati",
+      "terms": "Foydalanish shartlari"
+    },
+    "rights": "© 2026 AviShifo. Barcha huquqlar himoyalangan."
+  },
+  "cta": {
+    "dashboard": "Boshqaruv paneliga o'tish"
+  }
+}

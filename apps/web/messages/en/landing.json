@@ -1,0 +1,188 @@
+{
+  "meta": {
+    "title": "AviShifo — modern CRM and HIS for clinics",
+    "description": "A cloud, multi-branch management system for private clinics in Uzbekistan: live queue, patient records, cashier, laboratory, SMS and Telegram notifications."
+  },
+  "nav": {
+    "features": "Features",
+    "queue": "Live queue",
+    "why": "Why AviShifo",
+    "login": "Sign in",
+    "language": "Language"
+  },
+  "hero": {
+    "badge": "Cloud platform for clinics in Uzbekistan",
+    "title": "Run your clinic <hl>in one system</hl>",
+    "subtitle": "From the live queue to patient records, cashier and analytics — AviShifo is a complete cloud management platform for private clinics.",
+    "ctaPrimary": "Start free",
+    "ctaSecondary": "Features",
+    "trust": {
+      "multiBranch": "Multi-branch",
+      "realtime": "Real-time queue",
+      "messaging": "SMS + Telegram",
+      "payments": "Payme / Click / Uzum"
+    },
+    "preview": {
+      "title": "Live queue",
+      "branch": "Chilonzor branch",
+      "live": "Live",
+      "nowServing": "Now serving",
+      "waiting": "Waiting",
+      "room": "Room {n}",
+      "doctorCardio": "Cardiologist",
+      "doctorTherapist": "Therapist",
+      "statWaiting": "Waiting",
+      "statAvgWait": "Avg. wait",
+      "minutes": "min",
+      "toast": "Payment received"
+    }
+  },
+  "stats": {
+    "modules": { "value": "10+", "label": "modules" },
+    "languages": { "value": "4", "label": "languages" },
+    "realtime": { "value": "Real-time", "label": "live queue" },
+    "uptime": { "value": "24/7", "label": "in the cloud" }
+  },
+  "features": {
+    "title": "Everything your clinic needs",
+    "subtitle": "One system for every process — from check-in to payment.",
+    "items": {
+      "queue": {
+        "title": "Live queue",
+        "desc": "Real-time queue over WebSocket and a TV screen for the waiting room."
+      },
+      "ehr": {
+        "title": "Patient records & EHR",
+        "desc": "SOAP structure, ICD-10 diagnoses, prescriptions and full medical history."
+      },
+      "appointments": {
+        "title": "Appointments & calendar",
+        "desc": "Doctor schedules, online booking and automatic reminders."
+      },
+      "cashier": {
+        "title": "Cashier & payments",
+        "desc": "Payme, Click, Uzum, cash and terminal; cashier shifts and reconciliation."
+      },
+      "lab": {
+        "title": "Laboratory",
+        "desc": "Test orders, results and automatic flagging of out-of-range values."
+      },
+      "notifications": {
+        "title": "SMS & Telegram",
+        "desc": "Reminders and notifications via Eskiz.uz SMS and a Telegram bot."
+      },
+      "analytics": {
+        "title": "Analytics & reports",
+        "desc": "Live reports on revenue, patient flow and doctor performance."
+      },
+      "portal": {
+        "title": "Patient portal",
+        "desc": "Online booking, results and easy patient access to medical history."
+      }
+    }
+  },
+  "highlight": {
+    "badge": "Flagship module",
+    "title": "Live queue & TV display",
+    "subtitle": "A real-time queue that works with zero page refresh. Waiting-room TV screens call patients with a voice announcement.",
+    "points": {
+      "zeroRefresh": {
+        "title": "Zero refresh",
+        "desc": "The queue updates instantly over WebSocket — no need to reload the page."
+      },
+      "tv": {
+        "title": "Waiting-room screen",
+        "desc": "A fullscreen display with large numbers, room and your clinic branding."
+      },
+      "voice": {
+        "title": "Voice announcement",
+        "desc": "\"Patient A-013, please go to room 5\" — auto-call in Uzbek and Russian."
+      },
+      "priority": {
+        "title": "Priority & transfer",
+        "desc": "Priority patients, transfer between doctors and re-calling skipped ones."
+      }
+    },
+    "preview": {
+      "screen": "TV DISPLAY",
+      "nowServing": "NOW SERVING",
+      "next": "Next",
+      "announce": "Patient A-013, please go to room 5"
+    }
+  },
+  "roles": {
+    "title": "A dedicated workspace for every role",
+    "subtitle": "AviShifo is tailored to every member of your clinic team.",
+    "items": {
+      "director": {
+        "title": "Director",
+        "desc": "Overall analytics, revenue and multi-branch oversight."
+      },
+      "doctor": {
+        "title": "Doctor",
+        "desc": "Queue, visits, diagnoses and prescriptions."
+      },
+      "reception": {
+        "title": "Reception",
+        "desc": "Registration, booking and queue control."
+      },
+      "cashier": {
+        "title": "Cashier",
+        "desc": "Payments, shifts and debt tracking."
+      },
+      "lab": {
+        "title": "Lab technician",
+        "desc": "Test orders and result entry."
+      }
+    }
+  },
+  "benefits": {
+    "title": "Why AviShifo?",
+    "subtitle": "A modern platform built specifically for clinics in Uzbekistan.",
+    "items": {
+      "security": {
+        "title": "Security & isolation",
+        "desc": "Every clinic's data is fully separated and protected by tenant isolation."
+      },
+      "local": {
+        "title": "Built for Uzbekistan",
+        "desc": "Localized for the som (UZS), +998 numbers and the Asia/Tashkent time zone."
+      },
+      "fast": {
+        "title": "Fast to launch",
+        "desc": "A cloud solution — no installation, get started in a few minutes."
+      },
+      "multilang": {
+        "title": "Multilingual",
+        "desc": "Uzbek (Latin and Cyrillic), Russian and English — convenient for everyone."
+      }
+    }
+  },
+  "finalCta": {
+    "title": "Digitize your clinic",
+    "subtitle": "Get started with AviShifo today — leave paper queues and scattered schedules behind.",
+    "button": "Start free",
+    "note": "No credit card required"
+  },
+  "footer": {
+    "tagline": "A modern management platform for private clinics.",
+    "productTitle": "Product",
+    "companyTitle": "Company",
+    "legalTitle": "Legal",
+    "links": {
+      "features": "Features",
+      "queue": "Live queue",
+      "pricing": "Pricing",
+      "login": "Sign in",
+      "about": "About us",
+      "contact": "Contact",
+      "docs": "Documentation",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Use"
+    },
+    "rights": "© 2026 AviShifo. All rights reserved."
+  },
+  "cta": {
+    "dashboard": "Go to dashboard"
+  }
+}

@@ -27,7 +27,31 @@ export const MESSAGE_NAMESPACES = [
   'audit',
   'superadmin',
   'statuses',
+  'landing',
 ] as const;
+
+/**
+ * Load one namespace for a locale, falling back to the default locale when that
+ * locale has not been translated yet (e.g. an auto-generated `uz-Cyrl/<ns>.json`
+ * that is added later). This keeps every locale renderable instead of crashing on
+ * a missing message file.
+ */
+async function loadNamespace(
+  locale: AppLocale,
+  ns: (typeof MESSAGE_NAMESPACES)[number],
+): Promise<Record<string, unknown>> {
+  try {
+    const mod = (await import(`../../messages/${locale}/${ns}.json`)) as {
+      default: Record<string, unknown>;
+    };
+    return mod.default;
+  } catch {
+    const fallback = (await import(`../../messages/${routing.defaultLocale}/${ns}.json`)) as {
+      default: Record<string, unknown>;
+    };
+    return fallback.default;
+  }
+}
 
 export default getRequestConfig(async ({ requestLocale }) => {
   const requested = await requestLocale;
@@ -36,12 +60,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
     : routing.defaultLocale;
 
   const entries = await Promise.all(
-    MESSAGE_NAMESPACES.map(async (ns) => {
-      const mod = (await import(`../../messages/${locale}/${ns}.json`)) as {
-        default: Record<string, unknown>;
-      };
-      return [ns, mod.default] as const;
-    }),
+    MESSAGE_NAMESPACES.map(async (ns) => [ns, await loadNamespace(locale, ns)] as const),
   );
 
   return {
