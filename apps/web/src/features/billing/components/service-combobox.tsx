@@ -53,7 +53,7 @@ export function ServiceCombobox({ value, onChange, className }: ServiceComboboxP
           aria-expanded={open}
           className={cn('w-full justify-between font-normal', className)}
         >
-          <span className={cn('truncate', !value && 'text-muted-foreground')}>
+          <span className={cn('min-w-0 truncate', !value && 'text-muted-foreground')}>
             {value ? serviceName(value, locale) : t('select')}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

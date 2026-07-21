@@ -127,9 +127,9 @@ export function NewInvoiceDialog({ open, onOpenChange }: NewInvoiceDialogProps) 
                 return (
                   <div
                     key={field.id}
-                    className="grid grid-cols-2 items-end gap-2 rounded-md border p-3 md:grid-cols-[1fr_80px_140px_140px_120px_36px]"
+                    className="grid grid-cols-2 items-end gap-2 rounded-md border p-3 md:grid-cols-[minmax(0,1fr)_80px_140px_140px_120px_36px]"
                   >
-                    <div className="col-span-2 space-y-1 md:col-span-1">
+                    <div className="col-span-2 min-w-0 space-y-1 md:col-span-1">
                       <span className="text-xs text-muted-foreground">{t('form.service')}</span>
                       <ServiceCombobox
                         value={rowServices[field.id] ?? null}
