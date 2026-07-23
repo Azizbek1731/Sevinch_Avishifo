@@ -4,27 +4,38 @@ import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useTranslations } from 'next-intl';
-import { Wallet } from 'lucide-react';
+import { Plus, Wallet } from 'lucide-react';
 import { formatUZS } from '@avishifo/shared';
 import { useSocketEvent } from '@/hooks/use-socket';
 import { DataTable } from '@/components/data-table';
 import { StatusBadge } from '@/components/status-badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { NewInvoiceDialog } from '@/features/billing/components/new-invoice-dialog';
+import type { PatientBrief } from '@/features/billing/api';
 import { cn } from '@/lib/utils';
 import { formatTz } from '@/lib/dates';
 import type { BalanceTransaction, PatientInvoice } from '../api';
 import { usePatientBalance, usePatientInvoices, usePermissions } from '../hooks';
 
-export function PatientInvoicesTab({ patientId }: { patientId: string }) {
+export interface PatientInvoicesTabProps {
+  patientId: string;
+  /** Brief patient identity used to lock a new invoice to this patient. */
+  patient: PatientBrief;
+}
+
+export function PatientInvoicesTab({ patientId, patient }: PatientInvoicesTabProps) {
   const t = useTranslations('patients');
   const can = usePermissions();
   const queryClient = useQueryClient();
 
   const canInvoices = can('invoices.read');
   const canBalance = can('payments.create');
+  const canCreate = can('invoices.write');
 
   const [invoicePage, setInvoicePage] = useState(1);
   const [txPage, setTxPage] = useState(1);
+  const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
 
   const invoices = usePatientInvoices(patientId, invoicePage, canInvoices);
   const balance = usePatientBalance(patientId, txPage, canBalance);
@@ -136,6 +147,19 @@ export function PatientInvoicesTab({ patientId }: { patientId: string }) {
 
   return (
     <div className="space-y-6">
+      {canCreate ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed p-3">
+          <div>
+            <p className="text-sm font-medium">{t('invoices.addServicesTitle')}</p>
+            <p className="text-xs text-muted-foreground">{t('invoices.addServicesHint')}</p>
+          </div>
+          <Button size="sm" onClick={() => setNewInvoiceOpen(true)}>
+            <Plus className="mr-1 h-4 w-4" />
+            {t('invoices.addServices')}
+          </Button>
+        </div>
+      ) : null}
+
       {canInvoices ? (
         <div className="space-y-2">
           <h3 className="text-base font-semibold">{t('invoices.title')}</h3>
@@ -189,6 +213,14 @@ export function PatientInvoicesTab({ patientId }: { patientId: string }) {
             />
           </CardContent>
         </Card>
+      ) : null}
+
+      {canCreate ? (
+        <NewInvoiceDialog
+          open={newInvoiceOpen}
+          onOpenChange={setNewInvoiceOpen}
+          lockedPatient={patient}
+        />
       ) : null}
     </div>
   );

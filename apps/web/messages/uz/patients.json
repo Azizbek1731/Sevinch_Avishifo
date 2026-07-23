@@ -199,7 +199,10 @@
     "paid": "To'langan",
     "due": "Qoldiq",
     "status": "Holat",
-    "empty": "Hisob-fakturalar yo'q"
+    "empty": "Hisob-fakturalar yo'q",
+    "addServices": "Xizmat qo'shish",
+    "addServicesTitle": "Statsionar / bir nechta xizmat",
+    "addServicesHint": "Bir nechta xizmatni belgilab, bitta chek chiqaring"
   },
   "invoiceStatus": {
     "DRAFT": "Qoralama",

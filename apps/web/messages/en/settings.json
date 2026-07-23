@@ -6,7 +6,8 @@
     "branches": "Branches",
     "users": "Staff",
     "templates": "Templates",
-    "logs": "SMS log"
+    "logs": "SMS log",
+    "receipt": "Receipt"
   },
   "form": {
     "required": "Required field",
@@ -200,5 +201,41 @@
       "feedback": "Feedback",
       "audit": "Audit"
     }
+  },
+  "receipt": {
+    "title": "Receipt layout",
+    "desc": "Receipt template: paper width, font size and visible fields",
+    "logo": "Logo",
+    "logoHint": "Clinic logo shown at the top of the receipt (PNG, JPG or SVG)",
+    "uploadLogo": "Upload logo",
+    "removeLogo": "Remove",
+    "logoTooLarge": "Image too large — pick a smaller file",
+    "logoInvalid": "Could not read the image",
+    "paperWidth": "Paper width",
+    "paper58": "58 mm",
+    "paper80": "80 mm",
+    "fontScale": "Font size",
+    "fontSm": "Small",
+    "fontMd": "Medium",
+    "fontLg": "Large",
+    "headerText": "Header text",
+    "headerHint": "Extra line under the clinic name (slogan, licence no...)",
+    "footerText": "Footer text",
+    "footerHint": "Text at the bottom of the receipt (e.g. Thank you!)",
+    "showLogo": "Show logo",
+    "showBranch": "Show branch details",
+    "showTaxId": "Show tax ID",
+    "showCashier": "Show cashier",
+    "showPatientMrn": "Show patient code (MRN)",
+    "preview": "Preview",
+    "previewBranch": "Main branch",
+    "taxIdShort": "TIN",
+    "receiptNoShort": "Receipt #",
+    "patientShort": "Patient",
+    "cashierShort": "Cashier",
+    "previewService1": "Cardiologist visit",
+    "previewService2": "ECG test",
+    "totalShort": "TOTAL",
+    "thanksDefault": "Thank you for your visit!"
   }
 }

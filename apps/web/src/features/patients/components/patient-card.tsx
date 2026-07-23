@@ -183,9 +183,17 @@ export function PatientCardView({ patientId }: { patientId: string }) {
         <TabsContent value="documents" className="mt-4">
           <PatientDocumentsTab patientId={patient.id} />
         </TabsContent>
-        {can('invoices.read') || can('payments.create') ? (
+        {can('invoices.read') || can('invoices.write') || can('payments.create') ? (
           <TabsContent value="invoices" className="mt-4">
-            <PatientInvoicesTab patientId={patient.id} />
+            <PatientInvoicesTab
+              patientId={patient.id}
+              patient={{
+                id: patient.id,
+                mrn: patient.mrn,
+                fullName: patient.fullName,
+                phone: patient.phone,
+              }}
+            />
           </TabsContent>
         ) : null}
       </Tabs>

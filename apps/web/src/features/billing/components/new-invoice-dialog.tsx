@@ -47,23 +47,28 @@ function lineTotalTiyin(quantity: number, unitPrice: string, discount: string): 
 export interface NewInvoiceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * When set, the invoice is locked to this patient (used from the patient card
+   * for e.g. inpatient / statsionar billing) — the patient picker is hidden.
+   */
+  lockedPatient?: PatientBrief;
 }
 
-export function NewInvoiceDialog({ open, onOpenChange }: NewInvoiceDialogProps) {
+export function NewInvoiceDialog({ open, onOpenChange, lockedPatient }: NewInvoiceDialogProps) {
   const t = useTranslations('billing');
   const errorToast = useApiErrorToast();
   const router = useRouter();
   const queryClient = useQueryClient();
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
 
-  const [patient, setPatient] = useState<PatientBrief | null>(null);
+  const [patient, setPatient] = useState<PatientBrief | null>(lockedPatient ?? null);
   /** Selected service per field-array row, keyed by RHF field id. */
   const [rowServices, setRowServices] = useState<Record<string, ServiceOption | null>>({});
 
   const form = useForm<CreateInvoiceInput>({
     resolver: zodResolver(createInvoiceSchema),
     defaultValues: {
-      patientId: '',
+      patientId: lockedPatient?.id ?? '',
       branchId: activeBranchId ?? '',
       lines: [{ ...EMPTY_LINE }],
     },
@@ -72,11 +77,15 @@ export function NewInvoiceDialog({ open, onOpenChange }: NewInvoiceDialogProps) 
 
   useEffect(() => {
     if (open) {
-      setPatient(null);
+      setPatient(lockedPatient ?? null);
       setRowServices({});
-      form.reset({ patientId: '', branchId: activeBranchId ?? '', lines: [{ ...EMPTY_LINE }] });
+      form.reset({
+        patientId: lockedPatient?.id ?? '',
+        branchId: activeBranchId ?? '',
+        lines: [{ ...EMPTY_LINE }],
+      });
     }
-  }, [open, activeBranchId]);
+  }, [open, activeBranchId, lockedPatient]);
 
   const mutation = useMutation({
     mutationFn: (values: CreateInvoiceInput) => billingApi.createInvoice(values),
@@ -106,13 +115,20 @@ export function NewInvoiceDialog({ open, onOpenChange }: NewInvoiceDialogProps) 
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <div className="space-y-2">
             <Label>{t('form.patient')}</Label>
-            <PatientCombobox
-              value={patient}
-              onChange={(p) => {
-                setPatient(p);
-                form.setValue('patientId', p?.id ?? '', { shouldValidate: true });
-              }}
-            />
+            {lockedPatient ? (
+              <div className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                <span className="font-medium">{lockedPatient.fullName}</span>
+                <span className="font-mono text-xs text-muted-foreground">{lockedPatient.mrn}</span>
+              </div>
+            ) : (
+              <PatientCombobox
+                value={patient}
+                onChange={(p) => {
+                  setPatient(p);
+                  form.setValue('patientId', p?.id ?? '', { shouldValidate: true });
+                }}
+              />
+            )}
             {form.formState.errors.patientId ? (
               <p className="text-sm text-destructive">{t('form.patientRequired')}</p>
             ) : null}

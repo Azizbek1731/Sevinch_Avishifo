@@ -138,6 +138,8 @@ export class ClinicsService {
         name: dto.name,
         legalName: dto.legalName,
         taxId: dto.taxId,
+        // Empty string explicitly clears the logo; undefined leaves it untouched.
+        logoUrl: dto.logoUrl === undefined ? undefined : dto.logoUrl === '' ? null : dto.logoUrl,
         phone: dto.phone,
         email: dto.email,
         address: dto.address,
@@ -220,6 +222,8 @@ export class ClinicsService {
       name: clinic.name,
       legalName: clinic.legalName,
       taxId: clinic.taxId,
+      // Log only whether a logo is set — the data URI itself can be large.
+      hasLogo: Boolean(clinic.logoUrl),
       phone: clinic.phone,
       email: clinic.email,
       address: clinic.address,
