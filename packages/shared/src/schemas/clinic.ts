@@ -18,6 +18,9 @@ export const logoUrlSchema = z
     { message: 'logoUrl must be an http(s) URL or a data:image URI' },
   );
 
+/** Treat '' / null as "not provided" so an empty <Select> never blocks a save. */
+const blankToUndefined = (v: unknown): unknown => (v === '' || v === null ? undefined : v);
+
 export const updateClinicSchema = z.object({
   name: z.string().min(1).optional(),
   legalName: z.string().min(1).optional(),
@@ -26,7 +29,7 @@ export const updateClinicSchema = z.object({
   phone: phoneSchema.optional(),
   email: z.string().email().optional(),
   address: z.string().min(1).optional(),
-  defaultLocale: z.nativeEnum(Locale).optional(),
+  defaultLocale: z.preprocess(blankToUndefined, z.nativeEnum(Locale).optional()),
   smsSenderName: z.string().min(1).optional(),
 });
 export type UpdateClinicInput = z.infer<typeof updateClinicSchema>;
@@ -58,7 +61,7 @@ export const clinicSettingsSchema = z.object({
   invoiceNumberFormat: z.string().min(1).optional(),
   vatRate: z.number().min(0).max(100).optional(),
   visitLockHours: z.number().int().min(0).optional(),
-  doctorPatientAccess: z.enum(['own', 'branch']).optional(),
+  doctorPatientAccess: z.preprocess(blankToUndefined, z.enum(['own', 'branch']).optional()),
   queueAutoRecallPosition: z.number().int().min(0).optional(),
   receipt: receiptSettingsSchema.optional(),
 });

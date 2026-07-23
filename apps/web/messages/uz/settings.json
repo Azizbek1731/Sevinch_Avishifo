@@ -52,7 +52,8 @@
     "accessBranch": "Filialdagi barcha bemorlar",
     "queueAutoRecallPosition": "Navbatda avto qayta chaqirish pozitsiyasi",
     "recallHint": "O'tkazib yuborilgan bemorni shu pozitsiyadan keyin qayta chaqirish",
-    "saved": "Sozlamalar saqlandi"
+    "saved": "Sozlamalar saqlandi",
+    "saveInvalid": "Ba'zi maydonlar to'g'ri to'ldirilmagan — tekshiring"
   },
   "branches": {
     "add": "Filial qo'shish",

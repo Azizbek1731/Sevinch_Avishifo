@@ -52,7 +52,8 @@
     "accessBranch": "All patients in branch",
     "queueAutoRecallPosition": "Queue auto-recall position",
     "recallHint": "A skipped patient is recalled after this position",
-    "saved": "Settings saved"
+    "saved": "Settings saved",
+    "saveInvalid": "Some fields are invalid — please check"
   },
   "branches": {
     "add": "Add branch",

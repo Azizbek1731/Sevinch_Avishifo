@@ -95,7 +95,9 @@ function ClinicProfileForm() {
     );
   }
 
-  const defaultLocale = form.watch('defaultLocale');
+  // Fall back to the loaded clinic's locale so the picker shows the current
+  // value even before the form field binds — an unset value must not block save.
+  const defaultLocale = form.watch('defaultLocale') ?? clinic?.defaultLocale;
 
   return (
     <Card>
@@ -122,7 +124,10 @@ function ClinicProfileForm() {
       <CardContent>
         <form
           className="grid gap-4 sm:grid-cols-2"
-          onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
+          onSubmit={form.handleSubmit(
+            (values) => mutation.mutate(values),
+            () => toast.error(t('clinic.saveInvalid')),
+          )}
           noValidate
         >
           <div className="space-y-2">
@@ -276,7 +281,7 @@ function ClinicSettingsForm() {
     );
   }
 
-  const doctorPatientAccess = form.watch('doctorPatientAccess');
+  const doctorPatientAccess = form.watch('doctorPatientAccess') ?? settings?.doctorPatientAccess;
 
   return (
     <Card>
@@ -287,7 +292,10 @@ function ClinicSettingsForm() {
       <CardContent>
         <form
           className="grid gap-4 sm:grid-cols-2"
-          onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
+          onSubmit={form.handleSubmit(
+            (values) => mutation.mutate(values),
+            () => toast.error(t('clinic.saveInvalid')),
+          )}
           noValidate
         >
           <div className="space-y-2">
