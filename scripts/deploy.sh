@@ -39,7 +39,12 @@ if [ "${1:-}" = "--migrate" ]; then
 fi
 
 echo "==> [3/4] clean build (rm dist/.next → no stale bundles) — a few minutes"
+# NEXT_PUBLIC_* are inlined at BUILD time and Next.js only reads env files inside
+# apps/<app>/, never the repo-root .env — so the root .env must be sourced into
+# the build shell or settings like NEXT_PUBLIC_DEMO_LOGINS silently keep their
+# defaults no matter what the server's .env says.
 run_ssh "cd ${REMOTE_DIR} && export NODE_OPTIONS=--max-old-space-size=1536 && \
+  set -a && [ -f .env ] && . ./.env; set +a && \
   rm -rf apps/*/dist apps/*/.next apps/*/*.tsbuildinfo packages/*/dist packages/*/*.tsbuildinfo && \
   for pkg in shared api web display portal; do \
     echo \"  building \$pkg...\"; pnpm --filter @avishifo/\$pkg build >/dev/null 2>&1 || { echo \"BUILD FAILED: \$pkg\"; exit 1; }; \
