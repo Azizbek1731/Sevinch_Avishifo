@@ -416,6 +416,11 @@ model User {
   permissionOverrides Json @default("{}")
   /// For PATIENT-role users: link to the patient card
   patientId    String?    @unique
+  /// Telegram binding for STAFF and SUPER_ADMIN (patients bind via PortalAccount
+  /// / TelegramLink instead). One chat serves at most one staff identity.
+  telegramChatId   String?   @unique
+  telegramUsername String?
+  telegramLinkedAt DateTime? @db.Timestamptz(6)
   failedLoginCount Int    @default(0)
   lockedUntil  DateTime?  @db.Timestamptz(6)
   createdAt    DateTime   @default(now()) @db.Timestamptz(6)

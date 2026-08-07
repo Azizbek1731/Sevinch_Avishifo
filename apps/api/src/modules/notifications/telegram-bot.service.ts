@@ -1,7 +1,13 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { Bot, InputFile, Keyboard, type Context } from 'grammy';
 import { formatInTimeZone } from 'date-fns-tz';
-import { AuditAction, formatTicketNumber, normalizePhone, TIMEZONE } from '@avishifo/shared';
+import {
+  AuditAction,
+  formatTicketNumber,
+  formatUZS,
+  normalizePhone,
+  TIMEZONE,
+} from '@avishifo/shared';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
@@ -9,14 +15,46 @@ import { AuditService } from '../../core/audit/audit.service';
 import { StorageService } from '../../core/storage/storage.service';
 import { NotificationsService } from './notifications.service';
 
-const MAIN_KEYBOARD = new Keyboard()
-  .text('📅 Qabullarim')
-  .text('🕐 Navbatim')
-  .row()
-  .text('🧪 Tahlillarim')
-  .text('📄 Hujjatlarim')
+/** Buttons a linked patient sees. */
+const PATIENT_BUTTONS = ['📅 Qabullarim', '🕐 Navbatim', '🧪 Tahlillarim', '📄 Hujjatlarim'];
+/** Buttons a clinic owner/admin sees. */
+const STAFF_BUTTONS = ['📊 Bugungi holat', '👥 Navbat holati'];
+/** Buttons the platform super-admin sees. */
+const PLATFORM_BUTTONS = ['🏥 Klinikalar', '🆕 Yangi ro‘yxatdan o‘tganlar'];
+
+/** Who this chat is, resolved from its bound phone. */
+interface ChatIdentity {
+  /** Patient cards across clinics (may be empty). */
+  patientIds: string[];
+  /** Staff/super-admin account bound to this chat, if any. */
+  staff: { id: string; clinicId: string | null; role: string; fullName: string } | null;
+}
+
+/** Keyboard composed from whatever roles the chat actually holds. */
+function keyboardFor(identity: ChatIdentity): Keyboard {
+  const kb = new Keyboard();
+  const rows: string[][] = [];
+  if (identity.patientIds.length > 0) {
+    rows.push(PATIENT_BUTTONS.slice(0, 2), PATIENT_BUTTONS.slice(2));
+  }
+  const role = identity.staff?.role;
+  if (role === 'CLINIC_OWNER' || role === 'CLINIC_ADMIN') rows.push(STAFF_BUTTONS);
+  if (role === 'SUPER_ADMIN') rows.push(PLATFORM_BUTTONS);
+  for (const row of rows) {
+    for (const label of row) kb.text(label);
+    kb.row();
+  }
+  return kb.resized().persistent();
+}
+
+/** Keyboard shown before the chat is bound to anything. */
+const CONTACT_KEYBOARD = new Keyboard()
+  .requestContact('📱 Raqamni yuborish')
   .resized()
-  .persistent();
+  .oneTime();
+
+/** Patient-only keyboard, re-sent alongside patient answers. */
+const PATIENT_KEYBOARD = keyboardFor({ patientIds: ['x'], staff: null });
 
 /** Pick a display name from a multilingual Json name ({ uz, ru, en }). */
 function pickName(name: unknown): string {
@@ -38,12 +76,17 @@ function flagLabel(flag: string): string {
 }
 
 /**
- * Patient-facing Telegram bot (grammY, long polling). Links patients by phone
- * contact, shows upcoming appointments and live queue position, and handles
- * confirm/cancel buttons on reminder messages.
+ * The platform Telegram bot (grammY, long polling), serving THREE audiences from
+ * one chat: patients, clinic owners/admins, and the platform super-admin.
  *
- * The bot is cross-clinic by design: one platform bot serves patients of every
- * clinic, so lookups here use prisma.unscoped with per-row clinic checks.
+ * Registration is uniform — /start asks for the contact, and the phone is looked
+ * up against both Patient cards and staff User rows. Whatever it matches is what
+ * the chat gets: a phone that is both a patient and a clinic owner gets both
+ * sections of the menu. Every handler re-resolves the identity from the chat id,
+ * so a role can be revoked simply by clearing the binding.
+ *
+ * The bot is cross-clinic and pre-tenant by design, so lookups use
+ * prisma.unscoped, always keyed by the chat's own id — never by user input.
  */
 @Injectable()
 export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
@@ -77,12 +120,116 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
   private registerHandlers(bot: Bot): void {
     bot.command('start', (ctx) => this.handleStart(ctx));
+    bot.command('menu', (ctx) => this.handleMenu(ctx));
+    bot.command('unlink', (ctx) => this.handleUnlink(ctx));
     bot.on('message:contact', (ctx) => this.handleContact(ctx));
+    // Patient
     bot.hears('📅 Qabullarim', (ctx) => this.handleMyAppointments(ctx));
     bot.hears('🕐 Navbatim', (ctx) => this.handleMyQueue(ctx));
     bot.hears('🧪 Tahlillarim', (ctx) => this.handleMyResults(ctx));
     bot.hears('📄 Hujjatlarim', (ctx) => this.handleMyDocuments(ctx));
+    // Clinic owner / admin
+    bot.hears('📊 Bugungi holat', (ctx) => this.handleClinicToday(ctx));
+    bot.hears('👥 Navbat holati', (ctx) => this.handleClinicQueue(ctx));
+    // Platform super-admin
+    bot.hears('🏥 Klinikalar', (ctx) => this.handlePlatformClinics(ctx));
+    bot.hears('🆕 Yangi ro‘yxatdan o‘tganlar', (ctx) => this.handlePlatformSignups(ctx));
     bot.callbackQuery(/^(confirm|cancel):(.+)$/, (ctx) => this.handleAppointmentAction(ctx));
+  }
+
+  // ------------------------------------------------------------ identity
+
+  /**
+   * Who is this chat? Resolves BOTH sides: the patient cards routed to it and
+   * the staff/super-admin account bound to it. A phone can legitimately be both
+   * (a doctor who is also a patient), so the menu is composed, not exclusive.
+   *
+   * prisma.unscoped justified: the bot is cross-clinic and pre-tenant; every
+   * lookup is keyed by the chat's own id, never by user-supplied input.
+   */
+  private async identify(chatId: number): Promise<ChatIdentity> {
+    const chat = String(chatId);
+    const [links, staff] = await Promise.all([
+      this.prisma.unscoped.telegramLink.findMany({
+        where: { chatId: chat, isActive: true },
+        select: { patientId: true },
+      }),
+      this.prisma.unscoped.user.findFirst({
+        where: { telegramChatId: chat, deletedAt: null, status: 'ACTIVE' },
+        select: { id: true, clinicId: true, role: true, fullName: true },
+      }),
+    ]);
+    return { patientIds: links.map((l) => l.patientId), staff };
+  }
+
+  private roleLabel(role: string): string {
+    switch (role) {
+      case 'SUPER_ADMIN':
+        return 'Platforma administratori';
+      case 'CLINIC_OWNER':
+        return 'Klinika egasi';
+      case 'CLINIC_ADMIN':
+        return 'Klinika administratori';
+      case 'DOCTOR':
+        return 'Shifokor';
+      case 'RECEPTIONIST':
+        return 'Qabulxona';
+      case 'CASHIER':
+        return 'Kassir';
+      case 'LAB_TECH':
+        return 'Laborant';
+      default:
+        return 'Xodim';
+    }
+  }
+
+  /** Re-send the menu for whoever this chat is. */
+  private async handleMenu(ctx: Context): Promise<void> {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    const identity = await this.identify(chatId);
+    if (identity.patientIds.length === 0 && !identity.staff) {
+      await ctx.reply('Avval /start orqali telefon raqamingizni yuboring.', {
+        reply_markup: CONTACT_KEYBOARD,
+      });
+      return;
+    }
+    await ctx.reply(this.welcomeText(identity), { reply_markup: keyboardFor(identity) });
+  }
+
+  /** Release this chat from every identity it holds. */
+  private async handleUnlink(ctx: Context): Promise<void> {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    const chat = String(chatId);
+    await Promise.all([
+      this.prisma.unscoped.telegramLink.updateMany({
+        where: { chatId: chat },
+        data: { isActive: false },
+      }),
+      this.prisma.unscoped.portalAccount.updateMany({
+        where: { telegramChatId: chat },
+        data: { telegramChatId: null, telegramUsername: null, telegramLinkedAt: null },
+      }),
+      this.prisma.unscoped.user.updateMany({
+        where: { telegramChatId: chat },
+        data: { telegramChatId: null, telegramUsername: null, telegramLinkedAt: null },
+      }),
+    ]);
+    await ctx.reply('Akkaunt uzildi. Qayta ulash uchun /start bosing.', {
+      reply_markup: { remove_keyboard: true },
+    });
+  }
+
+  private welcomeText(identity: ChatIdentity): string {
+    const parts: string[] = [];
+    if (identity.staff) {
+      parts.push(`${identity.staff.fullName} — ${this.roleLabel(identity.staff.role)}`);
+    }
+    if (identity.patientIds.length > 0) {
+      parts.push(`Bemor kartalari: ${identity.patientIds.length} ta klinikada`);
+    }
+    return parts.length > 0 ? `Xush kelibsiz!\n${parts.join('\n')}` : 'Xush kelibsiz!';
   }
 
   // ------------------------------------------------------------ linking
@@ -94,11 +241,20 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       await this.handleLinkToken(ctx, payload);
       return;
     }
+    const chatId = ctx.chat?.id;
+    if (chatId !== undefined) {
+      // Already bound (e.g. /start pressed again) — go straight to the menu.
+      const identity = await this.identify(chatId);
+      if (identity.patientIds.length > 0 || identity.staff) {
+        await ctx.reply(this.welcomeText(identity), { reply_markup: keyboardFor(identity) });
+        return;
+      }
+    }
     await ctx.reply(
-      'Assalomu alaykum! AviShifo botiga xush kelibsiz. Ma’lumotlaringizni ko‘rish uchun telefon raqamingizni yuboring.',
-      {
-        reply_markup: new Keyboard().requestContact('📱 Raqamni yuborish').resized().oneTime(),
-      },
+      'Assalomu alaykum! AviShifo botiga xush kelibsiz.\n\n' +
+        'Ro‘yxatdan o‘tish uchun telefon raqamingizni yuboring — raqamingiz tizimdagi ' +
+        'bemor, xodim yoki administrator hisobiga bog‘lanadi.',
+      { reply_markup: CONTACT_KEYBOARD },
     );
   }
 
@@ -125,7 +281,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         ? ' Hozircha biriktirilgan bemor kartangiz yo‘q — klinikaga tashrifingizdan so‘ng ma’lumotlar ko‘rinadi.'
         : '';
     await ctx.reply(`Akkauntingiz Telegram bilan bog‘landi ✅${tail}`, {
-      reply_markup: MAIN_KEYBOARD,
+      reply_markup: PATIENT_KEYBOARD,
     });
   }
 
@@ -133,26 +289,49 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const contact = ctx.message?.contact;
     const chatId = ctx.chat?.id;
     if (!contact || chatId === undefined) return;
-    const phone = normalizePhone(contact.phone_number);
-    if (!phone) {
-      await ctx.reply("Kechirasiz, telefon raqamini aniqlab bo'lmadi.");
+
+    // Only accept the sender's OWN contact — otherwise anyone could forward a
+    // colleague's contact card and take over their staff account.
+    if (contact.user_id !== undefined && ctx.from?.id !== undefined && contact.user_id !== ctx.from.id) {
+      await ctx.reply('Iltimos, faqat o‘zingizning raqamingizni yuboring.', {
+        reply_markup: CONTACT_KEYBOARD,
+      });
       return;
     }
-    const cards = await this.bindChat(chatId, phone, ctx.from?.username ?? null);
-    if (cards === 0) {
+
+    const phone = normalizePhone(contact.phone_number);
+    if (!phone) {
+      await ctx.reply("Kechirasiz, telefon raqamini aniqlab bo'lmadi.", {
+        reply_markup: CONTACT_KEYBOARD,
+      });
+      return;
+    }
+
+    await this.bindChat(chatId, phone, ctx.from?.username ?? null);
+    const identity = await this.identify(chatId);
+
+    if (identity.patientIds.length === 0 && !identity.staff) {
       await ctx.reply(
-        'Raqamingiz bog‘landi. Hozircha biriktirilgan bemor kartangiz topilmadi — klinikaga tashrifingizdan so‘ng ma’lumotlaringiz shu yerda ko‘rinadi.',
-        { reply_markup: MAIN_KEYBOARD },
+        'Raqamingiz qabul qilindi, lekin tizimda bu raqam bilan hisob topilmadi.\n\n' +
+          'Agar siz bemor bo‘lsangiz — klinikaga tashrifingizdan so‘ng ma’lumotlaringiz shu yerda ko‘rinadi.\n' +
+          'Agar siz klinika xodimi bo‘lsangiz — administratoringiz profilingizga shu raqamni kiritishi kerak.',
       );
       return;
     }
-    await ctx.reply("Muvaffaqiyatli bog'landi ✅", { reply_markup: MAIN_KEYBOARD });
+
+    await ctx.reply(`Muvaffaqiyatli bog‘landi ✅\n\n${this.welcomeText(identity)}`, {
+      reply_markup: keyboardFor(identity),
+    });
   }
 
   /**
-   * Bind a Telegram chat to a phone: sets the durable PortalAccount link and
-   * upserts per-clinic TelegramLink routing rows. Cross-clinic by design, so
-   * lookups use prisma.unscoped. Returns the number of matched patient cards.
+   * Bind a Telegram chat to a phone across EVERY identity that phone holds:
+   * the durable PortalAccount link, per-clinic TelegramLink routing rows for
+   * patient cards, and the staff/super-admin User row. A phone can be both a
+   * patient and a staff member, so all matching bindings are made.
+   *
+   * Cross-clinic and pre-tenant by design, so lookups use prisma.unscoped.
+   * Returns the number of matched patient cards.
    */
   private async bindChat(
     chatId: number,
@@ -161,6 +340,27 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   ): Promise<number> {
     const phone = normalizePhone(rawPhone) ?? rawPhone;
     const chat = String(chatId);
+    const now = new Date();
+
+    // Staff / super-admin: release the chat from any other user first (the
+    // telegramChatId unique index would otherwise reject the bind), then attach
+    // it to whoever owns this phone. PATIENT-role users are excluded — they go
+    // through the patient path below.
+    await this.prisma.unscoped.user.updateMany({
+      where: { telegramChatId: chat, phone: { not: phone } },
+      data: { telegramChatId: null, telegramUsername: null, telegramLinkedAt: null },
+    });
+    const staff = await this.prisma.unscoped.user.findFirst({
+      where: { phone, deletedAt: null, status: 'ACTIVE', role: { not: 'PATIENT' } },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (staff) {
+      await this.prisma.unscoped.user.update({
+        where: { id: staff.id },
+        data: { telegramChatId: chat, telegramUsername: username, telegramLinkedAt: now },
+      });
+    }
 
     // A Telegram chat maps to at most one account: release the chatId from any
     // other phone first (re-linking to a different number), then bind it here.
@@ -227,14 +427,14 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       include: { doctor: { select: { fullName: true } } },
     });
     if (appointments.length === 0) {
-      await ctx.reply('Yaqin kunlarda qabullaringiz yo‘q.', { reply_markup: MAIN_KEYBOARD });
+      await ctx.reply('Yaqin kunlarda qabullaringiz yo‘q.', { reply_markup: PATIENT_KEYBOARD });
       return;
     }
     const lines = appointments.map(
       (a) =>
         `📅 ${formatInTimeZone(a.startAt, TIMEZONE, 'dd.MM.yyyy HH:mm')} — ${a.doctor.fullName}`,
     );
-    await ctx.reply(`Yaqin qabullaringiz:\n${lines.join('\n')}`, { reply_markup: MAIN_KEYBOARD });
+    await ctx.reply(`Yaqin qabullaringiz:\n${lines.join('\n')}`, { reply_markup: PATIENT_KEYBOARD });
   }
 
   private async handleMyQueue(ctx: Context): Promise<void> {
@@ -257,7 +457,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       orderBy: { createdAt: 'asc' },
     });
     if (tickets.length === 0) {
-      await ctx.reply('Bugun faol navbatingiz yo‘q.', { reply_markup: MAIN_KEYBOARD });
+      await ctx.reply('Bugun faol navbatingiz yo‘q.', { reply_markup: PATIENT_KEYBOARD });
       return;
     }
     const lines: string[] = [];
@@ -272,7 +472,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       });
       lines.push(`🎫 ${number} — oldingizda ${ahead} kishi bor.`);
     }
-    await ctx.reply(lines.join('\n'), { reply_markup: MAIN_KEYBOARD });
+    await ctx.reply(lines.join('\n'), { reply_markup: PATIENT_KEYBOARD });
   }
 
   private async handleMyResults(ctx: Context): Promise<void> {
@@ -306,7 +506,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       },
     });
     if (orders.length === 0) {
-      await ctx.reply('Hozircha tayyor tahlil natijalari yo‘q.', { reply_markup: MAIN_KEYBOARD });
+      await ctx.reply('Hozircha tayyor tahlil natijalari yo‘q.', { reply_markup: PATIENT_KEYBOARD });
       return;
     }
     const blocks = orders.map((o) => {
@@ -322,7 +522,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       });
       return [header, ...lines].join('\n');
     });
-    await ctx.reply(blocks.join('\n\n'), { reply_markup: MAIN_KEYBOARD });
+    await ctx.reply(blocks.join('\n\n'), { reply_markup: PATIENT_KEYBOARD });
   }
 
   private async handleMyDocuments(ctx: Context): Promise<void> {
@@ -340,7 +540,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       select: { title: true, fileKey: true, fileName: true, createdAt: true },
     });
     if (docs.length === 0) {
-      await ctx.reply('Hozircha hujjatlaringiz yo‘q.', { reply_markup: MAIN_KEYBOARD });
+      await ctx.reply('Hozircha hujjatlaringiz yo‘q.', { reply_markup: PATIENT_KEYBOARD });
       return;
     }
     await ctx.reply(`Sizda ${docs.length} ta hujjat topildi, yuborilmoqda…`);
@@ -354,7 +554,178 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         this.logger.error(`telegram document send failed: ${String(err)}`);
       }
     }
-    await ctx.reply('Barcha hujjatlar yuborildi ✅', { reply_markup: MAIN_KEYBOARD });
+    await ctx.reply('Barcha hujjatlar yuborildi ✅', { reply_markup: PATIENT_KEYBOARD });
+  }
+
+  // ------------------------------------------------------------ clinic staff
+
+  /** Resolve the staff identity, replying with a hint when the chat lacks the role. */
+  private async requireStaff(
+    ctx: Context,
+    roles: string[],
+  ): Promise<{ id: string; clinicId: string | null; role: string; fullName: string } | null> {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return null;
+    const identity = await this.identify(chatId);
+    if (!identity.staff || !roles.includes(identity.staff.role)) {
+      await ctx.reply('Bu bo‘lim uchun ruxsatingiz yo‘q.');
+      return null;
+    }
+    return identity.staff;
+  }
+
+  /** Start of today in the clinic's timezone, as a UTC instant. */
+  private todayRange(): { from: Date; to: Date } {
+    const day = formatInTimeZone(new Date(), TIMEZONE, 'yyyy-MM-dd');
+    // Asia/Tashkent is UTC+5 year-round (no DST), so the day starts at 19:00 UTC.
+    const from = new Date(`${day}T00:00:00.000+05:00`);
+    return { from, to: new Date(from.getTime() + 86_400_000) };
+  }
+
+  private async handleClinicToday(ctx: Context): Promise<void> {
+    const staff = await this.requireStaff(ctx, ['CLINIC_OWNER', 'CLINIC_ADMIN']);
+    if (!staff?.clinicId) return;
+    const clinicId = staff.clinicId;
+    const { from, to } = this.todayRange();
+
+    // Unscoped justified: bot runs pre-tenant; clinicId comes from the bound
+    // staff row, never from user input.
+    const [appointments, completed, waiting, newPatients, payments] = await Promise.all([
+      this.prisma.unscoped.appointment.count({
+        where: { clinicId, startAt: { gte: from, lt: to } },
+      }),
+      this.prisma.unscoped.visit.count({
+        where: { clinicId, completedAt: { gte: from, lt: to } },
+      }),
+      this.prisma.unscoped.queueTicket.count({ where: { clinicId, status: 'WAITING' } }),
+      this.prisma.unscoped.patient.count({
+        where: { clinicId, createdAt: { gte: from, lt: to }, deletedAt: null },
+      }),
+      this.prisma.unscoped.payment.aggregate({
+        where: { clinicId, status: 'COMPLETED', paidAt: { gte: from, lt: to } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const revenue = payments._sum.amount?.toFixed(2) ?? '0.00';
+    await ctx.reply(
+      `📊 Bugungi holat — ${formatInTimeZone(new Date(), TIMEZONE, 'dd.MM.yyyy')}\n\n` +
+        `📅 Qabullar: ${appointments}\n` +
+        `✅ Yakunlangan tashriflar: ${completed}\n` +
+        `🕐 Navbatda kutmoqda: ${waiting}\n` +
+        `🆕 Yangi bemorlar: ${newPatients}\n` +
+        `💰 Tushum: ${formatUZS(revenue)}`,
+    );
+  }
+
+  private async handleClinicQueue(ctx: Context): Promise<void> {
+    const staff = await this.requireStaff(ctx, ['CLINIC_OWNER', 'CLINIC_ADMIN']);
+    if (!staff?.clinicId) return;
+    const clinicId = staff.clinicId;
+
+    const tickets = await this.prisma.unscoped.queueTicket.groupBy({
+      by: ['doctorUserId', 'status'],
+      where: { clinicId, status: { in: ['WAITING', 'IN_ROOM'] } },
+      _count: { _all: true },
+    });
+    if (tickets.length === 0) {
+      await ctx.reply('Hozir navbat bo‘sh.');
+      return;
+    }
+    const doctorIds = [...new Set(tickets.map((t) => t.doctorUserId).filter((x): x is string => !!x))];
+    const doctors = await this.prisma.unscoped.user.findMany({
+      where: { id: { in: doctorIds } },
+      select: { id: true, fullName: true },
+    });
+    const nameById = new Map(doctors.map((d) => [d.id, d.fullName]));
+
+    const byDoctor = new Map<string, { waiting: number; inRoom: number }>();
+    for (const row of tickets) {
+      const key = row.doctorUserId ?? 'other';
+      const entry = byDoctor.get(key) ?? { waiting: 0, inRoom: 0 };
+      if (row.status === 'WAITING') entry.waiting += row._count._all;
+      else entry.inRoom += row._count._all;
+      byDoctor.set(key, entry);
+    }
+    const lines = [...byDoctor.entries()].map(([id, c]) => {
+      const name = nameById.get(id) ?? 'Boshqa';
+      return `👨‍⚕️ ${name} — kutmoqda: ${c.waiting}, qabulda: ${c.inRoom}`;
+    });
+    await ctx.reply(`👥 Navbat holati\n\n${lines.join('\n')}`);
+  }
+
+  // ------------------------------------------------------------ platform
+
+  private async handlePlatformClinics(ctx: Context): Promise<void> {
+    const staff = await this.requireStaff(ctx, ['SUPER_ADMIN']);
+    if (!staff) return;
+    const now = new Date();
+    const soon = new Date(now.getTime() + 3 * 86_400_000);
+
+    const [total, active, trial, expiring, expired] = await Promise.all([
+      this.prisma.unscoped.clinic.count(),
+      this.prisma.unscoped.clinic.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.unscoped.clinicSubscription.count({
+        where: { status: 'TRIAL', endsAt: { gt: now } },
+      }),
+      this.prisma.unscoped.clinicSubscription.count({
+        where: { status: { in: ['TRIAL', 'ACTIVE'] }, endsAt: { gt: now, lte: soon } },
+      }),
+      this.prisma.unscoped.clinicSubscription.count({
+        where: { status: { in: ['TRIAL', 'ACTIVE', 'PAST_DUE'] }, endsAt: { lte: now } },
+      }),
+    ]);
+
+    await ctx.reply(
+      `🏥 Platforma holati\n\n` +
+        `Jami klinikalar: ${total}\n` +
+        `Faol: ${active}\n` +
+        `Sinovda: ${trial}\n` +
+        `⚠️ 3 kun ichida tugaydi: ${expiring}\n` +
+        `⛔ Muddati tugagan: ${expired}`,
+    );
+  }
+
+  private async handlePlatformSignups(ctx: Context): Promise<void> {
+    const staff = await this.requireStaff(ctx, ['SUPER_ADMIN']);
+    if (!staff) return;
+    const clinics = await this.prisma.unscoped.clinic.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        createdAt: true,
+        subscriptions: {
+          where: { status: { in: ['TRIAL', 'ACTIVE', 'PAST_DUE'] } },
+          orderBy: [{ startsAt: 'desc' }],
+          take: 1,
+          select: { status: true, endsAt: true },
+        },
+      },
+    });
+    if (clinics.length === 0) {
+      await ctx.reply('Hozircha ro‘yxatdan o‘tgan klinika yo‘q.');
+      return;
+    }
+    const now = Date.now();
+    const lines = clinics.map((c) => {
+      const sub = c.subscriptions[0];
+      const days =
+        sub?.endsAt != null
+          ? Math.max(0, Math.ceil((sub.endsAt.getTime() - now) / 86_400_000))
+          : null;
+      const state = !sub
+        ? 'obunasiz'
+        : days === null
+          ? 'muddatsiz'
+          : days === 0
+            ? '⛔ tugagan'
+            : `${days} kun qoldi`;
+      return `🏥 ${c.name}\n   ${c.phone ?? 'raqamsiz'} · ${formatInTimeZone(c.createdAt, TIMEZONE, 'dd.MM.yyyy')} · ${state}`;
+    });
+    await ctx.reply(`🆕 So‘nggi ro‘yxatdan o‘tganlar\n\n${lines.join('\n')}`);
   }
 
   // ------------------------------------------------------------ reminder buttons
