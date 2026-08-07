@@ -4,7 +4,7 @@
  * data to a live, empty platform.
  *
  *   RESET_CONFIRM=DELETE-EVERYTHING \
- *   SUPERADMIN_EMAIL=... SUPERADMIN_PHONE=+998... SUPERADMIN_PASSWORD=... \
+ *   SUPERADMIN_EMAIL=... SUPERADMIN_PASSWORD=... [SUPERADMIN_PHONE=+998...] \
  *   npx tsx prisma/reset.ts
  *
  * TAKE A pg_dump FIRST — this cannot be undone.
@@ -48,8 +48,14 @@ async function main(): Promise<void> {
   const email = requireEnv('SUPERADMIN_EMAIL').toLowerCase();
   const password = requireEnv('SUPERADMIN_PASSWORD');
   if (password.length < 12) throw new Error('SUPERADMIN_PASSWORD must be at least 12 characters');
-  const phone = normalizePhone(requireEnv('SUPERADMIN_PHONE'));
-  if (!phone) throw new Error('SUPERADMIN_PHONE must be a valid Uzbek number (+998XXXXXXXXX)');
+  // Phone is optional — login accepts email or phone, and the column is nullable.
+  // It can be added later from Settings rather than guessed here.
+  const rawPhone = process.env.SUPERADMIN_PHONE?.trim();
+  let phone: string | null = null;
+  if (rawPhone) {
+    phone = normalizePhone(rawPhone);
+    if (!phone) throw new Error('SUPERADMIN_PHONE must be a valid Uzbek number (+998XXXXXXXXX)');
+  }
   const fullName = process.env.SUPERADMIN_NAME?.trim() || 'AviShifo Super Admin';
 
   // ---- what is about to be destroyed -------------------------------------
@@ -107,7 +113,7 @@ async function main(): Promise<void> {
 
   const icd10 = await prisma.icd10Code.count();
   console.log('\n--- done ---');
-  console.log(`super-admin: ${admin.email} / ${admin.phone}`);
+  console.log(`super-admin: ${admin.email}${admin.phone ? ` / ${admin.phone}` : ' (no phone set)'}`);
   console.log(`clinics: ${await prisma.clinic.count()} · patients: ${await prisma.patient.count()}`);
   console.log(`icd10 preserved: ${icd10}`);
 }
