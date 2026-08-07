@@ -13,12 +13,14 @@ interface AuthCtaProps {
   variant?: ButtonProps['variant'];
   className?: string;
   showArrow?: boolean;
+  /** Where an anonymous visitor goes: the free-trial sign-up or the login page. */
+  target?: 'register' | 'login';
 }
 
 /**
  * Primary call-to-action. Reads the auth store CLIENT-side: authenticated
- * visitors are sent to the dashboard, everyone else to the login page. The page
- * itself is never gated — this only swaps the button label and target.
+ * visitors are sent to the dashboard, everyone else to sign-up (or login). The
+ * page itself is never gated — this only swaps the button label and target.
  */
 export function AuthCta({
   anonymousLabel,
@@ -26,13 +28,14 @@ export function AuthCta({
   variant,
   className,
   showArrow = true,
+  target = 'register',
 }: AuthCtaProps) {
   const t = useTranslations('landing');
   const authenticated = useAuthStore((s) => s.status === 'authenticated');
 
   return (
     <Button asChild size={size} variant={variant} className={className}>
-      <Link href={authenticated ? '/dashboard' : '/login'}>
+      <Link href={authenticated ? '/dashboard' : `/${target}`}>
         {authenticated ? t('cta.dashboard') : anonymousLabel}
         {showArrow ? <ArrowRight className="h-4 w-4" /> : null}
       </Link>

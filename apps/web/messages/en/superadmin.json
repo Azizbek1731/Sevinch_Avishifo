@@ -14,7 +14,8 @@
       "branches": "Branches",
       "users": "Users",
       "patients": "Patients",
-      "visits30d": "Visits (30 days)"
+      "visits30d": "Visits (30 days)",
+      "subscription": "Subscription"
     },
     "empty": {
       "title": "No clinics found",
@@ -32,6 +33,15 @@
       "ownerPhone": "Phone",
       "ownerEmail": "Email",
       "password": "Password"
+    },
+    "daysLeft": "{days} days left",
+    "expired": "Expired",
+    "allSubscriptions": "All subscriptions",
+    "subscriptionFilter": {
+      "trial": "On trial",
+      "expiring": "Expiring (≤3 days)",
+      "expired": "Expired",
+      "paid": "Paid"
     }
   },
   "status": {
@@ -57,7 +67,14 @@
       "current": "Current plan",
       "select": "Select a plan",
       "assign": "Assign",
-      "assigned": "Plan assigned"
+      "assigned": "Plan assigned",
+      "endsAt": "End date",
+      "perpetual": "Perpetual",
+      "extendTitle": "Extend the term",
+      "days": "days",
+      "setDate": "Set date",
+      "extendHint": "Extending keeps the current subscription — the trial does not restart. If it has lapsed, the clock starts today.",
+      "extended": "Subscription term updated"
     },
     "flags": {
       "title": "Feature flags",

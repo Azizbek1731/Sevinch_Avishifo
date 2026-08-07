@@ -2,7 +2,15 @@
 
 Multi-tenant SaaS klinika boshqaruv tizimi (practice management + yengil EHR) — O'zbekistondagi xususiy klinikalar uchun. Bitta deployment ko'plab mustaqil klinikalarga (tenantlarga) xizmat qiladi; har bir klinikada filiallar, xodimlar, bemorlar, narxlar to'liq izolyatsiyalangan.
 
-**Asosiy imkoniyatlar:** jonli navbat (WebSocket + TV-ekran + ovozli e'lon) · bemor kartasi va tibbiy tarix · qabullar kalendari va slot-dvijok · SOAP tashriflar, ICD-10, retseptlar · hisob-fakturalar, kassa smenalari, qarzlar, Payme/Click/Uzum (sandbox) · laboratoriya moduli · SMS (Eskiz) + Telegram-bot bildirishnomalari · analitika va XLSX eksport · bemor portali + onlayn yozilish · super-admin panel · to'liq audit-jurnal.
+**Asosiy imkoniyatlar:** jonli navbat (WebSocket + TV-ekran + ovozli e'lon) · bemor kartasi va tibbiy tarix · qabullar kalendari va slot-dvijok · SOAP tashriflar, ICD-10, retseptlar · hisob-fakturalar, kassa smenalari, qarzlar, Payme/Click/Uzum (sandbox) · laboratoriya moduli · SMS (Eskiz) + Telegram-bot bildirishnomalari · analitika va XLSX eksport · bemor portali + onlayn yozilish · **o'zini-o'zi ro'yxatdan o'tkazish va 7 kunlik bepul sinov** · super-admin panel · to'liq audit-jurnal.
+
+## Ro'yxatdan o'tish va sinov muddati
+
+Klinika direktori `/register` sahifasidan o'zi ro'yxatdan o'tadi — klinika, birinchi filial va egasi yaratilib, **7 kunlik bepul sinov** boshlanadi (`TRIAL_DAYS`). Tasdiqlash bosqichi yo'q; suiiste'moldan himoya: soatiga 3 ta ro'yxatdan o'tish (IP bo'yicha), bitta telefonga bitta klinika, takrorlanmas klinika nomi.
+
+Muddat tugagach klinika **faqat o'qish rejimiga** o'tadi: barcha ma'lumotlarni ko'rish va chop etish mumkin, lekin yangi yozuv qo'shib bo'lmaydi (`402 SUBSCRIPTION_EXPIRED`). Panelda banner va **«Murojaat qilish»** tugmasi chiqadi (`SUPPORT_TELEGRAM` / `SUPPORT_PHONE`).
+
+Super-admin panelida: sinovdagi/tugayotgan/tugagan/to'lovli klinikalar bo'yicha filtr, «N kun qoldi» ustuni, va klinika sahifasida muddatni **+7 / +14 / +30 kun** uzaytirish yoki aniq sanani qo'yish.
 
 ## Arxitektura
 

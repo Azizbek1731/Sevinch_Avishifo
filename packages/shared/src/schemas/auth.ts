@@ -35,6 +35,21 @@ export const resetPasswordWithOtpSchema = z.object({
 });
 export type ResetPasswordWithOtpInput = z.infer<typeof resetPasswordWithOtpSchema>;
 
+/**
+ * Public self-service sign-up: a clinic director creates the clinic and becomes
+ * its CLINIC_OWNER, starting a free trial. No verification step — the platform
+ * super-admin reviews and can suspend abusive registrations.
+ */
+export const registerClinicSchema = z.object({
+  clinicName: z.string().min(2).max(120),
+  fullName: z.string().min(2).max(120),
+  phone: phoneSchema,
+  email: z.string().email().optional(),
+  password: z.string().min(8),
+  locale: z.nativeEnum(Locale).optional(),
+});
+export type RegisterClinicInput = z.infer<typeof registerClinicSchema>;
+
 export const updateProfileSchema = z.object({
   fullName: z.string().min(1).optional(),
   locale: z.nativeEnum(Locale).optional(),

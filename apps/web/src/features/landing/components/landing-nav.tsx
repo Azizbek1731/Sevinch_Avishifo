@@ -37,7 +37,7 @@ export function LandingNav() {
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <LanguageSwitcher />
-          <AuthCta anonymousLabel={t('nav.login')} size="sm" showArrow={false} />
+          <AuthCta anonymousLabel={t('nav.login')} size="sm" showArrow={false} target="login" />
         </div>
       </div>
     </header>

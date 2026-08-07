@@ -13,7 +13,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { CookieOptions, Request, Response } from 'express';
 import type { AuthUser } from '@avishifo/shared';
-import { CurrentUser, Public } from '../../common/decorators';
+import { AllowWhenExpired, CurrentUser, Public } from '../../common/decorators';
 import { paginated, type PaginatedResult } from '../../common/pagination';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { AuthService } from './auth.service';
@@ -23,9 +23,17 @@ import {
 } from './auth.service';
 import { TokenService } from './token.service';
 import { REFRESH_COOKIE } from './token.service';
-import { ChangePasswordDto, LoginDto, RequestPasswordResetDto, ResetPasswordWithOtpDto } from './dto/auth.dto';
+import {
+  ChangePasswordDto,
+  LoginDto,
+  RegisterClinicDto,
+  RequestPasswordResetDto,
+  ResetPasswordWithOtpDto,
+} from './dto/auth.dto';
 
 const AUTH_THROTTLE = { default: { limit: 10, ttl: 60_000 } };
+/** Sign-up creates a tenant — far stricter than a login attempt. */
+const SIGNUP_THROTTLE = { default: { limit: 3, ttl: 3_600_000 } };
 
 @ApiTags('auth')
 @Controller('auth')
@@ -51,6 +59,27 @@ export class AuthController {
     return { user, accessToken };
   }
 
+  // ---------------------------------------------------------------- sign-up
+
+  /**
+   * Public clinic sign-up — creates the clinic, its owner and a free trial,
+   * then signs the director in. Throttled harder than login: every call that
+   * gets through mints a whole tenant.
+   */
+  @Public()
+  @Throttle(SIGNUP_THROTTLE)
+  @Post('register-clinic')
+  @HttpCode(201)
+  async registerClinic(
+    @Body() dto: RegisterClinicDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ user: AuthUser; accessToken: string; trialEndsAt: string | null }> {
+    const { user, accessToken, refreshToken, trialEndsAt } =
+      await this.auth.registerClinic(dto);
+    this.setRefreshCookie(res, refreshToken);
+    return { user, accessToken, trialEndsAt };
+  }
+
   @Public()
   @Post('refresh')
   @HttpCode(200)
@@ -70,6 +99,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @AllowWhenExpired()
   @HttpCode(200)
   async logout(
     @CurrentUser() user: AuthUser,
@@ -106,6 +136,7 @@ export class AuthController {
   // -------------------------------------------------------- change password
 
   @Post('change-password')
+  @AllowWhenExpired()
   @HttpCode(200)
   changePassword(
     @CurrentUser() user: AuthUser,

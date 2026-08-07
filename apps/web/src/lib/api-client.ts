@@ -125,6 +125,9 @@ async function doFetch<T>(path: string, opts: FetchOptions, retried: boolean): P
 
   if (!res.ok || !json || !json.success) {
     const err = json && !json.success ? json.error : undefined;
+    // The trial lapsed mid-session: flip the app into read-only right away so
+    // the banner appears without waiting for the next /auth/me.
+    if (err?.code === 'SUBSCRIPTION_EXPIRED') useAuthStore.getState().markExpired();
     throw new ApiError(
       err?.code ?? ('INTERNAL_ERROR' as ErrorCode),
       err?.message ?? `Request failed (${res.status})`,

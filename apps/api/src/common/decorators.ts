@@ -16,6 +16,14 @@ export const PERMISSIONS_KEY = 'requiredPermissions';
 export const RequirePermissions = (...permissions: Permission[]) =>
   SetMetadata(PERMISSIONS_KEY, permissions);
 
+export const ALLOW_WHEN_EXPIRED_KEY = 'allowWhenExpired';
+/**
+ * Let this mutation through even when the clinic's subscription has lapsed.
+ * Only for things a locked-out clinic must still be able to do: sign in/out,
+ * refresh a token, read its own profile. See SubscriptionGuard.
+ */
+export const AllowWhenExpired = () => SetMetadata(ALLOW_WHEN_EXPIRED_KEY, true);
+
 export interface RequestWithUser extends Request {
   user?: AuthUser;
 }

@@ -6,7 +6,10 @@ import type {
   FeatureFlagSetInput,
   MoneyString,
   PlanUpsertInput,
+  SubscriptionFilter,
+  SubscriptionStatus,
   UpdateClinicStatusInput,
+  UpdateSubscriptionInput,
 } from '@avishifo/shared';
 
 // ------------------------------------------------------------- response types
@@ -26,9 +29,12 @@ export interface PlanRow {
 
 export interface SubscriptionInfo {
   id: string;
-  status: string;
+  status: SubscriptionStatus;
   startsAt: string;
   endsAt: string | null;
+  /** Whole days until endsAt; 0 once lapsed; null when perpetual. */
+  daysLeft: number | null;
+  isExpired: boolean;
   plan: PlanRow;
 }
 
@@ -81,6 +87,8 @@ export interface ImpersonationResult {
 export interface ClinicListFilters {
   search: string;
   status: ClinicStatus | null;
+  /** trial | expiring | expired | paid */
+  subscription: SubscriptionFilter | null;
   page: number;
 }
 
@@ -98,6 +106,7 @@ export const superadminApi = {
     api.get<ClinicListItem[]>('/platform/clinics', {
       search: f.search || undefined,
       status: f.status ?? undefined,
+      subscription: f.subscription ?? undefined,
       page: f.page,
     }),
 
@@ -118,6 +127,15 @@ export const superadminApi = {
 
   assignPlan: async (id: string, input: AssignPlanInput): Promise<SubscriptionInfo> => {
     const res = await api.post<SubscriptionInfo>(`/platform/clinics/${id}/plan`, input);
+    return res.data;
+  },
+
+  /** Extend/shorten the trial or pin an end date, keeping the same subscription row. */
+  updateSubscription: async (
+    id: string,
+    input: UpdateSubscriptionInput,
+  ): Promise<SubscriptionInfo> => {
+    const res = await api.patch<SubscriptionInfo>(`/platform/clinics/${id}/subscription`, input);
     return res.data;
   },
 

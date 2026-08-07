@@ -1,0 +1,13 @@
+{
+  "contact": "Murojaat qilish",
+  "trial": {
+    "title": "Sinov muddati: {days} kun qoldi",
+    "description": "Muddat tugagach tizim faqat o‘qish rejimiga o‘tadi.",
+    "endsAt": "{date} gacha. Keyin faqat o‘qish rejimi."
+  },
+  "expired": {
+    "trialTitle": "Sinov muddati tugadi — faqat o‘qish rejimi",
+    "planTitle": "Obuna muddati tugadi — faqat o‘qish rejimi",
+    "description": "Ma’lumotlarni ko‘rish va chop etish mumkin, lekin yangi yozuv qo‘shib bo‘lmaydi. Davom ettirish uchun biz bilan bog‘laning."
+  }
+}

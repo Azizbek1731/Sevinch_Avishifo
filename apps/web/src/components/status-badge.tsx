@@ -48,6 +48,10 @@ const STATUS_TONES: Record<string, StatusTone> = {
   CLOSED: 'gray',
   ACTIVE: 'green',
   SUSPENDED: 'red',
+  ARCHIVED: 'gray',
+  // Subscriptions
+  TRIAL: 'blue',
+  PAST_DUE: 'amber',
 };
 
 export interface StatusBadgeProps {

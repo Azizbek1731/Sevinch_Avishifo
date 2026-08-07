@@ -3,7 +3,16 @@ import { ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '@avishifo/shared';
 import { CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { PaginatedResult } from '../../common/pagination';
-import { AssignPlanDto, ClinicListQueryDto, CreateClinicWithOwnerDto, FeatureFlagSetDto, PlanUpdateDto, PlanUpsertDto, UpdateClinicStatusDto } from './dto/super-admin.dto';
+import {
+  AssignPlanDto,
+  ClinicListQueryDto,
+  CreateClinicWithOwnerDto,
+  FeatureFlagSetDto,
+  PlanUpdateDto,
+  PlanUpsertDto,
+  UpdateClinicStatusDto,
+  UpdateSubscriptionDto,
+} from './dto/super-admin.dto';
 import { SuperAdminService } from './super-admin.service';
 import {
   type ClinicBaseResponse,
@@ -55,6 +64,16 @@ export class SuperAdminController {
   @RequirePermissions('platform.clinics.write')
   assignPlan(@Param('id') id: string, @Body() dto: AssignPlanDto): Promise<SubscriptionResponse> {
     return this.superAdmin.assignPlan(id, dto);
+  }
+
+  /** Extend/shorten the trial, pin an end date, or switch plan/status in place. */
+  @Patch('clinics/:id/subscription')
+  @RequirePermissions('platform.clinics.write')
+  updateSubscription(
+    @Param('id') id: string,
+    @Body() dto: UpdateSubscriptionDto,
+  ): Promise<SubscriptionResponse> {
+    return this.superAdmin.updateSubscription(id, dto);
   }
 
   @Put('clinics/:id/feature-flags')

@@ -6,6 +6,7 @@ import {
   featureFlagSetSchema,
   planUpsertSchema,
   updateClinicStatusSchema,
+  updateSubscriptionSchema,
 } from '@avishifo/shared';
 
 /** POST /platform/clinics — clinic + first branch + owner + trial subscription. */
@@ -25,6 +26,7 @@ export class PlanUpdateDto extends createZodDto(planUpsertSchema.partial()) {}
 
 /** POST /platform/clinics/:id/plan — assign a subscription plan. */
 export class AssignPlanDto extends createZodDto(assignPlanSchema) {}
+export class UpdateSubscriptionDto extends createZodDto(updateSubscriptionSchema) {}
 
 /** PUT /platform/clinics/:id/feature-flags — upsert one flag. */
 export class FeatureFlagSetDto extends createZodDto(featureFlagSetSchema) {}

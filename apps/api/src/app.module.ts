@@ -18,9 +18,12 @@ import { AuditModule } from './core/audit/audit.module';
 import { SequenceModule } from './core/sequence/sequence.module';
 import { StorageModule } from './core/storage/storage.module';
 import { PrincipalModule } from './core/principal/principal.module';
+import { SubscriptionModule } from './core/subscription/subscription.module';
+import { ProvisioningModule } from './core/provisioning/provisioning.module';
 
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
+import { SubscriptionGuard } from './common/guards/subscription.guard';
 import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor';
 import { EnvelopeInterceptor } from './common/interceptors/envelope.interceptor';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -105,6 +108,8 @@ import { PortalModule } from './modules/portal/portal.module';
     SequenceModule,
     StorageModule,
     PrincipalModule,
+    SubscriptionModule,
+    ProvisioningModule,
     // Features
     AuthModule,
     UsersModule,
@@ -129,6 +134,9 @@ import { PortalModule } from './modules/portal/portal.module';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    // Last: permissions decide first, so a caller who may not touch the endpoint
+    // at all gets a plain 403 instead of leaking the clinic's billing state.
+    { provide: APP_GUARD, useClass: SubscriptionGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
     { provide: APP_INTERCEPTOR, useClass: EnvelopeInterceptor },
     { provide: APP_PIPE, useClass: ZodValidationPipe },

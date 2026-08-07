@@ -10,14 +10,21 @@ import {
   type AuthUser,
   type ChangePasswordInput,
   type LoginInput,
+  type RegisterClinicInput,
   type RequestPasswordResetInput,
   type ResetPasswordWithOtpInput,
 } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
 import { AuditService } from '../../core/audit/audit.service';
+import { AppConfigService } from '../../core/config/app-config.service';
 import { PrincipalService } from '../../core/principal/principal.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
+import { ClinicProvisioningService } from '../../core/provisioning/clinic-provisioning.service';
+import {
+  SubscriptionService,
+  type SubscriptionState,
+} from '../../core/subscription/subscription.service';
 import { TokenService } from './token.service';
 
 const MAX_FAILED_LOGINS = 5;
@@ -40,10 +47,20 @@ export interface RefreshResult {
   refreshToken: string;
 }
 
+/** Where a locked-out clinic should turn — surfaced on the trial-expired screen. */
+export interface SupportContact {
+  phone: string | null;
+  /** Telegram username without @. */
+  telegram: string | null;
+}
+
 export interface MeResult {
   user: AuthUser;
   clinic: { id: string; name: string; logoUrl: string | null } | null;
   branches: Array<{ id: string; name: string }>;
+  /** null for SUPER_ADMIN (platform scope has no subscription). */
+  subscription: SubscriptionState | null;
+  support: SupportContact;
 }
 
 export interface SessionItem {
@@ -63,7 +80,91 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly principal: PrincipalService,
     private readonly audit: AuditService,
+    private readonly config: AppConfigService,
+    private readonly provisioning: ClinicProvisioningService,
+    private readonly subscriptions: SubscriptionService,
   ) {}
+
+  // --------------------------------------------------------------- sign-up
+
+  /**
+   * Public self-service sign-up (M17): a clinic director creates their clinic
+   * and is signed in immediately on a free trial. There is no verification step
+   * by design — the super-admin panel surfaces every new trial and can suspend
+   * abusive registrations.
+   */
+  async registerClinic(
+    input: RegisterClinicInput,
+  ): Promise<LoginResult & { trialEndsAt: string | null }> {
+    const phone = normalizePhone(input.phone);
+    if (!phone) {
+      throw new AppException(ErrorCode.VALIDATION_ERROR, 'Invalid phone number', 400);
+    }
+
+    // A phone may only own ONE clinic — otherwise the same person can mint
+    // unlimited trials (User uniqueness is per-clinic, so the DB won't stop it).
+    // Unscoped: this is a pre-tenant lookup across all clinics (justified).
+    const existingOwner = await this.prisma.unscoped.user.findFirst({
+      where: { phone, deletedAt: null, role: UserRole.CLINIC_OWNER },
+      select: { id: true },
+    });
+    if (existingOwner) {
+      throw new AppException(
+        ErrorCode.PHONE_ALREADY_OWNS_CLINIC,
+        'This phone number already owns a clinic',
+        409,
+      );
+    }
+
+    const clinicName = input.clinicName.trim();
+    const nameTaken = await this.prisma.unscoped.clinic.findFirst({
+      where: { name: { equals: clinicName, mode: 'insensitive' }, status: { not: 'ARCHIVED' } },
+      select: { id: true },
+    });
+    if (nameTaken) {
+      throw new AppException(ErrorCode.CLINIC_NAME_TAKEN, 'Clinic name already taken', 409);
+    }
+
+    const provisioned = await this.provisioning.provision({
+      clinic: { name: clinicName, phone },
+      owner: {
+        fullName: input.fullName.trim(),
+        phone,
+        email: input.email,
+        password: input.password,
+        locale: input.locale,
+      },
+      source: 'self-signup',
+    });
+
+    // Sign the director straight in — no verification gate to pass.
+    const { session, refreshToken } = await this.createSession(provisioned.owner.id);
+    const payload = {
+      sub: provisioned.owner.id,
+      clinicId: provisioned.clinic.id,
+      role: provisioned.owner.role as UserRole,
+      sid: session.id,
+    };
+    const [authUser, accessToken] = await Promise.all([
+      this.principal.buildAuthUser(payload),
+      this.tokens.signAccessToken(payload),
+    ]);
+
+    await this.audit.log({
+      action: AuditAction.LOGIN,
+      entity: 'User',
+      entityId: provisioned.owner.id,
+      userId: provisioned.owner.id,
+      clinicId: provisioned.clinic.id,
+    });
+
+    return {
+      user: authUser,
+      accessToken,
+      refreshToken,
+      trialEndsAt: provisioned.subscription.endsAt?.toISOString() ?? null,
+    };
+  }
 
   // ------------------------------------------------------------------ login
 
@@ -303,15 +404,28 @@ export class AuthService {
 
   // --------------------------------------------------------------------- me
 
+  private supportContact(): SupportContact {
+    return {
+      phone: this.config.env.SUPPORT_PHONE ?? null,
+      telegram: this.config.env.SUPPORT_TELEGRAM ?? null,
+    };
+  }
+
   async me(user: AuthUser): Promise<MeResult> {
     if (!user.clinicId) {
       // SUPER_ADMIN: platform scope, no clinic/branch context.
-      return { user, clinic: null, branches: [] };
+      return {
+        user,
+        clinic: null,
+        branches: [],
+        subscription: null,
+        support: this.supportContact(),
+      };
     }
 
     // Pre-branch-context bootstrap: /auth/me feeds the branch switcher before any
     // x-branch-id header exists, so the lookups bypass tenant scoping (justified).
-    const [clinic, branches] = await Promise.all([
+    const [clinic, branches, subscription] = await Promise.all([
       this.prisma.unscoped.clinic.findUnique({
         where: { id: user.clinicId },
         select: { id: true, name: true, logoUrl: true },
@@ -326,9 +440,10 @@ export class AuthService {
         select: { id: true, name: true },
         orderBy: { name: 'asc' },
       }),
+      this.subscriptions.getState(user.clinicId),
     ]);
 
-    return { user, clinic, branches };
+    return { user, clinic, branches, subscription, support: this.supportContact() };
   }
 
   // --------------------------------------------------------------- sessions

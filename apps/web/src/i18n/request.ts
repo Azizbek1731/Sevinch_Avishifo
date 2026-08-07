@@ -28,6 +28,7 @@ export const MESSAGE_NAMESPACES = [
   'superadmin',
   'statuses',
   'landing',
+  'subscription',
 ] as const;
 
 /**

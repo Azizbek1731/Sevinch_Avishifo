@@ -69,6 +69,11 @@ export const ErrorCode = {
   CLINIC_SUSPENDED: 'CLINIC_SUSPENDED',
   PLAN_LIMIT_REACHED: 'PLAN_LIMIT_REACHED',
   FEATURE_DISABLED: 'FEATURE_DISABLED',
+  /** Trial/subscription lapsed — the clinic is read-only until it is renewed. */
+  SUBSCRIPTION_EXPIRED: 'SUBSCRIPTION_EXPIRED',
+  CLINIC_NAME_TAKEN: 'CLINIC_NAME_TAKEN',
+  /** The phone already owns a clinic — one trial per director. */
+  PHONE_ALREADY_OWNS_CLINIC: 'PHONE_ALREADY_OWNS_CLINIC',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

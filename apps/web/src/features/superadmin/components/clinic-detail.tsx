@@ -5,12 +5,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { ArrowLeft, Building2, LogIn, Pause, Play } from 'lucide-react';
-import { ClinicStatus, formatUZS } from '@avishifo/shared';
+import { ClinicStatus, formatUZS, type UpdateSubscriptionInput } from '@avishifo/shared';
 import { Link } from '@/i18n/routing';
 import { useAuthStore } from '@/stores/auth-store';
-import { formatDate } from '@/lib/dates';
+import { formatDate, formatTz } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -45,6 +46,7 @@ export function ClinicDetailView({ clinicId }: { clinicId: string }) {
   const queryClient = useQueryClient();
 
   const [planId, setPlanId] = useState<string>('');
+  const [endsAtDate, setEndsAtDate] = useState<string>('');
   const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
 
   const clinicQuery = useQuery({
@@ -75,6 +77,17 @@ export function ClinicDetailView({ clinicId }: { clinicId: string }) {
     onSuccess: () => {
       invalidate();
       toast.success(t('detail.plan.assigned'));
+    },
+    onError: errorToast,
+  });
+
+  /** Extend/shorten in place — never resets startsAt (unlike assignPlan). */
+  const extendMutation = useMutation({
+    mutationFn: (input: UpdateSubscriptionInput) =>
+      superadminApi.updateSubscription(clinicId, input),
+    onSuccess: () => {
+      invalidate();
+      toast.success(t('detail.plan.extended'));
     },
     onError: errorToast,
   });
@@ -198,11 +211,72 @@ export function ClinicDetailView({ clinicId }: { clinicId: string }) {
               }
             />
             {clinic.subscription ? (
-              <InfoRow
-                label={t('clinics.columns.status')}
-                value={<StatusBadge status={clinic.subscription.status} group="subscription" />}
-              />
+              <>
+                <InfoRow
+                  label={t('clinics.columns.status')}
+                  value={<StatusBadge status={clinic.subscription.status} group="subscription" />}
+                />
+                <InfoRow
+                  label={t('detail.plan.endsAt')}
+                  value={
+                    clinic.subscription.endsAt ? (
+                      <span className={clinic.subscription.isExpired ? 'text-destructive' : ''}>
+                        {formatTz(clinic.subscription.endsAt, 'dd.MM.yyyy')}
+                        {clinic.subscription.isExpired
+                          ? ` · ${t('clinics.expired')}`
+                          : clinic.subscription.daysLeft !== null
+                            ? ` · ${t('clinics.daysLeft', { days: clinic.subscription.daysLeft })}`
+                            : ''}
+                      </span>
+                    ) : (
+                      t('detail.plan.perpetual')
+                    )
+                  }
+                />
+              </>
             ) : null}
+
+            {canWrite && clinic.subscription ? (
+              <div className="space-y-2 rounded-md border border-dashed p-3">
+                <Label>{t('detail.plan.extendTitle')}</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {[7, 14, 30].map((days) => (
+                    <Button
+                      key={days}
+                      size="sm"
+                      variant="outline"
+                      disabled={extendMutation.isPending}
+                      onClick={() => extendMutation.mutate({ extendDays: days })}
+                    >
+                      +{days} {t('detail.plan.days')}
+                    </Button>
+                  ))}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="date"
+                      className="w-40"
+                      value={endsAtDate}
+                      onChange={(e) => setEndsAtDate(e.target.value)}
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={!endsAtDate || extendMutation.isPending}
+                      onClick={() =>
+                        extendMutation.mutate({
+                          // End of the chosen day, so the clinic keeps that day.
+                          endsAt: new Date(`${endsAtDate}T23:59:59.000Z`).toISOString(),
+                        })
+                      }
+                    >
+                      {t('detail.plan.setDate')}
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">{t('detail.plan.extendHint')}</p>
+              </div>
+            ) : null}
+
             {canWrite ? (
               <div className="flex items-end gap-2">
                 <div className="flex-1 space-y-2">

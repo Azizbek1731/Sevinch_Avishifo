@@ -44,5 +44,8 @@
   "IDEMPOTENCY_CONFLICT": "Duplicate request",
   "CONSENT_REQUIRED": "Patient consent required",
   "OTP_INVALID": "Invalid code",
-  "OTP_EXPIRED": "Code expired"
+  "OTP_EXPIRED": "Code expired",
+  "SUBSCRIPTION_EXPIRED": "Subscription expired — the system is read-only. Contact us to continue.",
+  "CLINIC_NAME_TAKEN": "A clinic with this name already exists",
+  "PHONE_ALREADY_OWNS_CLINIC": "This phone number already owns a clinic"
 }

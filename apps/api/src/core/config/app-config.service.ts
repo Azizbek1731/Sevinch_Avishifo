@@ -39,6 +39,12 @@ const envSchema = z.object({
   CLICK_SECRET_KEY: z.string().optional(),
   UZUM_MERCHANT_ID: z.string().optional(),
   UZUM_SECRET_KEY: z.string().optional(),
+  /** Free-trial length for a self-service sign-up. */
+  TRIAL_DAYS: z.coerce.number().int().min(1).max(365).default(7),
+  /** Shown on the "trial expired" screen so the clinic can reach the operator. */
+  SUPPORT_PHONE: z.string().optional(),
+  /** Telegram username without @, e.g. "avishifo_support". */
+  SUPPORT_TELEGRAM: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

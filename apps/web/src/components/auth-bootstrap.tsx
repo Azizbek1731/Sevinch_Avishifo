@@ -1,15 +1,8 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
-import type { AuthUser } from '@avishifo/shared';
 import { api } from '@/lib/api-client';
-import { useAuthStore, type BranchInfo, type ClinicInfo } from '@/stores/auth-store';
-
-interface MeResponse {
-  user: AuthUser;
-  clinic: ClinicInfo | null;
-  branches: BranchInfo[];
-}
+import { useAuthStore, type MeResponse } from '@/stores/auth-store';
 
 /**
  * Module-level guard: the session is bootstrapped ONCE per full page load, not

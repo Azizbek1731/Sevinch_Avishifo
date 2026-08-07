@@ -1,0 +1,13 @@
+{
+  "contact": "Contact us",
+  "trial": {
+    "title": "Trial: {days} days left",
+    "description": "The system switches to read-only when the trial ends.",
+    "endsAt": "Until {date}. Read-only afterwards."
+  },
+  "expired": {
+    "trialTitle": "Trial ended — read-only mode",
+    "planTitle": "Subscription ended — read-only mode",
+    "description": "You can still view and print your data, but new records cannot be added. Contact us to continue."
+  }
+}

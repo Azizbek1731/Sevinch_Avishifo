@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl';
 import { loginSchema, type AuthUser, type LoginInput } from '@avishifo/shared';
 import { HeartPulse } from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
-import { useAuthStore, type BranchInfo, type ClinicInfo } from '@/stores/auth-store';
+import { useAuthStore, type MeResponse } from '@/stores/auth-store';
 import { useRouter } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,12 +31,6 @@ const DEMO_ACCOUNTS = [
   { roleKey: 'role.LAB_TECH', identifier: 'labor@shifomed.uz', password: 'Demo123!' },
   { roleKey: 'role.SUPER_ADMIN', identifier: 'admin@avishifo.uz', password: 'Admin123!' },
 ] as const;
-
-interface MeResponse {
-  user: AuthUser;
-  clinic: ClinicInfo | null;
-  branches: BranchInfo[];
-}
 
 export function LoginForm() {
   const t = useTranslations('auth');

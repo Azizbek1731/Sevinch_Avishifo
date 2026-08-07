@@ -14,7 +14,8 @@
       "branches": "Filiallar",
       "users": "Foydalanuvchilar",
       "patients": "Bemorlar",
-      "visits30d": "Tashriflar (30 kun)"
+      "visits30d": "Tashriflar (30 kun)",
+      "subscription": "Obuna"
     },
     "empty": {
       "title": "Klinikalar topilmadi",
@@ -32,6 +33,15 @@
       "ownerPhone": "Telefon",
       "ownerEmail": "Email",
       "password": "Parol"
+    },
+    "daysLeft": "{days} kun qoldi",
+    "expired": "Muddati tugagan",
+    "allSubscriptions": "Barcha obunalar",
+    "subscriptionFilter": {
+      "trial": "Sinovdagilar",
+      "expiring": "Tugayotgan (≤3 kun)",
+      "expired": "Muddati tugagan",
+      "paid": "To‘lovli"
     }
   },
   "status": {
@@ -57,7 +67,14 @@
       "current": "Joriy tarif",
       "select": "Tarifni tanlang",
       "assign": "Biriktirish",
-      "assigned": "Tarif biriktirildi"
+      "assigned": "Tarif biriktirildi",
+      "endsAt": "Tugash sanasi",
+      "perpetual": "Muddatsiz",
+      "extendTitle": "Muddatni uzaytirish",
+      "days": "kun",
+      "setDate": "Sana qo‘yish",
+      "extendHint": "Uzaytirish joriy obunani saqlaydi — sinov qaytadan boshlanmaydi. Muddati tugagan bo‘lsa, bugundan hisoblanadi.",
+      "extended": "Obuna muddati yangilandi"
     },
     "flags": {
       "title": "Funksiya kalitlari",

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
-import * as argon2 from 'argon2';
 import {
   AuditAction,
   ClinicStatus,
@@ -11,12 +10,28 @@ import {
   UserStatus,
   type AuthUser,
   type JwtPayload,
+  type SubscriptionFilter,
 } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
 import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
 import { AuditService } from '../../core/audit/audit.service';
+import { AppConfigService } from '../../core/config/app-config.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { AssignPlanDto, ClinicListQueryDto, CreateClinicWithOwnerDto, FeatureFlagSetDto, PlanUpdateDto, PlanUpsertDto, UpdateClinicStatusDto } from './dto/super-admin.dto';
+import {
+  ClinicProvisioningService,
+  daysFromNow,
+} from '../../core/provisioning/clinic-provisioning.service';
+import { SubscriptionService } from '../../core/subscription/subscription.service';
+import {
+  AssignPlanDto,
+  ClinicListQueryDto,
+  CreateClinicWithOwnerDto,
+  FeatureFlagSetDto,
+  PlanUpdateDto,
+  PlanUpsertDto,
+  UpdateClinicStatusDto,
+  UpdateSubscriptionDto,
+} from './dto/super-admin.dto';
 
 /**
  * TENANCY NOTE (justification for prisma.unscoped everywhere in this service):
@@ -27,9 +42,9 @@ import { AssignPlanDto, ClinicListQueryDto, CreateClinicWithOwnerDto, FeatureFla
  * clinicId filter derived from the validated route parameter.
  */
 
-const TRIAL_DAYS = 14;
 const IMPERSONATION_TTL = '30m';
-const FIRST_BRANCH_NAME = 'Asosiy filial';
+/** "Expiring soon" bucket for the clinic-list filter. */
+const EXPIRING_SOON_DAYS = 3;
 
 // ----------------------------------------------------------------- responses
 
@@ -48,9 +63,12 @@ export interface PlanResponse {
 
 export interface SubscriptionResponse {
   id: string;
-  status: string;
+  status: SubscriptionStatus;
   startsAt: string;
   endsAt: string | null;
+  /** Whole days until endsAt; 0 once lapsed; null when perpetual. */
+  daysLeft: number | null;
+  isExpired: boolean;
   plan: PlanResponse;
 }
 
@@ -121,87 +139,25 @@ type PlanRecord = Prisma.SubscriptionPlanGetPayload<Record<string, never>>;
 type SubscriptionWithPlan = Prisma.ClinicSubscriptionGetPayload<{ include: { plan: true } }>;
 type ClinicRecord = Prisma.ClinicGetPayload<Record<string, never>>;
 
-function daysFromNow(days: number, from = new Date()): Date {
-  return new Date(from.getTime() + days * 86_400_000);
-}
-
 @Injectable()
 export class SuperAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly jwt: JwtService,
+    private readonly provisioning: ClinicProvisioningService,
+    private readonly subscriptions: SubscriptionService,
+    private readonly config: AppConfigService,
   ) {}
 
   // ------------------------------------------------------------- clinics
 
   async createClinicWithOwner(input: CreateClinicWithOwnerDto): Promise<CreatedClinicResponse> {
-    const plan = await this.resolvePlan(input.planCode);
-    // Hash outside the transaction (argon2 is slow; keep the tx short).
-    const passwordHash = await argon2.hash(input.owner.password, { type: argon2.argon2id });
-
-    const now = new Date();
-    const result = await this.prisma.unscoped.$transaction(async (tx) => {
-      const clinic = await tx.clinic.create({
-        data: {
-          name: input.clinic.name,
-          legalName: input.clinic.legalName ?? null,
-          phone: input.clinic.phone ?? null,
-          email: input.clinic.email ?? null,
-          settings: {},
-        },
-      });
-
-      const branch = await tx.branch.create({
-        data: { clinicId: clinic.id, name: FIRST_BRANCH_NAME },
-      });
-
-      const owner = await tx.user.create({
-        data: {
-          clinicId: clinic.id,
-          fullName: input.owner.fullName,
-          phone: input.owner.phone,
-          email: input.owner.email ?? null,
-          passwordHash,
-          role: UserRole.CLINIC_OWNER,
-          status: UserStatus.ACTIVE,
-          branches: {
-            // nested create is not auto-stamped — clinicId set explicitly
-            create: [{ clinicId: clinic.id, branchId: branch.id }],
-          },
-        },
-      });
-
-      const subscription = await tx.clinicSubscription.create({
-        data: {
-          clinicId: clinic.id,
-          planId: plan.id,
-          status: SubscriptionStatus.TRIAL,
-          startsAt: now,
-          endsAt: daysFromNow(TRIAL_DAYS, now),
-        },
-        include: { plan: true },
-      });
-
-      return { clinic, branch, owner, subscription };
-    });
-
-    await this.audit.log({
-      action: AuditAction.CREATE,
-      entity: 'Clinic',
-      entityId: result.clinic.id,
-      clinicId: result.clinic.id,
-      // never log the password or its hash
-      after: {
-        name: result.clinic.name,
-        legalName: result.clinic.legalName,
-        phone: result.clinic.phone,
-        email: result.clinic.email,
-        ownerId: result.owner.id,
-        branchId: result.branch.id,
-        planCode: plan.code,
-        subscriptionStatus: SubscriptionStatus.TRIAL,
-      },
+    const result = await this.provisioning.provision({
+      clinic: input.clinic,
+      owner: input.owner,
+      planCode: input.planCode,
+      source: 'super-admin',
     });
 
     return {
@@ -230,14 +186,26 @@ export class SuperAdminService {
             ],
           }
         : {}),
+      ...(query.subscription ? { subscriptions: { some: this.subscriptionFilter(query.subscription) } } : {}),
     };
 
     const [clinics, total] = await Promise.all([
       this.prisma.unscoped.clinic.findMany({
         where,
         include: {
+          // Only LIVE rows — the same selector SubscriptionService uses, so the
+          // panel never shows a stale CANCELLED row as "the" subscription.
           subscriptions: {
-            orderBy: { createdAt: 'desc' },
+            where: {
+              status: {
+                in: [
+                  SubscriptionStatus.TRIAL,
+                  SubscriptionStatus.ACTIVE,
+                  SubscriptionStatus.PAST_DUE,
+                ],
+              },
+            },
+            orderBy: [{ startsAt: 'desc' }, { createdAt: 'desc' }],
             take: 1,
             include: { plan: true },
           },
@@ -269,7 +237,21 @@ export class SuperAdminService {
     const clinic = await this.prisma.unscoped.clinic.findUnique({
       where: { id },
       include: {
-        subscriptions: { orderBy: { createdAt: 'desc' }, take: 1, include: { plan: true } },
+        // Live rows only — same selector as the list and SubscriptionService.
+        subscriptions: {
+          where: {
+            status: {
+              in: [
+                SubscriptionStatus.TRIAL,
+                SubscriptionStatus.ACTIVE,
+                SubscriptionStatus.PAST_DUE,
+              ],
+            },
+          },
+          orderBy: [{ startsAt: 'desc' }, { createdAt: 'desc' }],
+          take: 1,
+          include: { plan: true },
+        },
         featureFlags: { orderBy: { key: 'asc' } },
       },
     });
@@ -399,7 +381,10 @@ export class SuperAdminService {
           planId: plan.id,
           status,
           startsAt: now,
-          endsAt: status === SubscriptionStatus.TRIAL ? daysFromNow(TRIAL_DAYS, now) : null,
+          endsAt:
+            status === SubscriptionStatus.TRIAL
+              ? daysFromNow(this.config.env.TRIAL_DAYS, now)
+              : null,
         },
         include: { plan: true },
       });
@@ -413,7 +398,65 @@ export class SuperAdminService {
       after: { planId: plan.id, planCode: plan.code, status },
     });
 
+    await this.subscriptions.invalidate(clinicId);
     return this.toSubscription(subscription);
+  }
+
+  /**
+   * Edit the clinic's CURRENT subscription in place — extend/shorten a trial,
+   * pin an end date, switch plan or status. Unlike assignPlan this keeps the
+   * same row (and its startsAt), so the trial clock is adjusted, not reset.
+   */
+  async updateSubscription(
+    clinicId: string,
+    input: UpdateSubscriptionDto,
+  ): Promise<SubscriptionResponse> {
+    await this.requireClinic(clinicId);
+    const current = await this.subscriptions.currentSubscription(clinicId);
+    if (!current) {
+      throw new AppException(
+        ErrorCode.NOT_FOUND,
+        'Clinic has no live subscription — assign a plan first',
+        404,
+      );
+    }
+
+    const data: Prisma.ClinicSubscriptionUpdateInput = {};
+    if (input.planId !== undefined) {
+      const plan = await this.prisma.unscoped.subscriptionPlan.findUnique({
+        where: { id: input.planId },
+      });
+      if (!plan) throw new AppException(ErrorCode.NOT_FOUND, 'Plan not found', 404);
+      data.plan = { connect: { id: plan.id } };
+    }
+    if (input.status !== undefined) data.status = input.status;
+    if (input.endsAt !== undefined) data.endsAt = input.endsAt ? new Date(input.endsAt) : null;
+    if (input.extendDays !== undefined) {
+      const now = new Date();
+      // Extend from the current end date, or from now when it has already lapsed
+      // (or is perpetual) — so "+7 days" always means 7 usable days from today.
+      const base =
+        current.endsAt && current.endsAt.getTime() > now.getTime() ? current.endsAt : now;
+      data.endsAt = daysFromNow(input.extendDays, base);
+    }
+
+    const updated = await this.prisma.unscoped.clinicSubscription.update({
+      where: { id: current.id },
+      data,
+      include: { plan: true },
+    });
+
+    await this.audit.log({
+      action: AuditAction.UPDATE,
+      entity: 'ClinicSubscription',
+      entityId: updated.id,
+      clinicId,
+      before: { status: current.status, endsAt: current.endsAt?.toISOString() ?? null },
+      after: { status: updated.status, endsAt: updated.endsAt?.toISOString() ?? null },
+    });
+
+    await this.subscriptions.invalidate(clinicId);
+    return this.toSubscription(updated);
   }
 
   async setFeatureFlag(clinicId: string, input: FeatureFlagSetDto): Promise<FeatureFlagResponse> {
@@ -520,25 +563,27 @@ export class SuperAdminService {
     return clinic;
   }
 
-  /** Plan by code, or the cheapest active plan when no code was supplied. */
-  private async resolvePlan(planCode?: string): Promise<PlanRecord> {
-    if (planCode) {
-      const plan = await this.prisma.unscoped.subscriptionPlan.findUnique({
-        where: { code: planCode },
-      });
-      if (!plan || !plan.isActive) {
-        throw new AppException(ErrorCode.NOT_FOUND, 'Subscription plan not found', 404);
-      }
-      return plan;
+  /** Prisma filter for the subscription buckets exposed by the clinic list. */
+  private subscriptionFilter(bucket: SubscriptionFilter): Prisma.ClinicSubscriptionWhereInput {
+    const now = new Date();
+    switch (bucket) {
+      case 'trial':
+        return { status: SubscriptionStatus.TRIAL, endsAt: { gt: now } };
+      case 'expiring':
+        return {
+          status: { in: [SubscriptionStatus.TRIAL, SubscriptionStatus.ACTIVE] },
+          endsAt: { gt: now, lte: daysFromNow(EXPIRING_SOON_DAYS, now) },
+        };
+      case 'expired':
+        return {
+          status: {
+            in: [SubscriptionStatus.TRIAL, SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE],
+          },
+          endsAt: { lte: now },
+        };
+      case 'paid':
+        return { status: SubscriptionStatus.ACTIVE };
     }
-    const cheapest = await this.prisma.unscoped.subscriptionPlan.findFirst({
-      where: { isActive: true },
-      orderBy: { priceMonthly: 'asc' },
-    });
-    if (!cheapest) {
-      throw new AppException(ErrorCode.NOT_FOUND, 'No active subscription plan available', 404);
-    }
-    return cheapest;
   }
 
   /** Grouped counts for the clinics on the current page — avoids per-clinic N+1. */
@@ -626,11 +671,18 @@ export class SuperAdminService {
   }
 
   private toSubscription(sub: SubscriptionWithPlan): SubscriptionResponse {
+    // Days-left is computed server-side so every client agrees on the number
+    // regardless of the viewer's timezone (UTC storage, Asia/Tashkent display).
+    const now = Date.now();
+    const endsAtMs = sub.endsAt?.getTime() ?? null;
     return {
       id: sub.id,
-      status: sub.status,
+      status: sub.status as SubscriptionStatus,
       startsAt: sub.startsAt.toISOString(),
       endsAt: sub.endsAt?.toISOString() ?? null,
+      daysLeft:
+        endsAtMs === null ? null : endsAtMs <= now ? 0 : Math.ceil((endsAtMs - now) / 86_400_000),
+      isExpired: endsAtMs !== null && endsAtMs <= now,
       plan: this.toPlan(sub.plan),
     };
   }
