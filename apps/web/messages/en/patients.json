@@ -200,7 +200,10 @@
     "paid": "Paid",
     "due": "Due",
     "status": "Status",
-    "empty": "No invoices"
+    "empty": "No invoices",
+    "addServices": "Add service",
+    "addServicesTitle": "Inpatient / multiple services",
+    "addServicesHint": "Select several services and print a single receipt"
   },
   "invoiceStatus": {
     "DRAFT": "Draft",

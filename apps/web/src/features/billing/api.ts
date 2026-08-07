@@ -183,6 +183,18 @@ export interface ServiceOption {
   isActive: boolean;
 }
 
+export interface ReceiptSettings {
+  paperWidth?: '58' | '80';
+  fontScale?: 'sm' | 'md' | 'lg';
+  showLogo?: boolean;
+  headerText?: string;
+  footerText?: string;
+  showTaxId?: boolean;
+  showCashier?: boolean;
+  showPatientMrn?: boolean;
+  showBranch?: boolean;
+}
+
 export interface ReceiptPayload {
   clinic: {
     name: string;
@@ -193,6 +205,7 @@ export interface ReceiptPayload {
     address: string | null;
   } | null;
   branch: { name: string; address: string | null; phone: string | null } | null;
+  receipt: ReceiptSettings;
   invoice: InvoiceSummary;
   patient: { id: string; mrn: string; fullName: string };
   lines: InvoiceLine[];

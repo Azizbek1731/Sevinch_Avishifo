@@ -6,7 +6,8 @@
     "branches": "Filiallar",
     "users": "Xodimlar",
     "templates": "Shablonlar",
-    "logs": "SMS jurnali"
+    "logs": "SMS jurnali",
+    "receipt": "Chek"
   },
   "form": {
     "required": "Majburiy maydon",
@@ -51,7 +52,8 @@
     "accessBranch": "Filialdagi barcha bemorlar",
     "queueAutoRecallPosition": "Navbatda avto qayta chaqirish pozitsiyasi",
     "recallHint": "O'tkazib yuborilgan bemorni shu pozitsiyadan keyin qayta chaqirish",
-    "saved": "Sozlamalar saqlandi"
+    "saved": "Sozlamalar saqlandi",
+    "saveInvalid": "Ba'zi maydonlar to'g'ri to'ldirilmagan — tekshiring"
   },
   "branches": {
     "add": "Filial qo'shish",
@@ -200,5 +202,41 @@
       "feedback": "Fikr-mulohaza",
       "audit": "Audit"
     }
+  },
+  "receipt": {
+    "title": "Chek ko'rinishi",
+    "desc": "Chek (kvitansiya) shabloni: qog'oz eni, shrift va ko'rsatiladigan maydonlar",
+    "logo": "Logotip",
+    "logoHint": "Chek yuqorisida chiqadigan klinika logotipi (PNG, JPG yoki SVG)",
+    "uploadLogo": "Logotip yuklash",
+    "removeLogo": "O'chirish",
+    "logoTooLarge": "Rasm juda katta — kichikroq faylni tanlang",
+    "logoInvalid": "Rasmni o'qib bo'lmadi",
+    "paperWidth": "Qog'oz eni",
+    "paper58": "58 mm",
+    "paper80": "80 mm",
+    "fontScale": "Shrift o'lchami",
+    "fontSm": "Kichik",
+    "fontMd": "O'rta",
+    "fontLg": "Katta",
+    "headerText": "Yuqori matn",
+    "headerHint": "Klinika nomi ostidagi qo'shimcha satr (shior, litsenziya...)",
+    "footerText": "Pastki matn",
+    "footerHint": "Chek pastida chiqadigan matn (masalan: Xaridingiz uchun rahmat!)",
+    "showLogo": "Logotipni ko'rsatish",
+    "showBranch": "Filial ma'lumotlarini ko'rsatish",
+    "showTaxId": "STIR ni ko'rsatish",
+    "showCashier": "Kassirni ko'rsatish",
+    "showPatientMrn": "Bemor kodini (MRN) ko'rsatish",
+    "preview": "Ko'rinish",
+    "previewBranch": "Bosh filial",
+    "taxIdShort": "STIR",
+    "receiptNoShort": "Chek №",
+    "patientShort": "Bemor",
+    "cashierShort": "Kassir",
+    "previewService1": "Kardiolog qabuli",
+    "previewService2": "EKG tekshiruvi",
+    "totalShort": "JAMI",
+    "thanksDefault": "Xaridingiz uchun rahmat!"
   }
 }

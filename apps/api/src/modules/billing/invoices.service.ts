@@ -713,15 +713,41 @@ export class InvoicesService {
     // we read only the current tenant's own row via the context clinicId.
     const clinic = await this.prisma.unscoped.clinic.findUnique({
       where: { id: clinicId },
-      select: { name: true, legalName: true, taxId: true, logoUrl: true, phone: true, address: true },
+      select: {
+        name: true,
+        legalName: true,
+        taxId: true,
+        logoUrl: true,
+        phone: true,
+        address: true,
+        settings: true,
+      },
     });
     const branch = await this.prisma.db.branch.findFirst({
       where: { id: invoice.branchId },
       select: { name: true, address: true, phone: true },
     });
+    // Receipt template customization lives under Clinic.settings.receipt.
+    const settings =
+      clinic && typeof clinic.settings === 'object' && clinic.settings !== null
+        ? (clinic.settings as Record<string, unknown>)
+        : {};
+    const receiptSettings =
+      typeof settings.receipt === 'object' && settings.receipt !== null ? settings.receipt : {};
+    const clinicLetterhead = clinic
+      ? {
+          name: clinic.name,
+          legalName: clinic.legalName,
+          taxId: clinic.taxId,
+          logoUrl: clinic.logoUrl,
+          phone: clinic.phone,
+          address: clinic.address,
+        }
+      : null;
     return {
-      clinic: clinic ?? null,
+      clinic: clinicLetterhead,
       branch: branch ?? null,
+      receipt: receiptSettings,
       invoice: this.mapInvoice(invoice),
       patient: invoice.patient,
       lines: invoice.lines.map((l) => this.mapLine(l)),

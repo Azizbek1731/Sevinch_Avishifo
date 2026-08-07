@@ -4,28 +4,63 @@ import { useLocale, useTranslations } from 'next-intl';
 import { formatUZS } from '@avishifo/shared';
 import { formatTz } from '@/lib/dates';
 import { localizedText } from '@/lib/localized';
+import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { Separator } from '@/components/ui/separator';
-import type { ReceiptPayload } from '../api';
+import type { ReceiptPayload, ReceiptSettings } from '../api';
+
+/** Receipt-body font size per the clinic's fontScale setting. */
+const FONT_SCALE: Record<NonNullable<ReceiptSettings['fontScale']>, string> = {
+  sm: 'text-[10px]',
+  md: 'text-xs',
+  lg: 'text-sm',
+};
 
 /**
- * 80mm thermal receipt body. Rendered on the receipt page and — off-screen —
- * by <ReceiptPrinter /> right after a front-desk sale. The `print-area` class
- * is what the global print stylesheet keeps visible.
+ * Thermal receipt body, styled from the clinic's receipt settings (Sozlamalar →
+ * Chek). Rendered on the receipt page and — off-screen — by <ReceiptPrinter />
+ * right after a front-desk sale, so both paths print the same customized slip.
+ * The `print-area` class is what the global print stylesheet keeps visible.
  */
 export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
   const t = useTranslations('billing');
   const locale = useLocale();
   const user = useAuthStore((s) => s.user);
 
+  // Receipt customization (clinic settings) with sensible defaults.
+  const rc: ReceiptSettings = data.receipt ?? {};
+  const paperWidth = rc.paperWidth === '58' ? '58mm' : '80mm';
+  const fontClass = FONT_SCALE[rc.fontScale ?? 'md'];
+  const showLogo = rc.showLogo !== false && Boolean(data.clinic?.logoUrl);
+  const showBranch = rc.showBranch !== false;
+  const showTaxId = rc.showTaxId !== false;
+  const showCashier = rc.showCashier !== false;
+  const showPatientMrn = rc.showPatientMrn === true;
+  const headerText = rc.headerText?.trim();
+  const footerText = rc.footerText?.trim() || t('receipt.thanks');
+
   return (
-    <div className="print-area rounded-md border bg-card p-4 font-mono text-xs leading-relaxed">
-      <div className="text-center">
+    <div
+      className={cn(
+        'print-area mx-auto w-full rounded-md border bg-card p-4 font-mono leading-relaxed',
+        fontClass,
+      )}
+      style={{ maxWidth: paperWidth }}
+    >
+      <div className="space-y-1 text-center">
+        {showLogo && data.clinic?.logoUrl ? (
+          <img
+            src={data.clinic.logoUrl}
+            alt={data.clinic?.name ?? ''}
+            className="mx-auto max-h-16 w-auto object-contain"
+          />
+        ) : null}
         <p className="text-sm font-bold uppercase">{data.clinic?.name ?? ''}</p>
-        {data.branch ? <p>{data.branch.name}</p> : null}
-        {data.branch?.address ? <p>{data.branch.address}</p> : null}
-        {data.branch?.phone ? <p>{data.branch.phone}</p> : null}
-        {data.clinic?.taxId ? (
+        {headerText ? <p className="whitespace-pre-line">{headerText}</p> : null}
+        {showBranch && data.branch ? <p>{data.branch.name}</p> : null}
+        {showBranch && data.branch?.address ? <p>{data.branch.address}</p> : null}
+        {showBranch && data.branch?.phone ? <p>{data.branch.phone}</p> : null}
+        {showTaxId && data.clinic?.taxId ? (
           <p>
             {t('receipt.taxId')}: {data.clinic.taxId}
           </p>
@@ -45,9 +80,12 @@ export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
         </div>
         <div className="flex justify-between gap-2">
           <span>{t('receipt.patient')}</span>
-          <span className="text-right">{data.patient.fullName}</span>
+          <span className="text-right">
+            {data.patient.fullName}
+            {showPatientMrn ? ` · ${data.patient.mrn}` : ''}
+          </span>
         </div>
-        {user ? (
+        {showCashier && user ? (
           <div className="flex justify-between gap-2">
             <span>{t('receipt.cashier')}</span>
             <span className="text-right">{user.fullName}</span>
@@ -115,7 +153,7 @@ export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
       ) : null}
 
       <Separator className="my-2" />
-      <p className="text-center">{t('receipt.thanks')}</p>
+      <p className="whitespace-pre-line text-center">{footerText}</p>
     </div>
   );
 }

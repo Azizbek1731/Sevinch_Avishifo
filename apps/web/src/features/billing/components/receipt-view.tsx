@@ -47,8 +47,8 @@ export function ReceiptView({ id }: { id: string }) {
         </Button>
       </div>
 
-      {/* 80mm thermal receipt */}
-      <div className="mx-auto w-full max-w-[80mm]">
+      {/* Thermal receipt — paper width comes from the clinic's receipt settings. */}
+      <div className="mx-auto w-full">
         <ReceiptDocument data={data} />
       </div>
     </div>
