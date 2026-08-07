@@ -51,5 +51,7 @@
   "TWO_FACTOR_REQUIRED": "Verification code required",
   "TWO_FACTOR_CHALLENGE_INVALID": "The code has expired. Please sign in again.",
   "TELEGRAM_NOT_LINKED": "Telegram bot is not linked",
-  "RECORD_ACCESS_REQUIRED": "Ask the clinic to release your medical history"
+  "RECORD_ACCESS_REQUIRED": "Ask the clinic to release your medical history",
+  "APPOINTMENT_NOT_FOUND": "Appointment not found",
+  "QUEUE_CLOSED": "The queue is closed"
 }

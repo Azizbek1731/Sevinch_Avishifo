@@ -2,116 +2,103 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Building2, FlaskConical, HeartPulse, ShieldCheck, UserRound } from 'lucide-react';
+import {
+  ArrowRight,
+  CalendarCheck,
+  FileText,
+  FlaskConical,
+  Send,
+  Stethoscope,
+  UserRound,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Link } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
-import { resolvePortalBaseUrl } from '@/lib/portal-url';
-import { useAuthStore } from '@/stores/auth-store';
+import { portalBaseUrlFallback, resolvePortalBaseUrl } from '@/lib/portal-url';
 import { SectionHeading } from './section-heading';
 import { Reveal } from './reveal';
 
-const CLINIC_POINTS: ReadonlyArray<{ icon: LucideIcon; key: string }> = [
-  { icon: Building2, key: 'entry.clinic.points.branches' },
-  { icon: HeartPulse, key: 'entry.clinic.points.queue' },
-  { icon: ShieldCheck, key: 'entry.clinic.points.trial' },
-];
-
-const PATIENT_POINTS: ReadonlyArray<{ icon: LucideIcon; key: string }> = [
-  { icon: FlaskConical, key: 'entry.patient.points.labs' },
-  { icon: UserRound, key: 'entry.patient.points.history' },
-  { icon: ShieldCheck, key: 'entry.patient.points.telegram' },
+const POINTS: ReadonlyArray<{ icon: LucideIcon; key: string }> = [
+  { icon: FlaskConical, key: 'labs' },
+  { icon: CalendarCheck, key: 'appointments' },
+  { icon: FileText, key: 'documents' },
+  { icon: Stethoscope, key: 'history' },
 ];
 
 /**
- * The two front doors. Clinics and patients arrive on the same landing page but
- * want opposite things — one is buying software, the other is looking up a lab
- * result — and a single "Sign in" button sent both to the staff panel, where a
- * patient has no account and no way to make one.
+ * The patient door. Everything above this band sells the CRM to a clinic, but a
+ * patient looking up a lab result arrives on the same page and has no account in
+ * the staff panel — they belong on the portal host, which is a different origin.
  */
-export function LandingEntry() {
+export function LandingPatientEntry() {
   const t = useTranslations('landing');
-  const authenticated = useAuthStore((s) => s.status === 'authenticated');
-  // The portal host is derived from window.location, so it can only be resolved
-  // after mount; until then the buttons point at the portal root path.
-  const [portal, setPortal] = useState('');
+  // The portal host is derived from window.location, so the real value only
+  // exists after mount. Start from the build-time fallback so the server renders
+  // a working link rather than a placeholder — these are the primary buttons for
+  // every patient who lands here, and a dead first paint loses them.
+  const [portal, setPortal] = useState(portalBaseUrlFallback);
   useEffect(() => setPortal(resolvePortalBaseUrl()), []);
 
   return (
-    <section id="entry" className="border-t border-border/60 bg-muted/30 py-16 sm:py-20">
+    <section
+      id="patient"
+      className="scroll-mt-20 border-y border-emerald-500/20 bg-emerald-500/[0.05] py-20 sm:py-24"
+    >
       <div className="container">
-        <SectionHeading eyebrow={t('entry.eyebrow')} title={t('entry.title')} subtitle={t('entry.subtitle')} />
+        <SectionHeading
+          eyebrow={
+            <span className="inline-flex items-center gap-1.5">
+              <UserRound className="h-3.5 w-3.5" />
+              {t('patient.eyebrow')}
+            </span>
+          }
+          title={t('patient.title')}
+          subtitle={t('patient.subtitle')}
+        />
 
-        <div className="mx-auto mt-10 grid max-w-4xl gap-5 md:grid-cols-2">
-          {/* Clinic */}
-          <Reveal>
-            <div className="flex h-full flex-col rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md sm:p-7">
-              <span className="inline-flex w-fit items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                <Building2 className="h-3.5 w-3.5" />
-                {t('entry.clinic.badge')}
-              </span>
-              <h3 className="mt-4 text-xl font-bold text-foreground">{t('entry.clinic.title')}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{t('entry.clinic.description')}</p>
-
-              <ul className="mt-5 flex flex-col gap-2.5">
-                {CLINIC_POINTS.map(({ icon: Icon, key }) => (
-                  <li key={key} className="flex items-start gap-2.5 text-sm text-foreground/80">
-                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    {t(key)}
-                  </li>
-                ))}
-              </ul>
-
-              <div className="mt-auto flex flex-col gap-2 pt-6 sm:flex-row">
-                <Button asChild className="sm:flex-1">
-                  <Link href={authenticated ? '/dashboard' : '/register'}>
-                    {authenticated ? t('cta.dashboard') : t('entry.clinic.register')}
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-                {authenticated ? null : (
-                  <Button asChild variant="outline" className="sm:flex-1">
-                    <Link href="/login">{t('entry.clinic.login')}</Link>
-                  </Button>
-                )}
+        <div className="mx-auto mt-12 grid max-w-5xl gap-5 sm:grid-cols-2">
+          {POINTS.map(({ icon: Icon, key }, i) => (
+            <Reveal key={key} delay={i * 70}>
+              <div className="flex h-full items-start gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="font-semibold text-foreground">{t(`patient.points.${key}.title`)}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    {t(`patient.points.${key}.desc`)}
+                  </p>
+                </div>
               </div>
-            </div>
-          </Reveal>
-
-          {/* Patient */}
-          <Reveal delay={80}>
-            <div className="flex h-full flex-col rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md sm:p-7">
-              <span className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                <UserRound className="h-3.5 w-3.5" />
-                {t('entry.patient.badge')}
-              </span>
-              <h3 className="mt-4 text-xl font-bold text-foreground">{t('entry.patient.title')}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{t('entry.patient.description')}</p>
-
-              <ul className="mt-5 flex flex-col gap-2.5">
-                {PATIENT_POINTS.map(({ icon: Icon, key }) => (
-                  <li key={key} className="flex items-start gap-2.5 text-sm text-foreground/80">
-                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                    {t(key)}
-                  </li>
-                ))}
-              </ul>
-
-              <div className="mt-auto flex flex-col gap-2 pt-6 sm:flex-row">
-                <Button asChild className="bg-emerald-600 text-white hover:bg-emerald-700 sm:flex-1">
-                  <a href={`${portal}/login`}>
-                    {t('entry.patient.login')}
-                    <ArrowRight className="h-4 w-4" />
-                  </a>
-                </Button>
-                <Button asChild variant="outline" className="sm:flex-1">
-                  <a href={`${portal}/register`}>{t('entry.patient.register')}</a>
-                </Button>
-              </div>
-              <p className="pt-3 text-xs text-muted-foreground">{t('entry.patient.hint')}</p>
-            </div>
-          </Reveal>
+            </Reveal>
+          ))}
         </div>
+
+        <Reveal delay={140}>
+          <div className="mx-auto mt-8 flex max-w-5xl flex-col items-center gap-5 rounded-2xl border border-emerald-500/25 bg-card p-6 text-center shadow-sm sm:p-8">
+            <p className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+              <Send className="h-4 w-4" />
+              {t('patient.telegram')}
+            </p>
+
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+              <Button
+                asChild
+                size="lg"
+                className="h-12 bg-emerald-600 px-8 text-base font-semibold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700"
+              >
+                <a href={portal ? `${portal}/login` : '#patient'}>
+                  {t('patient.login')}
+                  <ArrowRight className="h-4 w-4" />
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="lg" className="h-12 text-base">
+                <a href={portal ? `${portal}/register` : '#patient'}>{t('patient.register')}</a>
+              </Button>
+            </div>
+
+            <p className="text-sm text-muted-foreground">{t('patient.hint')}</p>
+          </div>
+        </Reveal>
       </div>
     </section>
   );

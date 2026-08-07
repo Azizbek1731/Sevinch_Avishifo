@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import {
+  AUTH_2FA_TTL_SECONDS,
   AuditAction,
   ErrorCode,
   UserRole,
@@ -14,6 +15,8 @@ import {
   type RegisterClinicInput,
   type RequestPasswordResetInput,
   type ResetPasswordWithOtpInput,
+  type TelegramLoginRequestInput,
+  type TelegramLoginVerifyInput,
 } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
 import { TwoFactorService } from './two-factor.service';
@@ -196,7 +199,10 @@ export class AuthService {
   // ------------------------------------------------------------------ login
 
   async login(input: LoginInput): Promise<LoginOutcome> {
-    const phone = normalizePhone(input.identifier);
+    // normalizePhone strips every non-digit, so an address that happens to carry
+    // nine digits ("clinic123456789@gmail.com") would be read as a phone and the
+    // account would never be found. An identifier with an @ is always an email.
+    const phone = input.identifier.includes('@') ? null : normalizePhone(input.identifier);
 
     // Pre-tenant identity resolution: no clinic context exists before login,
     // so the lookup must bypass tenant scoping (justified unscoped usage).
@@ -319,10 +325,24 @@ export class AuthService {
    */
   async verifyTwoFactor(input: VerifyTwoFactorInput): Promise<LoginResult> {
     const userId = await this.twoFactor.consume(input.challengeId, input.code);
+    const user = await this.requireSignInReady(userId);
+    return this.issueSession(user.id, user.clinicId, user.role as UserRole);
+  }
 
+  /**
+   * Re-reads the account between the two steps of a code login and refuses
+   * anything that would not have been allowed to start one. The gap is small but
+   * real: a suspension landing inside it must still take effect.
+   */
+  private async requireSignInReady(userId: string): Promise<{
+    id: string;
+    clinicId: string | null;
+    role: string;
+    twoFactorEnabled: boolean;
+  }> {
     // Unscoped: pre-tenant, and the id comes from the challenge we just burned.
     const user = await this.prisma.unscoped.user.findFirst({
-      where: { id: userId, deletedAt: null },
+      where: { id: userId, deletedAt: null, role: { not: UserRole.PATIENT } },
       include: { clinic: { select: { status: true } } },
     });
     if (!user) throw new AppException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials', 401);
@@ -331,6 +351,96 @@ export class AuthService {
     }
     if (user.clinic && user.clinic.status !== 'ACTIVE') {
       throw new AppException(ErrorCode.CLINIC_SUSPENDED, 'Clinic is suspended', 403);
+    }
+    return user;
+  }
+
+  // ------------------------------------------------- passwordless (Telegram)
+
+  /**
+   * Step one of signing in through the bot instead of typing a password.
+   *
+   * Every caller gets a challengeId, whether or not the phone belongs to anyone:
+   * a 404 (or a slower 200) here would turn this endpoint into a directory of
+   * which numbers are staff. When there is nobody to send to, nothing is sent
+   * and the returned challenge simply never verifies.
+   */
+  async requestTelegramLoginCode(
+    input: TelegramLoginRequestInput,
+  ): Promise<{ challengeId: string; expiresInSeconds: number }> {
+    // Pre-tenant identity resolution (same justification as login). PATIENT
+    // accounts are portal-only and have their own OTP flow.
+    // User.phone is unique per clinic, not globally, so a number reused across
+    // two clinics matches twice. Resolve the oldest — the same one the bot binds
+    // the chat to (bindChat orders identically) — or the code would be sent to a
+    // chat that belongs to the other account.
+    const user = await this.prisma.unscoped.user.findFirst({
+      where: { phone: input.phone, deletedAt: null, role: { not: UserRole.PATIENT } },
+      include: { clinic: { select: { status: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Same bar as a password login, plus somewhere to send the code. Every
+    // rejection leaves through the same door, silently. lockedUntil is part of
+    // that bar: an account the password door has locked after repeated failures
+    // must not stay open through this one.
+    if (
+      !user ||
+      user.status !== UserStatus.ACTIVE ||
+      (user.clinic && user.clinic.status !== 'ACTIVE') ||
+      (user.lockedUntil && user.lockedUntil > new Date()) ||
+      !user.telegramChatId
+    ) {
+      return this.decoyChallenge();
+    }
+
+    // The user turned on a second factor: letting a Telegram code alone in would
+    // quietly undo that decision, so they are sent to the password flow — which
+    // asks for a Telegram code as its second step anyway.
+    if (user.twoFactorEnabled) {
+      // Not awaited, for the same timing reason as the code itself below.
+      void this.twoFactor.notifyPasswordRequired(user.telegramChatId, user.fullName);
+      return this.decoyChallenge();
+    }
+
+    // One code per number per minute, so this endpoint cannot be used to bombard
+    // someone's Telegram. A caller inside the cooldown gets the usual decoy.
+    if (!(await this.twoFactor.claimSendSlot(input.phone))) {
+      return this.decoyChallenge();
+    }
+
+    // Delivery is deliberately NOT awaited: this endpoint is unauthenticated, and
+    // waiting on Telegram would make the response time reveal which numbers
+    // belong to staff with a linked chat.
+    return this.twoFactor.issueInBackground(
+      user.id,
+      user.telegramChatId,
+      user.fullName,
+      'passwordless',
+    );
+  }
+
+  /**
+   * A challenge id backed by nothing. Indistinguishable from a real one to the
+   * caller, and no code exists that could ever verify it.
+   */
+  private decoyChallenge(): { challengeId: string; expiresInSeconds: number } {
+    return { challengeId: randomUUID(), expiresInSeconds: AUTH_2FA_TTL_SECONDS };
+  }
+
+  /** Step two: the code from the bot is the whole of the authentication. */
+  async verifyTelegramLogin(input: TelegramLoginVerifyInput): Promise<LoginResult> {
+    const userId = await this.twoFactor.consume(input.challengeId, input.code, 'passwordless');
+    const user = await this.requireSignInReady(userId);
+
+    // Turned on between the two steps: honour the stricter setting, not the
+    // challenge that was issued before it.
+    if (user.twoFactorEnabled) {
+      throw new AppException(
+        ErrorCode.TWO_FACTOR_CHALLENGE_INVALID,
+        'Hisobingizda ikki bosqichli himoya yoqilgan — parolingiz bilan kiring.',
+        401,
+      );
     }
 
     return this.issueSession(user.id, user.clinicId, user.role as UserRole);

@@ -7,6 +7,8 @@ import {
   requestPasswordResetSchema,
   resetPasswordWithOtpSchema,
   setTwoFactorSchema,
+  telegramLoginRequestSchema,
+  telegramLoginVerifySchema,
   verifyTwoFactorSchema,
 } from '@avishifo/shared';
 
@@ -19,3 +21,6 @@ export class ResetPasswordWithOtpDto extends createZodDto(resetPasswordWithOtpSc
 
 export class VerifyTwoFactorDto extends createZodDto(verifyTwoFactorSchema) {}
 export class SetTwoFactorDto extends createZodDto(setTwoFactorSchema) {}
+
+export class TelegramLoginRequestDto extends createZodDto(telegramLoginRequestSchema) {}
+export class TelegramLoginVerifyDto extends createZodDto(telegramLoginVerifySchema) {}

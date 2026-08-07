@@ -303,9 +303,15 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const chatId = ctx.chat?.id;
     if (!contact || chatId === undefined) return;
 
-    // Only accept the sender's OWN contact — otherwise anyone could forward a
-    // colleague's contact card and take over their staff account.
-    if (contact.user_id !== undefined && ctx.from?.id !== undefined && contact.user_id !== ctx.from.id) {
+    // Only accept the sender's OWN contact, and require positive proof of it.
+    // `Contact.user_id` is optional in the Bot API: it is present when the user
+    // taps the request-contact button (their own card) and absent when they
+    // share an arbitrary address-book entry — which is exactly what an attacker
+    // does after saving a colleague's number. Treating "absent" as acceptable
+    // would let them bind that colleague's staff account to their own chat, and
+    // since the Telegram binding is now sufficient to sign in on its own, that
+    // is a full account takeover. Missing user_id therefore fails closed.
+    if (contact.user_id === undefined || contact.user_id !== ctx.from?.id) {
       await ctx.reply('Iltimos, faqat o‘zingizning raqamingizni yuboring.', {
         reply_markup: CONTACT_KEYBOARD,
       });

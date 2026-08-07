@@ -6,7 +6,7 @@
     "channel": "Канал",
     "locale": "Тил",
     "body": "Хабар матни",
-    "bodyPlaceholder": "Ҳурматли ъ{'patient_name'}ъ, сизнинг қабулингиз ъ{'time'}ъ да...",
+    "bodyPlaceholder": "Ҳурматли '{'patient_name'}', сизнинг қабулингиз '{'time'}' да...",
     "variablesHint": "Ўзгарувчилар",
     "save": "Шаблонни сақлаш",
     "saved": "Шаблон сақланди",

@@ -1,23 +1,26 @@
 {
   "meta": {
-    "title": "AviShifo — Klinikalar uchun zamonaviy CRM va HIS",
-    "description": "O'zbekistondagi xususiy klinikalar uchun ko'p filialli bulutli boshqaruv tizimi: jonli navbat, bemor kartasi, kassa, laboratoriya, SMS va Telegram bildirishnomalari."
+    "title": "AviShifo — klinikalar uchun CRM. 7 kun bepul sinang",
+    "description": "O'zbekistondagi xususiy klinikalar uchun ko'p filialli bulutli CRM: jonli navbat, bemor kartasi, kassa, laboratoriya, SMS va Telegram bildirishnomalari. 7 kun bepul sinov, karta talab qilinmaydi."
   },
   "nav": {
     "features": "Imkoniyatlar",
     "queue": "Jonli navbat",
     "why": "Nega AviShifo",
+    "trial": "Bepul sinov",
     "login": "Tizimga kirish",
+    "trialCta": "7 kun bepul",
     "language": "Til",
     "pricing": "Narxlar",
     "patient": "Bemor kabineti"
   },
   "hero": {
-    "badge": "O'zbekiston klinikalari uchun bulutli platforma",
-    "title": "Klinikangizni <hl>bitta tizimda</hl> boshqaring",
-    "subtitle": "Jonli navbatdan tortib bemor kartasi, kassa va analitikagacha — AviShifo xususiy klinikalar uchun to'liq bulutli boshqaruv platformasi.",
-    "ctaPrimary": "Bepul sinab ko‘rish",
-    "ctaSecondary": "Imkoniyatlar",
+    "badge": "Klinikalar uchun CRM — 7 kun bepul sinov",
+    "title": "Klinikangiz uchun CRM. <hl>7 kun bepul sinang</hl>",
+    "subtitle": "Jonli navbat, bemor kartasi, kassa, laboratoriya va analitika — hammasi bitta tizimda. Ro‘yxatdan o‘ting va bugunoq butun klinikangizni AviShifoda ishlatib ko‘ring.",
+    "ctaPrimary": "7 kun bepul sinab ko‘rish",
+    "ctaSecondary": "Imkoniyatlarni ko‘rish",
+    "noCard": "Karta talab qilinmaydi · 2 daqiqada ishga tushadi · Istalgan payt to‘xtatasiz",
     "trust": {
       "multiBranch": "Ko'p filialli",
       "realtime": "Real-time navbat",
@@ -172,11 +175,36 @@
       }
     }
   },
+  "trial": {
+    "eyebrow": "7 kun bepul",
+    "title": "Sinov qanday boshlanadi",
+    "subtitle": "Uch qadam, taxminan besh daqiqa — shundan keyin klinikangiz AviShifoda to‘liq ishlay boshlaydi.",
+    "steps": {
+      "signup": {
+        "title": "Ro‘yxatdan o‘ting",
+        "desc": "Klinika nomi va telefon raqamingizni kiriting, SMS kodi bilan tasdiqlang. Shartnoma ham, karta ham kerak emas."
+      },
+      "setup": {
+        "title": "Klinikangizni sozlang",
+        "desc": "Filiallar, shifokorlar va boshqa xodimlar, xizmatlar va narxlar — hammasini o‘zingiz bir joydan kiritasiz."
+      },
+      "launch": {
+        "title": "Ishni boshlang",
+        "desc": "Qabulxona bemorni navbatga qo‘yadi, shifokor kartani to‘ldiradi, kassa to‘lovni oladi — birinchi kunidanoq."
+      }
+    },
+    "assurances": {
+      "noCard": "Karta talab qilinmaydi",
+      "fullAccess": "7 kun davomida barcha modullar ochiq",
+      "ownData": "Ma'lumotlaringiz faqat sizniki — istalgan payt yuklab olasiz"
+    },
+    "cta": "Bepul sinovni boshlash"
+  },
   "finalCta": {
     "title": "Klinikangizni raqamlashtiring",
     "subtitle": "Bugun AviShifo bilan boshlang — qog'oz navbatlar va tarqoq jadvallarni unuting.",
-    "button": "Bepul boshlash",
-    "note": "Kredit karta talab qilinmaydi"
+    "button": "7 kun bepul sinab ko‘rish",
+    "note": "Karta talab qilinmaydi · Sinov o‘zi tugaydi, hech narsa yechilmaydi"
   },
   "footer": {
     "tagline": "Xususiy klinikalar uchun zamonaviy boshqaruv platformasi.",
@@ -187,6 +215,8 @@
       "features": "Imkoniyatlar",
       "queue": "Jonli navbat",
       "pricing": "Narxlar",
+      "trial": "7 kun bepul sinov",
+      "patient": "Bemor kabineti",
       "login": "Tizimga kirish",
       "about": "Biz haqimizda",
       "contact": "Aloqa",
@@ -205,8 +235,8 @@
     "popular": "Ommabop",
     "som": "so'm",
     "perMonth": "oy",
-    "cta": "Boshlash",
-    "note": "Barcha tariflar 14 kunlik bepul sinov bilan. Katta tarmoq uchun individual taklif — biz bilan bog'laning.",
+    "cta": "7 kun bepul sinash",
+    "note": "Barcha tariflar 7 kunlik bepul sinov bilan boshlanadi — karta talab qilinmaydi. Katta tarmoq uchun individual taklif: biz bilan bog‘laning.",
     "tiers": {
       "starter": {
         "name": "Starter",
@@ -246,34 +276,31 @@
       }
     }
   },
-  "entry": {
-    "eyebrow": "Kirish",
-    "title": "Siz kim sifatida kirmoqchisiz?",
-    "subtitle": "Klinika uchun boshqaruv paneli va bemorlar uchun shaxsiy kabinet — ikkalasi alohida.",
-    "clinic": {
-      "badge": "Klinika",
-      "title": "Klinika uchun",
-      "description": "Direktor, administrator, shifokor va kassir uchun to‘liq boshqaruv paneli.",
-      "points": {
-        "branches": "Ko‘p filial, xodimlar va rollar",
-        "queue": "Jonli navbat, bemor kartasi, kassa va laboratoriya",
-        "trial": "7 kun bepul sinov — karta talab qilinmaydi"
+  "patient": {
+    "eyebrow": "Bemorlar uchun",
+    "title": "Bemor kabineti — klinikangiz cho‘ntagingizda",
+    "subtitle": "Siz AviShifo ishlatadigan klinikaga qatnasangiz, tahlil va qabullaringizni navbat kutmasdan, telefoningizdan ko‘rasiz.",
+    "points": {
+      "labs": {
+        "title": "Tahlil natijalari",
+        "desc": "Natija laboratoriyada tayyor bo‘lishi bilan kabinetingizda paydo bo‘ladi — klinikaga qayta borish shart emas."
       },
-      "register": "Bepul ro‘yxatdan o‘tish",
-      "login": "Tizimga kirish"
+      "appointments": {
+        "title": "Qabullar va yozilish",
+        "desc": "Shifokorga onlayn yoziling, vaqtingizni ko‘ring va eslatmani o‘z vaqtida oling."
+      },
+      "documents": {
+        "title": "Hujjatlar va cheklar",
+        "desc": "Xulosalar, retseptlar va to‘lov cheklari bir joyda — istalgan payt yuklab olasiz."
+      },
+      "history": {
+        "title": "Kasallik tarixi",
+        "desc": "Tashxis va davolash tarixingiz — klinikangiz ruxsat bergandan keyin ochiladi."
+      }
     },
-    "patient": {
-      "badge": "Bemor",
-      "title": "Bemorlar uchun",
-      "description": "O‘z tahlillaringiz, qabullaringiz va hujjatlaringizni telefoningizdan ko‘ring.",
-      "points": {
-        "labs": "Tayyor bo‘lgan tahlil natijalari",
-        "history": "Kasallik tarixi — klinika ruxsatidan keyin",
-        "telegram": "Telegram bot orqali ham xabar va natijalar"
-      },
-      "login": "Bemor kabinetiga kirish",
-      "register": "Ro‘yxatdan o‘tish",
-      "hint": "Kirish telefon raqamingizga kelgan kod orqali — parol kerak emas."
-    }
+    "telegram": "Xuddi shu narsalar Telegram botimizda ham bor",
+    "login": "Bemor kabinetiga kirish",
+    "register": "Ro‘yxatdan o‘tish",
+    "hint": "Kirish telefon raqamingizga kelgan kod orqali — parol kerak emas."
   }
 }

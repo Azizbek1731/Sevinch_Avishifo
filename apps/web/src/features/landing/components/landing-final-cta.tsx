@@ -25,7 +25,7 @@ export function LandingFinalCta() {
                 anonymousLabel={t('finalCta.button')}
                 size="lg"
                 variant="secondary"
-                className="mt-2 text-base"
+                className="mt-2 h-12 px-8 text-base font-semibold shadow-lg"
               />
               <p className="text-sm text-primary-foreground/80">{t('finalCta.note')}</p>
             </div>

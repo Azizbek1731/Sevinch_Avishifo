@@ -51,5 +51,7 @@
   "TWO_FACTOR_CHALLENGE_INVALID": "Срок действия кода истёк. Войдите заново.",
   "TWO_FACTOR_REQUIRED": "Требуется код подтверждения",
   "TELEGRAM_NOT_LINKED": "Telegram-бот не привязан",
-  "RECORD_ACCESS_REQUIRED": "Получите разрешение клиники на просмотр истории болезни"
+  "RECORD_ACCESS_REQUIRED": "Получите разрешение клиники на просмотр истории болезни",
+  "APPOINTMENT_NOT_FOUND": "Приём не найден",
+  "QUEUE_CLOSED": "Очередь закрыта"
 }

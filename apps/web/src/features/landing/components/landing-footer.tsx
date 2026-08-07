@@ -2,8 +2,8 @@
 
 import type { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
-import { Link } from '@/i18n/routing';
 import { Logo } from './logo';
+import { PanelLink } from './panel-link';
 
 function FooterLink({ href, children }: { href: string; children: ReactNode }) {
   return (
@@ -32,13 +32,15 @@ export function LandingFooter() {
             <p className="text-sm font-semibold text-foreground">{t('footer.productTitle')}</p>
             <FooterLink href="#features">{t('footer.links.features')}</FooterLink>
             <FooterLink href="#queue">{t('footer.links.queue')}</FooterLink>
-            <FooterLink href="#top">{t('footer.links.pricing')}</FooterLink>
-            <Link
-              href="/login"
+            <FooterLink href="#pricing">{t('footer.links.pricing')}</FooterLink>
+            <FooterLink href="#trial">{t('footer.links.trial')}</FooterLink>
+            <FooterLink href="#patient">{t('footer.links.patient')}</FooterLink>
+            <PanelLink
+              path="login"
               className="text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               {t('footer.links.login')}
-            </Link>
+            </PanelLink>
           </div>
 
           <div className="flex flex-col gap-3">

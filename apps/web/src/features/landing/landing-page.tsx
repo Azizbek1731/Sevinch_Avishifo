@@ -3,7 +3,8 @@
 import { useEffect } from 'react';
 import { LandingNav } from './components/landing-nav';
 import { LandingHero } from './components/landing-hero';
-import { LandingEntry } from './components/landing-entry';
+import { LandingTrial } from './components/landing-trial';
+import { LandingPatientEntry } from './components/landing-entry';
 import { LandingStats } from './components/landing-stats';
 import { LandingFeatures } from './components/landing-features';
 import { LandingHighlight } from './components/landing-highlight';
@@ -36,13 +37,17 @@ export function LandingPage() {
       <LandingNav />
       <main className="flex-1">
         <LandingHero />
-        <LandingEntry />
+        <LandingTrial />
         <LandingStats />
         <LandingFeatures />
         <LandingHighlight />
         <LandingRoles />
         <LandingBenefits />
         <LandingPricing />
+        {/* Patients arrive on the same page but belong on the portal host, so
+            their door sits below the whole clinic pitch instead of competing
+            with it under the hero. */}
+        <LandingPatientEntry />
         <LandingFinalCta />
       </main>
       <LandingFooter />

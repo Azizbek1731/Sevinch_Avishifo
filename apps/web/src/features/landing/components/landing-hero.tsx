@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Building2, MessageSquare, Radio, Wallet } from 'lucide-react';
+import { ArrowRight, Building2, CreditCard, MessageSquare, Radio, Sparkles, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AuthCta } from './auth-cta';
@@ -26,8 +26,8 @@ export function LandingHero() {
 
       <div className="container grid items-center gap-12 py-16 sm:py-20 lg:grid-cols-2 lg:gap-10 lg:py-28">
         <div className="flex flex-col items-start gap-6">
-          <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+          <span className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm shadow-primary/10 sm:text-sm">
+            <Sparkles className="h-3.5 w-3.5" />
             {t('hero.badge')}
           </span>
 
@@ -39,15 +39,24 @@ export function LandingHero() {
 
           <p className="max-w-xl text-pretty text-lg text-muted-foreground">{t('hero.subtitle')}</p>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <AuthCta anonymousLabel={t('hero.ctaPrimary')} size="lg" className="text-base" />
-            <Button asChild variant="outline" size="lg" className="text-base">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+            <AuthCta
+              anonymousLabel={t('hero.ctaPrimary')}
+              size="lg"
+              className="h-12 px-8 text-base font-semibold shadow-lg shadow-primary/25 transition-transform hover:-translate-y-0.5"
+            />
+            <Button asChild variant="outline" size="lg" className="h-12 text-base">
               <a href="#features">
                 {t('hero.ctaSecondary')}
                 <ArrowRight className="h-4 w-4" />
               </a>
             </Button>
           </div>
+
+          <p className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <CreditCard className="h-4 w-4 text-primary" />
+            {t('hero.noCard')}
+          </p>
 
           <div className="mt-2 flex flex-wrap gap-2">
             {TRUST.map(({ icon: Icon, key }) => (

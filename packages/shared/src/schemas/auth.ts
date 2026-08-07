@@ -77,6 +77,25 @@ export const setTwoFactorSchema = z.object({
 });
 export type SetTwoFactorInput = z.infer<typeof setTwoFactorSchema>;
 
+/**
+ * Passwordless staff sign-in: the phone identifies the account and the code
+ * arrives in its linked Telegram chat. Email is deliberately not accepted here —
+ * the flow only works for an account bound to a chat, and the phone is what the
+ * bot binding is built around.
+ */
+export const telegramLoginRequestSchema = z.object({
+  phone: phoneSchema,
+});
+export type TelegramLoginRequestInput = z.infer<typeof telegramLoginRequestSchema>;
+
+/**
+ * Second step of the passwordless sign-in — same shape as the two-factor step,
+ * but the challenges are not interchangeable: each is tagged with the flow that
+ * issued it, so a code meant for one step cannot complete the other.
+ */
+export const telegramLoginVerifySchema = verifyTwoFactorSchema;
+export type TelegramLoginVerifyInput = VerifyTwoFactorInput;
+
 /** How long a pending 2FA challenge stays valid. */
 export const AUTH_2FA_TTL_SECONDS = 300;
 /** Wrong codes tolerated before the challenge is burned. */

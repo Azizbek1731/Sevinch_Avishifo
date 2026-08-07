@@ -1,18 +1,21 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { UserRound } from 'lucide-react';
 import { Logo } from './logo';
 import { LanguageSwitcher } from './language-switcher';
 import { AuthCta } from './auth-cta';
+import { PanelLink } from './panel-link';
 
 const NAV_LINKS: ReadonlyArray<{ href: string; key: string }> = [
+  { href: '#trial', key: 'nav.trial' },
   { href: '#features', key: 'nav.features' },
   { href: '#queue', key: 'nav.queue' },
   { href: '#why', key: 'nav.why' },
   { href: '#pricing', key: 'nav.pricing' },
 ];
 
-/** Sticky, blurred top navigation with brand, section links, locale + primary CTA. */
+/** Sticky, blurred top navigation with brand, section links, locale + both doors. */
 export function LandingNav() {
   const t = useTranslations('landing');
 
@@ -37,13 +40,22 @@ export function LandingNav() {
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <a
-            href="#entry"
-            className="hidden rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:inline-flex"
+            href="#patient"
+            className="hidden items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:inline-flex"
           >
+            <UserRound className="h-4 w-4" />
             {t('nav.patient')}
           </a>
           <LanguageSwitcher />
-          <AuthCta anonymousLabel={t('nav.login')} size="sm" showArrow={false} target="login" />
+          {/* A plain link rather than an AuthCta so it never duplicates the
+              primary button's label once a visitor is signed in. */}
+          <PanelLink
+            path="login"
+            className="hidden rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:inline-flex"
+          >
+            {t('nav.login')}
+          </PanelLink>
+          <AuthCta anonymousLabel={t('nav.trialCta')} size="sm" showArrow={false} />
         </div>
       </div>
     </header>

@@ -1,23 +1,26 @@
 {
   "meta": {
-    "title": "AviShifo — modern CRM and HIS for clinics",
-    "description": "A cloud, multi-branch management system for private clinics in Uzbekistan: live queue, patient records, cashier, laboratory, SMS and Telegram notifications."
+    "title": "AviShifo — CRM for clinics. Try it free for 7 days",
+    "description": "A cloud, multi-branch CRM for private clinics in Uzbekistan: live queue, patient records, cashier, laboratory, SMS and Telegram notifications. 7-day free trial, no card required."
   },
   "nav": {
     "features": "Features",
     "queue": "Live queue",
     "why": "Why AviShifo",
+    "trial": "Free trial",
     "login": "Sign in",
+    "trialCta": "7 days free",
     "language": "Language",
     "pricing": "Pricing",
     "patient": "Patient account"
   },
   "hero": {
-    "badge": "Cloud platform for clinics in Uzbekistan",
-    "title": "Run your clinic <hl>in one system</hl>",
-    "subtitle": "From the live queue to patient records, cashier and analytics — AviShifo is a complete cloud management platform for private clinics.",
-    "ctaPrimary": "Start free trial",
-    "ctaSecondary": "Features",
+    "badge": "CRM for clinics — 7-day free trial",
+    "title": "A CRM for your clinic. <hl>Try it free for 7 days</hl>",
+    "subtitle": "Live queue, patient records, cashier, laboratory and analytics — all in one system. Sign up and run your whole clinic on AviShifo today.",
+    "ctaPrimary": "Start the 7-day free trial",
+    "ctaSecondary": "See the features",
+    "noCard": "No card required · Live in 2 minutes · Cancel anytime",
     "trust": {
       "multiBranch": "Multi-branch",
       "realtime": "Real-time queue",
@@ -172,11 +175,36 @@
       }
     }
   },
+  "trial": {
+    "eyebrow": "7 days free",
+    "title": "How the trial starts",
+    "subtitle": "Three steps, about five minutes — and your clinic is fully running on AviShifo.",
+    "steps": {
+      "signup": {
+        "title": "Sign up",
+        "desc": "Enter your clinic name and phone number, confirm the SMS code. No contract, no card."
+      },
+      "setup": {
+        "title": "Set up your clinic",
+        "desc": "Branches, doctors and the rest of your staff, services and prices — all entered in one place."
+      },
+      "launch": {
+        "title": "Start working",
+        "desc": "Reception queues the patient, the doctor fills in the record, the cash desk takes payment — from day one."
+      }
+    },
+    "assurances": {
+      "noCard": "No card required",
+      "fullAccess": "Every module unlocked for all 7 days",
+      "ownData": "Your data stays yours — export it anytime"
+    },
+    "cta": "Start the free trial"
+  },
   "finalCta": {
     "title": "Digitize your clinic",
     "subtitle": "Get started with AviShifo today — leave paper queues and scattered schedules behind.",
-    "button": "Start free",
-    "note": "No credit card required"
+    "button": "Start the 7-day free trial",
+    "note": "No card required · The trial simply ends, nothing is charged"
   },
   "footer": {
     "tagline": "A modern management platform for private clinics.",
@@ -187,6 +215,8 @@
       "features": "Features",
       "queue": "Live queue",
       "pricing": "Pricing",
+      "trial": "7-day free trial",
+      "patient": "Patient account",
       "login": "Sign in",
       "about": "About us",
       "contact": "Contact",
@@ -205,8 +235,8 @@
     "popular": "Popular",
     "som": "UZS",
     "perMonth": "mo",
-    "cta": "Get started",
-    "note": "All plans include a 14-day free trial. For large networks, contact us for a custom offer.",
+    "cta": "Try 7 days free",
+    "note": "Every plan starts with a 7-day free trial — no card required. For large networks, contact us for a custom offer.",
     "tiers": {
       "starter": {
         "name": "Starter",
@@ -246,34 +276,31 @@
       }
     }
   },
-  "entry": {
-    "eyebrow": "Sign in",
-    "title": "How would you like to sign in?",
-    "subtitle": "A management panel for clinics and a personal account for patients — two separate doors.",
-    "clinic": {
-      "badge": "Clinic",
-      "title": "For clinics",
-      "description": "The full management panel for directors, admins, doctors and cashiers.",
-      "points": {
-        "branches": "Multiple branches, staff and roles",
-        "queue": "Live queue, patient card, cash desk and lab",
-        "trial": "7-day free trial — no card required"
+  "patient": {
+    "eyebrow": "For patients",
+    "title": "Patient account — your clinic in your pocket",
+    "subtitle": "If your clinic runs on AviShifo, your lab results and appointments are right there on your phone — no calls, no queueing.",
+    "points": {
+      "labs": {
+        "title": "Lab results",
+        "desc": "A result shows up in your account the moment the lab finishes it — no second trip to the clinic."
       },
-      "register": "Start free trial",
-      "login": "Sign in"
+      "appointments": {
+        "title": "Appointments and booking",
+        "desc": "Book a doctor online, see your slot and get a reminder before it."
+      },
+      "documents": {
+        "title": "Documents and receipts",
+        "desc": "Summaries, prescriptions and payment receipts in one place — download them anytime."
+      },
+      "history": {
+        "title": "Medical history",
+        "desc": "Diagnoses and treatment history — unlocked once your clinic approves it."
+      }
     },
-    "patient": {
-      "badge": "Patient",
-      "title": "For patients",
-      "description": "See your lab results, appointments and documents from your phone.",
-      "points": {
-        "labs": "Lab results as soon as they are ready",
-        "history": "Medical history — once your clinic approves",
-        "telegram": "Notifications and results in the Telegram bot too"
-      },
-      "login": "Open patient account",
-      "register": "Register",
-      "hint": "Sign in with a code sent to your phone — no password needed."
-    }
+    "telegram": "All of it is in our Telegram bot too",
+    "login": "Open patient account",
+    "register": "Register",
+    "hint": "Sign in with a code sent to your phone — no password needed."
   }
 }

@@ -4,14 +4,23 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { loginSchema, type AuthUser, type LoginInput } from '@avishifo/shared';
-import { ArrowLeft } from 'lucide-react';
+import { z } from 'zod';
+import {
+  formatNationalPhone,
+  loginSchema,
+  phoneSchema,
+  phoneWireValue,
+  type AuthUser,
+  type LoginInput,
+} from '@avishifo/shared';
+import { ArrowLeft, Send } from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
 import { useAuthStore, type MeResponse } from '@/stores/auth-store';
 import { Link, useRouter } from '@/i18n/routing';
 import { LogoMark } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +44,20 @@ function isTwoFactor(r: LoginResult): r is TwoFactorPending {
   return 'twoFactorRequired' in r;
 }
 
+/**
+ * A code is waiting to be typed. Both ways in end up here; the source decides
+ * which endpoint verifies the code and which step "back" returns to.
+ */
+type PendingCode =
+  | { source: 'password'; challengeId: string; hint: string | null }
+  | { source: 'telegram'; challengeId: string; phone: string };
+
+const telegramPhoneSchema = z.object({ phone: phoneSchema });
+type TelegramPhoneInput = z.infer<typeof telegramPhoneSchema>;
+
+/** Public bot handle — the chat a code can only reach once the account is linked. */
+const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT ?? 'AviShifoBot';
+
 /** Demo/staging helper — hidden when NEXT_PUBLIC_DEMO_LOGINS="false". */
 const SHOW_DEMO = process.env.NEXT_PUBLIC_DEMO_LOGINS !== 'false';
 
@@ -55,8 +78,10 @@ export function LoginForm() {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
   const [serverError, setServerError] = useState<string | null>(null);
-  /** Non-null once the password step returned a challenge instead of a session. */
-  const [challenge, setChallenge] = useState<TwoFactorPending | null>(null);
+  /** Which way in the user picked; the code screen sits on top of both. */
+  const [step, setStep] = useState<'password' | 'telegram'>('password');
+  /** Non-null once a step returned a challenge instead of a session. */
+  const [pending, setPending] = useState<PendingCode | null>(null);
   const [code, setCode] = useState('');
   const [verifying, setVerifying] = useState(false);
 
@@ -65,18 +90,54 @@ export function LoginForm() {
     defaultValues: { identifier: '', password: '' },
   });
 
+  const phoneForm = useForm<TelegramPhoneInput>({
+    resolver: zodResolver(telegramPhoneSchema),
+    defaultValues: { phone: '' },
+  });
+
+  function toMessage(err: unknown): string {
+    return err instanceof ApiError ? tErr(err.code as never) : tErr('INTERNAL_ERROR');
+  }
+
+  /** Switch steps with nothing left over — a stale code must never be sent against a fresh challenge. */
+  function goTo(next: 'password' | 'telegram'): void {
+    setServerError(null);
+    setPending(null);
+    setCode('');
+    phoneForm.reset({ phone: '' });
+    setStep(next);
+  }
+
   const onSubmit = form.handleSubmit(async (values) => {
     setServerError(null);
     try {
       const res = await api.post<LoginResult>('/auth/login', values, undefined);
       if (isTwoFactor(res.data)) {
-        setChallenge(res.data);
+        setPending({
+          source: 'password',
+          challengeId: res.data.challengeId,
+          hint: res.data.hint,
+        });
         return;
       }
       await establishSession(res.data);
     } catch (err) {
-      if (err instanceof ApiError) setServerError(tErr(err.code as never));
-      else setServerError(tErr('INTERNAL_ERROR'));
+      setServerError(toMessage(err));
+    }
+  });
+
+  const onRequestCode = phoneForm.handleSubmit(async ({ phone }) => {
+    setServerError(null);
+    try {
+      const res = await api.post<{ challengeId: string; expiresInSeconds: number }>(
+        '/auth/telegram/request-code',
+        { phone },
+        undefined,
+      );
+      setCode('');
+      setPending({ source: 'telegram', challengeId: res.data.challengeId, phone });
+    } catch (err) {
+      setServerError(toMessage(err));
     }
   });
 
@@ -90,23 +151,23 @@ export function LoginForm() {
 
   async function onVerify(e: React.FormEvent): Promise<void> {
     e.preventDefault();
-    if (!challenge || code.length !== 6) return;
+    if (!pending || code.length !== 6) return;
     setServerError(null);
     setVerifying(true);
     try {
       const res = await api.post<LoginResponse>(
-        '/auth/two-factor/verify',
-        { challengeId: challenge.challengeId, code },
+        pending.source === 'telegram' ? '/auth/telegram/verify' : '/auth/two-factor/verify',
+        { challengeId: pending.challengeId, code },
         undefined,
       );
       await establishSession(res.data);
     } catch (err) {
       if (err instanceof ApiError) {
         setServerError(tErr(err.code as never));
-        // An expired or burned challenge cannot be retried — go back to the
-        // password step rather than leaving the user typing into a dead form.
+        // An expired or burned challenge cannot be retried — go back to the step
+        // that issued it rather than leaving the user typing into a dead form.
         if (err.code === 'TWO_FACTOR_CHALLENGE_INVALID') {
-          setChallenge(null);
+          setPending(null);
           setCode('');
         }
       } else setServerError(tErr('INTERNAL_ERROR'));
@@ -115,16 +176,18 @@ export function LoginForm() {
     }
   }
 
-  if (challenge) {
+  if (pending) {
     return (
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-2 text-center">
           <LogoMark className="mx-auto h-14 w-14" />
           <CardTitle className="text-2xl">{t('twoFactor.title')}</CardTitle>
           <CardDescription>
-            {challenge.hint
-              ? t('twoFactor.subtitleWithHint', { hint: challenge.hint })
-              : t('twoFactor.subtitle')}
+            {pending.source === 'telegram'
+              ? t('telegramLogin.sent', { phone: `+998 ${formatNationalPhone(pending.phone)}` })
+              : pending.hint
+                ? t('twoFactor.subtitleWithHint', { hint: pending.hint })
+                : t('twoFactor.subtitle')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -159,16 +222,76 @@ export function LoginForm() {
               variant="ghost"
               size="sm"
               className="w-full text-muted-foreground"
-              onClick={() => {
-                setChallenge(null);
-                setCode('');
-                setServerError(null);
-              }}
+              onClick={() => goTo(pending.source === 'telegram' ? 'telegram' : 'password')}
             >
               <ArrowLeft className="mr-1 h-4 w-4" />
-              {t('twoFactor.back')}
+              {pending.source === 'telegram' ? t('telegramLogin.backToPhone') : t('twoFactor.back')}
             </Button>
           </form>
+
+          {pending.source === 'telegram' ? (
+            <div className="mt-5 space-y-2 rounded-lg border bg-muted/40 p-3 text-sm">
+              <p className="font-medium">{t('telegramLogin.noCodeTitle')}</p>
+              <p className="text-muted-foreground">{t('telegramLogin.noCode')}</p>
+              <Button asChild variant="outline" size="sm" className="w-full">
+                <a href={`https://t.me/${BOT_USERNAME}`} target="_blank" rel="noreferrer noopener">
+                  <Send className="h-4 w-4" />
+                  {t('telegramLogin.openBot', { bot: BOT_USERNAME })}
+                </a>
+              </Button>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (step === 'telegram') {
+    return (
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="space-y-2 text-center">
+          <LogoMark className="mx-auto h-14 w-14" />
+          <CardTitle className="text-2xl">{t('telegramLogin.title')}</CardTitle>
+          <CardDescription>{t('telegramLogin.subtitle')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onRequestCode} className="space-y-4" noValidate>
+            <div className="space-y-2">
+              <Label htmlFor="telegram-phone">{t('telegramLogin.phone')}</Label>
+              <PhoneInput
+                id="telegram-phone"
+                autoFocus
+                {...phoneForm.register('phone', { setValueAs: phoneWireValue })}
+              />
+              {phoneForm.formState.errors.phone ? (
+                <p className="text-sm text-destructive">{t('telegramLogin.phoneInvalid')}</p>
+              ) : null}
+            </div>
+            {serverError ? (
+              <p className="text-sm font-medium text-destructive" role="alert">
+                {serverError}
+              </p>
+            ) : null}
+            <Button type="submit" className="w-full" disabled={phoneForm.formState.isSubmitting}>
+              {phoneForm.formState.isSubmitting
+                ? t('telegramLogin.submitting')
+                : t('telegramLogin.submit')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground"
+              onClick={() => goTo('password')}
+            >
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              {t('telegramLogin.passwordInstead')}
+            </Button>
+          </form>
+
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            {t('telegramLogin.linkHint')}
+          </p>
         </CardContent>
       </Card>
     );
@@ -209,6 +332,20 @@ export function LoginForm() {
             {form.formState.isSubmitting ? t('loggingIn') : t('login')}
           </Button>
         </form>
+
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center" aria-hidden="true">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center">
+            <span className="bg-card px-2 text-xs uppercase text-muted-foreground">{t('or')}</span>
+          </div>
+        </div>
+
+        <Button type="button" variant="outline" className="w-full" onClick={() => goTo('telegram')}>
+          <Send className="h-4 w-4" />
+          {t('telegramLogin.cta')}
+        </Button>
 
         <div className="mt-6 space-y-3 border-t pt-4">
           <p className="text-center text-sm text-muted-foreground">

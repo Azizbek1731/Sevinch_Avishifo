@@ -33,6 +33,8 @@ import {
   RequestPasswordResetDto,
   ResetPasswordWithOtpDto,
   SetTwoFactorDto,
+  TelegramLoginRequestDto,
+  TelegramLoginVerifyDto,
   VerifyTwoFactorDto,
 } from './dto/auth.dto';
 
@@ -77,6 +79,39 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ user: AuthUser; accessToken: string }> {
     const { user, accessToken, refreshToken } = await this.auth.verifyTwoFactor(dto);
+    this.setRefreshCookie(res, refreshToken);
+    return { user, accessToken };
+  }
+
+  // ------------------------------------------------- passwordless (Telegram)
+
+  /**
+   * Asks the bot to send a sign-in code to the phone's linked chat.
+   *
+   * Always 200 with a challengeId, even for a phone nobody owns — see
+   * AuthService.requestTelegramLoginCode. Throttled like login: this endpoint
+   * makes the bot send a message on an unauthenticated request.
+   */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('telegram/request-code')
+  @HttpCode(200)
+  requestTelegramLoginCode(
+    @Body() dto: TelegramLoginRequestDto,
+  ): Promise<{ challengeId: string; expiresInSeconds: number }> {
+    return this.auth.requestTelegramLoginCode(dto);
+  }
+
+  /** Exchanges the code from the bot for a session — no password involved. */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('telegram/verify')
+  @HttpCode(200)
+  async verifyTelegramLogin(
+    @Body() dto: TelegramLoginVerifyDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ user: AuthUser; accessToken: string }> {
+    const { user, accessToken, refreshToken } = await this.auth.verifyTelegramLogin(dto);
     this.setRefreshCookie(res, refreshToken);
     return { user, accessToken };
   }
