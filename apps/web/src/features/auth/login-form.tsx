@@ -5,10 +5,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { loginSchema, type AuthUser, type LoginInput } from '@avishifo/shared';
-import { ArrowLeft, HeartPulse } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
 import { useAuthStore, type MeResponse } from '@/stores/auth-store';
 import { Link, useRouter } from '@/i18n/routing';
+import { LogoMark } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
@@ -64,9 +65,7 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-md shadow-lg">
       <CardHeader className="space-y-2 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <HeartPulse className="h-7 w-7" />
-        </div>
+        <LogoMark className="mx-auto h-14 w-14" />
         <CardTitle className="text-2xl">{t('loginTitle')}</CardTitle>
         <CardDescription>{t('loginSubtitle')}</CardDescription>
       </CardHeader>

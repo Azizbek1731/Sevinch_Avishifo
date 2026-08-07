@@ -8,7 +8,6 @@ import {
   ClipboardList,
   CreditCard,
   FlaskConical,
-  HeartPulse,
   LayoutDashboard,
   ListOrdered,
   MessageSquareHeart,
@@ -25,6 +24,7 @@ import type { Permission, UserRole } from '@avishifo/shared';
 import { Link, usePathname } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
+import { Logo } from '@/components/logo';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface NavItem {
@@ -99,11 +99,8 @@ export function Sidebar() {
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r bg-card md:flex">
-      <div className="flex h-14 items-center gap-2 border-b px-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <HeartPulse className="h-5 w-5" />
-        </div>
-        <span className="text-lg font-bold tracking-tight">AviShifo</span>
+      <div className="flex h-14 items-center border-b px-4">
+        <Logo size="sm" />
       </div>
       <ScrollArea className="flex-1 px-3 py-3">
         <nav className="flex flex-col gap-1">

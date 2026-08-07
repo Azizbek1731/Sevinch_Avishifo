@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="AviShifo">
+  <title>AviShifo</title>
+  <defs>
+    <linearGradient id="avishifoIcon" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#14A5E4" />
+      <stop offset="0.55" stop-color="#0B87C1" />
+      <stop offset="1" stop-color="#0A5C8C" />
+    </linearGradient>
+  </defs>
+
+  <!--
+    Favicon variant of the brand mark. The chip's pins and the inner heart are
+    dropped: below ~24px they collapse into noise. What survives is the heart
+    silhouette plus a single bold chip square, which stays readable at 16px.
+  -->
+  <path
+    fill="url(#avishifoIcon)"
+    d="M24 43.2c-1.1 0-2.16-.4-2.98-1.16C13.9 35.2 3 27.4 3 17.9 3 10.5 8.6 5 15.7 5c3.3 0 6.35 1.36 8.3 3.63C25.95 6.36 29 5 32.3 5 39.4 5 45 10.5 45 17.9c0 9.5-10.9 17.3-18.02 24.14-.82.76-1.88 1.16-2.98 1.16Z"
+  />
+  <rect x="16" y="14" width="16" height="16" rx="3.6" fill="none" stroke="#fff" stroke-width="3" />
+</svg>

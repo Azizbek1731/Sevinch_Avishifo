@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, HeartPulse, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import {
   registerClinicSchema,
   type AuthUser,
@@ -14,6 +14,7 @@ import {
 import { api, ApiError } from '@/lib/api-client';
 import { useAuthStore, type MeResponse } from '@/stores/auth-store';
 import { Link, useRouter } from '@/i18n/routing';
+import { LogoMark } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
@@ -60,9 +61,7 @@ export function RegisterForm({ trialDays = 7 }: { trialDays?: number }) {
   return (
     <Card className="w-full max-w-md shadow-lg">
       <CardHeader className="space-y-2 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <HeartPulse className="h-6 w-6" />
-        </div>
+        <LogoMark className="mx-auto h-14 w-14" />
         <CardTitle className="text-2xl">{t('register.title')}</CardTitle>
         <CardDescription>{t('register.subtitle', { days: trialDays })}</CardDescription>
       </CardHeader>

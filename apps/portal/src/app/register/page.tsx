@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { HeartPulse } from 'lucide-react';
+import { LogoMark } from '@/components/logo-mark';
 import { Gender, type PortalUpdateProfileInput } from '@avishifo/shared';
 import { api, errorMessage } from '@/lib/api';
 import type { PortalProfile } from '@/lib/types';
@@ -235,9 +235,7 @@ function RegisterContent() {
   return (
     <div className="mx-auto max-w-md">
       <div className="mb-6 flex flex-col items-center text-center">
-        <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-white shadow-sm">
-          <HeartPulse className="h-7 w-7" />
-        </span>
+        <LogoMark className="mb-3 h-16 w-16" />
         <h1 className="text-2xl font-bold">Ro&apos;yxatdan o&apos;tish</h1>
         <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
       </div>

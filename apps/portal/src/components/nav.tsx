@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { HeartPulse, LogIn, LogOut, UserRound } from 'lucide-react';
+import { LogIn, LogOut, UserRound } from 'lucide-react';
+import { LogoMark } from '@/components/logo-mark';
 import { toast } from 'sonner';
 import { useSession } from '@/stores/session';
 
@@ -39,9 +40,7 @@ export function Nav() {
       <div className="mx-auto w-full max-w-3xl px-4">
         <div className="flex h-14 items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-white">
-              <HeartPulse className="h-5 w-5" />
-            </span>
+            <LogoMark className="h-8 w-8" />
             <span className="text-lg font-bold tracking-tight text-slate-900">
               Avi<span className="text-brand">Shifo</span>
             </span>

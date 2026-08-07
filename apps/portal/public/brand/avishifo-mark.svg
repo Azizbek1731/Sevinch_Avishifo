@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="AviShifo">
+  <title>AviShifo</title>
+  <defs>
+    <linearGradient id="avishifoMark" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#14A5E4" />
+      <stop offset="0.55" stop-color="#0B87C1" />
+      <stop offset="1" stop-color="#0A5C8C" />
+    </linearGradient>
+  </defs>
+
+  <!-- Heart: the original mark's silhouette — wide lobes, deep notch, soft tip -->
+  <path
+    fill="url(#avishifoMark)"
+    d="M24 43.2c-1.1 0-2.16-.4-2.98-1.16C13.9 35.2 3 27.4 3 17.9 3 10.5 8.6 5 15.7 5c3.3 0 6.35 1.36 8.3 3.63C25.95 6.36 29 5 32.3 5 39.4 5 45 10.5 45 17.9c0 9.5-10.9 17.3-18.02 24.14-.82.76-1.88 1.16-2.98 1.16Z"
+  />
+
+  <!-- Chip: strokes so it stays crisp when scaled down -->
+  <g stroke="#fff" stroke-width="1.8" stroke-linecap="round" fill="none">
+    <rect x="16.6" y="14.6" width="14.8" height="14.8" rx="3.2" />
+    <path d="M16.6 19.1h-3.3M16.6 22h-3.3M16.6 24.9h-3.3" />
+    <path d="M31.4 19.1h3.3M31.4 22h3.3M31.4 24.9h3.3" />
+    <!-- top pins skip the centre: it would run into the heart's notch -->
+    <path d="M21.1 14.6v-3.3M26.9 14.6v-3.3" />
+    <path d="M21.1 29.4v3.3M24 29.4v3.3M26.9 29.4v3.3" />
+  </g>
+
+  <!-- Core: a small heart inside the chip, echoing the outer silhouette -->
+  <path
+    fill="#fff"
+    d="M24 26.9c-.3 0-.58-.11-.8-.31-1.92-1.79-3.5-3-3.5-4.62a2.46 2.46 0 0 1 2.5-2.44c.72 0 1.4.3 1.8.79.4-.49 1.08-.79 1.8-.79a2.46 2.46 0 0 1 2.5 2.44c0 1.62-1.58 2.83-3.5 4.62-.22.2-.5.31-.8.31Z"
+  />
+</svg>
