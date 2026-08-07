@@ -33,7 +33,8 @@
     "deleteDesc": "{name} kartasi arxivlanadi. Bu amalni ortga qaytarib bo'lmaydi.",
     "notFound": "Bemor topilmadi",
     "loadError": "Ma'lumotni yuklab bo'lmadi",
-    "backToList": "Bemorlar ro'yxatiga qaytish"
+    "backToList": "Bemorlar ro'yxatiga qaytish",
+    "addServices": "Xizmat qo'shish"
   },
   "tabs": {
     "overview": "Umumiy",

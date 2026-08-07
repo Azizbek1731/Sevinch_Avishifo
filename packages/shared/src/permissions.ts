@@ -138,6 +138,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'services.read',
     'schedules.read',
   ],
+  // Small clinics run the cash desk from the front desk: the receptionist books
+  // the visit, sells the services and takes the money. Refunds stay with the
+  // cashier/owner (they need a second pair of eyes).
   [UserRole.RECEPTIONIST]: [
     'patients.read',
     'patients.write',
@@ -150,6 +153,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'services.read',
     'invoices.read',
     'invoices.write',
+    'payments.create',
+    'shifts.manage',
+    'debts.read',
     'schedules.read',
   ],
   [UserRole.CASHIER]: [

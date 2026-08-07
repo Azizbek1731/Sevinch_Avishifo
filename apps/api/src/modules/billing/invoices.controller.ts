@@ -4,7 +4,13 @@ import type { AuthUser } from '@avishifo/shared';
 import { CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { PaginatedResult } from '../../common/pagination';
 import { InvoicesService } from './invoices.service';
-import { AddPaymentDto, CreateInvoiceDto, CreateRefundDto, InvoiceQueryDto } from './dto';
+import {
+  AddPaymentDto,
+  CreateInvoiceDto,
+  CreateRefundDto,
+  InvoiceQueryDto,
+  QuickInvoiceDto,
+} from './dto';
 
 @ApiTags('billing')
 @Controller('invoices')
@@ -15,6 +21,13 @@ export class InvoicesController {
   @RequirePermissions('invoices.write')
   create(@Body() dto: CreateInvoiceDto, @CurrentUser() user: AuthUser): Promise<Record<string, unknown>> {
     return this.invoices.create(dto, user);
+  }
+
+  /** Front-desk sale: create + issue + (pay now | leave as debt) in one call. */
+  @Post('quick')
+  @RequirePermissions('invoices.write')
+  quick(@Body() dto: QuickInvoiceDto, @CurrentUser() user: AuthUser): Promise<Record<string, unknown>> {
+    return this.invoices.quick(dto, user);
   }
 
   @Get()

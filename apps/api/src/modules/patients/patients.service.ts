@@ -55,6 +55,8 @@ export interface PatientResponse {
 }
 
 export interface PatientCardResponse extends PatientResponse {
+  /** Unpaid remainder across the patient's open invoices ("0.00" when clear). */
+  debt: string;
   counts: { visits: number; invoices: number; documents: number };
 }
 
@@ -219,8 +221,19 @@ export class PatientsService {
       include: { _count: { select: { visits: true, invoices: true, documents: true } } },
     });
     if (!patient) throw new AppException(ErrorCode.PATIENT_NOT_FOUND, 'Patient not found', 404);
+
+    // Debt = unpaid remainder of open invoices (same definition as the debtors
+    // report). It is independent of `balance`, which is the advance/deposit ledger.
+    const open = await this.prisma.db.invoice.aggregate({
+      where: { patientId: id, status: { in: ['ISSUED', 'PARTIALLY_PAID'] } },
+      _sum: { total: true, paidTotal: true },
+    });
+    const zero = new Prisma.Decimal(0);
+    const debt = (open._sum.total ?? zero).sub(open._sum.paidTotal ?? zero);
+
     return {
       ...mapPatient(patient),
+      debt: (debt.gt(0) ? debt : zero).toFixed(2),
       counts: {
         visits: patient._count.visits,
         invoices: patient._count.invoices,

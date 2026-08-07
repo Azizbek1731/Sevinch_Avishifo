@@ -33,7 +33,8 @@
     "deleteDesc": "The record of {name} will be archived. This action cannot be undone.",
     "notFound": "Patient not found",
     "loadError": "Failed to load data",
-    "backToList": "Back to patient list"
+    "backToList": "Back to patient list",
+    "addServices": "Add services"
   },
   "tabs": {
     "overview": "Overview",

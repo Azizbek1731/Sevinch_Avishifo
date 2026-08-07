@@ -65,6 +65,16 @@
     "success": "To'lov qabul qilindi",
     "viewReceipt": "Chekni ochish"
   },
+  "quick": {
+    "title": "Xizmat qo'shish",
+    "subtitle": "Bemorni tanlang va xizmatlarni qo'shing",
+    "payNow": "Hozir to'lash",
+    "debt": "Qarzga yozish",
+    "paidSuccess": "{number} — to'lov qabul qilindi, chek chop etilmoqda",
+    "debtSuccess": "{number} — bemor qarziga yozildi",
+    "viewInvoice": "Hisobni ochish",
+    "shiftRequired": "Naqd to'lovni qabul qilish uchun avval kassa smenasini oching"
+  },
   "refundDlg": {
     "title": "Qaytarish — {number}",
     "paid": "To'langan",

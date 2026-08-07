@@ -25,6 +25,7 @@ describe('billing: invoices, payments, shift (e2e)', () => {
   let invoiceId: string;
   let finalPaymentKey: string;
   let finalPaymentId: string;
+  let quickPaidInvoiceId: string;
 
   beforeAll(async () => {
     prisma = new PrismaClient();
@@ -232,12 +233,199 @@ describe('billing: invoices, payments, shift (e2e)', () => {
     expect(byMethod).toEqual([{ method: 'CASH', amount: '350000.00', count: 2 }]);
   });
 
-  it('receptionist cannot take payments (RBAC)', async () => {
+  it('receptionist cannot refund — that stays with the cashier/owner (RBAC)', async () => {
     const res = await request(app.getHttpServer())
-      .post(`${API}/invoices/${invoiceId}/payments`)
+      .post(`${API}/invoices/${invoiceId}/refunds`)
       .set('Authorization', `Bearer ${recep.accessToken}`)
-      .send({ amount: '1.00', method: 'CASH', idempotencyKey: randomUUID() });
+      .send({ amount: '1.00', method: 'CASH', reason: 'E2E ruxsatsiz qaytarish' });
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('FORBIDDEN');
+  });
+
+  // -------------------------------------------------- front-desk quick sale
+  // The receptionist sells services and takes the money at the same desk:
+  // POST /invoices/quick creates + issues + settles (or leaves it as debt).
+
+  it('quick sale on debt: issues the invoice and leaves the whole amount due', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`${API}/invoices/quick`)
+      .set('Authorization', `Bearer ${recep.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({
+        patientId,
+        branchId: clinic.branchId,
+        lines: [{ serviceId, quantity: 1, unitPrice: '150000.00' }],
+        settle: 'DEBT',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.paid).toBe(false);
+    expect(res.body.data.invoice).toMatchObject({
+      status: 'ISSUED',
+      total: '150000.00',
+      paidTotal: '0.00',
+      due: '150000.00',
+    });
+    expect(res.body.data.lines).toHaveLength(1);
+  });
+
+  it('the debt lands on the patient card and in the debtors list', async () => {
+    const card = await request(app.getHttpServer())
+      .get(`${API}/patients/${patientId}`)
+      .set('Authorization', `Bearer ${recep.accessToken}`);
+    expect(card.status).toBe(200);
+    expect(card.body.data.debt).toBe('150000.00');
+
+    const debtors = await request(app.getHttpServer())
+      .get(`${API}/debtors`)
+      .set('Authorization', `Bearer ${recep.accessToken}`);
+    expect(debtors.status).toBe(200);
+    const row = (debtors.body.data.items as Array<{ patient: { id: string }; debt: string }>).find(
+      (d) => d.patient.id === patientId,
+    );
+    expect(row?.debt).toBe('150000.00');
+  });
+
+  it('quick pay-now in cash without an open shift → 409, and the sale degrades to debt', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`${API}/invoices/quick`)
+      .set('Authorization', `Bearer ${recep.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({
+        patientId,
+        branchId: clinic.branchId,
+        lines: [{ serviceId, quantity: 1, unitPrice: '100000.00' }],
+        settle: 'PAY_NOW',
+        method: 'CASH',
+        idempotencyKey: randomUUID(),
+      });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('SHIFT_NOT_OPEN');
+
+    // The invoice was still issued, so the money is tracked as debt (never lost).
+    const card = await request(app.getHttpServer())
+      .get(`${API}/patients/${patientId}`)
+      .set('Authorization', `Bearer ${recep.accessToken}`);
+    expect(card.body.data.debt).toBe('250000.00');
+  });
+
+  it('PAY_NOW without a payment method is rejected by validation', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`${API}/invoices/quick`)
+      .set('Authorization', `Bearer ${recep.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({
+        patientId,
+        branchId: clinic.branchId,
+        lines: [{ serviceId, quantity: 1, unitPrice: '100000.00' }],
+        settle: 'PAY_NOW',
+      });
+    expect(res.status).toBe(400);
+  });
+
+  it('receptionist opens their own shift and a quick sale settles on the spot', async () => {
+    const shift = await request(app.getHttpServer())
+      .post(`${API}/shifts/open`)
+      .set('Authorization', `Bearer ${recep.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({ openingCash: '0' });
+    expect(shift.status).toBe(201);
+
+    const res = await request(app.getHttpServer())
+      .post(`${API}/invoices/quick`)
+      .set('Authorization', `Bearer ${recep.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({
+        patientId,
+        branchId: clinic.branchId,
+        lines: [{ serviceId, quantity: 2, unitPrice: '150000.00', discount: '50000.00' }],
+        settle: 'PAY_NOW',
+        method: 'CASH',
+        idempotencyKey: randomUUID(),
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.paid).toBe(true);
+    expect(res.body.data.invoice).toMatchObject({
+      status: 'PAID',
+      subtotal: '300000.00',
+      discountTotal: '50000.00',
+      total: '250000.00',
+      paidTotal: '250000.00',
+      due: '0.00',
+    });
+    expect(res.body.data.payment).toMatchObject({
+      amount: '250000.00',
+      method: 'CASH',
+      status: 'COMPLETED',
+    });
+    quickPaidInvoiceId = res.body.data.invoice.id as string;
+  });
+
+  it('the settled sale yields a printable receipt payload', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`${API}/invoices/${quickPaidInvoiceId}/receipt`)
+      .set('Authorization', `Bearer ${recep.accessToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.totals).toMatchObject({
+      total: '250000.00',
+      paidTotal: '250000.00',
+      due: '0.00',
+    });
+    expect(res.body.data.payments).toHaveLength(1);
+    expect(res.body.data.lines).toHaveLength(1);
+    expect(res.body.data.clinic).toBeTruthy();
+  });
+
+  it('a doctor cannot make a front-desk sale (RBAC)', async () => {
+    const doctor = await login(app, clinic.doctor.email);
+    const res = await request(app.getHttpServer())
+      .post(`${API}/invoices/quick`)
+      .set('Authorization', `Bearer ${doctor.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({
+        patientId,
+        branchId: clinic.branchId,
+        lines: [{ serviceId, quantity: 1, unitPrice: '150000.00' }],
+        settle: 'DEBT',
+      });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN');
+  });
+
+  it('selling is allowed but settling is not, when payments.create is revoked', async () => {
+    await prisma.user.update({
+      where: { id: clinic.receptionist.id },
+      data: { permissionOverrides: { revoke: ['payments.create'] } },
+    });
+
+    const payNow = await request(app.getHttpServer())
+      .post(`${API}/invoices/quick`)
+      .set('Authorization', `Bearer ${recep.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({
+        patientId,
+        branchId: clinic.branchId,
+        lines: [{ serviceId, quantity: 1, unitPrice: '150000.00' }],
+        settle: 'PAY_NOW',
+        method: 'CASH',
+        idempotencyKey: randomUUID(),
+      });
+    expect(payNow.status).toBe(403);
+    expect(payNow.body.error.code).toBe('FORBIDDEN');
+
+    const onDebt = await request(app.getHttpServer())
+      .post(`${API}/invoices/quick`)
+      .set('Authorization', `Bearer ${recep.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({
+        patientId,
+        branchId: clinic.branchId,
+        lines: [{ serviceId, quantity: 1, unitPrice: '150000.00' }],
+        settle: 'DEBT',
+      });
+    expect(onDebt.status).toBe(201);
+    expect(onDebt.body.data.paid).toBe(false);
   });
 });

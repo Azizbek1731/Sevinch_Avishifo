@@ -84,5 +84,9 @@
     "subtitle": "{ticket} — {patient}",
     "targetDoctor": "Новый врач",
     "confirm": "Перевести"
+  },
+  "cashDesk": {
+    "title": "Касса",
+    "addServices": "Добавить услуги"
   }
 }

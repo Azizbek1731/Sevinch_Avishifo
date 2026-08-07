@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { GitMerge, Pencil, Trash2, UserX } from 'lucide-react';
+import { GitMerge, Pencil, Plus, Trash2, UserX } from 'lucide-react';
 import { formatPhone, formatUZS } from '@avishifo/shared';
 import { useRouter } from '@/i18n/routing';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { ApiError } from '@/lib/api-client';
+import { AddServicesDialog } from '@/features/billing/components/add-services-dialog';
 import { patientsApi } from '../api';
 import { useApiErrorToast, usePatient, usePermissions } from '../hooks';
 import { MergePatientDialog } from './merge-patient-dialog';
@@ -48,6 +49,7 @@ export function PatientCardView({ patientId }: { patientId: string }) {
   const [editOpen, setEditOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [addServicesOpen, setAddServicesOpen] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: () => patientsApi.remove(patientId),
@@ -92,6 +94,7 @@ export function PatientCardView({ patientId }: { patientId: string }) {
   }
 
   const negative = patient.balance.startsWith('-');
+  const hasDebt = Number.parseFloat(patient.debt) > 0;
 
   return (
     <div className="space-y-4">
@@ -120,10 +123,21 @@ export function PatientCardView({ patientId }: { patientId: string }) {
                 {formatUZS(patient.balance)}
                 {negative ? ` · ${t('card.debt')}` : ''}
               </span>
+              {hasDebt ? (
+                <span className="font-medium text-destructive">
+                  {t('card.debt')}: {formatUZS(patient.debt)}
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {can('invoices.write') ? (
+            <Button size="sm" onClick={() => setAddServicesOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              {t('card.addServices')}
+            </Button>
+          ) : null}
           {can('patients.write') ? (
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="mr-1 h-4 w-4" />
@@ -190,6 +204,16 @@ export function PatientCardView({ patientId }: { patientId: string }) {
         ) : null}
       </Tabs>
 
+      <AddServicesDialog
+        open={addServicesOpen}
+        onOpenChange={setAddServicesOpen}
+        patient={{
+          id: patient.id,
+          mrn: patient.mrn,
+          fullName: patient.fullName,
+          phone: patient.phone,
+        }}
+      />
       <PatientFormDialog open={editOpen} onOpenChange={setEditOpen} patient={patient} />
       <MergePatientDialog open={mergeOpen} onOpenChange={setMergeOpen} primary={patient} />
       <ConfirmDialog

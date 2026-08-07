@@ -12,6 +12,7 @@ import type {
   OpenShiftInput,
   PaymentMethod,
   PaymentStatus,
+  QuickInvoiceInput,
 } from '@avishifo/shared';
 import { api, type ApiResult } from '@/lib/api-client';
 
@@ -89,6 +90,14 @@ export interface InvoiceDetail extends InvoiceSummary {
   lines: InvoiceLine[];
   payments: InvoicePayment[];
   refunds: InvoiceRefund[];
+}
+
+/** Result of a front-desk sale (`POST /invoices/quick`). */
+export interface QuickInvoiceResult {
+  invoice: InvoiceSummary;
+  lines: InvoiceLine[];
+  payment?: InvoicePayment;
+  paid: boolean;
 }
 
 export interface CashierShift {
@@ -223,6 +232,7 @@ export const billingApi = {
     api.get<InvoiceListItem[]>('/invoices', { ...q }),
   getInvoice: (id: string) => api.get<InvoiceDetail>(`/invoices/${id}`),
   createInvoice: (body: CreateInvoiceInput) => api.post<InvoiceDetail>('/invoices', body),
+  quickInvoice: (body: QuickInvoiceInput) => api.post<QuickInvoiceResult>('/invoices/quick', body),
   issueInvoice: (id: string) => api.post<InvoiceSummary>(`/invoices/${id}/issue`),
   cancelInvoice: (id: string) => api.post<InvoiceSummary>(`/invoices/${id}/cancel`),
   addPayment: (id: string, body: AddPaymentInput) =>

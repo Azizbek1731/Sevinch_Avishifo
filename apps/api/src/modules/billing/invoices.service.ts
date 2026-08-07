@@ -16,6 +16,7 @@ import {
   type CreateInvoiceInput,
   type CreateRefundInput,
   type InvoiceQueryInput,
+  type QuickInvoiceInput,
 } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
 import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
@@ -322,6 +323,48 @@ export class InvoicesService {
     });
 
     return { ...this.mapInvoice(invoice), lines: invoice.lines.map((l) => this.mapLine(l)) };
+  }
+
+  /**
+   * Front-desk one-shot sale (spec §M8): create → issue → settle in a single
+   * call. `PAY_NOW` pays the whole invoice with the given method (an open
+   * cashier shift is required for CASH — enforced by `addPayment`); `DEBT`
+   * leaves it ISSUED so it shows up under the patient's debt and in the
+   * debtors list. If the payment leg fails the invoice stays ISSUED, i.e. it
+   * degrades into exactly the DEBT outcome rather than a stuck DRAFT.
+   */
+  async quick(dto: QuickInvoiceInput, user: AuthUser): Promise<Record<string, unknown>> {
+    if (dto.settle === 'PAY_NOW' && !user.permissions.includes('payments.create')) {
+      throw new AppException(
+        ErrorCode.FORBIDDEN,
+        'payments.create permission is required to settle an invoice immediately',
+        403,
+      );
+    }
+
+    const created = await this.create(
+      {
+        patientId: dto.patientId,
+        branchId: dto.branchId,
+        visitId: dto.visitId,
+        lines: dto.lines,
+      },
+      user,
+    );
+    const invoiceId = created.id as string;
+    const issued = await this.issue(invoiceId);
+
+    if (dto.settle === 'DEBT' || dto.method === undefined || dto.idempotencyKey === undefined) {
+      return { invoice: issued, lines: created.lines, paid: false };
+    }
+
+    const due = issued.due as string;
+    const settled = await this.addPayment(
+      invoiceId,
+      { amount: due, method: dto.method, idempotencyKey: dto.idempotencyKey },
+      user,
+    );
+    return { ...settled, lines: created.lines, paid: true };
   }
 
   async list(q: InvoiceQueryInput): Promise<PaginatedResult<Record<string, unknown>>> {

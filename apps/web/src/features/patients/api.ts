@@ -50,6 +50,8 @@ export interface Patient {
 }
 
 export interface PatientCard extends Patient {
+  /** Unpaid remainder across open invoices ("0.00" when the patient is clear). */
+  debt: string;
   counts: { visits: number; invoices: number; documents: number };
 }
 

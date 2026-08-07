@@ -66,6 +66,16 @@
   }
 }
 
+/* Holder for a receipt that exists only to be printed (see ReceiptPrinter):
+   parked off-screen, and made a static ancestor while printing so the
+   .print-area inside anchors to the page and not to this box. */
+.print-offscreen {
+  position: fixed;
+  top: 0;
+  left: -200vw;
+  width: 80mm;
+}
+
 /* Print styles: hide app chrome, show only .print-area (prescription, receipt, ...) */
 @media print {
   body * {
@@ -79,6 +89,11 @@
     position: absolute;
     inset: 0;
     width: 100%;
+  }
+  .print-offscreen {
+    position: static;
+    left: auto;
+    width: auto;
   }
   @page {
     margin: 12mm;

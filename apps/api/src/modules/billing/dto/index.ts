@@ -15,10 +15,12 @@ import {
   invoiceQuerySchema,
   openShiftSchema,
   paginationQuerySchema,
+  quickInvoiceSchema,
 } from '@avishifo/shared';
 
 // ---- Invoices
 export class CreateInvoiceDto extends createZodDto(createInvoiceSchema) {}
+export class QuickInvoiceDto extends createZodDto(quickInvoiceSchema) {}
 export class InvoiceQueryDto extends createZodDto(invoiceQuerySchema) {}
 export class AddPaymentDto extends createZodDto(addPaymentSchema) {}
 export class CreateRefundDto extends createZodDto(createRefundSchema) {}

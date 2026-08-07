@@ -46,6 +46,37 @@ export const addPaymentSchema = z.object({
 });
 export type AddPaymentInput = z.infer<typeof addPaymentSchema>;
 
+/**
+ * Front-desk one-shot sale: create the invoice, issue it and either settle it
+ * right away (`PAY_NOW` → receipt) or leave it open as patient debt (`DEBT`).
+ * Keeps the three-step create/issue/pay dance server-side so a half-finished
+ * sale can never be left in DRAFT by a dropped connection.
+ */
+export const INVOICE_SETTLEMENTS = ['PAY_NOW', 'DEBT'] as const;
+export type InvoiceSettlement = (typeof INVOICE_SETTLEMENTS)[number];
+
+export const quickInvoiceSchema = z
+  .object({
+    patientId: idSchema,
+    branchId: idSchema,
+    visitId: idSchema.optional(),
+    lines: z.array(invoiceLineSchema).min(1),
+    settle: z.enum(INVOICE_SETTLEMENTS),
+    /** Required for PAY_NOW. */
+    method: z.nativeEnum(PaymentMethod).optional(),
+    /** Required for PAY_NOW — makes a retried submission idempotent. */
+    idempotencyKey: z.string().uuid().optional(),
+  })
+  .refine((v) => v.settle !== 'PAY_NOW' || v.method !== undefined, {
+    message: 'method is required when settle is PAY_NOW',
+    path: ['method'],
+  })
+  .refine((v) => v.settle !== 'PAY_NOW' || v.idempotencyKey !== undefined, {
+    message: 'idempotencyKey is required when settle is PAY_NOW',
+    path: ['idempotencyKey'],
+  });
+export type QuickInvoiceInput = z.infer<typeof quickInvoiceSchema>;
+
 export const createRefundSchema = z.object({
   amount: moneySchema,
   method: z.nativeEnum(PaymentMethod),
