@@ -16,6 +16,7 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'UserBranch',
   'Patient',
   'PatientDocument',
+  'MedicalRecordAccess',
   'PatientConsent',
   'DoctorSchedule',
   'ScheduleException',

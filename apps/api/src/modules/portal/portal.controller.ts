@@ -17,6 +17,8 @@ import type { PaginatedResult } from '../../common/pagination';
 import type { FreeSlot } from '../appointments/slots.service';
 import { PortalAuthGuard, PortalPhone } from './portal-auth.guard';
 import { PortalService } from './portal.service';
+import { RecordAccessService } from '../record-access/record-access.service';
+import { RequestRecordAccessDto } from '../record-access/dto';
 import {
   type PortalAppointmentDto,
   type PortalBookingResultDto,
@@ -43,7 +45,10 @@ const OTP_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
 @Public()
 @Controller('portal')
 export class PortalController {
-  constructor(private readonly portal: PortalService) {}
+  constructor(
+    private readonly portal: PortalService,
+    private readonly recordAccessService: RecordAccessService,
+  ) {}
 
   // ------------------------------------------------------------------- auth
 
@@ -196,6 +201,29 @@ export class PortalController {
       type: mimeType,
       disposition: `attachment; filename="${encodeURIComponent(fileName)}"`,
     });
+  }
+
+  // ---------------------------------------------------- medical-record access
+
+  /**
+   * One row per clinic the patient has records in, with its access state. Lab
+   * results are never gated by this — only the clinical narrative is.
+   */
+  @Get('me/record-access')
+  @UseGuards(PortalAuthGuard)
+  recordAccess(@PortalPhone() phone: string): Promise<unknown[]> {
+    return this.recordAccessService.patientOverview(phone);
+  }
+
+  @Post('me/record-access/:clinicId')
+  @UseGuards(PortalAuthGuard)
+  @HttpCode(200)
+  requestRecordAccess(
+    @PortalPhone() phone: string,
+    @Param('clinicId', ParseUUIDPipe) clinicId: string,
+    @Body() dto: RequestRecordAccessDto,
+  ): Promise<{ status: string }> {
+    return this.recordAccessService.request(phone, clinicId, dto.note);
   }
 
   // --------------------------------------------------------------- telegram

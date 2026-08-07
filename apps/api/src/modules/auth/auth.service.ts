@@ -6,6 +6,7 @@ import {
   ErrorCode,
   UserRole,
   UserStatus,
+  type VerifyTwoFactorInput,
   normalizePhone,
   type AuthUser,
   type ChangePasswordInput,
@@ -15,6 +16,7 @@ import {
   type ResetPasswordWithOtpInput,
 } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
+import { TwoFactorService } from './two-factor.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { PrincipalService } from '../../core/principal/principal.service';
@@ -42,6 +44,24 @@ export interface LoginResult {
   refreshToken: string;
 }
 
+/**
+ * Password was correct but the account has the Telegram second factor on. No
+ * session exists yet — the client posts the code to /auth/two-factor/verify.
+ */
+export interface TwoFactorPendingResult {
+  twoFactorRequired: true;
+  challengeId: string;
+  expiresInSeconds: number;
+  /** Last two digits of the linked Telegram chat's phone, for "code sent to …". */
+  hint: string | null;
+}
+
+export type LoginOutcome = LoginResult | TwoFactorPendingResult;
+
+export function isTwoFactorPending(r: LoginOutcome): r is TwoFactorPendingResult {
+  return 'twoFactorRequired' in r;
+}
+
 export interface RefreshResult {
   accessToken: string;
   refreshToken: string;
@@ -61,6 +81,12 @@ export interface MeResult {
   /** null for SUPER_ADMIN (platform scope has no subscription). */
   subscription: SubscriptionState | null;
   support: SupportContact;
+  /** Drives the security card and the "link Telegram" prompt in the panel. */
+  security: {
+    twoFactorEnabled: boolean;
+    telegramLinked: boolean;
+    telegramUsername: string | null;
+  };
 }
 
 export interface SessionItem {
@@ -83,6 +109,7 @@ export class AuthService {
     private readonly config: AppConfigService,
     private readonly provisioning: ClinicProvisioningService,
     private readonly subscriptions: SubscriptionService,
+    private readonly twoFactor: TwoFactorService,
   ) {}
 
   // --------------------------------------------------------------- sign-up
@@ -168,7 +195,7 @@ export class AuthService {
 
   // ------------------------------------------------------------------ login
 
-  async login(input: LoginInput): Promise<LoginResult> {
+  async login(input: LoginInput): Promise<LoginOutcome> {
     const phone = normalizePhone(input.identifier);
 
     // Pre-tenant identity resolution: no clinic context exists before login,
@@ -231,6 +258,35 @@ export class AuthService {
       });
     }
 
+    // Second factor, if the user turned it on and can actually receive a code.
+    // No session is created until the code checks out.
+    if (this.twoFactor.isRequiredFor(user)) {
+      const { challengeId, expiresInSeconds } = await this.twoFactor.issue(
+        user.id,
+        user.telegramChatId as string,
+        user.fullName,
+      );
+      return {
+        twoFactorRequired: true,
+        challengeId,
+        expiresInSeconds,
+        hint: user.phone ? user.phone.slice(-2) : null,
+      };
+    }
+
+    return this.issueSession(user.id, user.clinicId, user.role as UserRole);
+  }
+
+  /**
+   * Mints the session + tokens for an already-authenticated user. Shared by the
+   * plain password path and the second step of a two-factor login.
+   */
+  private async issueSession(
+    userId: string,
+    clinicId: string | null,
+    role: UserRole,
+  ): Promise<LoginResult> {
+    const user = { id: userId, clinicId, role };
     const { session, refreshToken } = await this.createSession(user.id);
     const authUser = await this.principal.buildAuthUser({
       sub: user.id,
@@ -254,6 +310,56 @@ export class AuthService {
     });
 
     return { user: authUser, accessToken, refreshToken };
+  }
+
+  /**
+   * Second step of a two-factor login: exchange the emailed-to-Telegram code for
+   * a real session. The account state is re-checked here — a user suspended
+   * between the two steps must not slip through.
+   */
+  async verifyTwoFactor(input: VerifyTwoFactorInput): Promise<LoginResult> {
+    const userId = await this.twoFactor.consume(input.challengeId, input.code);
+
+    // Unscoped: pre-tenant, and the id comes from the challenge we just burned.
+    const user = await this.prisma.unscoped.user.findFirst({
+      where: { id: userId, deletedAt: null },
+      include: { clinic: { select: { status: true } } },
+    });
+    if (!user) throw new AppException(ErrorCode.INVALID_CREDENTIALS, 'Invalid credentials', 401);
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new AppException(ErrorCode.ACCOUNT_SUSPENDED, 'Account is suspended', 403);
+    }
+    if (user.clinic && user.clinic.status !== 'ACTIVE') {
+      throw new AppException(ErrorCode.CLINIC_SUSPENDED, 'Clinic is suspended', 403);
+    }
+
+    return this.issueSession(user.id, user.clinicId, user.role as UserRole);
+  }
+
+  /**
+   * Turn the Telegram second factor on or off for the signed-in user. Enabling
+   * requires a linked chat: without one the next login would ask for a code that
+   * can never arrive.
+   */
+  async setTwoFactor(userId: string, enabled: boolean): Promise<{ twoFactorEnabled: boolean }> {
+    // Unscoped: User is not tenant-scoped.
+    const user = await this.prisma.unscoped.user.findUnique({
+      where: { id: userId },
+      select: { telegramChatId: true },
+    });
+    if (enabled && !user?.telegramChatId) {
+      throw new AppException(
+        ErrorCode.TELEGRAM_NOT_LINKED,
+        'Avval Telegram botni ulang — aks holda tasdiqlash kodi keladigan joy bo‘lmaydi',
+        400,
+      );
+    }
+    const updated = await this.prisma.unscoped.user.update({
+      where: { id: userId },
+      data: { twoFactorEnabled: enabled },
+      select: { twoFactorEnabled: true },
+    });
+    return { twoFactorEnabled: updated.twoFactorEnabled };
   }
 
   private async registerFailedLogin(
@@ -412,6 +518,8 @@ export class AuthService {
   }
 
   async me(user: AuthUser): Promise<MeResult> {
+    const security = await this.securityState(user.id);
+
     if (!user.clinicId) {
       // SUPER_ADMIN: platform scope, no clinic/branch context.
       return {
@@ -420,6 +528,7 @@ export class AuthService {
         branches: [],
         subscription: null,
         support: this.supportContact(),
+        security,
       };
     }
 
@@ -443,7 +552,20 @@ export class AuthService {
       this.subscriptions.getState(user.clinicId),
     ]);
 
-    return { user, clinic, branches, subscription, support: this.supportContact() };
+    return { user, clinic, branches, subscription, support: this.supportContact(), security };
+  }
+
+  /** Unscoped: User is a platform model; read for the caller only. */
+  private async securityState(userId: string): Promise<MeResult['security']> {
+    const row = await this.prisma.unscoped.user.findUnique({
+      where: { id: userId },
+      select: { twoFactorEnabled: true, telegramChatId: true, telegramUsername: true },
+    });
+    return {
+      twoFactorEnabled: row?.twoFactorEnabled ?? false,
+      telegramLinked: !!row?.telegramChatId,
+      telegramUsername: row?.telegramUsername ?? null,
+    };
   }
 
   // --------------------------------------------------------------- sessions

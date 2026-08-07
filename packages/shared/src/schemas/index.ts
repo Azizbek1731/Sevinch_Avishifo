@@ -15,3 +15,4 @@ export * from './report';
 export * from './feedback';
 export * from './super-admin';
 export * from './portal';
+export * from './record-access';

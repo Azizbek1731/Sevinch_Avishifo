@@ -20,5 +20,6 @@
   "platform": "Платформа",
   "clinics": "Клиники",
   "plans": "Тарифы",
-  "analytics": "Аналитика"
+  "analytics": "Аналитика",
+  "recordAccess": "Доступ к истории"
 }

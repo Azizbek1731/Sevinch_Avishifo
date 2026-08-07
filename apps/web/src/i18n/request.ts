@@ -29,6 +29,8 @@ export const MESSAGE_NAMESPACES = [
   'statuses',
   'landing',
   'subscription',
+  'security',
+  'recordAccess',
 ] as const;
 
 /**

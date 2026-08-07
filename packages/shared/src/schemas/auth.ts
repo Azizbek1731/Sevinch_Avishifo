@@ -56,3 +56,28 @@ export const updateProfileSchema = z.object({
   avatarUrl: z.string().url().optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+/**
+ * Second step of a two-factor login. The password step returns a challengeId
+ * instead of tokens; the 6-digit code is delivered to the user's linked Telegram
+ * chat. The challenge is single-use and short-lived (see AUTH_2FA_TTL_SECONDS).
+ */
+export const verifyTwoFactorSchema = z.object({
+  challengeId: z.string().min(1),
+  code: z.string().regex(/^\d{6}$/, { message: 'Code must be 6 digits' }),
+});
+export type VerifyTwoFactorInput = z.infer<typeof verifyTwoFactorSchema>;
+
+/**
+ * Turning the Telegram second factor on requires a linked chat — enabling it
+ * blind would lock the user out on their next login.
+ */
+export const setTwoFactorSchema = z.object({
+  enabled: z.boolean(),
+});
+export type SetTwoFactorInput = z.infer<typeof setTwoFactorSchema>;
+
+/** How long a pending 2FA challenge stays valid. */
+export const AUTH_2FA_TTL_SECONDS = 300;
+/** Wrong codes tolerated before the challenge is burned. */
+export const AUTH_2FA_MAX_ATTEMPTS = 5;

@@ -19,6 +19,7 @@ import * as argon2 from 'argon2';
 import cookieParser from 'cookie-parser';
 import request, { type Response } from 'supertest';
 import { AppModule } from '../src/app.module';
+import { TelegramChannel } from '../src/modules/notifications/channels/telegram.channel';
 
 // Repo-root .env (DATABASE_URL etc.) — same files AppConfigModule loads.
 loadDotenv({ path: [resolve(__dirname, '../../../.env.local'), resolve(__dirname, '../../../.env')] });
@@ -28,8 +29,28 @@ export const API = '/api/v1';
 
 // ---------------------------------------------------------------- app boot
 
-export async function createApp(): Promise<INestApplication> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+/** Captures what would have gone to Telegram, so tests can read codes back. */
+export interface CapturedTelegram {
+  chatId: string;
+  text: string;
+}
+
+/**
+ * Boots the app. Pass `captureTelegram` to swap TelegramChannel for a recorder —
+ * the only way to exercise the Telegram-delivered login code end to end, since
+ * the real channel needs a live bot token.
+ */
+export async function createApp(captureTelegram?: CapturedTelegram[]): Promise<INestApplication> {
+  const builder = Test.createTestingModule({ imports: [AppModule] });
+  if (captureTelegram) {
+    builder.overrideProvider(TelegramChannel).useValue({
+      send: (chatId: string, text: string) => {
+        captureTelegram.push({ chatId, text });
+        return Promise.resolve();
+      },
+    });
+  }
+  const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication({ logger: false });
 
   // Mirror main.ts: cookie parsing + API prefix. Global pipes/guards/filters/

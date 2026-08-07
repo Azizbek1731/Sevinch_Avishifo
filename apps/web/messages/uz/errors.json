@@ -47,5 +47,9 @@
   "OTP_EXPIRED": "Kod muddati tugagan",
   "SUBSCRIPTION_EXPIRED": "Obuna muddati tugagan — tizim faqat o‘qish rejimida. Davom ettirish uchun biz bilan bog‘laning.",
   "CLINIC_NAME_TAKEN": "Bu nomdagi klinika allaqachon mavjud",
-  "PHONE_ALREADY_OWNS_CLINIC": "Bu raqamga allaqachon klinika ro‘yxatdan o‘tgan"
+  "PHONE_ALREADY_OWNS_CLINIC": "Bu raqamga allaqachon klinika ro‘yxatdan o‘tgan",
+  "TWO_FACTOR_REQUIRED": "Tasdiqlash kodi talab qilinadi",
+  "TWO_FACTOR_CHALLENGE_INVALID": "Kod muddati tugagan. Qaytadan kiring.",
+  "TELEGRAM_NOT_LINKED": "Telegram bot ulanmagan",
+  "RECORD_ACCESS_REQUIRED": "Kasallik tarixini ko‘rish uchun klinikadan ruxsat oling"
 }

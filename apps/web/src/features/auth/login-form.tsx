@@ -21,6 +21,20 @@ interface LoginResponse {
   accessToken: string;
 }
 
+/** Password accepted, but the account has the Telegram second factor on. */
+interface TwoFactorPending {
+  twoFactorRequired: true;
+  challengeId: string;
+  expiresInSeconds: number;
+  hint: string | null;
+}
+
+type LoginResult = LoginResponse | TwoFactorPending;
+
+function isTwoFactor(r: LoginResult): r is TwoFactorPending {
+  return 'twoFactorRequired' in r;
+}
+
 /** Demo/staging helper — hidden when NEXT_PUBLIC_DEMO_LOGINS="false". */
 const SHOW_DEMO = process.env.NEXT_PUBLIC_DEMO_LOGINS !== 'false';
 
@@ -41,6 +55,10 @@ export function LoginForm() {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
   const [serverError, setServerError] = useState<string | null>(null);
+  /** Non-null once the password step returned a challenge instead of a session. */
+  const [challenge, setChallenge] = useState<TwoFactorPending | null>(null);
+  const [code, setCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -50,17 +68,111 @@ export function LoginForm() {
   const onSubmit = form.handleSubmit(async (values) => {
     setServerError(null);
     try {
-      const res = await api.post<LoginResponse>('/auth/login', values, undefined);
-      // Login returns only { user, accessToken }; clinic + branches come from /auth/me.
-      useAuthStore.getState().setAccessToken(res.data.accessToken);
-      const me = await api.get<MeResponse>('/auth/me');
-      setSession({ ...me.data, accessToken: res.data.accessToken });
-      router.replace(res.data.user.role === 'SUPER_ADMIN' ? '/platform/clinics' : '/dashboard');
+      const res = await api.post<LoginResult>('/auth/login', values, undefined);
+      if (isTwoFactor(res.data)) {
+        setChallenge(res.data);
+        return;
+      }
+      await establishSession(res.data);
     } catch (err) {
       if (err instanceof ApiError) setServerError(tErr(err.code as never));
       else setServerError(tErr('INTERNAL_ERROR'));
     }
   });
+
+  /** Login returns only { user, accessToken }; clinic + branches come from /auth/me. */
+  async function establishSession(data: LoginResponse): Promise<void> {
+    useAuthStore.getState().setAccessToken(data.accessToken);
+    const me = await api.get<MeResponse>('/auth/me');
+    setSession({ ...me.data, accessToken: data.accessToken });
+    router.replace(data.user.role === 'SUPER_ADMIN' ? '/platform/clinics' : '/dashboard');
+  }
+
+  async function onVerify(e: React.FormEvent): Promise<void> {
+    e.preventDefault();
+    if (!challenge || code.length !== 6) return;
+    setServerError(null);
+    setVerifying(true);
+    try {
+      const res = await api.post<LoginResponse>(
+        '/auth/two-factor/verify',
+        { challengeId: challenge.challengeId, code },
+        undefined,
+      );
+      await establishSession(res.data);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setServerError(tErr(err.code as never));
+        // An expired or burned challenge cannot be retried — go back to the
+        // password step rather than leaving the user typing into a dead form.
+        if (err.code === 'TWO_FACTOR_CHALLENGE_INVALID') {
+          setChallenge(null);
+          setCode('');
+        }
+      } else setServerError(tErr('INTERNAL_ERROR'));
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  if (challenge) {
+    return (
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="space-y-2 text-center">
+          <LogoMark className="mx-auto h-14 w-14" />
+          <CardTitle className="text-2xl">{t('twoFactor.title')}</CardTitle>
+          <CardDescription>
+            {challenge.hint
+              ? t('twoFactor.subtitleWithHint', { hint: challenge.hint })
+              : t('twoFactor.subtitle')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onVerify} className="space-y-4" noValidate>
+            <div className="space-y-2">
+              <Label htmlFor="code">{t('twoFactor.code')}</Label>
+              <Input
+                id="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                maxLength={6}
+                placeholder="000000"
+                className="text-center font-mono text-2xl tracking-[0.4em]"
+                value={code}
+                onChange={(e) => {
+                  setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                  setServerError(null);
+                }}
+              />
+            </div>
+            {serverError ? (
+              <p className="text-sm font-medium text-destructive" role="alert">
+                {serverError}
+              </p>
+            ) : null}
+            <Button type="submit" className="w-full" disabled={verifying || code.length !== 6}>
+              {verifying ? t('twoFactor.verifying') : t('twoFactor.verify')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground"
+              onClick={() => {
+                setChallenge(null);
+                setCode('');
+                setServerError(null);
+              }}
+            >
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              {t('twoFactor.back')}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full max-w-md shadow-lg">

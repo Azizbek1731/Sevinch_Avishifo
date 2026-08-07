@@ -36,6 +36,12 @@ export function LandingNav() {
         </nav>
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+          <a
+            href="#entry"
+            className="hidden rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:inline-flex"
+          >
+            {t('nav.patient')}
+          </a>
           <LanguageSwitcher />
           <AuthCta anonymousLabel={t('nav.login')} size="sm" showArrow={false} target="login" />
         </div>

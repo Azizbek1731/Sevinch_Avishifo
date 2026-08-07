@@ -1,0 +1,22 @@
+{
+  "title": "Xavfsizlik",
+  "description": "Akkauntingizni himoyalash sozlamalari.",
+  "telegram": {
+    "title": "Telegram ulanishi",
+    "description": "Bot orqali xabarnomalar va tasdiqlash kodini olish uchun.",
+    "linked": "Telegram ulangan",
+    "notLinked": "Telegram ulanmagan",
+    "howTo": "Botni oching, /start bosing va telefon raqamingizni yuboring. Raqamingiz tizimdagi raqam bilan mos kelsa, akkaunt avtomatik bog‘lanadi.",
+    "open": "@{bot} ni ochish"
+  },
+  "twoFactor": {
+    "title": "Ikki bosqichli kirish",
+    "description": "Parolni kiritganingizdan keyin Telegramga 6 xonali kod yuboriladi. Parolingiz o‘g‘irlansa ham, Telegramsiz kirib bo‘lmaydi.",
+    "label": "Telegram orqali tasdiqlash",
+    "on": "Yoqilgan — har kirishda kod so‘raladi",
+    "off": "O‘chirilgan — faqat parol bilan kiriladi",
+    "needsTelegram": "Buni yoqish uchun avval Telegramni ulang — aks holda kod keladigan joy bo‘lmaydi."
+  },
+  "enabledToast": "Ikki bosqichli kirish yoqildi",
+  "disabledToast": "Ikki bosqichli kirish o‘chirildi"
+}

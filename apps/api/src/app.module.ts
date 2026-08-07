@@ -47,6 +47,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
 import { AuditViewerModule } from './modules/audit-viewer/audit-viewer.module';
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { PortalModule } from './modules/portal/portal.module';
+import { RecordAccessModule } from './modules/record-access/record-access.module';
 
 @Module({
   imports: [
@@ -127,6 +128,7 @@ import { PortalModule } from './modules/portal/portal.module';
     FeedbackModule,
     AuditViewerModule,
     SuperAdminModule,
+    RecordAccessModule,
     PortalModule,
   ],
   controllers: [HealthController],

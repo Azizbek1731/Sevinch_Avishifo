@@ -35,12 +35,20 @@ export interface SupportContact {
 }
 
 /** GET /auth/me — the single session payload the whole app bootstraps from. */
+/** Per-user security state — drives the "link Telegram" prompt and the 2FA switch. */
+export interface SecurityInfo {
+  twoFactorEnabled: boolean;
+  telegramLinked: boolean;
+  telegramUsername: string | null;
+}
+
 export interface MeResponse {
   user: AuthUser;
   clinic: ClinicInfo | null;
   branches: BranchInfo[];
   subscription: SubscriptionInfo | null;
   support: SupportContact;
+  security: SecurityInfo;
 }
 
 interface AuthState {
@@ -49,6 +57,7 @@ interface AuthState {
   branches: BranchInfo[];
   subscription: SubscriptionInfo | null;
   support: SupportContact;
+  security: SecurityInfo | null;
   accessToken: string | null;
   activeBranchId: string | null;
   status: 'loading' | 'authenticated' | 'anonymous';
@@ -57,6 +66,8 @@ interface AuthState {
   setActiveBranch: (id: string) => void;
   /** Flip to read-only when the API reports SUBSCRIPTION_EXPIRED mid-session. */
   markExpired: () => void;
+  /** Keep the security card in sync after toggling the second factor. */
+  setTwoFactorEnabled: (enabled: boolean) => void;
   clear: () => void;
 }
 
@@ -70,10 +81,11 @@ export const useAuthStore = create<AuthState>()(
       branches: [],
       subscription: null,
       support: NO_SUPPORT,
+      security: null,
       accessToken: null,
       activeBranchId: null,
       status: 'loading',
-      setSession: ({ user, clinic, branches, subscription, support, accessToken }) => {
+      setSession: ({ user, clinic, branches, subscription, support, security, accessToken }) => {
         const current = get().activeBranchId;
         const valid = branches.some((b) => b.id === current);
         set({
@@ -82,6 +94,7 @@ export const useAuthStore = create<AuthState>()(
           branches,
           subscription: subscription ?? null,
           support: support ?? NO_SUPPORT,
+          security: security ?? null,
           accessToken,
           status: 'authenticated',
           activeBranchId: valid ? current : (branches[0]?.id ?? null),
@@ -94,6 +107,11 @@ export const useAuthStore = create<AuthState>()(
         if (!sub || sub.isExpired) return;
         set({ subscription: { ...sub, isExpired: true, daysLeft: 0 } });
       },
+      setTwoFactorEnabled: (twoFactorEnabled) => {
+        const security = get().security;
+        if (!security) return;
+        set({ security: { ...security, twoFactorEnabled } });
+      },
       clear: () =>
         set({
           user: null,
@@ -101,6 +119,7 @@ export const useAuthStore = create<AuthState>()(
           branches: [],
           subscription: null,
           support: NO_SUPPORT,
+          security: null,
           accessToken: null,
           status: 'anonymous',
         }),

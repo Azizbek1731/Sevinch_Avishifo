@@ -1,0 +1,33 @@
+{
+  "title": "Kasallik tarixiga ruxsat",
+  "description": "Bemorlar o‘z tashxis va retseptlarini ilovada ko‘rish uchun so‘rov yuboradi. Tahlil natijalari bunga bog‘liq emas — ular doim ochiq.",
+  "tabs": {
+    "pending": "Kutilmoqda",
+    "approved": "Ruxsat berilgan",
+    "all": "Barchasi"
+  },
+  "columns": {
+    "patient": "Bemor",
+    "note": "Izoh",
+    "requestedAt": "So‘ralgan vaqt",
+    "status": "Holat",
+    "actions": ""
+  },
+  "status": {
+    "PENDING": "Kutilmoqda",
+    "APPROVED": "Ruxsat berilgan",
+    "REJECTED": "Rad etilgan",
+    "REVOKED": "Bekor qilingan"
+  },
+  "actions": {
+    "approve": "Ruxsat berish",
+    "reject": "Rad etish",
+    "revoke": "Bekor qilish"
+  },
+  "toast": {
+    "approved": "Ruxsat berildi",
+    "rejected": "So‘rov rad etildi",
+    "revoked": "Ruxsat bekor qilindi"
+  },
+  "empty": "Hozircha so‘rovlar yo‘q"
+}

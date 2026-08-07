@@ -47,5 +47,9 @@
   "OTP_EXPIRED": "Code expired",
   "SUBSCRIPTION_EXPIRED": "Subscription expired — the system is read-only. Contact us to continue.",
   "CLINIC_NAME_TAKEN": "A clinic with this name already exists",
-  "PHONE_ALREADY_OWNS_CLINIC": "This phone number already owns a clinic"
+  "PHONE_ALREADY_OWNS_CLINIC": "This phone number already owns a clinic",
+  "TWO_FACTOR_REQUIRED": "Verification code required",
+  "TWO_FACTOR_CHALLENGE_INVALID": "The code has expired. Please sign in again.",
+  "TELEGRAM_NOT_LINKED": "Telegram bot is not linked",
+  "RECORD_ACCESS_REQUIRED": "Ask the clinic to release your medical history"
 }

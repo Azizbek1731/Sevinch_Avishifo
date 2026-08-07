@@ -9,6 +9,7 @@ import { formatDate } from '@/lib/dates';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import { EmptyState } from '@/components/empty-state';
 import { PageLoader } from '@/components/spinner';
+import { RecordAccessGate } from '@/components/record-access-gate';
 
 export default function VisitsPage() {
   const authStatus = useRequireAuth();
@@ -30,7 +31,8 @@ export default function VisitsPage() {
         </p>
       </div>
 
-      {visitsQ.isPending && <PageLoader />}
+      <RecordAccessGate>
+        {visitsQ.isPending && <PageLoader />}
       {visitsQ.isError && (
         <EmptyState title="Yuklab bo'lmadi" description={errorMessage(visitsQ.error)} />
       )}
@@ -85,6 +87,7 @@ export default function VisitsPage() {
             })}
           </ul>
         ))}
+      </RecordAccessGate>
     </div>
   );
 }

@@ -9,7 +9,8 @@
     "why": "Nega AviShifo",
     "login": "Tizimga kirish",
     "language": "Til",
-    "pricing": "Narxlar"
+    "pricing": "Narxlar",
+    "patient": "Bemor kabineti"
   },
   "hero": {
     "badge": "O'zbekiston klinikalari uchun bulutli platforma",
@@ -243,6 +244,36 @@
           "Payme / Click / Uzum onlayn to'lovlar"
         ]
       }
+    }
+  },
+  "entry": {
+    "eyebrow": "Kirish",
+    "title": "Siz kim sifatida kirmoqchisiz?",
+    "subtitle": "Klinika uchun boshqaruv paneli va bemorlar uchun shaxsiy kabinet — ikkalasi alohida.",
+    "clinic": {
+      "badge": "Klinika",
+      "title": "Klinika uchun",
+      "description": "Direktor, administrator, shifokor va kassir uchun to‘liq boshqaruv paneli.",
+      "points": {
+        "branches": "Ko‘p filial, xodimlar va rollar",
+        "queue": "Jonli navbat, bemor kartasi, kassa va laboratoriya",
+        "trial": "7 kun bepul sinov — karta talab qilinmaydi"
+      },
+      "register": "Bepul ro‘yxatdan o‘tish",
+      "login": "Tizimga kirish"
+    },
+    "patient": {
+      "badge": "Bemor",
+      "title": "Bemorlar uchun",
+      "description": "O‘z tahlillaringiz, qabullaringiz va hujjatlaringizni telefoningizdan ko‘ring.",
+      "points": {
+        "labs": "Tayyor bo‘lgan tahlil natijalari",
+        "history": "Kasallik tarixi — klinika ruxsatidan keyin",
+        "telegram": "Telegram bot orqali ham xabar va natijalar"
+      },
+      "login": "Bemor kabinetiga kirish",
+      "register": "Ro‘yxatdan o‘tish",
+      "hint": "Kirish telefon raqamingizga kelgan kod orqali — parol kerak emas."
     }
   }
 }

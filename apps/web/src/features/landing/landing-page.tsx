@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { LandingNav } from './components/landing-nav';
 import { LandingHero } from './components/landing-hero';
+import { LandingEntry } from './components/landing-entry';
 import { LandingStats } from './components/landing-stats';
 import { LandingFeatures } from './components/landing-features';
 import { LandingHighlight } from './components/landing-highlight';
@@ -35,6 +36,7 @@ export function LandingPage() {
       <LandingNav />
       <main className="flex-1">
         <LandingHero />
+        <LandingEntry />
         <LandingStats />
         <LandingFeatures />
         <LandingHighlight />

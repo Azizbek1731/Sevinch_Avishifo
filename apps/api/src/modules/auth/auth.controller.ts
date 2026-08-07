@@ -16,7 +16,10 @@ import type { AuthUser } from '@avishifo/shared';
 import { AllowWhenExpired, CurrentUser, Public } from '../../common/decorators';
 import { paginated, type PaginatedResult } from '../../common/pagination';
 import { AppConfigService } from '../../core/config/app-config.service';
-import { AuthService } from './auth.service';
+import { AuthService, isTwoFactorPending, type TwoFactorPendingResult } from './auth.service';
+
+/** Either a signed-in session or a pending second-factor challenge. */
+type LoginHttpResponse = { user: AuthUser; accessToken: string } | TwoFactorPendingResult;
 import {
   type MeResult,
   type SessionItem,
@@ -29,6 +32,8 @@ import {
   RegisterClinicDto,
   RequestPasswordResetDto,
   ResetPasswordWithOtpDto,
+  SetTwoFactorDto,
+  VerifyTwoFactorDto,
 } from './dto/auth.dto';
 
 const AUTH_THROTTLE = { default: { limit: 10, ttl: 60_000 } };
@@ -53,10 +58,37 @@ export class AuthController {
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
+  ): Promise<LoginHttpResponse> {
+    const result = await this.auth.login(dto);
+    // Two-factor accounts get a challenge instead of a session; no cookie is
+    // set until the code is verified.
+    if (isTwoFactorPending(result)) return result;
+    this.setRefreshCookie(res, result.refreshToken);
+    return { user: result.user, accessToken: result.accessToken };
+  }
+
+  /** Second step of a two-factor login — exchanges the Telegram code for a session. */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('two-factor/verify')
+  @HttpCode(200)
+  async verifyTwoFactor(
+    @Body() dto: VerifyTwoFactorDto,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<{ user: AuthUser; accessToken: string }> {
-    const { user, accessToken, refreshToken } = await this.auth.login(dto);
+    const { user, accessToken, refreshToken } = await this.auth.verifyTwoFactor(dto);
     this.setRefreshCookie(res, refreshToken);
     return { user, accessToken };
+  }
+
+  /** Turn the Telegram second factor on or off for the signed-in user. */
+  @Post('two-factor')
+  @HttpCode(200)
+  setTwoFactor(
+    @Body() dto: SetTwoFactorDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ twoFactorEnabled: boolean }> {
+    return this.auth.setTwoFactor(user.id, dto.enabled);
   }
 
   // ---------------------------------------------------------------- sign-up

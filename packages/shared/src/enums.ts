@@ -281,3 +281,11 @@ export const StockMovementType = {
   ADJUSTMENT: 'ADJUSTMENT',
 } as const;
 export type StockMovementType = (typeof StockMovementType)[keyof typeof StockMovementType];
+
+export const RecordAccessStatus = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  REVOKED: 'REVOKED',
+} as const;
+export type RecordAccessStatus = (typeof RecordAccessStatus)[keyof typeof RecordAccessStatus];

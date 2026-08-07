@@ -30,6 +30,6 @@ import { TelegramBotService } from './telegram-bot.service';
   ],
   // SmsChannel is exported so the portal can deliver OTP codes over real SMS
   // (Eskiz) instead of the log-only dev fallback.
-  exports: [NotificationsService, SmsChannel],
+  exports: [NotificationsService, SmsChannel, TelegramChannel],
 })
 export class NotificationsModule {}

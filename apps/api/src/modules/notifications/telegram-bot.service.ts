@@ -16,7 +16,13 @@ import { StorageService } from '../../core/storage/storage.service';
 import { NotificationsService } from './notifications.service';
 
 /** Buttons a linked patient sees. */
-const PATIENT_BUTTONS = ['📅 Qabullarim', '🕐 Navbatim', '🧪 Tahlillarim', '📄 Hujjatlarim'];
+const PATIENT_BUTTONS = [
+  '📅 Qabullarim',
+  '🕐 Navbatim',
+  '🧪 Tahlillarim',
+  '📄 Hujjatlarim',
+  '📋 Kasallik tarixim',
+];
 /** Buttons a clinic owner/admin sees. */
 const STAFF_BUTTONS = ['📊 Bugungi holat', '👥 Navbat holati'];
 /** Buttons the platform super-admin sees. */
@@ -35,7 +41,9 @@ function keyboardFor(identity: ChatIdentity): Keyboard {
   const kb = new Keyboard();
   const rows: string[][] = [];
   if (identity.patientIds.length > 0) {
-    rows.push(PATIENT_BUTTONS.slice(0, 2), PATIENT_BUTTONS.slice(2));
+    for (let i = 0; i < PATIENT_BUTTONS.length; i += 2) {
+      rows.push(PATIENT_BUTTONS.slice(i, i + 2));
+    }
   }
   const role = identity.staff?.role;
   if (role === 'CLINIC_OWNER' || role === 'CLINIC_ADMIN') rows.push(STAFF_BUTTONS);
@@ -128,6 +136,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     bot.hears('🕐 Navbatim', (ctx) => this.handleMyQueue(ctx));
     bot.hears('🧪 Tahlillarim', (ctx) => this.handleMyResults(ctx));
     bot.hears('📄 Hujjatlarim', (ctx) => this.handleMyDocuments(ctx));
+    bot.hears('📋 Kasallik tarixim', (ctx) => this.handleMyHistory(ctx));
     // Clinic owner / admin
     bot.hears('📊 Bugungi holat', (ctx) => this.handleClinicToday(ctx));
     bot.hears('👥 Navbat holati', (ctx) => this.handleClinicQueue(ctx));
@@ -135,6 +144,10 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     bot.hears('🏥 Klinikalar', (ctx) => this.handlePlatformClinics(ctx));
     bot.hears('🆕 Yangi ro‘yxatdan o‘tganlar', (ctx) => this.handlePlatformSignups(ctx));
     bot.callbackQuery(/^(confirm|cancel):(.+)$/, (ctx) => this.handleAppointmentAction(ctx));
+    // Patient asks a clinic to release their history.
+    bot.callbackQuery(/^ra_req:(.+)$/, (ctx) => this.handleHistoryRequest(ctx));
+    // Doctor / clinic admin decides, straight from the notification.
+    bot.callbackQuery(/^ra_(ok|no):(.+)$/, (ctx) => this.handleHistoryDecision(ctx));
   }
 
   // ------------------------------------------------------------ identity
@@ -555,6 +568,282 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       }
     }
     await ctx.reply('Barcha hujjatlar yuborildi ✅', { reply_markup: PATIENT_KEYBOARD });
+  }
+
+  // -------------------------------------------------- medical-record access
+
+  /**
+   * The clinical narrative — diagnoses, prescriptions, doctor's plan — is shown
+   * only for clinics that approved this patient. Lab results are never gated
+   * this way (see 🧪 Tahlillarim); what needs a human decision is the record a
+   * patient could misread without a clinician present.
+   */
+  private async handleMyHistory(ctx: Context): Promise<void> {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    const patientIds = await this.linkedPatientIds(chatId);
+    if (patientIds.length === 0) {
+      await ctx.reply('Avval /start orqali telefon raqamingizni bog‘lang.');
+      return;
+    }
+
+    // Unscoped justified: the bot is pre-tenant; patientIds come from this
+    // chat's own bindings, never from user input.
+    const patients = await this.prisma.unscoped.patient.findMany({
+      where: { id: { in: patientIds } },
+      select: { id: true, clinicId: true, recordAccess: { select: { status: true } } },
+    });
+    const approved = patients.filter((p) => p.recordAccess?.status === 'APPROVED');
+
+    if (approved.length === 0) {
+      const pending = patients.filter((p) => p.recordAccess?.status === 'PENDING');
+      if (pending.length > 0) {
+        await ctx.reply(
+          '⏳ So‘rovingiz klinikaga yuborilgan. Shifokor yoki administrator tasdiqlagach, ' +
+            'kasallik tarixingiz shu yerda ko‘rinadi.',
+          { reply_markup: PATIENT_KEYBOARD },
+        );
+        return;
+      }
+      const clinics = await this.prisma.unscoped.clinic.findMany({
+        where: { id: { in: [...new Set(patients.map((p) => p.clinicId))] } },
+        select: { id: true, name: true },
+      });
+      if (clinics.length === 0) {
+        await ctx.reply('Hozircha kasallik tarixingiz yo‘q.', { reply_markup: PATIENT_KEYBOARD });
+        return;
+      }
+      await ctx.reply(
+        '🔒 Kasallik tarixini ko‘rish uchun klinikadan ruxsat kerak.\n\n' +
+          'Quyidagi tugma orqali so‘rov yuboring — shifokor yoki administrator ' +
+          'tasdiqlagach, tarixingiz shu yerda ochiladi.',
+        {
+          reply_markup: {
+            inline_keyboard: clinics.map((c) => [
+              { text: `📨 ${c.name} — so‘rov yuborish`, callback_data: `ra_req:${c.id}` },
+            ]),
+          },
+        },
+      );
+      return;
+    }
+
+    const visits = await this.prisma.unscoped.visit.findMany({
+      where: {
+        patientId: { in: approved.map((p) => p.id) },
+        status: 'COMPLETED',
+      },
+      orderBy: { startedAt: 'desc' },
+      take: 5,
+      select: {
+        startedAt: true,
+        assessmentNote: true,
+        plan: true,
+        doctor: { select: { fullName: true } },
+        diagnoses: {
+          select: { isPrimary: true, icd10: { select: { code: true, nameUz: true } } },
+        },
+        prescriptions: { select: { drugName: true, dosage: true, frequency: true } },
+      },
+    });
+
+    if (visits.length === 0) {
+      await ctx.reply('Hozircha yakunlangan tashriflaringiz yo‘q.', {
+        reply_markup: PATIENT_KEYBOARD,
+      });
+      return;
+    }
+
+    const blocks = visits.map((v) => {
+      const lines = [
+        `📋 ${formatInTimeZone(v.startedAt, TIMEZONE, 'dd.MM.yyyy')} — ${v.doctor.fullName}`,
+      ];
+      for (const d of v.diagnoses) {
+        lines.push(`• ${d.isPrimary ? 'Asosiy' : 'Qo‘shimcha'}: ${d.icd10.code} ${d.icd10.nameUz}`);
+      }
+      if (v.assessmentNote) lines.push(`🩺 ${v.assessmentNote}`);
+      if (v.plan) lines.push(`📝 ${v.plan}`);
+      for (const rx of v.prescriptions) {
+        lines.push(
+          `💊 ${rx.drugName}${rx.dosage ? ` — ${rx.dosage}` : ''}${rx.frequency ? `, ${rx.frequency}` : ''}`,
+        );
+      }
+      return lines.join('\n');
+    });
+
+    await ctx.reply(blocks.join('\n\n'), { reply_markup: PATIENT_KEYBOARD });
+  }
+
+  /** Patient tapped "so‘rov yuborish" under a clinic. */
+  private async handleHistoryRequest(ctx: Context): Promise<void> {
+    const match = ctx.match;
+    if (typeof match === 'string' || !match) return;
+    const clinicId = match[1];
+    const chatId = ctx.chat?.id ?? ctx.from?.id;
+    if (!clinicId || chatId === undefined) return;
+
+    // The chat must actually own a patient card at that clinic — the clinicId
+    // arrives from a callback payload, so it is treated as untrusted.
+    const link = await this.prisma.unscoped.telegramLink.findFirst({
+      where: { clinicId, chatId: String(chatId), isActive: true },
+      select: { patientId: true },
+    });
+    if (!link) {
+      await ctx.answerCallbackQuery({ text: 'Ruxsat yo‘q.' });
+      return;
+    }
+
+    const patient = await this.prisma.unscoped.patient.findUnique({
+      where: { id: link.patientId },
+      select: { id: true, fullName: true, mrn: true, recordAccess: { select: { status: true } } },
+    });
+    if (!patient) {
+      await ctx.answerCallbackQuery({ text: 'Bemor kartasi topilmadi.' });
+      return;
+    }
+    if (patient.recordAccess?.status === 'APPROVED') {
+      await ctx.answerCallbackQuery({ text: 'Ruxsat allaqachon berilgan.' });
+      return;
+    }
+
+    const row = await this.prisma.unscoped.medicalRecordAccess.upsert({
+      where: { patientId: patient.id },
+      create: { clinicId, patientId: patient.id, status: 'PENDING' },
+      update: {
+        status: 'PENDING',
+        requestedAt: new Date(),
+        decidedAt: null,
+        decidedById: null,
+        decisionNote: null,
+      },
+      select: { id: true },
+    });
+
+    await this.notifyStaffOfHistoryRequest(clinicId, row.id, patient.fullName, patient.mrn);
+    await ctx.answerCallbackQuery({ text: '✅ So‘rov yuborildi.' });
+    await ctx.reply(
+      '📨 So‘rovingiz klinikaga yuborildi. Tasdiqlangach, shu yerda xabar beramiz.',
+      { reply_markup: PATIENT_KEYBOARD },
+    );
+  }
+
+  /** Doctor / clinic admin approves or rejects straight from the notification. */
+  private async handleHistoryDecision(ctx: Context): Promise<void> {
+    const match = ctx.match;
+    if (typeof match === 'string' || !match) return;
+    const decision = match[1];
+    const requestId = match[2];
+    const chatId = ctx.chat?.id ?? ctx.from?.id;
+    if (!decision || !requestId || chatId === undefined) return;
+
+    const identity = await this.identify(chatId);
+    const staff = identity.staff;
+    if (!staff || !['CLINIC_OWNER', 'CLINIC_ADMIN', 'DOCTOR'].includes(staff.role)) {
+      await ctx.answerCallbackQuery({ text: 'Ruxsatingiz yo‘q.' });
+      return;
+    }
+
+    const request = await this.prisma.unscoped.medicalRecordAccess.findUnique({
+      where: { id: requestId },
+      select: {
+        id: true,
+        clinicId: true,
+        status: true,
+        patient: { select: { fullName: true, phone: true } },
+      },
+    });
+    // The decider must belong to the clinic that owns the request.
+    if (!request || request.clinicId !== staff.clinicId) {
+      await ctx.answerCallbackQuery({ text: 'So‘rov topilmadi.' });
+      return;
+    }
+    if (request.status !== 'PENDING') {
+      await ctx.answerCallbackQuery({ text: 'Bu so‘rov allaqachon hal qilingan.' });
+      return;
+    }
+
+    const status = decision === 'ok' ? 'APPROVED' : 'REJECTED';
+    await TenantContext.run({ clinicId: request.clinicId }, async () => {
+      await this.prisma.db.medicalRecordAccess.update({
+        where: { id: request.id },
+        data: { status, decidedById: staff.id, decidedAt: new Date() },
+      });
+      await this.audit.log({
+        action: AuditAction.UPDATE,
+        entity: 'MedicalRecordAccess',
+        entityId: request.id,
+        userId: staff.id,
+        before: { status: request.status },
+        after: { status, via: 'telegram' },
+      });
+    });
+
+    await ctx.answerCallbackQuery({
+      text: status === 'APPROVED' ? '✅ Ruxsat berildi.' : '❌ Rad etildi.',
+    });
+    await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => undefined);
+    await ctx.reply(
+      `${request.patient.fullName}: ${status === 'APPROVED' ? 'ruxsat berildi ✅' : 'rad etildi ❌'}`,
+    );
+
+    // Tell the patient, if they have the bot.
+    if (request.patient.phone) {
+      const patientLink = await this.prisma.unscoped.telegramLink.findFirst({
+        where: {
+          clinicId: request.clinicId,
+          isActive: true,
+          patient: { phone: request.patient.phone, deletedAt: null },
+        },
+        select: { chatId: true },
+      });
+      if (patientLink) {
+        await this.bot?.api
+          .sendMessage(
+            patientLink.chatId,
+            status === 'APPROVED'
+              ? '✅ Kasallik tarixingizni ko‘rishga ruxsat berildi. «📋 Kasallik tarixim» tugmasini bosing.'
+              : '❌ Kasallik tarixiga so‘rovingiz rad etildi. Klinikaga murojaat qiling.',
+          )
+          .catch((e: unknown) => this.logger.warn(`patient notify failed: ${String(e)}`));
+      }
+    }
+  }
+
+  /** Push the request to every decision-maker who linked a chat. */
+  private async notifyStaffOfHistoryRequest(
+    clinicId: string,
+    requestId: string,
+    patientName: string,
+    mrn: string,
+  ): Promise<void> {
+    const staff = await this.prisma.unscoped.user.findMany({
+      where: {
+        clinicId,
+        status: 'ACTIVE',
+        telegramChatId: { not: null },
+        role: { in: ['CLINIC_OWNER', 'CLINIC_ADMIN', 'DOCTOR'] },
+      },
+      select: { telegramChatId: true },
+    });
+    const text =
+      `🔐 Kasallik tarixiga ruxsat so‘raldi\n\n` +
+      `Bemor: ${patientName} (${mrn})\n\n` +
+      `Ruxsat bersangiz, bemor o‘z tashxislari va retseptlarini ilovada va botda ko‘ra oladi.`;
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: '✅ Ruxsat berish', callback_data: `ra_ok:${requestId}` },
+          { text: '❌ Rad etish', callback_data: `ra_no:${requestId}` },
+        ],
+      ],
+    };
+    await Promise.all(
+      staff.map((u) =>
+        this.bot?.api
+          .sendMessage(u.telegramChatId as string, text, { reply_markup: keyboard })
+          .catch((e: unknown) => this.logger.warn(`staff notify failed: ${String(e)}`)),
+      ),
+    );
   }
 
   // ------------------------------------------------------------ clinic staff

@@ -1,0 +1,33 @@
+{
+  "title": "Medical history access",
+  "description": "Patients request access to their own diagnoses and prescriptions in the app. Lab results are not affected — those are always visible.",
+  "tabs": {
+    "pending": "Pending",
+    "approved": "Approved",
+    "all": "All"
+  },
+  "columns": {
+    "patient": "Patient",
+    "note": "Note",
+    "requestedAt": "Requested",
+    "status": "Status",
+    "actions": ""
+  },
+  "status": {
+    "PENDING": "Pending",
+    "APPROVED": "Approved",
+    "REJECTED": "Rejected",
+    "REVOKED": "Revoked"
+  },
+  "actions": {
+    "approve": "Approve",
+    "reject": "Reject",
+    "revoke": "Revoke"
+  },
+  "toast": {
+    "approved": "Access granted",
+    "rejected": "Request rejected",
+    "revoked": "Access revoked"
+  },
+  "empty": "No requests yet"
+}

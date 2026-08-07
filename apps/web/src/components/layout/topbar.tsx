@@ -1,14 +1,14 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { Bell, Check, Globe, LogOut, Search, WifiOff } from 'lucide-react';
+import { Bell, Check, Globe, LogOut, Search, ShieldCheck, WifiOff } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { InAppNotificationPayload } from '@avishifo/shared';
 import { api } from '@/lib/api-client';
 import { disconnectSocket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/auth-store';
 import { useSocket, useSocketEvent } from '@/hooks/use-socket';
-import { usePathname, useRouter } from '@/i18n/routing';
+import { Link, usePathname, useRouter } from '@/i18n/routing';
 import { formatTz } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -196,6 +196,12 @@ export function Topbar() {
                 {name}
               </DropdownMenuItem>
             ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/security">
+                <ShieldCheck className="mr-2 h-4 w-4" /> {tAuth('security')}
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => void logout()} className="text-destructive">
               <LogOut className="mr-2 h-4 w-4" /> {tAuth('logout')}

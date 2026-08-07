@@ -14,7 +14,17 @@ export interface TelegramInlineKeyboard {
 export class TelegramChannel {
   constructor(private readonly config: AppConfigService) {}
 
-  async send(chatId: string, text: string, replyMarkup?: TelegramInlineKeyboard): Promise<void> {
+  /**
+   * `parseMode` is opt-in: templated bodies interpolate patient data, and a name
+   * containing `<` would make Telegram reject the whole message. Only pass it
+   * for text this codebase builds and escapes itself.
+   */
+  async send(
+    chatId: string,
+    text: string,
+    replyMarkup?: TelegramInlineKeyboard,
+    parseMode?: 'HTML',
+  ): Promise<void> {
     const { TELEGRAM_ENABLED, TELEGRAM_BOT_TOKEN } = this.config.env;
     if (!TELEGRAM_ENABLED || !TELEGRAM_BOT_TOKEN) {
       throw new Error('Telegram bot is not enabled (TELEGRAM_ENABLED / TELEGRAM_BOT_TOKEN)');
@@ -25,6 +35,7 @@ export class TelegramChannel {
       body: JSON.stringify({
         chat_id: chatId,
         text,
+        ...(parseMode ? { parse_mode: parseMode } : {}),
         ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       }),
     });

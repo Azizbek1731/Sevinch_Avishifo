@@ -12,6 +12,10 @@ export const PERMISSIONS = [
   'patients.merge',
   'patients.export',
   'patients.documents.write',
+  // Deciding whether a patient may read their own clinical history in the
+  // portal. Kept separate from patients.write: a receptionist edits patient
+  // cards all day, but releasing diagnoses is a clinical call.
+  'patients.recordAccess.manage',
   // Appointments (M4)
   'appointments.read',
   'appointments.write',
@@ -89,6 +93,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'patients.merge',
     'patients.export',
     'patients.documents.write',
+    'patients.recordAccess.manage',
     'appointments.read',
     'appointments.write',
     'appointments.cancel',
@@ -117,6 +122,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   ],
   [UserRole.DOCTOR]: [
     'patients.read',
+    'patients.recordAccess.manage',
     'appointments.read',
     'queue.read',
     'queue.call',

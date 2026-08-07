@@ -421,6 +421,10 @@ model User {
   telegramChatId   String?   @unique
   telegramUsername String?
   telegramLinkedAt DateTime? @db.Timestamptz(6)
+  /// Opt-in second factor: after the password, a code is sent to the linked
+  /// Telegram chat. Ignored while telegramChatId is null — a user can never be
+  /// locked out by enabling this before linking.
+  twoFactorEnabled Boolean   @default(false)
   failedLoginCount Int    @default(0)
   lockedUntil  DateTime?  @db.Timestamptz(6)
   createdAt    DateTime   @default(now()) @db.Timestamptz(6)
@@ -602,6 +606,7 @@ model Patient {
 
   user                User?
   documents           PatientDocument[]
+  recordAccess        MedicalRecordAccess?
   consents            PatientConsent[]
   appointments        Appointment[]
   queueTickets        QueueTicket[]
@@ -633,6 +638,40 @@ model PatientDocument {
   patient Patient @relation(fields: [patientId], references: [id])
 
   @@index([clinicId, patientId])
+}
+
+enum RecordAccessStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REVOKED
+}
+
+/// A patient's request to read their own clinical history through the portal or
+/// the Telegram bot. Lab results are always visible; SOAP notes, diagnoses and
+/// prescriptions are not, until a doctor or clinic admin approves — a clinician
+/// may need to explain a diagnosis before the patient reads it alone.
+/// Approval is one-off and stays open until the clinic revokes it.
+model MedicalRecordAccess {
+  id           String             @id @default(uuid(7))
+  clinicId     String
+  /// A patient belongs to exactly one clinic, so one row per patient is enough —
+  /// a re-request updates this row instead of piling up history.
+  patientId    String             @unique
+  status       RecordAccessStatus @default(PENDING)
+  /// Optional message the patient attached to the request.
+  patientNote  String?
+  /// Staff member who approved/rejected/revoked, and why.
+  decidedById  String?
+  decidedAt    DateTime?          @db.Timestamptz(6)
+  decisionNote String?
+  requestedAt  DateTime           @default(now()) @db.Timestamptz(6)
+  createdAt    DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime           @updatedAt @db.Timestamptz(6)
+
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([clinicId, status, requestedAt])
 }
 
 model PatientConsent {

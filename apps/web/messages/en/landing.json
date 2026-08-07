@@ -9,7 +9,8 @@
     "why": "Why AviShifo",
     "login": "Sign in",
     "language": "Language",
-    "pricing": "Pricing"
+    "pricing": "Pricing",
+    "patient": "Patient account"
   },
   "hero": {
     "badge": "Cloud platform for clinics in Uzbekistan",
@@ -243,6 +244,36 @@
           "Payme / Click / Uzum online payments"
         ]
       }
+    }
+  },
+  "entry": {
+    "eyebrow": "Sign in",
+    "title": "How would you like to sign in?",
+    "subtitle": "A management panel for clinics and a personal account for patients — two separate doors.",
+    "clinic": {
+      "badge": "Clinic",
+      "title": "For clinics",
+      "description": "The full management panel for directors, admins, doctors and cashiers.",
+      "points": {
+        "branches": "Multiple branches, staff and roles",
+        "queue": "Live queue, patient card, cash desk and lab",
+        "trial": "7-day free trial — no card required"
+      },
+      "register": "Start free trial",
+      "login": "Sign in"
+    },
+    "patient": {
+      "badge": "Patient",
+      "title": "For patients",
+      "description": "See your lab results, appointments and documents from your phone.",
+      "points": {
+        "labs": "Lab results as soon as they are ready",
+        "history": "Medical history — once your clinic approves",
+        "telegram": "Notifications and results in the Telegram bot too"
+      },
+      "login": "Open patient account",
+      "register": "Register",
+      "hint": "Sign in with a code sent to your phone — no password needed."
     }
   }
 }

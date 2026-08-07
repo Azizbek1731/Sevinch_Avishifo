@@ -20,5 +20,6 @@
   "platform": "Platform",
   "clinics": "Clinics",
   "plans": "Plans",
-  "analytics": "Analytics"
+  "analytics": "Analytics",
+  "recordAccess": "History access"
 }

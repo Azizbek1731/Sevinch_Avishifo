@@ -33,6 +33,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { SmsChannel } from '../notifications/channels/sms.channel';
 import { StorageService } from '../../core/storage/storage.service';
 import { AppConfigService } from '../../core/config/app-config.service';
+import { RecordAccessService } from '../record-access/record-access.service';
+import { TelegramChannel } from '../notifications/channels/telegram.channel';
 import type {
   PortalAppointmentsQueryInput,
   PortalBookExtendedInput,
@@ -324,6 +326,8 @@ export class PortalService {
     private readonly sms: SmsChannel,
     private readonly storage: StorageService,
     private readonly config: AppConfigService,
+    private readonly recordAccess: RecordAccessService,
+    private readonly telegram: TelegramChannel,
   ) {}
 
   // ------------------------------------------------------------------- auth
@@ -349,17 +353,42 @@ export class PortalService {
       },
     });
 
-    // Real SMS delivery via the Eskiz channel (falls back to app-log when
-    // SMS_PROVIDER=log, where SmsChannel prints the full message for dev).
     const message = `AviShifo tasdiqlash kodi: ${code}. Uni hech kimga bermang. Kod ${OTP_TTL_MINUTES} daqiqa amal qiladi.`;
-    try {
-      await this.sms.send(phone, message);
-    } catch (err) {
-      // Delivery failure must neither leak provider internals nor block the
-      // flow — the code is stored and the patient can request a new one.
-      this.logger.error(`OTP SMS delivery failed for ${maskPhone(phone)}: ${String(err)}`);
+
+    // Telegram first when the patient has already bound a chat: it is free,
+    // instant, and works even when the SMS provider is unconfigured. SMS is the
+    // fallback for everyone else.
+    // Unscoped (justified): pre-auth lookup keyed by the submitted phone.
+    const chat = await this.prisma.unscoped.telegramLink.findFirst({
+      where: { isActive: true, patient: { phone, deletedAt: null } },
+      select: { chatId: true },
+    });
+
+    let delivered = false;
+    if (chat) {
+      try {
+        await this.telegram.send(chat.chatId, `🔐 ${message}`);
+        delivered = true;
+      } catch (err) {
+        this.logger.warn(`OTP Telegram delivery failed for ${maskPhone(phone)}: ${String(err)}`);
+      }
     }
-    this.logger.log(`[PORTAL OTP → ${maskPhone(phone)}] issued (expires in ${OTP_TTL_MINUTES}m)`);
+
+    if (!delivered) {
+      // Real SMS delivery via the Eskiz channel (falls back to app-log when
+      // SMS_PROVIDER=log, where SmsChannel prints the full message for dev).
+      try {
+        await this.sms.send(phone, message);
+      } catch (err) {
+        // Delivery failure must neither leak provider internals nor block the
+        // flow — the code is stored and the patient can request a new one.
+        this.logger.error(`OTP SMS delivery failed for ${maskPhone(phone)}: ${String(err)}`);
+      }
+    }
+
+    this.logger.log(
+      `[PORTAL OTP → ${maskPhone(phone)}] issued via ${delivered ? 'telegram' : 'sms'} (expires in ${OTP_TTL_MINUTES}m)`,
+    );
     return { requested: true };
   }
 
@@ -1015,7 +1044,15 @@ export class PortalService {
   }
 
   async meVisits(phone: string, query: PageQuery): Promise<PaginatedResult<PortalVisitDto>> {
+    // Clinical history is released per clinic by a doctor or clinic admin. With
+    // no approval anywhere the list is empty rather than an error — the portal
+    // shows the "request access" screen instead of a failure.
+    const clinicIds = await this.recordAccess.approvedClinicIds(phone);
+    if (clinicIds.length === 0) {
+      return paginated([], { page: query.page, limit: query.limit, total: 0 });
+    }
     const where: Prisma.VisitWhereInput = {
+      clinicId: { in: clinicIds },
       patient: { phone, deletedAt: null },
       status: VisitStatus.COMPLETED,
     };
@@ -1116,6 +1153,13 @@ export class PortalService {
       },
     });
     if (!v) throw new AppException(ErrorCode.VISIT_NOT_FOUND, 'Tashrif topilmadi', 404);
+    if (!(await this.recordAccess.isApprovedForClinic(phone, v.clinicId))) {
+      throw new AppException(
+        ErrorCode.RECORD_ACCESS_REQUIRED,
+        'Kasallik tarixini ko‘rish uchun klinikadan ruxsat oling',
+        403,
+      );
+    }
 
     const clinicName = (await this.clinicNames([v.clinicId])).get(v.clinicId) ?? '';
     return {

@@ -1,0 +1,22 @@
+{
+  "title": "Security",
+  "description": "Settings that protect your account.",
+  "telegram": {
+    "title": "Telegram link",
+    "description": "For notifications and login verification codes through the bot.",
+    "linked": "Telegram linked",
+    "notLinked": "Telegram not linked",
+    "howTo": "Open the bot, press /start and send your phone number. If it matches the number on your account, the chat is linked automatically.",
+    "open": "Open @{bot}"
+  },
+  "twoFactor": {
+    "title": "Two-step sign-in",
+    "description": "After your password, a 6-digit code is sent to Telegram. Even a stolen password is not enough to get in.",
+    "label": "Verify through Telegram",
+    "on": "On — a code is required at every sign-in",
+    "off": "Off — password only",
+    "needsTelegram": "Link Telegram first — otherwise the code has nowhere to arrive."
+  },
+  "enabledToast": "Two-step sign-in enabled",
+  "disabledToast": "Two-step sign-in disabled"
+}
