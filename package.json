@@ -20,6 +20,7 @@
     "db:seed": "pnpm --filter @avishifo/api db:seed",
     "db:studio": "pnpm --filter @avishifo/api db:studio",
     "keys:generate": "node scripts/generate-keys.mjs",
+    "logo:export": "node scripts/export-logo.mjs .",
     "dev:services": "node scripts/dev-local.mjs"
   },
   "devDependencies": {
