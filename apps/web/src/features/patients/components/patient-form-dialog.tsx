@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -291,10 +292,8 @@ export function PatientFormDialog({ open, onOpenChange, patient }: PatientFormDi
                 render={({ field }) => (
                   <div className="space-y-1.5">
                     <Label htmlFor="pf-phone">{t('form.phone')}</Label>
-                    <Input
+                    <PhoneInput
                       id="pf-phone"
-                      inputMode="tel"
-                      placeholder="+998 90 123-45-67"
                       value={field.value}
                       onChange={(e) => field.onChange(maskPhone(e.target.value))}
                     />
@@ -310,10 +309,8 @@ export function PatientFormDialog({ open, onOpenChange, patient }: PatientFormDi
                 render={({ field }) => (
                   <div className="space-y-1.5">
                     <Label htmlFor="pf-phoneAlt">{t('form.phoneAlt')}</Label>
-                    <Input
+                    <PhoneInput
                       id="pf-phoneAlt"
-                      inputMode="tel"
-                      placeholder="+998 90 123-45-67"
                       value={field.value}
                       onChange={(e) => field.onChange(maskPhone(e.target.value))}
                     />

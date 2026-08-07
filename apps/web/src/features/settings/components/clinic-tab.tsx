@@ -9,14 +9,15 @@ import { toast } from 'sonner';
 import {
   Locale,
   clinicSettingsSchema,
-  normalizePhone,
   updateClinicSchema,
   type ClinicSettingsInput,
   type UpdateClinicInput,
+  phoneWireValueOptional,
 } from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -33,12 +34,6 @@ import { useApiErrorToast, useHasPermission } from '../hooks';
 
 const LOCALE_VALUES: Locale[] = [Locale.UZ, Locale.UZ_CYRL, Locale.RU, Locale.EN];
 
-/** '' → undefined; otherwise normalized +998… (falls back to raw so zod flags it). */
-function phoneToUndefined(value: unknown): string | undefined {
-  const s = String(value ?? '').trim();
-  if (s === '') return undefined;
-  return normalizePhone(s) ?? s;
-}
 
 function ClinicProfileForm() {
   const t = useTranslations('settings');
@@ -155,12 +150,10 @@ function ClinicProfileForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="clinic-phone">{t('clinic.phone')}</Label>
-            <Input
+            <PhoneInput
               id="clinic-phone"
-              inputMode="tel"
-              placeholder="+998 90 123-45-67"
               autoComplete="off"
-              {...form.register('phone', { setValueAs: phoneToUndefined })}
+              {...form.register('phone', { setValueAs: phoneWireValueOptional})}
             />
             {form.formState.errors.phone ? (
               <p className="text-sm text-destructive">{t('form.invalidPhone')}</p>

@@ -8,8 +8,9 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
   createClinicWithOwnerSchema,
-  normalizePhone,
   type CreateClinicWithOwnerInput,
+  phoneWireValue,
+  phoneWireValueOptional,
 } from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -31,18 +33,7 @@ function emptyToUndefined(v: unknown): string | undefined {
   return typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined;
 }
 
-/** Normalize a required phone field on submit; keep raw input when invalid so zod reports it. */
-function normalizeRequiredPhone(v: unknown): string {
-  if (typeof v !== 'string') return '';
-  return normalizePhone(v) ?? v;
-}
 
-/** Normalize an optional phone field; "" → undefined. */
-function normalizeOptionalPhone(v: unknown): string | undefined {
-  const s = emptyToUndefined(v);
-  if (s === undefined) return undefined;
-  return normalizePhone(s) ?? s;
-}
 
 const EMPTY_VALUES: CreateClinicWithOwnerInput = {
   clinic: { name: '' },
@@ -109,12 +100,10 @@ export function CreateClinicDialog({ open, onOpenChange }: CreateClinicDialogPro
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="clinic-phone">{t('clinics.createDialog.phone')}</Label>
-              <Input
+              <PhoneInput
                 id="clinic-phone"
-                inputMode="tel"
                 autoComplete="off"
-                placeholder="+998 90 123 45 67"
-                {...form.register('clinic.phone', { setValueAs: normalizeOptionalPhone })}
+                {...form.register('clinic.phone', { setValueAs: phoneWireValueOptional})}
               />
               {errors.clinic?.phone ? (
                 <p className="text-sm text-destructive">{t('form.invalidPhone')}</p>
@@ -148,12 +137,10 @@ export function CreateClinicDialog({ open, onOpenChange }: CreateClinicDialogPro
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="owner-phone">{t('clinics.createDialog.ownerPhone')}</Label>
-              <Input
+              <PhoneInput
                 id="owner-phone"
-                inputMode="tel"
                 autoComplete="off"
-                placeholder="+998 90 123 45 67"
-                {...form.register('owner.phone', { setValueAs: normalizeRequiredPhone })}
+                {...form.register('owner.phone', { setValueAs: phoneWireValue})}
               />
               {errors.owner?.phone ? (
                 <p className="text-sm text-destructive">{t('form.invalidPhone')}</p>

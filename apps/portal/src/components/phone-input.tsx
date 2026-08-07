@@ -1,23 +1,19 @@
 'use client';
 
 import { forwardRef } from 'react';
+import { formatNationalPhone } from '@avishifo/shared';
 
 /**
  * Format any partial input as "+998 90 123-45-67" while typing.
- * A leading "998" is stripped only when it is clearly a country code
- * (explicit "+" or more than 9 digits), so numbers of the 99-operator survive.
+ *
+ * The digit rules live in @avishifo/shared so the portal and the staff panel
+ * can never drift apart — including the subtle one: a leading "998" is only a
+ * country code when more than 9 digits were entered, so 99-operator numbers
+ * (99 812 34 56) survive.
  */
 export function formatPhoneDisplay(raw: string): string {
-  const hadPlus = raw.trim().startsWith('+');
-  let digits = raw.replace(/\D/g, '');
-  if ((hadPlus || digits.length > 9) && digits.startsWith('998')) digits = digits.slice(3);
-  digits = digits.slice(0, 9);
-  if (digits.length === 0) return '';
-  let out = `+998 ${digits.slice(0, 2)}`;
-  if (digits.length > 2) out += ` ${digits.slice(2, 5)}`;
-  if (digits.length > 5) out += `-${digits.slice(5, 7)}`;
-  if (digits.length > 7) out += `-${digits.slice(7, 9)}`;
-  return out;
+  const national = formatNationalPhone(raw);
+  return national === '' ? '' : `+998 ${national}`;
 }
 
 interface PhoneInputProps {

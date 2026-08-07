@@ -6,7 +6,9 @@ import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { createBranchSchema, normalizePhone, type CreateBranchInput } from '@avishifo/shared';
+import { createBranchSchema, type CreateBranchInput,
+  phoneWireValueOptional,
+} from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -34,11 +37,6 @@ export interface BranchDialogProps {
   branch: BranchRow | null;
 }
 
-function phoneToUndefined(value: unknown): string | undefined {
-  const s = String(value ?? '').trim();
-  if (s === '') return undefined;
-  return normalizePhone(s) ?? s;
-}
 
 export function BranchDialog({ open, onOpenChange, branch }: BranchDialogProps) {
   const t = useTranslations('settings');
@@ -109,12 +107,10 @@ export function BranchDialog({ open, onOpenChange, branch }: BranchDialogProps) 
             </div>
             <div className="space-y-2">
               <Label htmlFor="branch-phone">{t('branches.phone')}</Label>
-              <Input
+              <PhoneInput
                 id="branch-phone"
-                inputMode="tel"
-                placeholder="+998 90 123-45-67"
                 autoComplete="off"
-                {...form.register('phone', { setValueAs: phoneToUndefined })}
+                {...form.register('phone', { setValueAs: phoneWireValueOptional})}
               />
               {form.formState.errors.phone ? (
                 <p className="text-sm text-destructive">{t('form.invalidPhone')}</p>

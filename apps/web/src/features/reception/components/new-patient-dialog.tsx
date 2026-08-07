@@ -5,7 +5,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslations } from 'next-intl';
-import { Gender, formatPhone, normalizePhone, type CreatePatientInput } from '@avishifo/shared';
+import { Gender, formatPhone, normalizePhone, type CreatePatientInput,
+  phoneWireValueOptional,
+} from '@avishifo/shared';
 import { ApiError } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -136,12 +139,9 @@ export function NewPatientDialog({ open, onOpenChange, onCreated }: NewPatientDi
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="np-phone">{tc('phone')}</Label>
-            <Input
+            <PhoneInput
               id="np-phone"
-              type="tel"
-              inputMode="tel"
-              placeholder="+998 90 123-45-67"
-              {...form.register('phone')}
+              {...form.register('phone', { setValueAs: phoneWireValueOptional })}
             />
             <FieldError message={form.formState.errors.phone?.message} />
           </div>

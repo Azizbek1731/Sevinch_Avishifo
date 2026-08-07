@@ -9,11 +9,11 @@ import { toast } from 'sonner';
 import {
   Locale,
   createUserSchema,
-  normalizePhone,
   staffRoleSchema,
   updateUserSchema,
   type CreateUserInput,
   type UpdateUserInput,
+  phoneWireValueOptional,
 } from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import {
@@ -49,11 +50,6 @@ export interface UserDialogProps {
 const STAFF_ROLES = staffRoleSchema.options;
 const LOCALE_VALUES: Locale[] = [Locale.UZ, Locale.UZ_CYRL, Locale.RU, Locale.EN];
 
-function phoneToUndefined(value: unknown): string | undefined {
-  const s = String(value ?? '').trim();
-  if (s === '') return undefined;
-  return normalizePhone(s) ?? s;
-}
 
 export function UserDialog({ open, onOpenChange, user }: UserDialogProps) {
   const t = useTranslations('settings');
@@ -148,12 +144,10 @@ export function UserDialog({ open, onOpenChange, user }: UserDialogProps) {
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="user-phone">{t('users.phone')}</Label>
-              <Input
+              <PhoneInput
                 id="user-phone"
-                inputMode="tel"
-                placeholder="+998 90 123-45-67"
                 autoComplete="off"
-                {...form.register('phone', { setValueAs: phoneToUndefined })}
+                {...form.register('phone', { setValueAs: phoneWireValueOptional})}
               />
               {form.formState.errors.phone ? (
                 <p className="text-sm text-destructive">{t('form.invalidPhone')}</p>

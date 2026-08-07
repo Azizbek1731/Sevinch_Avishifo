@@ -6,16 +6,17 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, HeartPulse, ShieldCheck } from 'lucide-react';
 import {
-  normalizePhone,
   registerClinicSchema,
   type AuthUser,
   type RegisterClinicInput,
+  phoneWireValue,
 } from '@avishifo/shared';
 import { api, ApiError } from '@/lib/api-client';
 import { useAuthStore, type MeResponse } from '@/stores/auth-store';
 import { Link, useRouter } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -95,13 +96,10 @@ export function RegisterForm({ trialDays = 7 }: { trialDays?: number }) {
 
           <div className="space-y-2">
             <Label htmlFor="phone">{t('register.phone')}</Label>
-            <Input
+            <PhoneInput
               id="phone"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="+998 90 123-45-67"
               {...form.register('phone', {
-                setValueAs: (v: unknown) => normalizePhone(String(v ?? '')) ?? String(v ?? ''),
+                setValueAs: phoneWireValue,
               })}
             />
             {form.formState.errors.phone ? (

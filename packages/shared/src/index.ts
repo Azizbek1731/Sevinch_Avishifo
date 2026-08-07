@@ -5,6 +5,7 @@ export * from './permissions';
 export * from './socket-events';
 export * from './types';
 export * from './utils/phone';
+export * from './utils/phone-mask';
 export * from './utils/money';
 export * from './utils/ticket';
 export * from './schemas';
