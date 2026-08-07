@@ -51,7 +51,14 @@ run_ssh "cd ${REMOTE_DIR} && export NODE_OPTIONS=--max-old-space-size=1536 && \
   done && echo build-ok"
 
 echo "==> [4/4] restart pm2 + health check"
-run_ssh "cd ${REMOTE_DIR} && pm2 restart all --update-env >/dev/null 2>&1 && pm2 save >/dev/null 2>&1 && sleep 5 && curl -s -m 8 http://localhost:3001/api/v1/health"
+# The API needs ~10-20s to boot on the 2GB box (Nest + Prisma + Redis + the
+# Telegram long poll). A fixed sleep reported a failure on every deploy that was
+# in fact fine, so poll until it answers instead.
+run_ssh "cd ${REMOTE_DIR} && pm2 restart all --update-env >/dev/null 2>&1 && pm2 save >/dev/null 2>&1 && \
+  for i in \$(seq 1 30); do \
+    out=\$(curl -s -m 5 http://localhost:3001/api/v1/health 2>/dev/null) && [ -n \"\$out\" ] && { echo \"\$out\"; exit 0; }; \
+    sleep 2; \
+  done; echo 'HEALTH CHECK TIMED OUT after 60s'; pm2 logs --nostream --lines 20 --err; exit 1"
 echo ""
 echo "==> done. External check:"
 curl -s -m 10 "http://${HOST}/api/v1/health" && echo ""
