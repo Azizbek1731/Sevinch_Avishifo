@@ -44,5 +44,7 @@
   "phone": "Телефон",
   "fullName": "Ф.И.О.",
   "notFound": "Не найдено",
-  "select": "Выберите..."
+  "select": "Выберите...",
+  "showPassword": "Показать пароль",
+  "hidePassword": "Скрыть пароль"
 }

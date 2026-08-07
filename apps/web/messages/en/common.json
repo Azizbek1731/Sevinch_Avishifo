@@ -44,5 +44,7 @@
   "phone": "Phone",
   "fullName": "Full name",
   "notFound": "Not found",
-  "select": "Select..."
+  "select": "Select...",
+  "showPassword": "Show password",
+  "hidePassword": "Hide password"
 }

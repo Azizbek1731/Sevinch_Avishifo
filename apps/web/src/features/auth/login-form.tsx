@@ -5,12 +5,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { loginSchema, type AuthUser, type LoginInput } from '@avishifo/shared';
-import { HeartPulse } from 'lucide-react';
+import { ArrowLeft, HeartPulse } from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
 import { useAuthStore, type MeResponse } from '@/stores/auth-store';
-import { useRouter } from '@/i18n/routing';
+import { Link, useRouter } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -82,9 +83,8 @@ export function LoginForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">{t('password')}</Label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               autoComplete="current-password"
               {...form.register('password')}
             />
@@ -98,6 +98,21 @@ export function LoginForm() {
             {form.formState.isSubmitting ? t('loggingIn') : t('login')}
           </Button>
         </form>
+
+        <div className="mt-6 space-y-3 border-t pt-4">
+          <p className="text-center text-sm text-muted-foreground">
+            {t('noAccount')}{' '}
+            <Link href="/register" className="font-medium text-primary hover:underline">
+              {t('registerFree')}
+            </Link>
+          </p>
+          <Button asChild variant="ghost" size="sm" className="w-full text-muted-foreground">
+            <Link href="/">
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              {t('backHome')}
+            </Link>
+          </Button>
+        </div>
 
         {SHOW_DEMO ? (
           <details className="mt-6 rounded-lg border bg-muted/40 p-3 text-sm">

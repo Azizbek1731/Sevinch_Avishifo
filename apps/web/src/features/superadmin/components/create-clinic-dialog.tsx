@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { superadminApi } from '../api';
@@ -173,9 +174,8 @@ export function CreateClinicDialog({ open, onOpenChange }: CreateClinicDialogPro
           </div>
           <div className="space-y-2">
             <Label htmlFor="owner-password">{t('clinics.createDialog.password')}</Label>
-            <Input
+            <PasswordInput
               id="owner-password"
-              type="password"
               autoComplete="new-password"
               {...form.register('owner.password')}
             />

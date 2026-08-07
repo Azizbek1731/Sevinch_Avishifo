@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { HeartPulse, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, HeartPulse, ShieldCheck } from 'lucide-react';
 import {
   normalizePhone,
   registerClinicSchema,
@@ -16,6 +16,7 @@ import { useAuthStore, type MeResponse } from '@/stores/auth-store';
 import { Link, useRouter } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -131,9 +132,8 @@ export function RegisterForm({ trialDays = 7 }: { trialDays?: number }) {
 
           <div className="space-y-2">
             <Label htmlFor="password">{t('register.password')}</Label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               autoComplete="new-password"
               {...form.register('password')}
             />
@@ -163,6 +163,13 @@ export function RegisterForm({ trialDays = 7 }: { trialDays?: number }) {
               {t('register.signIn')}
             </Link>
           </p>
+
+          <Button asChild variant="ghost" size="sm" className="w-full text-muted-foreground">
+            <Link href="/">
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              {t('backHome')}
+            </Link>
+          </Button>
         </form>
       </CardContent>
     </Card>

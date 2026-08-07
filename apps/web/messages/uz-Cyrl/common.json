@@ -44,5 +44,7 @@
   "phone": "Телефон",
   "fullName": "Ф.И.Ш.",
   "notFound": "Топилмади",
-  "select": "Танланг..."
+  "select": "Танланг...",
+  "showPassword": "Паролни кўрсатиш",
+  "hidePassword": "Паролни яшириш"
 }

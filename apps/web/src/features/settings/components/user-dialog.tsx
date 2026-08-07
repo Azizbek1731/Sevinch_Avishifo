@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -175,9 +176,8 @@ export function UserDialog({ open, onOpenChange, user }: UserDialogProps) {
             <Label htmlFor="user-password">
               {isEdit ? t('users.newPassword') : t('users.password')}
             </Label>
-            <Input
+            <PasswordInput
               id="user-password"
-              type="password"
               autoComplete="new-password"
               {...form.register('password', isEdit ? { setValueAs: emptyToUndefined } : undefined)}
             />

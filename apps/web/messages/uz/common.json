@@ -44,5 +44,7 @@
   "phone": "Telefon",
   "fullName": "F.I.Sh.",
   "notFound": "Topilmadi",
-  "select": "Tanlang..."
+  "select": "Tanlang...",
+  "showPassword": "Parolni ko'rsatish",
+  "hidePassword": "Parolni yashirish"
 }
