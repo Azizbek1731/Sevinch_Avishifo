@@ -7,6 +7,7 @@ import { NotificationsProcessor } from './notifications.processor';
 import { RemindersProcessor } from './reminders.processor';
 import { SmsChannel } from './channels/sms.channel';
 import { TelegramChannel } from './channels/telegram.channel';
+import { TelegramGatewayChannel } from './channels/telegram-gateway.channel';
 import { TelegramBotService } from './telegram-bot.service';
 
 /**
@@ -26,10 +27,11 @@ import { TelegramBotService } from './telegram-bot.service';
     RemindersProcessor,
     SmsChannel,
     TelegramChannel,
+    TelegramGatewayChannel,
     TelegramBotService,
   ],
   // SmsChannel is exported so the portal can deliver OTP codes over real SMS
   // (Eskiz) instead of the log-only dev fallback.
-  exports: [NotificationsService, SmsChannel, TelegramChannel],
+  exports: [NotificationsService, SmsChannel, TelegramChannel, TelegramGatewayChannel],
 })
 export class NotificationsModule {}

@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "AviShifo — CRM for clinics. Try it free for 7 days",
-    "description": "A cloud, multi-branch CRM for private clinics in Uzbekistan: live queue, patient records, cashier, laboratory, SMS and Telegram notifications. 7-day free trial, no card required."
+    "description": "Multi-branch cloud CRM for private clinics in Uzbekistan: live queue, patient records, cash desk, lab, SMS and Telegram notifications. 7-day free trial."
   },
   "nav": {
     "features": "Features",
@@ -20,7 +20,6 @@
     "subtitle": "Live queue, patient records, cashier, laboratory and analytics — all in one system. Sign up and run your whole clinic on AviShifo today.",
     "ctaPrimary": "Start the 7-day free trial",
     "ctaSecondary": "See the features",
-    "noCard": "No card required · Live in 2 minutes · Cancel anytime",
     "trust": {
       "multiBranch": "Multi-branch",
       "realtime": "Real-time queue",
@@ -182,7 +181,7 @@
     "steps": {
       "signup": {
         "title": "Sign up",
-        "desc": "Enter your clinic name and phone number, confirm the SMS code. No contract, no card."
+        "desc": "Enter your clinic name and phone number and confirm the code. No contract needed."
       },
       "setup": {
         "title": "Set up your clinic",
@@ -194,7 +193,6 @@
       }
     },
     "assurances": {
-      "noCard": "No card required",
       "fullAccess": "Every module unlocked for all 7 days",
       "ownData": "Your data stays yours — export it anytime"
     },
@@ -204,7 +202,7 @@
     "title": "Digitize your clinic",
     "subtitle": "Get started with AviShifo today — leave paper queues and scattered schedules behind.",
     "button": "Start the 7-day free trial",
-    "note": "No card required · The trial simply ends, nothing is charged"
+    "note": "The trial ends on its own"
   },
   "footer": {
     "tagline": "A modern management platform for private clinics.",
@@ -236,7 +234,7 @@
     "som": "UZS",
     "perMonth": "mo",
     "cta": "Try 7 days free",
-    "note": "Every plan starts with a 7-day free trial — no card required. For large networks, contact us for a custom offer.",
+    "note": "Every plan starts with a 7-day free trial. For a large network we prepare an individual offer — get in touch.",
     "tiers": {
       "starter": {
         "name": "Starter",

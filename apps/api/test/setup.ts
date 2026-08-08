@@ -20,6 +20,7 @@ import cookieParser from 'cookie-parser';
 import request, { type Response } from 'supertest';
 import { AppModule } from '../src/app.module';
 import { TelegramChannel } from '../src/modules/notifications/channels/telegram.channel';
+import { TelegramGatewayChannel } from '../src/modules/notifications/channels/telegram-gateway.channel';
 
 // Repo-root .env (DATABASE_URL etc.) — same files AppConfigModule loads.
 loadDotenv({ path: [resolve(__dirname, '../../../.env.local'), resolve(__dirname, '../../../.env')] });
@@ -29,7 +30,11 @@ export const API = '/api/v1';
 
 // ---------------------------------------------------------------- app boot
 
-/** Captures what would have gone to Telegram, so tests can read codes back. */
+/**
+ * Captures what would have gone to Telegram, so tests can read codes back.
+ * `chatId` is the bot chat id, or `gateway:<phone>` when the code went out
+ * through Telegram Gateway instead.
+ */
 export interface CapturedTelegram {
   chatId: string;
   text: string;
@@ -48,6 +53,23 @@ export async function createApp(captureTelegram?: CapturedTelegram[]): Promise<I
         captureTelegram.push({ chatId, text });
         return Promise.resolve();
       },
+    });
+    // Gateway is off unless a test turns it on, so the default suite keeps
+    // exercising the bot-chat path exactly as before.
+    let gatewayEnabled = false;
+    builder.overrideProvider(TelegramGatewayChannel).useValue({
+      get enabled() {
+        return gatewayEnabled;
+      },
+      setEnabled: (v: boolean) => {
+        gatewayEnabled = v;
+      },
+      sendCode: (phone: string, code: string) => {
+        if (!gatewayEnabled) return Promise.resolve(null);
+        captureTelegram.push({ chatId: `gateway:${phone}`, text: `Kod: ${code}` });
+        return Promise.resolve(`req-${phone}`);
+      },
+      revoke: () => Promise.resolve(),
     });
   }
   const moduleRef = await builder.compile();

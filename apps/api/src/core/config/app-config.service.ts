@@ -32,6 +32,15 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   /** Bot @username (without @) — used to build t.me deep links for web linking. */
   TELEGRAM_BOT_USERNAME: z.string().optional(),
+  /**
+   * Telegram Gateway (gatewayapi.telegram.org) access token. Delivers
+   * verification codes to ANY phone registered on Telegram, from the verified
+   * "Verification Codes" sender — no bot linking needed, which is what makes it
+   * usable for first-time sign-ins. Unset disables the channel entirely.
+   */
+  TELEGRAM_GATEWAY_TOKEN: z.string().optional(),
+  /** Optional verified channel to send as, instead of the generic sender. */
+  TELEGRAM_GATEWAY_SENDER: z.string().optional(),
   PAYME_MERCHANT_ID: z.string().optional(),
   PAYME_KEY: z.string().optional(),
   CLICK_MERCHANT_ID: z.string().optional(),

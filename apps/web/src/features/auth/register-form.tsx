@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, ShieldCheck } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import {
   registerClinicSchema,
   type AuthUser,
@@ -148,11 +148,6 @@ export function RegisterForm({ trialDays = 7 }: { trialDays?: number }) {
           <Button type="submit" className="w-full" size="lg" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting ? t('register.submitting') : t('register.submit')}
           </Button>
-
-          <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            {t('register.noCard')}
-          </p>
 
           <p className="text-center text-sm text-muted-foreground">
             {t('register.haveAccount')}{' '}

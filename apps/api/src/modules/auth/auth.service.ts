@@ -269,8 +269,10 @@ export class AuthService {
     if (this.twoFactor.isRequiredFor(user)) {
       const { challengeId, expiresInSeconds } = await this.twoFactor.issue(
         user.id,
-        user.telegramChatId as string,
+        user.telegramChatId,
         user.fullName,
+        'second-factor',
+        user.phone,
       );
       return {
         twoFactorRequired: true,
@@ -388,9 +390,14 @@ export class AuthService {
       !user ||
       user.status !== UserStatus.ACTIVE ||
       (user.clinic && user.clinic.status !== 'ACTIVE') ||
-      (user.lockedUntil && user.lockedUntil > new Date()) ||
-      !user.telegramChatId
+      (user.lockedUntil && user.lockedUntil > new Date())
     ) {
+      return this.decoyChallenge();
+    }
+
+    // Somewhere to send it: the user's own bot chat, or Telegram Gateway, which
+    // reaches any number registered on Telegram without prior linking.
+    if (!user.telegramChatId && !this.twoFactor.gatewayEnabled) {
       return this.decoyChallenge();
     }
 
@@ -399,7 +406,9 @@ export class AuthService {
     // asks for a Telegram code as its second step anyway.
     if (user.twoFactorEnabled) {
       // Not awaited, for the same timing reason as the code itself below.
-      void this.twoFactor.notifyPasswordRequired(user.telegramChatId, user.fullName);
+      if (user.telegramChatId) {
+        void this.twoFactor.notifyPasswordRequired(user.telegramChatId, user.fullName);
+      }
       return this.decoyChallenge();
     }
 
@@ -417,6 +426,7 @@ export class AuthService {
       user.telegramChatId,
       user.fullName,
       'passwordless',
+      user.phone,
     );
   }
 
@@ -455,9 +465,12 @@ export class AuthService {
     // Unscoped: User is not tenant-scoped.
     const user = await this.prisma.unscoped.user.findUnique({
       where: { id: userId },
-      select: { telegramChatId: true },
+      select: { telegramChatId: true, phone: true },
     });
-    if (enabled && !user?.telegramChatId) {
+    // Gateway delivers to the account's own phone number, so a linked bot chat
+    // is only required when it is the sole route available.
+    const reachable = !!user?.telegramChatId || (this.twoFactor.gatewayEnabled && !!user?.phone);
+    if (enabled && !reachable) {
       throw new AppException(
         ErrorCode.TELEGRAM_NOT_LINKED,
         'Avval Telegram botni ulang — aks holda tasdiqlash kodi keladigan joy bo‘lmaydi',

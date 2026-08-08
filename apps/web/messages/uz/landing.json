@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "AviShifo — klinikalar uchun CRM. 7 kun bepul sinang",
-    "description": "O'zbekistondagi xususiy klinikalar uchun ko'p filialli bulutli CRM: jonli navbat, bemor kartasi, kassa, laboratoriya, SMS va Telegram bildirishnomalari. 7 kun bepul sinov, karta talab qilinmaydi."
+    "description": "O'zbekistondagi xususiy klinikalar uchun ko'p filialli bulutli CRM: jonli navbat, bemor kartasi, kassa, laboratoriya, SMS va Telegram bildirishnomalari. 7 kun bepul sinov."
   },
   "nav": {
     "features": "Imkoniyatlar",
@@ -20,7 +20,6 @@
     "subtitle": "Jonli navbat, bemor kartasi, kassa, laboratoriya va analitika — hammasi bitta tizimda. Ro‘yxatdan o‘ting va bugunoq butun klinikangizni AviShifoda ishlatib ko‘ring.",
     "ctaPrimary": "7 kun bepul sinab ko‘rish",
     "ctaSecondary": "Imkoniyatlarni ko‘rish",
-    "noCard": "Karta talab qilinmaydi · 2 daqiqada ishga tushadi · Istalgan payt to‘xtatasiz",
     "trust": {
       "multiBranch": "Ko'p filialli",
       "realtime": "Real-time navbat",
@@ -194,7 +193,6 @@
       }
     },
     "assurances": {
-      "noCard": "Karta talab qilinmaydi",
       "fullAccess": "7 kun davomida barcha modullar ochiq",
       "ownData": "Ma'lumotlaringiz faqat sizniki — istalgan payt yuklab olasiz"
     },
@@ -204,7 +202,7 @@
     "title": "Klinikangizni raqamlashtiring",
     "subtitle": "Bugun AviShifo bilan boshlang — qog'oz navbatlar va tarqoq jadvallarni unuting.",
     "button": "7 kun bepul sinab ko‘rish",
-    "note": "Karta talab qilinmaydi · Sinov o‘zi tugaydi, hech narsa yechilmaydi"
+    "note": "Sinov muddati o‘zi tugaydi"
   },
   "footer": {
     "tagline": "Xususiy klinikalar uchun zamonaviy boshqaruv platformasi.",
@@ -236,7 +234,7 @@
     "som": "so'm",
     "perMonth": "oy",
     "cta": "7 kun bepul sinash",
-    "note": "Barcha tariflar 7 kunlik bepul sinov bilan boshlanadi — karta talab qilinmaydi. Katta tarmoq uchun individual taklif: biz bilan bog‘laning.",
+    "note": "Barcha tariflar 7 kunlik bepul sinov bilan boshlanadi. Katta tarmoq uchun individual taklif: biz bilan bog‘laning.",
     "tiers": {
       "starter": {
         "name": "Starter",

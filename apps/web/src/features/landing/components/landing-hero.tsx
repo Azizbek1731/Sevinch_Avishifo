@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Building2, CreditCard, MessageSquare, Radio, Sparkles, Wallet } from 'lucide-react';
+import { ArrowRight, Building2, MessageSquare, Radio, Sparkles, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AuthCta } from './auth-cta';
@@ -52,11 +52,6 @@ export function LandingHero() {
               </a>
             </Button>
           </div>
-
-          <p className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <CreditCard className="h-4 w-4 text-primary" />
-            {t('hero.noCard')}
-          </p>
 
           <div className="mt-2 flex flex-wrap gap-2">
             {TRUST.map(({ icon: Icon, key }) => (

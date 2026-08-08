@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { CalendarClock, CreditCard, Rocket, ShieldCheck, SlidersHorizontal, UserPlus } from 'lucide-react';
+import { CalendarClock, Rocket, ShieldCheck, SlidersHorizontal, UserPlus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { AuthCta } from './auth-cta';
 import { Reveal } from './reveal';
@@ -14,7 +14,6 @@ const STEPS: ReadonlyArray<{ icon: LucideIcon; key: string }> = [
 ];
 
 const ASSURANCES: ReadonlyArray<{ icon: LucideIcon; key: string }> = [
-  { icon: CreditCard, key: 'trial.assurances.noCard' },
   { icon: CalendarClock, key: 'trial.assurances.fullAccess' },
   { icon: ShieldCheck, key: 'trial.assurances.ownData' },
 ];

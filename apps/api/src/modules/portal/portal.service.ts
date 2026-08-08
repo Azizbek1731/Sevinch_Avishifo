@@ -35,6 +35,7 @@ import { StorageService } from '../../core/storage/storage.service';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { RecordAccessService } from '../record-access/record-access.service';
 import { TelegramChannel } from '../notifications/channels/telegram.channel';
+import { TelegramGatewayChannel } from '../notifications/channels/telegram-gateway.channel';
 import type {
   PortalAppointmentsQueryInput,
   PortalBookExtendedInput,
@@ -328,6 +329,7 @@ export class PortalService {
     private readonly config: AppConfigService,
     private readonly recordAccess: RecordAccessService,
     private readonly telegram: TelegramChannel,
+    private readonly gateway: TelegramGatewayChannel,
   ) {}
 
   // ------------------------------------------------------------------- auth
@@ -364,17 +366,24 @@ export class PortalService {
       select: { chatId: true },
     });
 
-    let delivered = false;
+    let via = '';
     if (chat) {
       try {
         await this.telegram.send(chat.chatId, `🔐 ${message}`);
-        delivered = true;
+        via = 'bot';
       } catch (err) {
         this.logger.warn(`OTP Telegram delivery failed for ${maskPhone(phone)}: ${String(err)}`);
       }
     }
 
-    if (!delivered) {
+    // Telegram Gateway reaches any number registered on Telegram without the
+    // patient ever having opened our bot — which is most of them, and the whole
+    // reason a first sign-in used to depend on SMS.
+    if (!via && (await this.gateway.sendCode(phone, code, OTP_TTL_MINUTES * 60))) {
+      via = 'gateway';
+    }
+
+    if (!via) {
       // Real SMS delivery via the Eskiz channel (falls back to app-log when
       // SMS_PROVIDER=log, where SmsChannel prints the full message for dev).
       try {
@@ -387,7 +396,7 @@ export class PortalService {
     }
 
     this.logger.log(
-      `[PORTAL OTP → ${maskPhone(phone)}] issued via ${delivered ? 'telegram' : 'sms'} (expires in ${OTP_TTL_MINUTES}m)`,
+      `[PORTAL OTP → ${maskPhone(phone)}] issued via ${via || 'sms'} (expires in ${OTP_TTL_MINUTES}m)`,
     );
     return { requested: true };
   }

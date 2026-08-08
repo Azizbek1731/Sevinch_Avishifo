@@ -4,6 +4,7 @@ import { AUTH_2FA_MAX_ATTEMPTS, AUTH_2FA_TTL_SECONDS, ErrorCode } from '@avishif
 import { AppException } from '../../common/app.exception';
 import { RedisService } from '../../core/redis/redis.service';
 import { TelegramChannel } from '../notifications/channels/telegram.channel';
+import { TelegramGatewayChannel } from '../notifications/channels/telegram-gateway.channel';
 
 /**
  * Which flow a challenge belongs to. A code is only ever valid for the step that
@@ -17,6 +18,8 @@ interface Challenge {
   code: string;
   /** Absent on challenges issued before purposes existed — those were 2FA. */
   purpose?: ChallengePurpose;
+  /** Set when the code went out through Telegram Gateway, so it can be revoked. */
+  gatewayRequestId?: string;
 }
 
 const key = (id: string): string => `auth:2fa:${id}`;
@@ -47,15 +50,50 @@ export class TwoFactorService {
   constructor(
     private readonly redis: RedisService,
     private readonly telegram: TelegramChannel,
+    private readonly gateway: TelegramGatewayChannel,
   ) {}
 
+  /** Whether Telegram Gateway is configured — it reaches unlinked phones too. */
+  get gatewayEnabled(): boolean {
+    return this.gateway.enabled;
+  }
+
   /**
-   * A user is challenged only when they asked for it AND can actually receive
-   * the code. The second half of that condition is what keeps the feature from
-   * ever locking anyone out.
+   * A user is challenged only when they asked for it AND the code has somewhere
+   * to arrive. That second half is what keeps the feature from ever locking
+   * anyone out — and Telegram Gateway widens it, because it reaches any phone
+   * on Telegram without the user having linked the bot first.
    */
   isRequiredFor(user: { twoFactorEnabled: boolean; telegramChatId: string | null }): boolean {
-    return user.twoFactorEnabled && !!user.telegramChatId;
+    return user.twoFactorEnabled && (!!user.telegramChatId || this.gateway.enabled);
+  }
+
+  /**
+   * Delivers a code by whatever route can carry it: the user's own bot chat
+   * first (free, and it can say more than six digits), then Telegram Gateway.
+   * Returns the Gateway request id when that was the route, so the caller can
+   * withdraw the message once the code stops being valid.
+   */
+  private async deliver(
+    chatId: string | null,
+    phone: string | null,
+    code: string,
+    fullName: string,
+    purpose: ChallengePurpose,
+  ): Promise<{ delivered: boolean; gatewayRequestId?: string }> {
+    if (chatId) {
+      try {
+        await this.telegram.send(chatId, this.codeMessage(code, fullName, purpose));
+        return { delivered: true };
+      } catch (e) {
+        this.logger.warn(`Bot chat delivery failed, trying Gateway: ${String(e)}`);
+      }
+    }
+    if (phone) {
+      const requestId = await this.gateway.sendCode(phone, code, AUTH_2FA_TTL_SECONDS);
+      if (requestId) return { delivered: true, gatewayRequestId: requestId };
+    }
+    return { delivered: false };
   }
 
   private async createChallenge(
@@ -73,6 +111,20 @@ export class TwoFactorService {
     return { challengeId, code };
   }
 
+  /** Records the Gateway request against a live challenge, for later revocation. */
+  private async attachGatewayRequest(challengeId: string, requestId: string): Promise<void> {
+    const raw = await this.redis.client.get(key(challengeId));
+    if (!raw) return;
+    const ttl = await this.redis.client.ttl(key(challengeId));
+    const challenge = JSON.parse(raw) as Challenge;
+    await this.redis.client.set(
+      key(challengeId),
+      JSON.stringify({ ...challenge, gatewayRequestId: requestId } satisfies Challenge),
+      'EX',
+      ttl > 0 ? ttl : 1,
+    );
+  }
+
   /**
    * Sends the code and returns the challenge id. If Telegram delivery fails the
    * challenge is discarded and the caller gets a hard error rather than a
@@ -85,26 +137,33 @@ export class TwoFactorService {
    */
   async issue(
     userId: string,
-    chatId: string,
+    chatId: string | null,
     fullName: string,
     purpose: ChallengePurpose = 'second-factor',
+    phone: string | null = null,
   ): Promise<{
     challengeId: string;
     expiresInSeconds: number;
   }> {
     const { challengeId, code } = await this.createChallenge(userId, purpose);
+    const { delivered, gatewayRequestId } = await this.deliver(
+      chatId,
+      phone,
+      code,
+      fullName,
+      purpose,
+    );
 
-    try {
-      await this.telegram.send(chatId, this.codeMessage(code, fullName, purpose));
-    } catch (e) {
+    if (!delivered) {
       await this.redis.client.del(key(challengeId));
-      this.logger.error(`Login code delivery failed for user ${userId}: ${String(e)}`);
+      this.logger.error(`Login code delivery failed for user ${userId}`);
       throw new AppException(
         ErrorCode.TELEGRAM_NOT_LINKED,
         'Tasdiqlash kodini yuborib bo‘lmadi. Telegram botni tekshiring yoki administratorga murojaat qiling.',
         503,
       );
     }
+    if (gatewayRequestId) await this.attachGatewayRequest(challengeId, gatewayRequestId);
 
     return { challengeId, expiresInSeconds: AUTH_2FA_TTL_SECONDS };
   }
@@ -118,16 +177,21 @@ export class TwoFactorService {
    */
   async issueInBackground(
     userId: string,
-    chatId: string,
+    chatId: string | null,
     fullName: string,
     purpose: ChallengePurpose,
+    phone: string | null = null,
   ): Promise<{ challengeId: string; expiresInSeconds: number }> {
     const { challengeId, code } = await this.createChallenge(userId, purpose);
-    void this.telegram
-      .send(chatId, this.codeMessage(code, fullName, purpose))
-      .catch((e: unknown) =>
-        this.logger.warn(`Login code delivery failed for user ${userId}: ${String(e)}`),
-      );
+    void this.deliver(chatId, phone, code, fullName, purpose)
+      .then((r) => {
+        if (!r.delivered) this.logger.warn(`Login code not delivered for user ${userId}`);
+        else if (r.gatewayRequestId) {
+          return this.attachGatewayRequest(challengeId, r.gatewayRequestId);
+        }
+        return undefined;
+      })
+      .catch((e: unknown) => this.logger.warn(`Login code delivery failed: ${String(e)}`));
     return { challengeId, expiresInSeconds: AUTH_2FA_TTL_SECONDS };
   }
 
@@ -227,6 +291,7 @@ export class TwoFactorService {
       }
       if (attempts >= AUTH_2FA_MAX_ATTEMPTS) {
         await this.redis.client.del(key(challengeId), attemptsKey(challengeId));
+        if (challenge.gatewayRequestId) await this.gateway.revoke(challenge.gatewayRequestId);
         throw new AppException(
           ErrorCode.TWO_FACTOR_CHALLENGE_INVALID,
           'Juda ko‘p urinish. Qaytadan kiring.',
@@ -237,6 +302,9 @@ export class TwoFactorService {
     }
 
     await this.redis.client.del(key(challengeId), attemptsKey(challengeId));
+    // The code is spent; take it out of the user's Telegram so a live-looking
+    // one is not left sitting in their chat history.
+    if (challenge.gatewayRequestId) await this.gateway.revoke(challenge.gatewayRequestId);
     return challenge.userId;
   }
 }
