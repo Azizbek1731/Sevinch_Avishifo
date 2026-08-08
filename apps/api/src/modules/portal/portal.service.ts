@@ -366,21 +366,34 @@ export class PortalService {
       select: { chatId: true },
     });
 
-    let via = '';
-    if (chat) {
-      try {
-        await this.telegram.send(chat.chatId, `🔐 ${message}`);
-        via = 'bot';
-      } catch (err) {
-        this.logger.warn(`OTP Telegram delivery failed for ${maskPhone(phone)}: ${String(err)}`);
-      }
-    }
-
     // Telegram Gateway reaches any number registered on Telegram without the
     // patient ever having opened our bot — which is most of them, and the whole
-    // reason a first sign-in used to depend on SMS.
-    if (!via && (await this.gateway.sendCode(phone, code, OTP_TTL_MINUTES * 60))) {
-      via = 'gateway';
+    // reason a first sign-in used to depend on SMS. VERIFICATION_CODE_CHANNEL
+    // decides which of the two Telegram routes is tried first; the other is the
+    // fallback, and SMS is the last resort.
+    const preferBot = this.config.env.VERIFICATION_CODE_CHANNEL === 'bot';
+
+    const viaBot = async (): Promise<boolean> => {
+      if (!chat) return false;
+      try {
+        await this.telegram.send(chat.chatId, `🔐 ${message}`);
+        return true;
+      } catch (err) {
+        this.logger.warn(`OTP Telegram delivery failed for ${maskPhone(phone)}: ${String(err)}`);
+        return false;
+      }
+    };
+    const viaGateway = async (): Promise<boolean> =>
+      (await this.gateway.sendCode(phone, code, OTP_TTL_MINUTES * 60)) !== null;
+
+    let via = '';
+    for (const [name, attempt] of preferBot
+      ? ([['bot', viaBot], ['gateway', viaGateway]] as const)
+      : ([['gateway', viaGateway], ['bot', viaBot]] as const)) {
+      if (await attempt()) {
+        via = name;
+        break;
+      }
     }
 
     if (!via) {

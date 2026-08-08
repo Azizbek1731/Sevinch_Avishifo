@@ -20,9 +20,10 @@ import {
  * Telegram Gateway as a delivery route for verification codes.
  *
  * What it buys is reach: the bot can only message a chat that already pressed
- * /start, which a first-time sign-in never has. These tests pin the resulting
- * order — linked bot chat first, Gateway second — and, more importantly, that
- * turning Gateway off puts everything back exactly as it was.
+ * /start, which a first-time sign-in never has. Gateway is therefore the
+ * default route — one recognisable sender for everybody — with the linked bot
+ * chat as the fallback. These tests pin that order, and, more importantly, that
+ * turning Gateway off puts every flow back exactly as it was.
  */
 describe('telegram gateway delivery (e2e)', () => {
   let app: INestApplication;
@@ -87,7 +88,7 @@ describe('telegram gateway delivery (e2e)', () => {
     expect(res.body.data.user.id).toBe(clinic.doctor.id);
   });
 
-  it('prefers the linked bot chat over the paid channel', async () => {
+  it('sends through Gateway even when the user has a linked bot chat', async () => {
     setGateway(true);
     const chatId = `gw-chat-${clinic.tag}`;
     await prisma.user.update({
@@ -98,8 +99,32 @@ describe('telegram gateway delivery (e2e)', () => {
 
     await requestCode(phone);
     expect(sent).toHaveLength(1);
-    // The bot chat, not gateway:<phone> — Gateway costs money per message.
+    // VERIFICATION_CODE_CHANNEL defaults to `gateway`: every user sees the code
+    // arrive from the same recognisable sender, whether or not they ever linked
+    // the bot. Exactly one message goes out — never both.
+    expect(sent[0]!.chatId).toBe(`gateway:${phone}`);
+  });
+
+  it('falls back to the linked bot chat when Gateway cannot deliver', async () => {
+    setGateway(false);
+    const chatId = `gw-fallback-${clinic.tag}`;
+    await prisma.user.update({
+      where: { id: clinic.cashier.id },
+      data: { telegramChatId: chatId },
+    });
+    const phone = (await prisma.user.findUnique({ where: { id: clinic.cashier.id } }))!.phone!;
+
+    const challengeId = await requestCode(phone);
+    expect(sent).toHaveLength(1);
     expect(sent[0]!.chatId).toBe(chatId);
+
+    // And the fallback code is a real one, not a decoy.
+    const code = /(\d{6})/.exec(sent[0]!.text)?.[1] as string;
+    await request(app.getHttpServer())
+      .post(`${API}/auth/telegram/verify`)
+      .set('X-Forwarded-For', uniqueIp())
+      .send({ challengeId, code })
+      .expect(200);
   });
 
   it('goes back to refusing unlinked accounts when Gateway is off', async () => {

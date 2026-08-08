@@ -3,6 +3,7 @@ import { randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { AUTH_2FA_MAX_ATTEMPTS, AUTH_2FA_TTL_SECONDS, ErrorCode } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
 import { RedisService } from '../../core/redis/redis.service';
+import { AppConfigService } from '../../core/config/app-config.service';
 import { TelegramChannel } from '../notifications/channels/telegram.channel';
 import { TelegramGatewayChannel } from '../notifications/channels/telegram-gateway.channel';
 
@@ -51,6 +52,7 @@ export class TwoFactorService {
     private readonly redis: RedisService,
     private readonly telegram: TelegramChannel,
     private readonly gateway: TelegramGatewayChannel,
+    private readonly config: AppConfigService,
   ) {}
 
   /** Whether Telegram Gateway is configured — it reaches unlinked phones too. */
@@ -81,24 +83,38 @@ export class TwoFactorService {
     fullName: string,
     purpose: ChallengePurpose,
   ): Promise<{ delivered: boolean; gatewayRequestId?: string }> {
-    if (chatId) {
+    const viaGateway = async (): Promise<{ delivered: boolean; gatewayRequestId?: string }> => {
+      if (!phone) return { delivered: false };
+      const requestId = await this.gateway.sendCode(phone, code, AUTH_2FA_TTL_SECONDS);
+      if (!requestId) return { delivered: false };
+      // Which route carried a code is the first thing anyone asks when a user
+      // says "no code arrived", and it is not otherwise recoverable.
+      this.logger.log(`Login code (${purpose}) delivered via telegram gateway`);
+      return { delivered: true, gatewayRequestId: requestId };
+    };
+
+    const viaBot = async (): Promise<{ delivered: boolean }> => {
+      if (!chatId) return { delivered: false };
       try {
         await this.telegram.send(chatId, this.codeMessage(code, fullName, purpose));
         this.logger.log(`Login code (${purpose}) delivered via bot chat`);
         return { delivered: true };
       } catch (e) {
-        this.logger.warn(`Bot chat delivery failed, trying Gateway: ${String(e)}`);
+        this.logger.warn(`Bot chat delivery failed: ${String(e)}`);
+        return { delivered: false };
       }
+    };
+
+    const order =
+      this.config.env.VERIFICATION_CODE_CHANNEL === 'bot'
+        ? [viaBot, viaGateway]
+        : [viaGateway, viaBot];
+
+    for (const attempt of order) {
+      const result = await attempt();
+      if (result.delivered) return result;
     }
-    if (phone) {
-      const requestId = await this.gateway.sendCode(phone, code, AUTH_2FA_TTL_SECONDS);
-      if (requestId) {
-        // Which route carried a code is the first thing anyone asks when a user
-        // says "no code arrived", and it is not otherwise recoverable.
-        this.logger.log(`Login code (${purpose}) delivered via telegram gateway`);
-        return { delivered: true, gatewayRequestId: requestId };
-      }
-    }
+
     this.logger.warn(`Login code (${purpose}) had no working delivery route`);
     return { delivered: false };
   }

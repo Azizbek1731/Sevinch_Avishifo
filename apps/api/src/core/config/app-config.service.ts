@@ -41,6 +41,15 @@ const envSchema = z.object({
   TELEGRAM_GATEWAY_TOKEN: z.string().optional(),
   /** Optional verified channel to send as, instead of the generic sender. */
   TELEGRAM_GATEWAY_SENDER: z.string().optional(),
+  /**
+   * Which Telegram route carries verification codes when both are available.
+   * `gateway` is the default: it is the purpose-built verification channel, it
+   * looks the same to every user whether or not they ever linked our bot, and
+   * it costs about $0.01 a code. Set `bot` to prefer the user's linked chat
+   * instead, which is free but only reaches people who already pressed /start.
+   * Either way the other route is the fallback.
+   */
+  VERIFICATION_CODE_CHANNEL: z.enum(['gateway', 'bot']).default('gateway'),
   PAYME_MERCHANT_ID: z.string().optional(),
   PAYME_KEY: z.string().optional(),
   CLICK_MERCHANT_ID: z.string().optional(),
