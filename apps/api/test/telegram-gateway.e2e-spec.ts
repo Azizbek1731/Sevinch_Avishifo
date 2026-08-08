@@ -199,6 +199,36 @@ describe('telegram gateway delivery (e2e)', () => {
     expect(res.body.error.code).toBe('TELEGRAM_NOT_LINKED');
   });
 
+  it('actually sends the password-reset code instead of only logging it', async () => {
+    setGateway(true);
+    await prisma.user.update({
+      where: { id: clinic.cashier.id },
+      data: { telegramChatId: null, status: 'ACTIVE' },
+    });
+    const phone = (await prisma.user.findUnique({ where: { id: clinic.cashier.id } }))!.phone!;
+
+    sent.length = 0;
+    await request(app.getHttpServer())
+      .post(`${API}/auth/password-reset/request`)
+      .set('X-Forwarded-For', uniqueIp())
+      .send({ phone })
+      .expect(200);
+
+    // Delivery is fire-and-forget so the response time cannot betray whether the
+    // account exists; give the send a moment to land in the recorder.
+    await new Promise((r) => setTimeout(r, 200));
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.chatId).toBe(`gateway:${phone}`);
+
+    // And the code that arrived is the one that works.
+    const code = /(\d{6})/.exec(sent[0]!.text)?.[1] as string;
+    await request(app.getHttpServer())
+      .post(`${API}/auth/password-reset/confirm`)
+      .set('X-Forwarded-For', uniqueIp())
+      .send({ phone, otp: code, newPassword: 'NewE2ePass123!' })
+      .expect(200);
+  });
+
   it('delivers a portal sign-in code through Gateway when the bot is unlinked', async () => {
     setGateway(true);
     sent.length = 0;

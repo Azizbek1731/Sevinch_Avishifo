@@ -83,21 +83,46 @@ export class TwoFactorService {
     fullName: string,
     purpose: ChallengePurpose,
   ): Promise<{ delivered: boolean; gatewayRequestId?: string }> {
+    return this.deliverCode({
+      chatId,
+      phone,
+      code,
+      botText: this.codeMessage(code, fullName, purpose),
+      label: purpose,
+    });
+  }
+
+  /**
+   * Sends a six-digit code by whichever Telegram route is preferred, falling
+   * back to the other. Public because not every code lives in a Redis challenge
+   * — the password-reset code is stored in the database and still has to reach
+   * the user the same way.
+   */
+  async deliverCode(i: {
+    chatId: string | null;
+    phone: string | null;
+    code: string;
+    /** What the bot chat says; Gateway renders its own text from the code. */
+    botText: string;
+    /** Only for the log line, so "no code arrived" is answerable. */
+    label: string;
+  }): Promise<{ delivered: boolean; gatewayRequestId?: string }> {
+    const { chatId, phone, code, botText, label: purpose } = i;
     const viaGateway = async (): Promise<{ delivered: boolean; gatewayRequestId?: string }> => {
       if (!phone) return { delivered: false };
       const requestId = await this.gateway.sendCode(phone, code, AUTH_2FA_TTL_SECONDS);
       if (!requestId) return { delivered: false };
       // Which route carried a code is the first thing anyone asks when a user
       // says "no code arrived", and it is not otherwise recoverable.
-      this.logger.log(`Login code (${purpose}) delivered via telegram gateway`);
+      this.logger.log(`Code (${purpose}) delivered via telegram gateway`);
       return { delivered: true, gatewayRequestId: requestId };
     };
 
     const viaBot = async (): Promise<{ delivered: boolean }> => {
       if (!chatId) return { delivered: false };
       try {
-        await this.telegram.send(chatId, this.codeMessage(code, fullName, purpose));
-        this.logger.log(`Login code (${purpose}) delivered via bot chat`);
+        await this.telegram.send(chatId, botText);
+        this.logger.log(`Code (${purpose}) delivered via bot chat`);
         return { delivered: true };
       } catch (e) {
         this.logger.warn(`Bot chat delivery failed: ${String(e)}`);
@@ -115,7 +140,7 @@ export class TwoFactorService {
       if (result.delivered) return result;
     }
 
-    this.logger.warn(`Login code (${purpose}) had no working delivery route`);
+    this.logger.warn(`Code (${purpose}) had no working delivery route`);
     return { delivered: false };
   }
 

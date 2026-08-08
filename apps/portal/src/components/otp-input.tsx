@@ -39,7 +39,7 @@ export function OtpInput({ value, onChange, disabled, autoFocus }: OtpInputProps
   };
 
   return (
-    <div className="flex justify-between gap-2" role="group" aria-label="SMS kod">
+    <div className="flex justify-between gap-2" role="group" aria-label="Tasdiqlash kodi">
       {Array.from({ length: LENGTH }, (_, i) => (
         <input
           key={i}

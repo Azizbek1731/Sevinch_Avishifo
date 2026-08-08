@@ -773,7 +773,7 @@ export class AuthService {
         role: { not: UserRole.PATIENT },
         status: UserStatus.ACTIVE,
       },
-      select: { id: true },
+      select: { id: true, fullName: true, telegramChatId: true },
     });
 
     // Always answer success — never reveal whether the phone exists.
@@ -794,11 +794,24 @@ export class AuthService {
       },
     });
 
-    // Log-mode SMS delivery (spec M1 — auth must not depend on the notifications
-    // module). Phone is masked to keep PHI out of log lines.
-    this.logger.log(
-      `Password-reset OTP for ${input.phone.slice(0, 7)}*****${input.phone.slice(-2)}: ${code} (expires in ${OTP_TTL_MINUTES}m)`,
-    );
+    // Delivery is not awaited: this endpoint is unauthenticated and answers the
+    // same way for every phone, so waiting on Telegram would let the response
+    // time say whether the account exists.
+    void this.twoFactor
+      .deliverCode({
+        chatId: user.telegramChatId,
+        phone: input.phone,
+        code,
+        botText:
+          `🔑 AviShifo — parolni tiklash kodi\n\n` +
+          `Kod: ${code}\n\n` +
+          `${user.fullName}, bu kod ${OTP_TTL_MINUTES} daqiqa amal qiladi.\n` +
+          `Agar parolni tiklashni siz so‘ramagan bo‘lsangiz, bu xabarni e'tiborsiz qoldiring — ` +
+          `parolingiz o‘zgarmaydi.`,
+        label: 'password-reset',
+      })
+      .catch((e: unknown) => this.logger.warn(`Password-reset code delivery failed: ${String(e)}`));
+
     return { requested: true };
   }
 

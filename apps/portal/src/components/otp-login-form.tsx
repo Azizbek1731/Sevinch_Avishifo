@@ -70,7 +70,7 @@ export function OtpLoginForm({ initialPhone, onSuccess }: OtpLoginFormProps) {
       codeForm.reset({ phone: normalized, code: '' });
       setStep('code');
       setResendIn(RESEND_SECONDS);
-      toast.success('Tasdiqlash kodi SMS orqali yuborildi');
+      toast.success('Tasdiqlash kodi yuborildi');
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
@@ -133,7 +133,7 @@ export function OtpLoginForm({ initialPhone, onSuccess }: OtpLoginFormProps) {
           {requestOtp.isPending ? <Spinner className="h-5 w-5 text-white" /> : 'Kod olish'}
         </button>
         <p className="text-center text-xs text-slate-500">
-          Raqamingizga 6 xonali tasdiqlash kodi SMS orqali yuboriladi
+          6 xonali kod Telegramingizga yuboriladi. Telegram bo‘lmasa — SMS orqali.
         </p>
       </form>
     );
@@ -149,6 +149,9 @@ export function OtpLoginForm({ initialPhone, onSuccess }: OtpLoginFormProps) {
           {phone !== null ? formatPhone(phone) : ''}
         </span>{' '}
         raqamiga yuborilgan 6 xonali kodni kiriting
+      </p>
+      <p className="text-center text-xs text-slate-500">
+        Telegramingizni tekshiring — kod «Verification Codes» dan keladi.
       </p>
       <Controller
         control={codeForm.control}
