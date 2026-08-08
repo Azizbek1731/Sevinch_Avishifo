@@ -41,7 +41,7 @@ export function LandingPatientEntry() {
   return (
     <section
       id="patient"
-      className="scroll-mt-20 border-y border-emerald-500/20 bg-emerald-500/[0.05] py-20 sm:py-24"
+      className="scroll-mt-20 border-y border-emerald-500/20 bg-emerald-500/[0.05] py-14 sm:py-24"
     >
       <div className="container">
         <SectionHeading
@@ -55,10 +55,10 @@ export function LandingPatientEntry() {
           subtitle={t('patient.subtitle')}
         />
 
-        <div className="mx-auto mt-12 grid max-w-5xl gap-5 sm:grid-cols-2">
+        <div className="mx-auto mt-8 grid max-w-5xl gap-4 sm:mt-12 sm:gap-5 sm:grid-cols-2">
           {POINTS.map(({ icon: Icon, key }, i) => (
             <Reveal key={key} delay={i * 70}>
-              <div className="flex h-full items-start gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+              <div className="flex h-full items-start gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                   <Icon className="h-5 w-5" />
                 </span>
@@ -74,7 +74,7 @@ export function LandingPatientEntry() {
         </div>
 
         <Reveal delay={140}>
-          <div className="mx-auto mt-8 flex max-w-5xl flex-col items-center gap-5 rounded-2xl border border-emerald-500/25 bg-card p-6 text-center shadow-sm sm:p-8">
+          <div className="mx-auto mt-6 flex max-w-5xl flex-col items-center gap-5 rounded-2xl border border-emerald-500/25 bg-card p-5 text-center shadow-sm sm:mt-8 sm:p-8">
             <p className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
               <Send className="h-4 w-4" />
               {t('patient.telegram')}
@@ -84,14 +84,14 @@ export function LandingPatientEntry() {
               <Button
                 asChild
                 size="lg"
-                className="h-12 bg-emerald-600 px-8 text-base font-semibold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700"
+                className="h-12 bg-emerald-600 px-6 text-base font-semibold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 sm:px-8"
               >
                 <a href={portal ? `${portal}/login` : '#patient'}>
                   {t('patient.login')}
                   <ArrowRight className="h-4 w-4" />
                 </a>
               </Button>
-              <Button asChild variant="outline" size="lg" className="h-12 text-base">
+              <Button asChild variant="outline" size="lg" className="h-12 px-6 text-base sm:px-8">
                 <a href={portal ? `${portal}/register` : '#patient'}>{t('patient.register')}</a>
               </Button>
             </div>

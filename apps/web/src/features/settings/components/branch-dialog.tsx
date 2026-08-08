@@ -7,8 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { createBranchSchema, type CreateBranchInput,
-  phoneWireValueOptional,
-} from '@avishifo/shared';
+  phoneWireValueOptional, formatNationalPhone } from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -57,7 +56,7 @@ export function BranchDialog({ open, onOpenChange, branch }: BranchDialogProps) 
       form.reset({
         name: branch.name,
         address: branch.address ?? undefined,
-        phone: branch.phone ?? undefined,
+        phone: branch.phone ? formatNationalPhone(branch.phone) : undefined,
         workingHours: parsed.length > 0 ? parsed : defaultWorkingHours(),
       });
     } else {

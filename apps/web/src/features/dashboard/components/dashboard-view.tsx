@@ -29,7 +29,7 @@ export function DashboardView() {
     <div className="space-y-6">
       <PageHeader title={t('title')} description={t('description')} />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {summary.isPending ? (
           Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-[116px] rounded-lg" />

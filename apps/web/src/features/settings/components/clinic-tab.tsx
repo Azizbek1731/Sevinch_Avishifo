@@ -12,8 +12,7 @@ import {
   updateClinicSchema,
   type ClinicSettingsInput,
   type UpdateClinicInput,
-  phoneWireValueOptional,
-} from '@avishifo/shared';
+  phoneWireValueOptional, formatNationalPhone } from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -58,7 +57,7 @@ function ClinicProfileForm() {
       name: clinic.name,
       legalName: clinic.legalName ?? undefined,
       taxId: clinic.taxId ?? undefined,
-      phone: clinic.phone ?? undefined,
+      phone: clinic.phone ? formatNationalPhone(clinic.phone) : undefined,
       email: clinic.email ?? undefined,
       address: clinic.address ?? undefined,
       defaultLocale: clinic.defaultLocale,

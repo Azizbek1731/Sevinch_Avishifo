@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PatientSearchCommand } from '@/components/patient-search-command';
+import { MobileNav } from '@/components/layout/sidebar';
 import { useState } from 'react';
 
 interface InboxResponse {
@@ -63,14 +64,14 @@ function NotificationBell() {
           ) : null}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
+      <DropdownMenuContent align="end" className="w-[19rem] sm:w-80">
         <DropdownMenuLabel className="flex items-center justify-between">
           <span>{t('appName')}</span>
           {unread > 0 ? (
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 gap-1 text-xs"
+              className="h-9 gap-1 text-xs md:h-7"
               onClick={() =>
                 void api.post('/notifications/inbox/read-all').then(() =>
                   queryClient.invalidateQueries({ queryKey: ['notifications', 'inbox'] }),
@@ -127,10 +128,12 @@ export function Topbar() {
   };
 
   return (
-    <header className="flex h-14 items-center gap-2 border-b bg-card px-4">
+    <header className="flex h-14 items-center gap-1 border-b bg-card px-3 md:gap-2 md:px-4">
+      <MobileNav />
+
       {branches.length > 0 ? (
         <Select value={activeBranchId ?? undefined} onValueChange={setActiveBranch}>
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-36 min-w-0 text-sm md:w-44">
             <SelectValue placeholder={t('branch')} />
           </SelectTrigger>
           <SelectContent>
@@ -142,7 +145,7 @@ export function Topbar() {
           </SelectContent>
         </Select>
       ) : (
-        <span className="text-sm font-medium text-muted-foreground">{clinic?.name}</span>
+        <span className="truncate text-sm font-medium text-muted-foreground">{clinic?.name}</span>
       )}
 
       <Button
@@ -156,18 +159,30 @@ export function Topbar() {
       </Button>
       <PatientSearchCommand open={searchOpen} onOpenChange={setSearchOpen} />
 
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex shrink-0 items-center gap-0.5 md:gap-1">
         {!connected ? (
           <span className="flex items-center gap-1 rounded-full bg-warning/15 px-2 py-1 text-xs text-warning-foreground">
-            <WifiOff className="h-3 w-3" /> {t('offline')}
+            <WifiOff className="h-3 w-3" />
+            <span className="hidden sm:inline">{t('offline')}</span>
           </span>
         ) : null}
+
+        {/* Without a keyboard there is no ⌘K, so the narrow layout needs its own way in. */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 lg:hidden"
+          aria-label={t('search')}
+          onClick={() => setSearchOpen(true)}
+        >
+          <Search className="h-5 w-5" />
+        </Button>
 
         <NotificationBell />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="gap-2 px-2">
+            <Button variant="ghost" className="shrink-0 gap-2 px-1.5 md:px-2">
               <Avatar className="h-8 w-8">
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>

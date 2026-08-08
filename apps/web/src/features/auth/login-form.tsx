@@ -201,7 +201,9 @@ export function LoginForm() {
                 autoFocus
                 maxLength={6}
                 placeholder="000000"
-                className="text-center font-mono text-2xl tracking-[0.4em]"
+                // The indent offsets the trailing letter-space so the six digits
+                // read as centred rather than nudged left.
+                className="h-14 text-center font-mono text-2xl tracking-[0.4em] indent-[0.4em] md:h-12"
                 value={code}
                 onChange={(e) => {
                   setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
@@ -214,7 +216,12 @@ export function LoginForm() {
                 {serverError}
               </p>
             ) : null}
-            <Button type="submit" className="w-full" disabled={verifying || code.length !== 6}>
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={verifying || code.length !== 6}
+            >
               {verifying ? t('twoFactor.verifying') : t('twoFactor.verify')}
             </Button>
             <Button
@@ -272,7 +279,12 @@ export function LoginForm() {
                 {serverError}
               </p>
             ) : null}
-            <Button type="submit" className="w-full" disabled={phoneForm.formState.isSubmitting}>
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={phoneForm.formState.isSubmitting}
+            >
               {phoneForm.formState.isSubmitting
                 ? t('telegramLogin.submitting')
                 : t('telegramLogin.submit')}
@@ -328,7 +340,7 @@ export function LoginForm() {
               {serverError}
             </p>
           ) : null}
-          <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+          <Button type="submit" size="lg" className="w-full" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting ? t('loggingIn') : t('login')}
           </Button>
         </form>
@@ -342,7 +354,13 @@ export function LoginForm() {
           </div>
         </div>
 
-        <Button type="button" variant="outline" className="w-full" onClick={() => goTo('telegram')}>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="w-full"
+          onClick={() => goTo('telegram')}
+        >
           <Send className="h-4 w-4" />
           {t('telegramLogin.cta')}
         </Button>
@@ -350,7 +368,12 @@ export function LoginForm() {
         <div className="mt-6 space-y-3 border-t pt-4">
           <p className="text-center text-sm text-muted-foreground">
             {t('noAccount')}{' '}
-            <Link href="/register" className="font-medium text-primary hover:underline">
+            {/* The padding grows the thumb target; the equal negative margin
+                keeps the line box — and so the whole card — where it was. */}
+            <Link
+              href="/register"
+              className="font-medium text-primary hover:underline max-md:-my-3 max-md:inline-block max-md:py-3"
+            >
               {t('registerFree')}
             </Link>
           </p>
@@ -364,7 +387,7 @@ export function LoginForm() {
 
         {SHOW_DEMO ? (
           <details className="mt-6 rounded-lg border bg-muted/40 p-3 text-sm">
-            <summary className="cursor-pointer select-none font-medium text-muted-foreground">
+            <summary className="flex min-h-11 cursor-pointer select-none items-center font-medium text-muted-foreground md:min-h-0">
               {t('demoAccounts')}
             </summary>
             <div className="mt-3 grid gap-1.5">
@@ -372,7 +395,7 @@ export function LoginForm() {
                 <button
                   key={acc.identifier}
                   type="button"
-                  className="flex items-center justify-between rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent"
+                  className="flex min-h-11 items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent md:min-h-0"
                   onClick={() => {
                     form.setValue('identifier', acc.identifier);
                     form.setValue('password', acc.password);
@@ -380,7 +403,7 @@ export function LoginForm() {
                   }}
                 >
                   <span className="font-medium">{tStatus(acc.roleKey as never)}</span>
-                  <span className="text-xs text-muted-foreground">{acc.identifier}</span>
+                  <span className="truncate text-xs text-muted-foreground">{acc.identifier}</span>
                 </button>
               ))}
               <p className="mt-1 px-2 text-xs text-muted-foreground">{t('demoDisplayHint')}</p>

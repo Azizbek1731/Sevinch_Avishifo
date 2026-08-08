@@ -24,28 +24,33 @@ export function LandingHero() {
         <div className="absolute right-[-8%] top-[18%] h-[26rem] w-[26rem] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.12),transparent_65%)] blur-2xl" />
       </div>
 
-      <div className="container grid items-center gap-12 py-16 sm:py-20 lg:grid-cols-2 lg:gap-10 lg:py-28">
-        <div className="flex flex-col items-start gap-6">
+      {/* The mobile type scale and gaps are deliberately tighter than the desktop
+          composition: on a phone the offer and the button have to clear the fold
+          together, and a 5-line subtitle pushes the button past it. */}
+      <div className="container grid items-center gap-8 py-10 sm:gap-12 sm:py-20 lg:grid-cols-2 lg:gap-10 lg:py-28">
+        <div className="flex flex-col items-start gap-4 sm:gap-6">
           <span className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm shadow-primary/10 sm:text-sm">
             <Sparkles className="h-3.5 w-3.5" />
             {t('hero.badge')}
           </span>
 
-          <h1 className="text-balance text-4xl font-extrabold leading-[1.08] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+          <h1 className="text-balance text-[2rem] font-extrabold leading-[1.1] tracking-tight text-foreground sm:text-5xl sm:leading-[1.08] lg:text-6xl">
             {t.rich('hero.title', {
               hl: (chunks) => <span className="text-primary">{chunks}</span>,
             })}
           </h1>
 
-          <p className="max-w-xl text-pretty text-lg text-muted-foreground">{t('hero.subtitle')}</p>
+          <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
+            {t('hero.subtitle')}
+          </p>
 
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <AuthCta
               anonymousLabel={t('hero.ctaPrimary')}
               size="lg"
-              className="h-12 px-8 text-base font-semibold shadow-lg shadow-primary/25 transition-transform hover:-translate-y-0.5"
+              className="h-12 px-6 text-base font-semibold shadow-lg shadow-primary/25 transition-transform hover:-translate-y-0.5 sm:px-8"
             />
-            <Button asChild variant="outline" size="lg" className="h-12 text-base">
+            <Button asChild variant="outline" size="lg" className="h-12 px-6 text-base sm:px-8">
               <a href="#features">
                 {t('hero.ctaSecondary')}
                 <ArrowRight className="h-4 w-4" />
@@ -53,7 +58,7 @@ export function LandingHero() {
             </Button>
           </div>
 
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 sm:mt-2">
             {TRUST.map(({ icon: Icon, key }) => (
               <span
                 key={key}

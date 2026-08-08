@@ -107,14 +107,16 @@ export default function CabinetPage() {
                     href={`/c/${card.clinicId}`}
                     className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
                   >
-                    <span className="flex items-center gap-3">
+                    <span className="flex min-w-0 items-center gap-3">
                       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
                         <Building2 className="h-5 w-5" />
                       </span>
-                      <span>
-                        <span className="block font-medium">{card.clinicName}</span>
-                        <span className="block text-sm text-slate-500">
-                          {card.fullName} · {card.mrn}
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{card.clinicName}</span>
+                        {/* Card number first — it is what reception asks for, and the
+                            patient's own name is already at the top of this screen. */}
+                        <span className="block truncate text-sm text-slate-500">
+                          {card.mrn} · {card.fullName}
                         </span>
                       </span>
                     </span>
@@ -131,7 +133,10 @@ export default function CabinetPage() {
         title="Kasallik tarixi"
         action={
           visitsQ.data !== undefined && visitsQ.data.length > 0 ? (
-            <Link href="/me/visits" className="text-sm font-medium text-brand hover:underline">
+            <Link
+              href="/me/visits"
+              className="-my-2 inline-flex min-h-11 items-center px-2 text-sm font-medium text-brand hover:underline"
+            >
               Barchasi
             </Link>
           ) : undefined
@@ -160,7 +165,7 @@ export default function CabinetPage() {
                       <div className="min-w-0">
                         <p className="truncate font-medium">{visit.doctorName}</p>
                         <p className="truncate text-sm text-slate-500">
-                          {visit.clinicName} · {formatDate(visit.completedAt ?? visit.startedAt)}
+                          {formatDate(visit.completedAt ?? visit.startedAt)} · {visit.clinicName}
                         </p>
                         {primary !== null && (
                           <p className="mt-1 line-clamp-1 text-sm text-slate-600">

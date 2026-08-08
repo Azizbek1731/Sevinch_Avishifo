@@ -12,7 +12,9 @@
     "trialCta": "7 kun bepul",
     "language": "Til",
     "pricing": "Narxlar",
-    "patient": "Bemor kabineti"
+    "patient": "Bemor kabineti",
+    "menu": "Menyu",
+    "close": "Yopish"
   },
   "hero": {
     "badge": "Klinikalar uchun CRM — 7 kun bepul sinov",

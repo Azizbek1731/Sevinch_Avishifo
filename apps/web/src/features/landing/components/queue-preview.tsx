@@ -27,7 +27,7 @@ export function QueuePreview() {
 
   return (
     <div className="relative">
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-2xl shadow-primary/10">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-2xl shadow-primary/10 sm:p-5">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">{t('hero.preview.title')}</p>
@@ -42,7 +42,7 @@ export function QueuePreview() {
           </span>
         </div>
 
-        <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:mt-5">
           {t('hero.preview.nowServing')}
         </p>
         <div className="mt-2 space-y-2">
@@ -91,7 +91,7 @@ export function QueuePreview() {
           ))}
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-4 sm:mt-5">
           <div className="rounded-lg bg-muted/50 p-3">
             <p className="text-2xl font-bold text-foreground">12</p>
             <p className="text-xs text-muted-foreground">{t('hero.preview.statWaiting')}</p>

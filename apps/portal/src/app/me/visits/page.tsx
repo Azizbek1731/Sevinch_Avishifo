@@ -33,60 +33,58 @@ export default function VisitsPage() {
 
       <RecordAccessGate>
         {visitsQ.isPending && <PageLoader />}
-      {visitsQ.isError && (
-        <EmptyState title="Yuklab bo'lmadi" description={errorMessage(visitsQ.error)} />
-      )}
-      {visitsQ.data !== undefined &&
-        (visitsQ.data.length === 0 ? (
-          <EmptyState
-            icon={<Stethoscope className="h-10 w-10" />}
-            title="Kasallik tarixi hali bo'sh"
-            description="Shifokor tekshiruvidan o'tganingizdan so'ng ma'lumotlar shu yerda ko'rinadi"
-          />
-        ) : (
-          <ul className="space-y-3">
-            {visitsQ.data.map((visit) => {
-              const primary =
-                visit.diagnoses.find((d) => d.isPrimary) ?? visit.diagnoses[0] ?? null;
-              return (
-                <li key={visit.id}>
-                  <Link
-                    href={`/me/visits/${visit.id}`}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand"
-                  >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
-                      <Stethoscope className="h-5 w-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
+        {visitsQ.isError && (
+          <EmptyState title="Yuklab bo'lmadi" description={errorMessage(visitsQ.error)} />
+        )}
+        {visitsQ.data !== undefined &&
+          (visitsQ.data.length === 0 ? (
+            <EmptyState
+              icon={<Stethoscope className="h-10 w-10" />}
+              title="Kasallik tarixi hali bo'sh"
+              description="Shifokor tekshiruvidan o'tganingizdan so'ng ma'lumotlar shu yerda ko'rinadi"
+            />
+          ) : (
+            <ul className="space-y-3">
+              {visitsQ.data.map((visit) => {
+                const primary =
+                  visit.diagnoses.find((d) => d.isPrimary) ?? visit.diagnoses[0] ?? null;
+                return (
+                  <li key={visit.id}>
+                    <Link
+                      href={`/me/visits/${visit.id}`}
+                      className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand"
+                    >
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
+                        <Stethoscope className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        {/* The name gets the whole row: sharing it with the date on
+                            one line cut Uzbek patronymics to a dozen characters. */}
                         <p className="truncate font-semibold">{visit.doctorName}</p>
-                        <p className="shrink-0 text-sm text-slate-500">
+                        <p className="truncate text-sm text-slate-500">
                           {formatDate(visit.completedAt ?? visit.startedAt)}
+                          {visit.doctorSpecialty ? ` · ${visit.doctorSpecialty}` : ''} ·{' '}
+                          {visit.clinicName}
                         </p>
+                        {primary !== null && (
+                          <p className="mt-1.5 line-clamp-1 text-sm text-slate-700">
+                            <span className="font-medium">Tashxis:</span> {primary.nameUz}
+                          </p>
+                        )}
+                        {visit.prescriptionCount > 0 && (
+                          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                            <Pill className="h-3 w-3" />
+                            {visit.prescriptionCount} ta retsept
+                          </span>
+                        )}
                       </div>
-                      <p className="truncate text-sm text-slate-500">
-                        {visit.doctorSpecialty ? `${visit.doctorSpecialty} · ` : ''}
-                        {visit.clinicName}
-                      </p>
-                      {primary !== null && (
-                        <p className="mt-1.5 line-clamp-1 text-sm text-slate-700">
-                          <span className="font-medium">Tashxis:</span> {primary.nameUz}
-                        </p>
-                      )}
-                      {visit.prescriptionCount > 0 && (
-                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                          <Pill className="h-3 w-3" />
-                          {visit.prescriptionCount} ta retsept
-                        </span>
-                      )}
-                    </div>
-                    <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        ))}
+                      <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ))}
       </RecordAccessGate>
     </div>
   );

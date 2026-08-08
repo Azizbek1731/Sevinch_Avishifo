@@ -50,9 +50,12 @@ function LoginContent() {
           }}
         />
       </SectionCard>
-      <p className="mt-4 text-center text-sm text-slate-500">
+      <p className="mt-2 text-center text-sm text-slate-500">
         Akkauntingiz yo‘qmi?{' '}
-        <Link href={registerHref} className="font-medium text-brand hover:underline">
+        <Link
+          href={registerHref}
+          className="inline-flex min-h-11 items-center px-2 font-medium text-brand hover:underline"
+        >
           Ro‘yxatdan o‘tish
         </Link>
       </p>

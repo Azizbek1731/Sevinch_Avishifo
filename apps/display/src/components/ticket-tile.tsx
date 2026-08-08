@@ -2,35 +2,20 @@ import { TicketStatus } from '@avishifo/shared';
 import type { QueueTicketPayload } from '@avishifo/shared';
 import { roomLabel } from '@/lib/format';
 
+/**
+ * How dense the board is. It no longer picks a font size — the tile's own
+ * container query does that from the space it was actually given — but it still
+ * decides how much padding is affordable and whether the status pill earns its
+ * vertical space.
+ */
 export type TileSize = 'hero' | 'xl' | 'lg' | 'md' | 'sm';
 
-const NUMBER_CLASS: Record<TileSize, string> = {
-  hero: 'text-hero',
-  xl: 'text-display',
-  lg: 'text-display-sm',
-  md: 'text-8xl',
-  sm: 'text-6xl',
-};
-const ROOM_CLASS: Record<TileSize, string> = {
-  hero: 'text-7xl',
-  xl: 'text-6xl',
-  lg: 'text-5xl',
-  md: 'text-4xl',
-  sm: 'text-3xl',
-};
-const DOCTOR_CLASS: Record<TileSize, string> = {
-  hero: 'text-4xl',
-  xl: 'text-4xl',
-  lg: 'text-3xl',
-  md: 'text-2xl',
-  sm: 'text-xl',
-};
 const PAD: Record<TileSize, string> = {
-  hero: 'px-14 py-12 gap-6',
-  xl: 'px-10 py-10 gap-5',
-  lg: 'px-8 py-8 gap-4',
-  md: 'px-6 py-6 gap-3',
-  sm: 'px-5 py-4 gap-2',
+  hero: 'px-[4%] py-[4%] gap-[3%]',
+  xl: 'px-[4%] py-[4%] gap-[3%]',
+  lg: 'px-[4%] py-[3.5%] gap-[2.5%]',
+  md: 'px-[3.5%] py-[3%] gap-[2%]',
+  sm: 'px-[3%] py-[2.5%] gap-[1.5%]',
 };
 
 /** "Now serving" tile: giant ticket number + room + doctor. */
@@ -54,12 +39,12 @@ export function TicketTile({
 
   return (
     <div
-      className={`animate-enter flex flex-col items-center justify-center rounded-[2rem] border-2 text-center shadow-2xl backdrop-blur-sm ${PAD[size]} ${frame}`}
+      className={`tile animate-enter flex flex-col items-center justify-center overflow-hidden rounded-[2rem] border-2 text-center shadow-2xl backdrop-blur-sm ${PAD[size]} ${frame}`}
     >
       {/* status pill (hidden on the compact tier to save vertical space) */}
       {size !== 'sm' ? (
         <div
-          className={`flex items-center gap-2.5 rounded-full px-4 py-1.5 text-lg font-bold uppercase tracking-[0.2em] ${
+          className={`tile-pill flex shrink-0 items-center gap-[0.5em] rounded-full px-[1em] py-[0.35em] font-bold uppercase tracking-[0.2em] ${
             highlighted
               ? 'bg-emerald-400/15 text-emerald-300'
               : inRoom
@@ -68,14 +53,14 @@ export function TicketTile({
           }`}
         >
           {highlighted ? (
-            <span className="animate-breathe h-2.5 w-2.5 rounded-full bg-emerald-300" />
+            <span className="animate-breathe h-[0.6em] w-[0.6em] rounded-full bg-emerald-300" />
           ) : null}
           {inRoom ? 'Qabulda' : 'Chaqirilmoqda'}
         </div>
       ) : null}
 
       <div
-        className={`${NUMBER_CLASS[size]} font-black leading-none tabular-nums ${
+        className={`tile-number font-black tabular-nums ${
           highlighted ? 'text-white drop-shadow-[0_0_25px_rgba(52,211,153,0.45)]' : 'text-white'
         }`}
       >
@@ -83,14 +68,14 @@ export function TicketTile({
       </div>
 
       {room !== null ? (
-        <div className={`${ROOM_CLASS[size]} flex items-center gap-3 font-black text-amber-300`}>
+        <div className="tile-room flex shrink-0 items-center gap-[0.35em] font-black text-amber-300">
           <span className="animate-nudge text-amber-400">→</span>
           {room}
         </div>
       ) : null}
 
       {ticket.doctorName !== null ? (
-        <div className={`${DOCTOR_CLASS[size]} font-medium text-slate-300`}>{ticket.doctorName}</div>
+        <div className="tile-doctor w-full truncate font-medium text-slate-300">{ticket.doctorName}</div>
       ) : null}
     </div>
   );

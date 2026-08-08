@@ -13,7 +13,11 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      'inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground',
+      // Stretching the triggers hands them the list's full height, which is what
+      // makes them a usable size on a phone. Once the row can scroll, centring
+      // it would put the first tab out of reach past the left edge, and a fixed
+      // height would hide a wrapped second row behind the same scroller.
+      'inline-flex h-9 min-h-12 max-w-full items-stretch justify-start overflow-x-auto rounded-lg bg-muted p-0.5 text-muted-foreground max-md:h-auto md:min-h-0 md:p-1',
       className,
     )}
     {...props}
@@ -28,7 +32,10 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow',
+      // The trigger carries its own touch floor rather than inheriting the
+      // list's height: settings and the patient card wrap their tabs, and a
+      // wrapped row is only as tall as its own text.
+      'inline-flex min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow',
       className,
     )}
     {...props}

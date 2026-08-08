@@ -16,6 +16,8 @@ interface AuthCtaProps {
   showArrow?: boolean;
   /** Where an anonymous visitor goes: the free-trial sign-up or the login page. */
   target?: PanelPath;
+  /** Lets an overlay close itself before the browser leaves the page. */
+  onClick?: () => void;
 }
 
 /**
@@ -31,6 +33,7 @@ export function AuthCta({
   className,
   showArrow = true,
   target = 'register',
+  onClick,
 }: AuthCtaProps) {
   const t = useTranslations('landing');
   const authenticated = useAuthStore((s) => s.status === 'authenticated');
@@ -42,7 +45,7 @@ export function AuthCta({
   if (!authenticated && panelUrl) {
     return (
       <Button asChild size={size} variant={variant} className={className}>
-        <a href={panelUrl}>
+        <a href={panelUrl} onClick={onClick}>
           {label}
           {arrow}
         </a>
@@ -52,7 +55,7 @@ export function AuthCta({
 
   return (
     <Button asChild size={size} variant={variant} className={className}>
-      <Link href={authenticated ? '/dashboard' : `/${target}`}>
+      <Link href={authenticated ? '/dashboard' : `/${target}`} onClick={onClick}>
         {label}
         {arrow}
       </Link>

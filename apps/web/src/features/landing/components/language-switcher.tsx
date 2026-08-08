@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { Check, Globe } from 'lucide-react';
 import { usePathname, useRouter, type AppLocale } from '@/i18n/routing';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-const LOCALES: ReadonlyArray<{ code: AppLocale; short: string; name: string }> = [
+export const LOCALES: ReadonlyArray<{ code: AppLocale; short: string; name: string }> = [
   { code: 'uz', short: 'UZ', name: "O'zbekcha (lotin)" },
   { code: 'uz-Cyrl', short: 'ЎЗ', name: 'Ўзбекча (кирилл)' },
   { code: 'ru', short: 'RU', name: 'Русский' },
@@ -19,7 +20,7 @@ const LOCALES: ReadonlyArray<{ code: AppLocale; short: string; name: string }> =
 ];
 
 /** Compact locale switcher — swaps only the locale segment, keeping the path. */
-export function LanguageSwitcher() {
+export function LanguageSwitcher({ className }: { className?: string }) {
   const t = useTranslations('landing');
   const locale = useLocale();
   const router = useRouter();
@@ -29,7 +30,12 @@ export function LanguageSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-1.5 px-2.5" aria-label={t('nav.language')}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn('h-11 gap-1.5 px-3 md:h-8 md:px-2.5', className)}
+          aria-label={t('nav.language')}
+        >
           <Globe className="h-4 w-4" />
           <span className="text-xs font-semibold">{current?.short ?? 'UZ'}</span>
         </Button>

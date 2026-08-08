@@ -151,7 +151,10 @@ export function RegisterForm({ trialDays = 7 }: { trialDays?: number }) {
 
           <p className="text-center text-sm text-muted-foreground">
             {t('register.haveAccount')}{' '}
-            <Link href="/login" className="font-medium text-primary hover:underline">
+            <Link
+              href="/login"
+              className="font-medium text-primary hover:underline max-md:-my-3 max-md:inline-block max-md:py-3"
+            >
               {t('register.signIn')}
             </Link>
           </p>

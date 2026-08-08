@@ -175,7 +175,7 @@ export function CategorySidebar({ selectedId, onSelect }: CategorySidebarProps) 
             type="button"
             onClick={() => onSelect(null)}
             className={cn(
-              'flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-muted',
+              'flex min-h-11 w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-muted md:min-h-0',
               selectedId === null && 'bg-muted font-medium',
             )}
           >
@@ -196,7 +196,7 @@ export function CategorySidebar({ selectedId, onSelect }: CategorySidebarProps) 
               <div
                 key={cat.id}
                 className={cn(
-                  'group flex w-full items-center gap-1 rounded-md px-3 py-1.5 text-sm hover:bg-muted',
+                  'group flex min-h-11 w-full items-center gap-1 rounded-md px-3 py-1.5 text-sm hover:bg-muted md:min-h-0',
                   selectedId === cat.id && 'bg-muted',
                 )}
               >

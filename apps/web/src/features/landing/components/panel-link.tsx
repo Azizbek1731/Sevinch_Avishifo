@@ -27,27 +27,30 @@ export function usePanelUrl(path: PanelPath): string | null {
   return base ? `${base}/${locale}/${path}` : null;
 }
 
-/** Plain text link to a panel page, for nav and footer. */
+/** Plain text link to a panel page, for nav, footer and the mobile menu. */
 export function PanelLink({
   path,
   className,
+  onClick,
   children,
 }: {
   path: PanelPath;
   className?: string;
+  /** Lets an overlay close itself before the browser leaves the page. */
+  onClick?: () => void;
   children: ReactNode;
 }) {
   const href = usePanelUrl(path);
 
   if (href) {
     return (
-      <a href={href} className={className}>
+      <a href={href} className={className} onClick={onClick}>
         {children}
       </a>
     );
   }
   return (
-    <Link href={`/${path}`} className={className}>
+    <Link href={`/${path}`} className={className} onClick={onClick}>
       {children}
     </Link>
   );

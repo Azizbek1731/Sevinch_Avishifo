@@ -67,14 +67,16 @@ export default function ResultsPage() {
                     onClick={() => setOpenId(isOpen ? null : order.id)}
                     className="flex w-full items-center justify-between gap-3 p-4 text-left"
                   >
-                    <span className="flex items-center gap-3">
+                    <span className="flex min-w-0 items-center gap-3">
                       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
                         <FlaskConical className="h-5 w-5" />
                       </span>
-                      <span>
+                      <span className="min-w-0">
                         <span className="block font-semibold">№ {order.orderNumber}</span>
-                        <span className="block text-sm text-slate-500">
-                          {order.clinicName} · {formatDate(order.date)}
+                        {/* Date first, clamped: a long clinic name used to push the
+                            header to four lines and bury the date under it. */}
+                        <span className="line-clamp-2 text-sm text-slate-500">
+                          {formatDate(order.date)} · {order.clinicName}
                         </span>
                       </span>
                     </span>
@@ -88,52 +90,44 @@ export default function ResultsPage() {
                     <div className="space-y-4 border-t border-slate-100 p-4">
                       {order.items.map((item) => (
                         <div key={item.testName}>
-                          <p className="mb-2 font-medium">{item.testName}</p>
-                          <div className="overflow-x-auto">
-                            <table className="w-full min-w-[28rem] text-sm">
-                              <thead>
-                                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
-                                  <th className="py-1.5 pr-3 font-medium">Ko&apos;rsatkich</th>
-                                  <th className="py-1.5 pr-3 font-medium">Natija</th>
-                                  <th className="py-1.5 pr-3 font-medium" aria-label="Belgi" />
-                                  <th className="py-1.5 font-medium">Norma</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {item.values.map((v) => {
-                                  const flagMeta = v.flag !== null ? FLAG_META[v.flag] : null;
-                                  return (
-                                    <tr
-                                      key={v.parameter}
-                                      className="border-b border-slate-100 last:border-0"
+                          <p className="mb-1 font-medium">{item.testName}</p>
+                          {/* Rows, not a table: at 375px a four-column table can
+                              only be read by scrolling it sideways. */}
+                          <ul className="text-sm">
+                            {item.values.map((v) => {
+                              const flagMeta = v.flag !== null ? FLAG_META[v.flag] : null;
+                              return (
+                                <li
+                                  key={v.parameter}
+                                  className="flex flex-wrap items-baseline gap-x-2 border-b border-slate-100 py-2 last:border-0"
+                                >
+                                  <span className="min-w-0 flex-1 break-words text-slate-600">
+                                    {v.parameter}
+                                  </span>
+                                  <span className={valueClass(v.flag)}>
+                                    {v.value}
+                                    {v.unit !== null && v.unit !== '' && (
+                                      <span className="ml-1 text-xs font-normal text-slate-400">
+                                        {v.unit}
+                                      </span>
+                                    )}
+                                  </span>
+                                  {flagMeta !== null && (
+                                    <span
+                                      className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-xs font-bold ${flagMeta.className}`}
                                     >
-                                      <td className="py-2 pr-3 text-slate-600">{v.parameter}</td>
-                                      <td className={`py-2 pr-3 ${valueClass(v.flag)}`}>
-                                        {v.value}
-                                        {v.unit !== null && v.unit !== '' && (
-                                          <span className="ml-1 text-xs font-normal text-slate-400">
-                                            {v.unit}
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="py-2 pr-3">
-                                        {flagMeta !== null && (
-                                          <span
-                                            className={`inline-flex h-5 w-5 items-center justify-center rounded text-xs font-bold ${flagMeta.className}`}
-                                          >
-                                            {flagMeta.short}
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="py-2 text-slate-500">
-                                        {v.referenceText ?? '—'}
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
+                                      {flagMeta.short}
+                                    </span>
+                                  )}
+                                  {v.referenceText !== null && v.referenceText !== '' && (
+                                    <span className="w-full text-xs text-slate-400 sm:w-auto sm:pl-2">
+                                      Norma: {v.referenceText}
+                                    </span>
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
                         </div>
                       ))}
                     </div>

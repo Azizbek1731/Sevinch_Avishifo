@@ -210,7 +210,7 @@ export default function BookingPage() {
             type="button"
             onClick={goBack}
             aria-label="Orqaga"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
+            className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -218,7 +218,7 @@ export default function BookingPage() {
           <Link
             href={`/c/${clinicId}`}
             aria-label="Orqaga"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
+            className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100"
           >
             <ChevronLeft className="h-5 w-5" />
           </Link>
@@ -360,7 +360,7 @@ export default function BookingPage() {
                     setSlot(s);
                     setStep(4);
                   }}
-                  className={`rounded-xl border py-2.5 text-sm font-semibold transition ${
+                  className={`min-h-11 rounded-xl border text-sm font-semibold transition ${
                     slot?.startAt === s.startAt
                       ? 'border-brand bg-brand text-white'
                       : 'border-slate-200 bg-white text-slate-800 hover:border-brand'
@@ -428,7 +428,7 @@ export default function BookingPage() {
                   <p className="mb-3 text-sm text-slate-500">
                     Bu klinikaga birinchi marta yozilyapsiz — ism va familiyangizni kiriting
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div>
                       <input
                         value={firstName}

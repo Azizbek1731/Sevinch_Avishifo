@@ -15,11 +15,23 @@ const PRIORITY_STYLE: Record<TicketPriority, { row: string; num: string; badge: 
   NORMAL: { row: 'border-white/8 bg-white/[0.03]', num: 'text-white', badge: null },
 };
 
-/** Right column: the next waiting tickets (rank + number + doctor). */
-export function WaitingList({ tickets }: { tickets: QueueTicketPayload[] }) {
+/**
+ * The next waiting tickets. How many actually fit depends on the monitor, so the
+ * list is clipped by its own box rather than by a fixed count, and whatever did
+ * not fit is counted at the bottom — a queue that silently stops at eight reads
+ * as "only eight people waiting".
+ */
+export function WaitingList({
+  tickets,
+  total,
+}: {
+  tickets: QueueTicketPayload[];
+  /** Everyone waiting, not just the ones handed to this list. */
+  total: number;
+}) {
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-6 flex shrink-0 items-center gap-3">
         <span className="h-8 w-1.5 rounded-full bg-brand" />
         <h2 className="text-3xl font-bold uppercase tracking-[0.2em] text-slate-300">Keyingi navbat</h2>
       </div>
@@ -29,13 +41,13 @@ export function WaitingList({ tickets }: { tickets: QueueTicketPayload[] }) {
           <p className="text-3xl font-medium text-slate-600">Navbat bo&apos;sh</p>
         </div>
       ) : (
-        <ul className="flex flex-col gap-3.5">
+        <ul className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-hidden">
           {tickets.map((ticket, index) => {
             const style = PRIORITY_STYLE[ticket.priority];
             return (
               <li
                 key={ticket.id}
-                className={`animate-enter flex items-center gap-4 rounded-2xl border px-5 py-4 ${style.row}`}
+                className={`animate-enter flex shrink-0 items-center gap-4 rounded-2xl border px-5 py-4 ${style.row}`}
               >
                 <span className="w-9 shrink-0 text-center text-2xl font-bold tabular-nums text-slate-600">
                   {index + 1}
@@ -58,6 +70,12 @@ export function WaitingList({ tickets }: { tickets: QueueTicketPayload[] }) {
           })}
         </ul>
       )}
+
+      {total > tickets.length ? (
+        <p className="mt-4 shrink-0 text-center text-xl font-semibold text-slate-500">
+          +{total - tickets.length} kishi kutmoqda
+        </p>
+      ) : null}
     </div>
   );
 }

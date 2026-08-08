@@ -134,24 +134,28 @@ export function RecordAccessPage() {
                       ) : null}
                     </TableCell>
                     <TableCell className="text-right">
+                      {/* Narrow screens keep the icons and drop the labels — three
+                          words of Uzbek per button would push the row off-screen. */}
                       {r.status === 'PENDING' ? (
                         <div className="flex justify-end gap-2">
                           <Button
                             size="sm"
                             disabled={decide.isPending}
+                            aria-label={t('actions.approve')}
                             onClick={() => decide.mutate({ id: r.id, status: 'APPROVED' })}
                           >
                             <Check className="h-4 w-4" />
-                            {t('actions.approve')}
+                            <span className="hidden lg:inline">{t('actions.approve')}</span>
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             disabled={decide.isPending}
+                            aria-label={t('actions.reject')}
                             onClick={() => decide.mutate({ id: r.id, status: 'REJECTED' })}
                           >
                             <X className="h-4 w-4" />
-                            {t('actions.reject')}
+                            <span className="hidden lg:inline">{t('actions.reject')}</span>
                           </Button>
                         </div>
                       ) : r.status === 'APPROVED' ? (
@@ -159,10 +163,11 @@ export function RecordAccessPage() {
                           size="sm"
                           variant="outline"
                           disabled={decide.isPending}
+                          aria-label={t('actions.revoke')}
                           onClick={() => decide.mutate({ id: r.id, status: 'REVOKED' })}
                         >
                           <ShieldOff className="h-4 w-4" />
-                          {t('actions.revoke')}
+                          <span className="hidden lg:inline">{t('actions.revoke')}</span>
                         </Button>
                       ) : null}
                     </TableCell>

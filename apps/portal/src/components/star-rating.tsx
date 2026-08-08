@@ -37,7 +37,9 @@ export function StarRating({ value, onChange, size = 'lg' }: StarRatingProps) {
             onClick={() => onChange?.(star)}
             onMouseEnter={() => setHovered(star)}
             onMouseLeave={() => setHovered(0)}
-            className={`transition-transform ${readOnly ? '' : 'active:scale-90'}`}
+            className={`flex min-h-11 min-w-11 items-center justify-center transition-transform ${
+              readOnly ? '' : 'active:scale-90'
+            }`}
           >
             <Star
               className={`${iconSize} ${

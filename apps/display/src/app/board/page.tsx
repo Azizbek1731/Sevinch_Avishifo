@@ -22,8 +22,14 @@ const PRIORITY_RANK: Record<TicketPriority, number> = {
   NORMAL: 2,
 };
 
-const WAITING_LIMIT = 8;
+const WAITING_LIMIT = 10;
 const HISTORY_LIMIT = 5;
+/**
+ * Beyond this the numbers stop being readable from the far side of a waiting
+ * room, which is the only thing this screen is for. The rest are counted off to
+ * the side rather than shrunk into illegibility.
+ */
+const ACTIVE_LIMIT = 12;
 
 export default function BoardPage() {
   const router = useRouter();
@@ -85,6 +91,11 @@ export default function BoardPage() {
     [allTickets],
   );
 
+  const waitingTotal = useMemo(
+    () => allTickets.filter((t) => t.status === TicketStatus.WAITING).length,
+    [allTickets],
+  );
+
   const waiting = useMemo(
     () =>
       allTickets
@@ -121,11 +132,23 @@ export default function BoardPage() {
     return newestCalled !== undefined ? newestCalled.id : null;
   }, [lastCalledId, tickets, active]);
 
-  const count = active.length;
+  const shown = active.slice(0, ACTIVE_LIMIT);
+  const overflowCount = active.length - shown.length;
+  const count = shown.length;
   const tileSize: TileSize =
     count === 1 ? 'hero' : count === 2 ? 'xl' : count <= 4 ? 'lg' : count <= 6 ? 'md' : 'sm';
+  // Columns are picked so that columns x rows always covers the count. Every row
+  // is 1fr, so the grid divides the available height between them and no tile is
+  // ever pushed out of sight — which on a queue board would mean a patient being
+  // called with nothing on screen to tell them.
   const gridCols =
-    count === 1 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-3';
+    count <= 1
+      ? 'grid-cols-1'
+      : count <= 4
+        ? 'grid-cols-2'
+        : count <= 9
+          ? 'grid-cols-3'
+          : 'grid-cols-4';
 
   const tokenHint = token !== null ? `…${token.slice(-6)}` : null;
 
@@ -149,7 +172,7 @@ export default function BoardPage() {
 
       <div className="mx-12 h-px shrink-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-      <div className="flex min-h-0 flex-1 gap-8 px-12 py-8">
+      <div className="flex min-h-0 flex-1 gap-8 px-12 py-8 portrait:flex-col">
         <main className="flex min-w-0 flex-1 flex-col">
           <div className="mb-7 flex shrink-0 items-center gap-4">
             <span className="animate-breathe h-4 w-4 rounded-full bg-emerald-400 shadow-[0_0_12px_2px_rgba(52,211,153,0.7)]" />
@@ -162,8 +185,10 @@ export default function BoardPage() {
               <p className="text-display-sm font-black text-slate-700">Navbat kutilmoqda…</p>
             </div>
           ) : (
-            <div className={`grid flex-1 content-center gap-7 overflow-hidden ${gridCols}`}>
-              {active.map((ticket) => (
+            <div
+              className={`tile-grid grid min-h-0 flex-1 auto-rows-fr gap-7 overflow-hidden ${gridCols}`}
+            >
+              {shown.map((ticket) => (
                 <TicketTile
                   key={ticket.id}
                   ticket={ticket}
@@ -173,10 +198,15 @@ export default function BoardPage() {
               ))}
             </div>
           )}
+          {overflowCount > 0 ? (
+            <p className="mt-4 shrink-0 text-center text-2xl font-semibold text-slate-500">
+              +{overflowCount} ta yana chaqirilmoqda
+            </p>
+          ) : null}
         </main>
 
-        <aside className="w-[27rem] shrink-0 rounded-[2rem] border border-white/5 bg-white/[0.015] px-8 py-7">
-          <WaitingList tickets={waiting} />
+        <aside className="min-h-0 w-[27rem] shrink-0 rounded-[2rem] border border-white/5 bg-white/[0.015] px-8 py-7 portrait:h-[38%] portrait:w-full">
+          <WaitingList tickets={waiting} total={waitingTotal} />
         </aside>
       </div>
 

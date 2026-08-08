@@ -23,7 +23,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
             <Skeleton key={i} className="mb-3 h-8 w-full" />
           ))}
         </div>
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-4 md:p-6">
           <Skeleton className="mb-6 h-12 w-full" />
           <Skeleton className="h-64 w-full" />
         </div>

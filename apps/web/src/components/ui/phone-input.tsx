@@ -29,7 +29,7 @@ const PhoneInput = React.forwardRef<
 
   return (
     <div className={cn('relative', className)}>
-      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-muted-foreground">
+      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-muted-foreground max-md:text-base">
         +998
       </span>
       <input
@@ -69,7 +69,8 @@ const PhoneInput = React.forwardRef<
             if (el.selectionStart === el.selectionEnd) e.preventDefault();
           }
         }}
-        className="flex h-9 w-full rounded-md border border-input bg-transparent py-1 pl-[3.25rem] pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        // The left padding clears the fixed prefix, which is wider at 16px.
+        className="flex h-9 min-h-11 w-full rounded-md border border-input bg-transparent py-1 pl-[3.25rem] pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:min-h-0 max-md:pl-14 max-md:text-base"
         {...props}
       />
     </div>

@@ -89,7 +89,7 @@ export default function VisitDetailPage({ params }: { params: Promise<{ id: stri
         <button
           type="button"
           onClick={() => window.print()}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
+          className="flex h-11 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
         >
           <Printer className="h-4 w-4" />
           Chop etish
@@ -159,14 +159,14 @@ export default function VisitDetailPage({ params }: { params: Promise<{ id: stri
       {/* Recommendations (plan) */}
       {v.plan && (
         <Section icon={<FileText className="h-4 w-4" />} title="Tavsiyalar">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{v.plan}</p>
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">{v.plan}</p>
         </Section>
       )}
 
       {/* Complaints (subjective) */}
       {v.subjective && (
         <Section icon={<FileText className="h-4 w-4" />} title="Shikoyatlar va anamnez">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">
             {v.subjective}
           </p>
         </Section>
@@ -175,7 +175,7 @@ export default function VisitDetailPage({ params }: { params: Promise<{ id: stri
       {/* Examination (objective) */}
       {v.objective && (
         <Section icon={<Activity className="h-4 w-4" />} title="Ko'rik">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">
             {v.objective}
           </p>
         </Section>
@@ -232,7 +232,7 @@ function BackLink() {
   return (
     <Link
       href="/me/visits"
-      className="flex items-center gap-1.5 text-sm font-medium text-slate-600 transition hover:text-brand"
+      className="-ml-2 flex min-h-11 items-center gap-1.5 px-2 text-sm font-medium text-slate-600 transition hover:text-brand"
     >
       <ArrowLeft className="h-4 w-4" />
       Kasallik tarixi

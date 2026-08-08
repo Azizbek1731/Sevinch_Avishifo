@@ -15,6 +15,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  // Without this env(safe-area-inset-*) is always 0 on iOS, and the bottom tab
+  // bar would sit under the home indicator.
+  viewportFit: 'cover',
   themeColor: '#0e7ab8',
 };
 
@@ -24,7 +27,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-screen">
         <Providers>
           <Nav />
-          <main className="mx-auto w-full max-w-3xl px-4 pb-20 pt-6">{children}</main>
+          <main className="mx-auto w-full max-w-3xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-6 md:pb-20">
+            {children}
+          </main>
         </Providers>
       </body>
     </html>

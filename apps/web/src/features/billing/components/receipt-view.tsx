@@ -15,7 +15,10 @@ export function ReceiptView({ id }: { id: string }) {
   const tc = useTranslations('common');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['invoices', id, 'receipt'],
+    // See receipt-printer: kept out of the ['invoices'] prefix, which every
+    // sale invalidates. A settled receipt is immutable.
+    queryKey: ['receipt', id],
+    staleTime: Infinity,
     queryFn: async () => (await billingApi.getReceipt(id)).data,
   });
 

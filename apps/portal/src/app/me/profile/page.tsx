@@ -87,10 +87,11 @@ function ProfileView({ profile }: { profile: PortalProfile }) {
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+              aria-label="Tahrirlash"
+              className="flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 sm:px-3"
             >
               <Pencil className="h-4 w-4" />
-              Tahrirlash
+              <span className="hidden sm:inline">Tahrirlash</span>
             </button>
           )}
         </div>
@@ -174,14 +175,14 @@ function ProfileView({ profile }: { profile: PortalProfile }) {
                   href={`/c/${card.clinicId}`}
                   className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
                 >
-                  <span className="flex items-center gap-3">
+                  <span className="flex min-w-0 items-center gap-3">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
                       <Building2 className="h-5 w-5" />
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate font-medium">{card.clinicName}</span>
-                      <span className="block text-sm text-slate-500">
-                        {card.fullName} · {card.mrn}
+                      <span className="block truncate text-sm text-slate-500">
+                        {card.mrn} · {card.fullName}
                       </span>
                     </span>
                   </span>
@@ -225,9 +226,9 @@ function StatTile({
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
-      <dt className="text-sm text-slate-500">{label}</dt>
-      <dd className="text-right text-sm font-medium text-slate-900">{value}</dd>
+    <div className="flex items-baseline justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
+      <dt className="shrink-0 text-sm text-slate-500">{label}</dt>
+      <dd className="min-w-0 break-words text-right text-sm font-medium text-slate-900">{value}</dd>
     </div>
   );
 }
@@ -423,7 +424,7 @@ function TelegramCard({ profile }: { profile: PortalProfile }) {
                 type="button"
                 onClick={() => unlinkMut.mutate()}
                 disabled={unlinkMut.isPending}
-                className="mt-3 h-9 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+                className="mt-3 h-11 rounded-lg border border-slate-300 px-4 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
               >
                 Uzish
               </button>
@@ -439,7 +440,7 @@ function TelegramCard({ profile }: { profile: PortalProfile }) {
                 type="button"
                 onClick={() => linkMut.mutate()}
                 disabled={linkMut.isPending || !telegram.enabled}
-                className="mt-3 flex h-10 items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:opacity-60"
+                className="mt-3 flex h-11 items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:opacity-60"
               >
                 {linkMut.isPending ? (
                   <Spinner className="h-4 w-4 text-white" />
@@ -534,7 +535,9 @@ function Toggle({
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-50 ${
+      // The pill is 24px tall; the pseudo-element grows the hit area to 44px
+      // without pushing the rows apart.
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition before:absolute before:-inset-x-2 before:-inset-y-2.5 before:content-[''] disabled:opacity-50 ${
         checked ? 'bg-brand' : 'bg-slate-300'
       }`}
     >

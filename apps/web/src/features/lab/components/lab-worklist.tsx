@@ -179,7 +179,7 @@ export function LabWorklist() {
         <button
           type="button"
           className={cn(
-            'rounded-full border px-3 py-1 text-sm transition-colors hover:bg-muted',
+            'inline-flex min-h-11 items-center rounded-full border px-4 text-sm transition-colors hover:bg-muted md:min-h-0 md:px-3 md:py-1',
             status === undefined && 'border-primary bg-primary/10 font-medium text-primary',
           )}
           onClick={() => {
@@ -194,7 +194,7 @@ export function LabWorklist() {
             key={s}
             type="button"
             className={cn(
-              'rounded-full border px-3 py-1 text-sm transition-colors hover:bg-muted',
+              'inline-flex min-h-11 items-center rounded-full border px-4 text-sm transition-colors hover:bg-muted md:min-h-0 md:px-3 md:py-1',
               status === s && 'border-primary bg-primary/10 font-medium text-primary',
             )}
             onClick={() => {

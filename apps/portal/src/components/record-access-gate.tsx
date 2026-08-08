@@ -99,14 +99,16 @@ export function RecordAccessGate({ children }: { children: React.ReactNode }) {
                           onChange={(e) => setNote(e.target.value.slice(0, 500))}
                           rows={2}
                           placeholder="Izoh (ixtiyoriy)"
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand"
+                          // text-base, not text-sm: iOS Safari zooms the page in
+                          // when a focused field is under 16px.
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-base outline-none focus:border-brand"
                         />
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
                             disabled={request.isPending}
                             onClick={() => request.mutate(c.clinicId)}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                            className="inline-flex h-11 items-center gap-1.5 rounded-xl bg-brand px-4 text-sm font-semibold text-white disabled:opacity-60"
                           >
                             <Send className="h-4 w-4" />
                             {request.isPending ? 'Yuborilmoqda…' : 'So‘rov yuborish'}
@@ -117,7 +119,7 @@ export function RecordAccessGate({ children }: { children: React.ReactNode }) {
                               setOpenFor(null);
                               setNote('');
                             }}
-                            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium"
+                            className="h-11 rounded-xl border border-slate-200 px-4 text-sm font-medium"
                           >
                             Bekor qilish
                           </button>
@@ -127,7 +129,7 @@ export function RecordAccessGate({ children }: { children: React.ReactNode }) {
                       <button
                         type="button"
                         onClick={() => setOpenFor(c.clinicId)}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white"
+                        className="inline-flex h-11 items-center gap-1.5 rounded-xl bg-brand px-4 text-sm font-semibold text-white"
                       >
                         <Send className="h-4 w-4" />
                         Ruxsat so&apos;rash

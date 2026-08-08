@@ -16,11 +16,13 @@ const buttonVariants = cva(
         ghost: 'hover:bg-accent hover:text-accent-foreground',
         link: 'text-primary underline-offset-4 hover:underline',
       },
+      // A finger needs ~44px, a mouse does not. Expressed as a floor that lifts
+      // only below md, so a caller's own `h-8`/`h-12` still decides the desktop.
       size: {
-        default: 'h-9 px-4 py-2',
-        sm: 'h-8 rounded-md px-3 text-xs',
-        lg: 'h-10 rounded-md px-8',
-        icon: 'h-9 w-9',
+        default: 'h-9 min-h-11 px-4 py-2 md:min-h-0',
+        sm: 'h-8 min-h-11 rounded-md px-3 text-xs md:min-h-0',
+        lg: 'h-10 min-h-12 rounded-md px-8 md:min-h-0',
+        icon: 'h-9 w-9 min-h-11 min-w-11 md:min-h-0 md:min-w-0',
       },
     },
     defaultVariants: {

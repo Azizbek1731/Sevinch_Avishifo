@@ -30,7 +30,10 @@ export default function ClinicPage() {
         title="Klinika topilmadi"
         description={errorMessage(clinicQ.error)}
         action={
-          <Link href="/" className="font-medium text-brand hover:text-brand-dark">
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center px-2 font-medium text-brand hover:text-brand-dark"
+          >
             Bosh sahifaga qaytish
           </Link>
         }
@@ -41,7 +44,7 @@ export default function ClinicPage() {
   const { clinic, branches, doctors, services } = clinicQ.data;
 
   return (
-    <div className="space-y-5 pb-16">
+    <div className="space-y-5">
       {/* About */}
       <section className="flex items-start gap-4">
         {clinic.logoUrl !== null && clinic.logoUrl !== '' ? (
@@ -66,7 +69,7 @@ export default function ClinicPage() {
           {clinic.phone !== null && clinic.phone !== '' && (
             <a
               href={`tel:${clinic.phone}`}
-              className="mt-1 flex items-center gap-1.5 text-sm font-medium text-brand hover:text-brand-dark"
+              className="-ml-2 flex min-h-11 items-center gap-1.5 px-2 text-sm font-medium text-brand hover:text-brand-dark"
             >
               <Phone className="h-4 w-4 shrink-0" />
               {formatPhone(clinic.phone)}
@@ -96,7 +99,7 @@ export default function ClinicPage() {
                     {branch.phone !== null && branch.phone !== '' && (
                       <a
                         href={`tel:${branch.phone}`}
-                        className="flex items-center gap-1.5 font-medium text-brand hover:text-brand-dark"
+                        className="-ml-2 flex min-h-11 items-center gap-1.5 px-2 font-medium text-brand hover:text-brand-dark"
                       >
                         <Phone className="h-4 w-4 shrink-0" />
                         {formatPhone(branch.phone)}
@@ -156,8 +159,9 @@ export default function ClinicPage() {
         )}
       </SectionCard>
 
-      {/* Sticky booking CTA */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 backdrop-blur">
+      {/* Sticky booking CTA. The layout's bottom padding — sized for the phone
+          tab bar — already clears it, so the page adds none of its own. */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] backdrop-blur">
         <div className="mx-auto max-w-3xl">
           <Link
             href={`/c/${clinicId}/book`}

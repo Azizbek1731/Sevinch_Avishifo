@@ -12,7 +12,9 @@
     "trialCta": "7 days free",
     "language": "Language",
     "pricing": "Pricing",
-    "patient": "Patient account"
+    "patient": "Patient account",
+    "menu": "Menu",
+    "close": "Close"
   },
   "hero": {
     "badge": "CRM for clinics — 7-day free trial",

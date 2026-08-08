@@ -98,8 +98,10 @@ export default function DocumentsPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-slate-900">{doc.title}</p>
+                      {/* Date and kind first: on a phone this line truncates, and a
+                          long clinic name would otherwise swallow both. */}
                       <p className="truncate text-sm text-slate-500">
-                        {doc.clinicName} · {label} · {formatDate(doc.createdAt)}
+                        {formatDate(doc.createdAt)} · {label} · {doc.clinicName}
                       </p>
                       <p className="mt-0.5 text-xs text-slate-400">{formatBytes(doc.sizeBytes)}</p>
                     </div>
@@ -108,7 +110,7 @@ export default function DocumentsPage() {
                       onClick={() => handleDownload(doc)}
                       disabled={isDownloading}
                       aria-label={`${doc.title} — yuklab olish`}
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-brand hover:text-brand disabled:opacity-60"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-brand hover:text-brand disabled:opacity-60"
                     >
                       {isDownloading ? (
                         <Spinner className="h-5 w-5" />

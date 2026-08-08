@@ -40,6 +40,9 @@ export function OtpLoginForm({ initialPhone, onSuccess }: OtpLoginFormProps) {
   const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [phone, setPhone] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
+  // Bumped after a rejected code: remounting OtpInput empties the six boxes and
+  // puts the caret back in the first one, so a retry is one tap, not six.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -89,7 +92,11 @@ export function OtpLoginForm({ initialPhone, onSuccess }: OtpLoginFormProps) {
       toast.success('Xush kelibsiz!');
       onSuccess(data.accessToken, values.phone, data.isNew);
     },
-    onError: (error) => toast.error(errorMessage(error)),
+    onError: (error) => {
+      toast.error(errorMessage(error));
+      codeForm.setValue('code', '');
+      setAttempt((n) => n + 1);
+    },
   });
 
   if (step === 'phone') {
@@ -159,8 +166,14 @@ export function OtpLoginForm({ initialPhone, onSuccess }: OtpLoginFormProps) {
         render={({ field, fieldState }) => (
           <>
             <OtpInput
+              key={attempt}
               value={field.value}
               onChange={field.onChange}
+              // Nobody should have to reach for a button after the last digit —
+              // and an autofilled code would otherwise just sit there.
+              onComplete={(code) => {
+                if (phone !== null && !verifyOtp.isPending) verifyOtp.mutate({ phone, code });
+              }}
               disabled={verifyOtp.isPending}
               autoFocus
             />
@@ -177,19 +190,19 @@ export function OtpLoginForm({ initialPhone, onSuccess }: OtpLoginFormProps) {
       >
         {verifyOtp.isPending ? <Spinner className="h-5 w-5 text-white" /> : 'Tasdiqlash'}
       </button>
-      <div className="flex items-center justify-between text-sm">
+      <div className="-mx-2 flex items-center justify-between gap-2 text-sm">
         <button
           type="button"
           onClick={() => {
             setStep('phone');
             setPhone(null);
           }}
-          className="text-slate-500 hover:text-slate-700"
+          className="inline-flex min-h-11 items-center px-2 text-left text-slate-500 hover:text-slate-700"
         >
           Raqamni o&apos;zgartirish
         </button>
         {resendIn > 0 ? (
-          <span className="text-slate-400">Qayta yuborish: {resendIn} s</span>
+          <span className="px-2 text-right text-slate-400">Qayta yuborish: {resendIn} s</span>
         ) : (
           <button
             type="button"
@@ -197,7 +210,7 @@ export function OtpLoginForm({ initialPhone, onSuccess }: OtpLoginFormProps) {
             onClick={() => {
               if (phone !== null) requestOtp.mutate(phone);
             }}
-            className="font-medium text-brand hover:text-brand-dark disabled:opacity-60"
+            className="inline-flex min-h-11 items-center px-2 text-right font-medium text-brand hover:text-brand-dark disabled:opacity-60"
           >
             Kodni qayta yuborish
           </button>

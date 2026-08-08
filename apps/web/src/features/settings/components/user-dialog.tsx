@@ -13,8 +13,7 @@ import {
   updateUserSchema,
   type CreateUserInput,
   type UpdateUserInput,
-  phoneWireValueOptional,
-} from '@avishifo/shared';
+  phoneWireValueOptional, formatNationalPhone } from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -72,7 +71,7 @@ export function UserDialog({ open, onOpenChange, user }: UserDialogProps) {
     if (user) {
       form.reset({
         fullName: user.fullName,
-        phone: user.phone ?? undefined,
+        phone: user.phone ? formatNationalPhone(user.phone) : undefined,
         email: user.email ?? undefined,
         password: undefined,
         role: user.role as CreateUserInput['role'],

@@ -26,7 +26,7 @@ export function LandingTrial() {
   const t = useTranslations('landing');
 
   return (
-    <section id="trial" className="scroll-mt-20 border-t border-border/60 bg-muted/30 py-16 sm:py-20">
+    <section id="trial" className="scroll-mt-20 border-t border-border/60 bg-muted/30 py-12 sm:py-20">
       <div className="container">
         <SectionHeading
           eyebrow={t('trial.eyebrow')}
@@ -34,10 +34,10 @@ export function LandingTrial() {
           subtitle={t('trial.subtitle')}
         />
 
-        <ol className="mx-auto mt-12 grid max-w-5xl gap-5 md:grid-cols-3">
+        <ol className="mx-auto mt-8 grid max-w-5xl gap-4 sm:mt-12 sm:gap-5 md:grid-cols-3">
           {STEPS.map(({ icon: Icon, key }, i) => (
             <Reveal key={key} delay={i * 80}>
-              <li className="flex h-full flex-col rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
+              <li className="flex h-full flex-col rounded-2xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md sm:p-6">
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     <Icon className="h-5 w-5" />
@@ -46,10 +46,10 @@ export function LandingTrial() {
                     {String(i + 1).padStart(2, '0')}
                   </span>
                 </div>
-                <h3 className="mt-4 text-lg font-bold text-foreground">
+                <h3 className="mt-3 text-lg font-bold text-foreground sm:mt-4">
                   {t(`trial.steps.${key}.title`)}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground sm:mt-2">
                   {t(`trial.steps.${key}.desc`)}
                 </p>
               </li>
@@ -58,7 +58,7 @@ export function LandingTrial() {
         </ol>
 
         <Reveal delay={160}>
-          <div className="mx-auto mt-10 flex max-w-5xl flex-col items-center gap-6 rounded-2xl border border-primary/20 bg-primary/[0.05] p-6 sm:p-8 lg:flex-row lg:justify-between">
+          <div className="mx-auto mt-6 flex max-w-5xl flex-col items-center gap-5 rounded-2xl border border-primary/20 bg-primary/[0.05] p-5 sm:mt-10 sm:gap-6 sm:p-8 lg:flex-row lg:justify-between">
             <ul className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center lg:justify-start">
               {ASSURANCES.map(({ icon: Icon, key }) => (
                 <li

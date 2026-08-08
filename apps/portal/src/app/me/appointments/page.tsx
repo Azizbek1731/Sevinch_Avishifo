@@ -68,7 +68,7 @@ export default function AppointmentsPage() {
             key={tab.value}
             type="button"
             onClick={() => setScope(tab.value)}
-            className={`h-9 rounded-lg text-sm font-medium transition ${
+            className={`h-11 rounded-lg text-sm font-medium transition ${
               scope === tab.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
             }`}
           >
@@ -89,7 +89,10 @@ export default function AppointmentsPage() {
             description={scope === 'upcoming' ? 'Klinika sahifasidan qabulga yoziling' : undefined}
             action={
               scope === 'upcoming' ? (
-                <Link href="/" className="font-medium text-brand hover:text-brand-dark">
+                <Link
+                  href="/"
+                  className="inline-flex min-h-11 items-center px-2 font-medium text-brand hover:text-brand-dark"
+                >
                   Bosh sahifaga o&apos;tish
                 </Link>
               ) : undefined
@@ -117,7 +120,7 @@ export default function AppointmentsPage() {
                   {scope === 'upcoming' && canCancel(a) && (
                     <div className="mt-3 border-t border-slate-100 pt-3">
                       {confirmingId === a.id ? (
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <span className="text-sm text-slate-600">
                             Qabulni bekor qilishni tasdiqlaysizmi?
                           </span>
@@ -126,16 +129,16 @@ export default function AppointmentsPage() {
                               type="button"
                               disabled={cancel.isPending}
                               onClick={() => cancel.mutate(a.id)}
-                              className="flex h-8 items-center gap-1 rounded-lg bg-red-600 px-3 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+                              className="flex h-11 flex-1 items-center justify-center gap-1 rounded-lg bg-red-600 px-4 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60 sm:flex-none"
                             >
-                              {cancel.isPending && <Spinner className="h-3.5 w-3.5 text-white" />}
+                              {cancel.isPending && <Spinner className="h-4 w-4 text-white" />}
                               Ha
                             </button>
                             <button
                               type="button"
                               disabled={cancel.isPending}
                               onClick={() => setConfirmingId(null)}
-                              className="h-8 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                              className="h-11 flex-1 rounded-lg border border-slate-300 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 sm:flex-none"
                             >
                               Yo&apos;q
                             </button>
@@ -145,7 +148,7 @@ export default function AppointmentsPage() {
                         <button
                           type="button"
                           onClick={() => setConfirmingId(a.id)}
-                          className="text-sm font-medium text-red-600 transition hover:text-red-700"
+                          className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-red-600 transition hover:text-red-700"
                         >
                           Bekor qilish
                         </button>

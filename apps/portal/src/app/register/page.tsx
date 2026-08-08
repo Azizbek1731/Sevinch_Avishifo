@@ -249,9 +249,12 @@ function RegisterContent() {
       </SectionCard>
 
       {phase === 'otp' && (
-        <p className="mt-4 text-center text-sm text-slate-500">
+        <p className="mt-2 text-center text-sm text-slate-500">
           Akkauntingiz bormi?{' '}
-          <Link href={loginHref} className="font-medium text-brand hover:underline">
+          <Link
+            href={loginHref}
+            className="inline-flex min-h-11 items-center px-2 font-medium text-brand hover:underline"
+          >
             Kirish
           </Link>
         </p>

@@ -117,11 +117,11 @@ export default function LandingPage() {
                   href={`/c/${card.clinicId}`}
                   className="flex items-center justify-between gap-3 py-3 transition hover:bg-slate-50"
                 >
-                  <span className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-light text-brand">
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
                       <Building2 className="h-5 w-5" />
                     </span>
-                    <span className="font-medium">{card.clinicName}</span>
+                    <span className="truncate font-medium">{card.clinicName}</span>
                   </span>
                   <ChevronRight className="h-4 w-4 text-slate-400" />
                 </Link>

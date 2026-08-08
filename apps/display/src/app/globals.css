@@ -9,6 +9,23 @@ body {
   overflow: hidden;
 }
 
+/*
+ * The whole board is sized in rem, so anchoring the root font size to the
+ * viewport makes every element scale with the monitor instead of with the
+ * browser's 16px default. Clinics hang this on whatever screen they have: a
+ * 1366x768 office monitor, a 1080p TV, a 4K panel, occasionally one mounted
+ * portrait. Before this, the design was pinned to 1080p — it overflowed the
+ * small ones and left the big ones showing tiny numbers no one could read from
+ * the waiting-room chairs.
+ *
+ * Both dimensions feed in, so a very wide-but-short screen does not blow the
+ * type up past what fits vertically. 1920x1080 lands on ~15.6px, i.e. the
+ * design as it was drawn.
+ */
+html {
+  font-size: clamp(9px, calc(0.52vw + 0.52vh), 34px);
+}
+
 body {
   -webkit-user-select: none;
   user-select: none;
@@ -108,4 +125,39 @@ body {
 }
 .animate-nudge {
   animation: nudge 1.4s ease-in-out infinite;
+}
+
+/*
+ * Each "now serving" tile is its own container, so the ticket number is sized
+ * from the space the grid actually gave that tile rather than from a size tier
+ * chosen by ticket count. One patient on a 4K screen and nine on a small
+ * monitor then both read correctly, and nothing has to be clipped to fit.
+ */
+.tile {
+  container-type: size;
+}
+.tile-number {
+  font-size: clamp(1.5rem, min(42cqh, 30cqw), 18rem);
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+}
+.tile-room {
+  font-size: clamp(0.9rem, min(13cqh, 11cqw), 6rem);
+  line-height: 1.05;
+}
+.tile-doctor {
+  font-size: clamp(0.7rem, min(8cqh, 7cqw), 3rem);
+  line-height: 1.15;
+}
+.tile-pill {
+  font-size: clamp(0.55rem, min(5.5cqh, 4.5cqw), 1.5rem);
+}
+
+/*
+ * Container queries need a definite size to resolve against; without this the
+ * tile collapses to zero height and every cqh above resolves to 0.
+ */
+.tile-grid > * {
+  min-height: 0;
+  min-width: 0;
 }

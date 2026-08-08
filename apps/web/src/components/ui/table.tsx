@@ -1,9 +1,15 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
+/**
+ * The scroll container is the point: a table too wide for a phone must pan
+ * inside its own box. `max-w-full` keeps it from growing the page when it lands
+ * in a flex or grid cell, and `overscroll-x-contain` stops a sideways swipe at
+ * the end of the table instead of handing it to the page.
+ */
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
+    <div className="relative w-full max-w-full overflow-x-auto overscroll-x-contain">
       <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
   ),
@@ -59,7 +65,8 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      'h-10 px-2 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0',
+      // Wrapping a header into three lines is worse than panning the container.
+      'h-10 whitespace-nowrap px-2 text-left align-middle font-medium text-muted-foreground md:whitespace-normal [&:has([role=checkbox])]:pr-0',
       className,
     )}
     {...props}
