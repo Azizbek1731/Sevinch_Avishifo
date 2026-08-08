@@ -84,6 +84,7 @@ export class TwoFactorService {
     if (chatId) {
       try {
         await this.telegram.send(chatId, this.codeMessage(code, fullName, purpose));
+        this.logger.log(`Login code (${purpose}) delivered via bot chat`);
         return { delivered: true };
       } catch (e) {
         this.logger.warn(`Bot chat delivery failed, trying Gateway: ${String(e)}`);
@@ -91,8 +92,14 @@ export class TwoFactorService {
     }
     if (phone) {
       const requestId = await this.gateway.sendCode(phone, code, AUTH_2FA_TTL_SECONDS);
-      if (requestId) return { delivered: true, gatewayRequestId: requestId };
+      if (requestId) {
+        // Which route carried a code is the first thing anyone asks when a user
+        // says "no code arrived", and it is not otherwise recoverable.
+        this.logger.log(`Login code (${purpose}) delivered via telegram gateway`);
+        return { delivered: true, gatewayRequestId: requestId };
+      }
     }
+    this.logger.warn(`Login code (${purpose}) had no working delivery route`);
     return { delivered: false };
   }
 
