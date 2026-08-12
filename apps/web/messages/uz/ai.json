@@ -1,0 +1,31 @@
+{
+  "title": "AviShifo AI",
+  "description": "Klinikangiz haqida oddiy til bilan so‘rang — javob shu yerdagi ma’lumotlardan olinadi.",
+  "placeholder": "Masalan: shu oy qancha tushum bo‘ldi?",
+  "send": "Yuborish",
+  "usedData": "Ishlatilgan ma’lumot",
+  "examplesTitle": "Namuna savollar",
+  "examples": [
+    "Bu oy qancha tushum bo‘ldi?",
+    "Eng ko‘p qarzi bor 5 ta bemorni ko‘rsat",
+    "O‘tgan hafta qaysi shifokor eng ko‘p bemor qabul qildi?",
+    "Bugun nechta qabul rejalashtirilgan?"
+  ],
+  "privacyNote": "Yordamchi faqat sizning klinikangiz ma’lumotini va faqat sizda ruxsat bor bo‘limlarni ko‘radi. Boshqa klinikalarning ma’lumotiga umuman yo‘l yo‘q.",
+  "disabledTitle": "AviShifo AI hali yoqilmagan",
+  "disabledBody": "Yoqish uchun serverda Gemini API kaliti sozlanishi kerak. Administratoringizga murojaat qiling.",
+  "tools": {
+    "clinic_today": "bugungi holat",
+    "revenue_report": "tushum hisoboti",
+    "patient_flow": "bemorlar oqimi",
+    "doctor_performance": "shifokorlar ko‘rsatkichlari",
+    "service_sales": "xizmatlar sotuvi",
+    "queue_stats": "navbat statistikasi",
+    "lab_turnaround": "laboratoriya muddatlari",
+    "cashier_shifts": "kassa smenalari",
+    "top_debtors": "qarzdorlar",
+    "count_patients": "bemorlar soni",
+    "appointments_on_day": "kunlik qabullar",
+    "staff_list": "xodimlar ro‘yxati"
+  }
+}

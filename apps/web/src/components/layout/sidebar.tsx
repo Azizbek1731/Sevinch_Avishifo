@@ -16,6 +16,7 @@ import {
   Receipt,
   ScrollText,
   Settings,
+  Sparkles,
   ShieldCheck,
   Stethoscope,
   Tags,
@@ -43,6 +44,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard, permissions: ['reports.read'] },
+  { key: 'ai', href: '/ai', icon: Sparkles, permissions: ['ai.use'] },
   { key: 'reception', href: '/reception', icon: ClipboardList, permissions: ['queue.manage'] },
   { key: 'doctor', href: '/doctor', icon: Stethoscope, permissions: ['queue.call'], roles: ['DOCTOR'] },
   { key: 'queue', href: '/queue', icon: ListOrdered, permissions: ['queue.read'] },

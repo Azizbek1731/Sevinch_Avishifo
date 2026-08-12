@@ -57,6 +57,15 @@ const envSchema = z.object({
   CLICK_SECRET_KEY: z.string().optional(),
   UZUM_MERCHANT_ID: z.string().optional(),
   UZUM_SECRET_KEY: z.string().optional(),
+  /**
+   * AviShifo AI. Empty disables the assistant everywhere — no endpoint, no
+   * menu entry — so the feature ships dark until a clinic decides to turn it on.
+   */
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().default('gemini-2.0-flash'),
+  /** Questions per clinic per hour. Each one can cost several model calls. */
+  AI_HOURLY_LIMIT: z.coerce.number().int().min(1).max(1000).default(60),
+
   /** Free-trial length for a self-service sign-up. */
   TRIAL_DAYS: z.coerce.number().int().min(1).max(365).default(7),
   /** Shown on the "trial expired" screen so the clinic can reach the operator. */

@@ -1,0 +1,31 @@
+{
+  "title": "AviShifo AI",
+  "description": "Ask about your clinic in plain language — answers come from your own data.",
+  "placeholder": "For example: how much revenue this month?",
+  "send": "Send",
+  "usedData": "Data used",
+  "examplesTitle": "Example questions",
+  "examples": [
+    "How much revenue did we take this month?",
+    "Show the 5 patients who owe the most",
+    "Which doctor saw the most patients last week?",
+    "How many appointments are booked for today?"
+  ],
+  "privacyNote": "The assistant sees only your clinic's data, and only the areas you already have access to. It has no route to any other clinic's data at all.",
+  "disabledTitle": "AviShifo AI is not enabled yet",
+  "disabledBody": "A Gemini API key must be configured on the server. Ask your administrator.",
+  "tools": {
+    "clinic_today": "today at a glance",
+    "revenue_report": "revenue report",
+    "patient_flow": "patient flow",
+    "doctor_performance": "doctor performance",
+    "service_sales": "service sales",
+    "queue_stats": "queue statistics",
+    "lab_turnaround": "lab turnaround",
+    "cashier_shifts": "cashier shifts",
+    "top_debtors": "debtors",
+    "count_patients": "patient count",
+    "appointments_on_day": "appointments for a day",
+    "staff_list": "staff list"
+  }
+}

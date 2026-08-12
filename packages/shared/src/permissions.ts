@@ -71,6 +71,11 @@ export const PERMISSIONS = [
   'feedback.read',
   // Audit (M16)
   'audit.read',
+  // AviShifo AI — asking questions about this clinic's own data in natural
+  // language. Separate from reports.read: the assistant can only ever surface
+  // what the caller could already open in the panel, but sending anything to a
+  // model provider is a decision a clinic makes deliberately.
+  'ai.use',
   // Platform / super-admin (M17)
   'platform.clinics.read',
   'platform.clinics.write',
@@ -94,6 +99,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'patients.export',
     'patients.documents.write',
     'patients.recordAccess.manage',
+    'ai.use',
     'appointments.read',
     'appointments.write',
     'appointments.cancel',

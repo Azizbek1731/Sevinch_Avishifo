@@ -48,6 +48,7 @@ import { AuditViewerModule } from './modules/audit-viewer/audit-viewer.module';
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { PortalModule } from './modules/portal/portal.module';
 import { RecordAccessModule } from './modules/record-access/record-access.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -129,6 +130,7 @@ import { RecordAccessModule } from './modules/record-access/record-access.module
     AuditViewerModule,
     SuperAdminModule,
     RecordAccessModule,
+    AiModule,
     PortalModule,
   ],
   controllers: [HealthController],

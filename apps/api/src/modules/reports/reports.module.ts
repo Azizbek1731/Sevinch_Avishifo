@@ -13,5 +13,8 @@ import { XlsxService } from './xlsx.service';
 @Module({
   controllers: [ReportsController],
   providers: [ReportsService, XlsxService],
+  // AviShifo AI's tools are thin wrappers over these, so the assistant reuses
+  // the same tenant-scoped code the panel's reports run on.
+  exports: [ReportsService],
 })
 export class ReportsModule {}

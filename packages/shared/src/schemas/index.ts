@@ -16,3 +16,4 @@ export * from './feedback';
 export * from './super-admin';
 export * from './portal';
 export * from './record-access';
+export * from './ai';
