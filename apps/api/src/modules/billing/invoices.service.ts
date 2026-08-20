@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type {
@@ -16,6 +17,7 @@ import {
   type CreateInvoiceInput,
   type CreateRefundInput,
   type InvoiceQueryInput,
+  type PaymentPart,
   type QuickInvoiceInput,
 } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
@@ -75,6 +77,21 @@ function providerState(status: DbPaymentStatus): number {
     default:
       return -1;
   }
+}
+
+
+/**
+ * A stable idempotency key for one leg of a split, derived from the sale's
+ * single key plus the leg index.
+ *
+ * The client sends one key for the whole sale; deriving the rest here means a
+ * retried submission reproduces exactly the same keys, so each leg is still
+ * written at most once. Formatted as a v4-shaped UUID because that is what the
+ * payment schema and the unique index expect.
+ */
+function legKey(base: string, index: number): string {
+  const h = createHash('sha256').update(`${base}:${index}`).digest('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
 
 @Injectable()
@@ -354,17 +371,103 @@ export class InvoicesService {
     const invoiceId = created.id as string;
     const issued = await this.issue(invoiceId);
 
-    if (dto.settle === 'DEBT' || dto.method === undefined || dto.idempotencyKey === undefined) {
+    if (
+      dto.settle === 'DEBT' ||
+      dto.payments === undefined ||
+      dto.payments.length === 0 ||
+      dto.idempotencyKey === undefined
+    ) {
       return { invoice: issued, lines: created.lines, paid: false };
     }
 
-    const due = issued.due as string;
-    const settled = await this.addPayment(
+    const settled = await this.addPayments(
       invoiceId,
-      { amount: due, method: dto.method, idempotencyKey: dto.idempotencyKey },
+      dto.payments,
+      dto.idempotencyKey,
       user,
+      // A sale settled at the front desk is paid in full or it is not "pay now";
+      // anything less belongs on the patient's account as debt instead.
+      { requireFull: true },
     );
     return { ...settled, lines: created.lines, paid: true };
+  }
+
+  /**
+   * Settles an invoice with one or more payment legs — 100 000 by Click plus
+   * 30 000 in cash against the same bill.
+   *
+   * Every leg is validated against the invoice BEFORE any of them is written.
+   * Applying them one at a time and discovering on the third that the cash
+   * drawer is closed would leave the invoice half-paid and the cashier holding
+   * money the system has not recorded, so the whole split is checked first and
+   * only then applied.
+   */
+  async addPayments(
+    invoiceId: string,
+    parts: PaymentPart[],
+    baseKey: string,
+    user: AuthUser,
+    opts: { requireFull?: boolean } = {},
+  ): Promise<Record<string, unknown>> {
+    const invoice = await this.prisma.db.invoice.findFirst({ where: { id: invoiceId } });
+    if (!invoice) throw new AppException(ErrorCode.INVOICE_NOT_FOUND, 'Invoice not found', 404);
+
+    const due = invoice.total.sub(invoice.paidTotal);
+    let sum = new Prisma.Decimal(0);
+    for (const part of parts) {
+      const amount = new Prisma.Decimal(part.amount);
+      if (amount.lte(0)) {
+        throw new AppException(
+          ErrorCode.VALIDATION_ERROR,
+          'Har bir to‘lov qismi noldan katta bo‘lishi kerak',
+          400,
+        );
+      }
+      sum = sum.add(amount);
+    }
+
+    if (sum.gt(due)) {
+      throw new AppException(
+        ErrorCode.PAYMENT_EXCEEDS_DUE,
+        'To‘lovlar yig‘indisi hisob summasidan ko‘p',
+        422,
+        [{ due: due.toFixed(2), given: sum.toFixed(2) }],
+      );
+    }
+    if (opts.requireFull && !sum.eq(due)) {
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'To‘lovlar yig‘indisi hisob summasiga teng bo‘lishi kerak',
+        400,
+        [{ due: due.toFixed(2), given: sum.toFixed(2) }],
+      );
+    }
+
+    // Cash needs an open drawer, and the check belongs here rather than only
+    // inside the per-leg call: a split whose cash leg is last must fail before
+    // its card leg has already been taken.
+    if (parts.some((p) => p.method === 'CASH')) {
+      const shift = await this.prisma.db.cashierShift.findFirst({
+        where: { cashierUserId: user.id, branchId: invoice.branchId, status: 'OPEN' },
+      });
+      if (!shift) {
+        throw new AppException(
+          ErrorCode.SHIFT_NOT_OPEN,
+          'Open cashier shift required for cash payments',
+          409,
+        );
+      }
+    }
+
+    let last: Record<string, unknown> | null = null;
+    for (const [i, part] of parts.entries()) {
+      last = await this.addPayment(
+        invoiceId,
+        { amount: part.amount, method: part.method, idempotencyKey: legKey(baseKey, i) },
+        user,
+      );
+    }
+    return last as Record<string, unknown>;
   }
 
   async list(q: InvoiceQueryInput): Promise<PaginatedResult<Record<string, unknown>>> {

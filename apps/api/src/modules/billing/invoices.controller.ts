@@ -6,6 +6,7 @@ import type { PaginatedResult } from '../../common/pagination';
 import { InvoicesService } from './invoices.service';
 import {
   AddPaymentDto,
+  AddPaymentsDto,
   CreateInvoiceDto,
   CreateRefundDto,
   InvoiceQueryDto,
@@ -62,6 +63,17 @@ export class InvoicesController {
     @CurrentUser() user: AuthUser,
   ): Promise<Record<string, unknown>> {
     return this.invoices.addPayment(id, dto, user);
+  }
+
+  /** Settle an issued invoice across several methods at once. */
+  @Post(':id/payments/split')
+  @RequirePermissions('payments.create')
+  addPayments(
+    @Param('id') id: string,
+    @Body() dto: AddPaymentsDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Record<string, unknown>> {
+    return this.invoices.addPayments(id, dto.payments, dto.idempotencyKey, user);
   }
 
   @Post(':id/refunds')

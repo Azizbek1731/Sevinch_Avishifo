@@ -117,5 +117,13 @@
     "paid": "Paid",
     "due": "Due",
     "thanks": "Thank you!"
+  },
+  "split": {
+    "addMethod": "Add method",
+    "remove": "Remove method",
+    "amountFor": "Amount for {method}",
+    "balanced": "{total} in total — fully allocated",
+    "remaining": "{amount} still unallocated",
+    "over": "{amount} over — reduce the amounts"
   }
 }

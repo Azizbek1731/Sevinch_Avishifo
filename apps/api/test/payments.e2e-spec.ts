@@ -296,7 +296,7 @@ describe('billing: invoices, payments, shift (e2e)', () => {
         branchId: clinic.branchId,
         lines: [{ serviceId, quantity: 1, unitPrice: '100000.00' }],
         settle: 'PAY_NOW',
-        method: 'CASH',
+        payments: [{ method: 'CASH', amount: '100000.00' }],
         idempotencyKey: randomUUID(),
       });
     expect(res.status).toBe(409);
@@ -340,7 +340,7 @@ describe('billing: invoices, payments, shift (e2e)', () => {
         branchId: clinic.branchId,
         lines: [{ serviceId, quantity: 2, unitPrice: '150000.00', discount: '50000.00' }],
         settle: 'PAY_NOW',
-        method: 'CASH',
+        payments: [{ method: 'CASH', amount: '250000.00' }],
         idempotencyKey: randomUUID(),
       });
 
@@ -409,7 +409,7 @@ describe('billing: invoices, payments, shift (e2e)', () => {
         branchId: clinic.branchId,
         lines: [{ serviceId, quantity: 1, unitPrice: '150000.00' }],
         settle: 'PAY_NOW',
-        method: 'CASH',
+        payments: [{ method: 'CASH', amount: '150000.00' }],
         idempotencyKey: randomUUID(),
       });
     expect(payNow.status).toBe(403);
@@ -427,5 +427,172 @@ describe('billing: invoices, payments, shift (e2e)', () => {
       });
     expect(onDebt.status).toBe(201);
     expect(onDebt.body.data.paid).toBe(false);
+  });
+  // ------------------------------------------------------- split payments
+  // A 130 000 bill paid 100 000 by Click and 30 000 in cash is one invoice with
+  // two payments — the shape a front desk actually deals with.
+
+  it('splits one sale across two payment methods', async () => {
+    await request(app.getHttpServer())
+      .post(`${API}/shifts/open`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({ openingCash: '0' });
+
+    const res = await request(app.getHttpServer())
+      .post(`${API}/invoices/quick`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({
+        patientId,
+        branchId: clinic.branchId,
+        lines: [{ serviceId, quantity: 1, unitPrice: '130000.00' }],
+        settle: 'PAY_NOW',
+        payments: [
+          { method: 'CLICK', amount: '100000.00' },
+          { method: 'CASH', amount: '30000.00' },
+        ],
+        idempotencyKey: randomUUID(),
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.paid).toBe(true);
+    expect(res.body.data.invoice).toMatchObject({
+      total: '130000.00',
+      paidTotal: '130000.00',
+      due: '0.00',
+      status: 'PAID',
+    });
+
+    // Both legs are recorded separately — the cash one has to reconcile against
+    // the drawer, the Click one against the provider.
+    const invoiceId = res.body.data.invoice.id as string;
+    const detail = await request(app.getHttpServer())
+      .get(`${API}/invoices/${invoiceId}`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`);
+    const payments = detail.body.data.payments as Array<{ method: string; amount: string }>;
+    expect(payments).toHaveLength(2);
+    expect(payments.map((p) => `${p.method}:${p.amount}`).sort()).toEqual([
+      'CASH:30000.00',
+      'CLICK:100000.00',
+    ]);
+  });
+
+  it('refuses a split that does not add up to the invoice total', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`${API}/invoices/quick`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({
+        patientId,
+        branchId: clinic.branchId,
+        lines: [{ serviceId, quantity: 1, unitPrice: '130000.00' }],
+        settle: 'PAY_NOW',
+        // 20 000 short — a slip that would otherwise leave the sale half-paid.
+        payments: [
+          { method: 'CLICK', amount: '100000.00' },
+          { method: 'CASH', amount: '10000.00' },
+        ],
+        idempotencyKey: randomUUID(),
+      });
+    expect(res.status).toBe(400);
+  });
+
+  it('refuses a split that overshoots the total', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`${API}/invoices/quick`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({
+        patientId,
+        branchId: clinic.branchId,
+        lines: [{ serviceId, quantity: 1, unitPrice: '130000.00' }],
+        settle: 'PAY_NOW',
+        payments: [
+          { method: 'CLICK', amount: '100000.00' },
+          { method: 'CARD', amount: '90000.00' },
+        ],
+        idempotencyKey: randomUUID(),
+      });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('PAYMENT_EXCEEDS_DUE');
+  });
+
+  it('takes nothing at all when the cash leg has no open drawer', async () => {
+    // Close the shift, then try a split whose cash leg comes second. The Click
+    // leg must NOT be taken: money the system cannot account for is worse than
+    // a refused sale.
+    await request(app.getHttpServer())
+      .post(`${API}/shifts/close`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({ actualCash: '0' });
+
+    const before = await request(app.getHttpServer())
+      .get(`${API}/patients/${patientId}`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`);
+
+    const res = await request(app.getHttpServer())
+      .post(`${API}/invoices/quick`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({
+        patientId,
+        branchId: clinic.branchId,
+        lines: [{ serviceId, quantity: 1, unitPrice: '130000.00' }],
+        settle: 'PAY_NOW',
+        payments: [
+          { method: 'CLICK', amount: '100000.00' },
+          { method: 'CASH', amount: '30000.00' },
+        ],
+        idempotencyKey: randomUUID(),
+      });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('SHIFT_NOT_OPEN');
+
+    // The invoice is issued as debt for the full amount — no partial capture.
+    const after = await request(app.getHttpServer())
+      .get(`${API}/patients/${patientId}`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`);
+    const grew =
+      Number(after.body.data.debt) - Number(before.body.data.debt);
+    expect(grew).toBe(130000);
+  });
+
+  it('a retried split writes each leg exactly once', async () => {
+    await request(app.getHttpServer())
+      .post(`${API}/shifts/open`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({ openingCash: '0' });
+
+    const key = randomUUID();
+    const body = {
+      patientId,
+      branchId: clinic.branchId,
+      lines: [{ serviceId, quantity: 1, unitPrice: '130000.00' }],
+      settle: 'PAY_NOW' as const,
+      payments: [
+        { method: 'CLICK', amount: '100000.00' },
+        { method: 'CASH', amount: '30000.00' },
+      ],
+      idempotencyKey: key,
+    };
+
+    const first = await request(app.getHttpServer())
+      .post(`${API}/invoices/quick`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send(body);
+    expect(first.status).toBe(201);
+
+    // The same key again: the invoice is new (a fresh sale row), but neither
+    // leg may be charged a second time.
+    const invoiceId = first.body.data.invoice.id as string;
+    const detail = await request(app.getHttpServer())
+      .get(`${API}/invoices/${invoiceId}`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`);
+    expect(detail.body.data.payments).toHaveLength(2);
+    expect(detail.body.data.paidTotal).toBe('130000.00');
   });
 });

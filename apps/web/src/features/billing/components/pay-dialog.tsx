@@ -6,7 +6,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { addPaymentSchema, formatUZS, PaymentMethod, type MoneyString } from '@avishifo/shared';
+import {
+  addPaymentSchema,
+  formatUZS,
+  PaymentMethod,
+  toTiyin,
+  type MoneyString,
+  type PaymentPart,
+} from '@avishifo/shared';
 import { useRouter } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,18 +26,12 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { billingApi, sanitizeMoney } from '../api';
+import { PaymentSplit, splitTotalTiyin } from './payment-split';
 import { useApiErrorToast, useInvalidateBilling } from '../hooks';
 
-const payFormSchema = addPaymentSchema.omit({ idempotencyKey: true });
-type PayFormValues = { amount: MoneyString; method: PaymentMethod };
+const payFormSchema = addPaymentSchema.omit({ idempotencyKey: true, method: true });
+type PayFormValues = { amount: MoneyString };
 
 export interface PayDialogProps {
   open: boolean;
@@ -49,19 +50,33 @@ export function PayDialog({ open, onOpenChange, invoice }: PayDialogProps) {
 
   const form = useForm<PayFormValues>({
     resolver: zodResolver(payFormSchema),
-    defaultValues: { amount: invoice.due, method: PaymentMethod.CASH },
+    defaultValues: { amount: invoice.due },
   });
+
+  /** How the amount above is made up. One entry is the ordinary case. */
+  const [payments, setPayments] = useState<PaymentPart[]>([
+    { method: PaymentMethod.CASH, amount: invoice.due },
+  ]);
 
   useEffect(() => {
     if (open) {
       setIdempotencyKey(crypto.randomUUID());
-      form.reset({ amount: invoice.due, method: PaymentMethod.CASH });
+      form.reset({ amount: invoice.due });
+      setPayments([{ method: PaymentMethod.CASH, amount: invoice.due }]);
     }
   }, [open, invoice.id, invoice.due]);
 
   const mutation = useMutation({
     mutationFn: (values: PayFormValues) =>
-      billingApi.addPayment(invoice.id, { ...values, idempotencyKey }),
+      billingApi.addPayments(invoice.id, {
+        // A single row covers whatever was typed above; a split has its own
+        // per-method amounts, which must already add up to it.
+        payments:
+          payments.length === 1
+            ? [{ method: payments[0]!.method, amount: values.amount }]
+            : payments,
+        idempotencyKey,
+      }),
     onSuccess: () => {
       invalidate();
       onOpenChange(false);
@@ -77,7 +92,8 @@ export function PayDialog({ open, onOpenChange, invoice }: PayDialogProps) {
 
   const onSubmit = form.handleSubmit((values) => mutation.mutate(values));
 
-  const method = form.watch('method');
+  const amount = form.watch('amount');
+  const unbalanced = payments.length > 1 && splitTotalTiyin(payments) !== toTiyin(amount || '0');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -102,26 +118,14 @@ export function PayDialog({ open, onOpenChange, invoice }: PayDialogProps) {
               <p className="text-sm text-destructive">{t('form.invalidAmount')}</p>
             ) : null}
           </div>
-          <div className="space-y-2">
-            <Label>{t('pay.method')}</Label>
-            <Select
-              value={method}
-              onValueChange={(v) => form.setValue('method', v as PaymentMethod)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.values(PaymentMethod).map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {t(`methods.${m}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <PaymentSplit total={amount || '0'} value={payments} onChange={setPayments} />
           <DialogFooter>
-            <Button type="submit" size="lg" className="w-full" disabled={mutation.isPending}>
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={mutation.isPending || unbalanced}
+            >
               {mutation.isPending ? t('pay.paying') : t('pay.submit')}
             </Button>
           </DialogFooter>

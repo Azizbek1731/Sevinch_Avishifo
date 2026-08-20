@@ -117,5 +117,13 @@
     "paid": "To'langan",
     "due": "Qarz",
     "thanks": "Xaridingiz uchun rahmat!"
+  },
+  "split": {
+    "addMethod": "Usul qo‘shish",
+    "remove": "Usulni olib tashlash",
+    "amountFor": "{method} summasi",
+    "balanced": "Jami {total} — to‘liq taqsimlandi",
+    "remaining": "Yana {amount} taqsimlanmagan",
+    "over": "{amount} ortiqcha — summani kamaytiring"
   }
 }

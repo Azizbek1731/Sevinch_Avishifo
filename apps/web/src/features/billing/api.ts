@@ -3,6 +3,7 @@
 import type {
   AddDepositInput,
   AddPaymentInput,
+  AddPaymentsInput,
   ApiMeta,
   CloseShiftInput,
   CreateInvoiceInput,
@@ -250,6 +251,12 @@ export const billingApi = {
   cancelInvoice: (id: string) => api.post<InvoiceSummary>(`/invoices/${id}/cancel`),
   addPayment: (id: string, body: AddPaymentInput) =>
     api.post<{ payment: InvoicePayment; invoice: InvoiceSummary }>(`/invoices/${id}/payments`, body),
+  /** Settle an invoice across several methods in one request. */
+  addPayments: (id: string, body: AddPaymentsInput) =>
+    api.post<{ payment: InvoicePayment; invoice: InvoiceSummary }>(
+      `/invoices/${id}/payments/split`,
+      body,
+    ),
   addRefund: (id: string, body: CreateRefundInput) =>
     api.post<{ refund: InvoiceRefund; invoice: InvoiceSummary }>(`/invoices/${id}/refunds`, body),
   getReceipt: (id: string) => api.get<ReceiptPayload>(`/invoices/${id}/receipt`),

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   addDepositSchema,
   addPaymentSchema,
+  addPaymentsSchema,
   CashierShiftStatus,
   closeShiftSchema,
   createExpenseSchema,
@@ -23,6 +24,7 @@ export class CreateInvoiceDto extends createZodDto(createInvoiceSchema) {}
 export class QuickInvoiceDto extends createZodDto(quickInvoiceSchema) {}
 export class InvoiceQueryDto extends createZodDto(invoiceQuerySchema) {}
 export class AddPaymentDto extends createZodDto(addPaymentSchema) {}
+export class AddPaymentsDto extends createZodDto(addPaymentsSchema) {}
 export class CreateRefundDto extends createZodDto(createRefundSchema) {}
 
 // ---- Cashier shifts

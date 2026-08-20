@@ -11,6 +11,7 @@ import {
   createInvoiceSchema,
   formatUZS,
   fromTiyin,
+  type PaymentPart,
   PaymentMethod,
   toTiyin,
   type CreateInvoiceInput,
@@ -30,18 +31,12 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { billingApi, sanitizeMoney, type PatientBrief, type ServiceOption } from '../api';
 import { useApiErrorToast, useInvalidateBilling, usePermission } from '../hooks';
 import { PatientCombobox } from './patient-combobox';
 import { ReceiptPrinter } from './receipt-printer';
+import { PaymentSplit, splitTotalTiyin } from './payment-split';
 import { ServiceCombobox } from './service-combobox';
 
 const EMPTY_LINE = { quantity: 1, unitPrice: '0' as MoneyString, discount: '0' as MoneyString };
@@ -89,7 +84,14 @@ export function AddServicesDialog({
   const [patient, setPatient] = useState<PatientBrief | null>(fixedPatient ?? null);
   /** Selected service per field-array row, keyed by RHF field id. */
   const [rowServices, setRowServices] = useState<Record<string, ServiceOption | null>>({});
-  const [method, setMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
+  /**
+   * How the sale is paid. One entry is the ordinary case; a cashier splitting a
+   * bill across Click and cash adds more. Kept in sync with the running total
+   * below so a single-row split always covers the whole sale.
+   */
+  const [payments, setPayments] = useState<PaymentPart[]>([
+    { method: PaymentMethod.CASH, amount: '0' },
+  ]);
   /** One key per dialog opening: a retried submission reuses it. */
   const [idempotencyKey, setIdempotencyKey] = useState<string>(() => crypto.randomUUID());
   /** Invoice whose receipt is being pushed to the printer, if any. */
@@ -109,7 +111,7 @@ export function AddServicesDialog({
     if (!open) return;
     setPatient(fixedPatient ?? null);
     setRowServices({});
-    setMethod(PaymentMethod.CASH);
+    setPayments([{ method: PaymentMethod.CASH, amount: '0' }]);
     setIdempotencyKey(crypto.randomUUID());
     form.reset({
       patientId: fixedPatient?.id ?? '',
@@ -124,7 +126,8 @@ export function AddServicesDialog({
     queryFn: async () => (await billingApi.currentShift()).data,
     enabled: open && canPay,
   });
-  const cashBlocked = canPay && method === PaymentMethod.CASH && shift === null;
+  const cashBlocked =
+    canPay && shift === null && payments.some((p) => p.method === PaymentMethod.CASH);
 
   const mutation = useMutation({
     mutationFn: ({ values, settle }: { values: CreateInvoiceInput; settle: InvoiceSettlement }) =>
@@ -134,7 +137,15 @@ export function AddServicesDialog({
         visitId,
         lines: values.lines ?? [],
         settle,
-        ...(settle === 'PAY_NOW' ? { method, idempotencyKey } : {}),
+        ...(settle === 'PAY_NOW'
+          ? {
+              payments:
+                payments.length === 1
+                  ? [{ method: payments[0]!.method, amount: fromTiyin(totalTiyin) }]
+                  : payments,
+              idempotencyKey,
+            }
+          : {}),
       }),
     onSuccess: (res) => {
       const { invoice, paid } = res.data;
@@ -170,6 +181,9 @@ export function AddServicesDialog({
     return acc + (lt !== null && lt > 0n ? lt : 0n);
   }, 0n);
   const total = formatUZS(fromTiyin(totalTiyin));
+  // Only meaningful once the sale is actually split: a single row always covers
+  // the whole total, because its amount is filled in at submit time.
+  const splitUnbalanced = payments.length > 1 && splitTotalTiyin(payments) !== totalTiyin;
 
   return (
     <>
@@ -295,20 +309,13 @@ export function AddServicesDialog({
 
             <div className="flex flex-wrap items-end justify-between gap-4">
               {canPay ? (
-                <div className="space-y-2">
-                  <Label>{t('pay.method')}</Label>
-                  <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.values(PaymentMethod).map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {t(`methods.${m}`)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="min-w-64 flex-1">
+                  <PaymentSplit
+                    total={fromTiyin(totalTiyin)}
+                    value={payments}
+                    onChange={setPayments}
+                    cashBlocked={shift === null}
+                  />
                 </div>
               ) : (
                 <span />
@@ -341,7 +348,7 @@ export function AddServicesDialog({
                 <Button
                   type="button"
                   size="lg"
-                  disabled={mutation.isPending || cashBlocked}
+                  disabled={mutation.isPending || cashBlocked || splitUnbalanced}
                   onClick={() => void submit('PAY_NOW')}
                 >
                   <Banknote className="mr-2 h-5 w-5" />

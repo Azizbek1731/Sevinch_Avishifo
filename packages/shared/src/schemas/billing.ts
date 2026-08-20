@@ -55,6 +55,23 @@ export type AddPaymentInput = z.infer<typeof addPaymentSchema>;
 export const INVOICE_SETTLEMENTS = ['PAY_NOW', 'DEBT'] as const;
 export type InvoiceSettlement = (typeof INVOICE_SETTLEMENTS)[number];
 
+/**
+ * One leg of a payment. A patient settling a 130 000 bill with 100 000 by Click
+ * and 30 000 in cash is two of these against one invoice — which is how a front
+ * desk actually takes money, and what a single `method` field could not express.
+ */
+export const paymentPartSchema = z.object({
+  method: z.nativeEnum(PaymentMethod),
+  amount: moneySchema,
+});
+export type PaymentPart = z.infer<typeof paymentPartSchema>;
+
+/**
+ * Capped at six: past that it is not a split any more, and every extra leg is
+ * another row on the receipt and another shift entry to reconcile.
+ */
+export const paymentSplitSchema = z.array(paymentPartSchema).min(1).max(6);
+
 export const quickInvoiceSchema = z
   .object({
     patientId: idSchema,
@@ -62,20 +79,35 @@ export const quickInvoiceSchema = z
     visitId: idSchema.optional(),
     lines: z.array(invoiceLineSchema).min(1),
     settle: z.enum(INVOICE_SETTLEMENTS),
-    /** Required for PAY_NOW. */
-    method: z.nativeEnum(PaymentMethod).optional(),
-    /** Required for PAY_NOW — makes a retried submission idempotent. */
+    /**
+     * Required for PAY_NOW. One entry is the ordinary case; more than one splits
+     * the total across methods. The server checks the sum against the invoice it
+     * just built rather than trusting a total computed on the client.
+     */
+    payments: paymentSplitSchema.optional(),
+    /**
+     * Required for PAY_NOW — makes a retried submission idempotent. One key for
+     * the whole sale; the server derives a stable per-leg key from it, so a
+     * retry cannot double-charge any single leg.
+     */
     idempotencyKey: z.string().uuid().optional(),
   })
-  .refine((v) => v.settle !== 'PAY_NOW' || v.method !== undefined, {
-    message: 'method is required when settle is PAY_NOW',
-    path: ['method'],
+  .refine((v) => v.settle !== 'PAY_NOW' || (v.payments?.length ?? 0) > 0, {
+    message: 'payments is required when settle is PAY_NOW',
+    path: ['payments'],
   })
   .refine((v) => v.settle !== 'PAY_NOW' || v.idempotencyKey !== undefined, {
     message: 'idempotencyKey is required when settle is PAY_NOW',
     path: ['idempotencyKey'],
   });
 export type QuickInvoiceInput = z.infer<typeof quickInvoiceSchema>;
+
+/** Settling an already-issued invoice, optionally across several methods. */
+export const addPaymentsSchema = z.object({
+  payments: paymentSplitSchema,
+  idempotencyKey: z.string().uuid(),
+});
+export type AddPaymentsInput = z.infer<typeof addPaymentsSchema>;
 
 export const createRefundSchema = z.object({
   amount: moneySchema,
