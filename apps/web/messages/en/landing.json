@@ -230,8 +230,13 @@
     "dashboard": "Go to dashboard"
   },
   "pricing": {
-    "title": "Other clinic systems start at 300 000 so‘m a month. AviShifo is 199 000.",
-    "subtitle": "Priced in so‘m, fixed — not tied to the dollar. First week free.",
+    "title": "Clinic software starts at 300 000 so‘m a month. AviShifo is 199 000.",
+    "subtitle": "The same job for less. Priced in so‘m — a rising dollar does not move it. First week free.",
+    "compare": {
+      "others": "Elsewhere",
+      "ours": "At AviShifo",
+      "save": "You save at least {amount} so‘m a month"
+    },
     "popular": "Most popular",
     "som": "so‘m",
     "perMonth": "month",

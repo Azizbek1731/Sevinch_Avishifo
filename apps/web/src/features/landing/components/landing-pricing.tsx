@@ -1,7 +1,15 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Ban, Banknote, CalendarCheck, Check, FileSpreadsheet, type LucideIcon } from 'lucide-react';
+import {
+  ArrowRight,
+  Ban,
+  Banknote,
+  CalendarCheck,
+  Check,
+  FileSpreadsheet,
+  type LucideIcon,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Reveal } from './reveal';
 import { SectionHeading } from './section-heading';
@@ -29,6 +37,17 @@ const TIERS: readonly Tier[] = [
 
 const GUARANTEE_ICONS: readonly LucideIcon[] = [CalendarCheck, FileSpreadsheet, Ban, Banknote];
 
+/**
+ * The comparison the headline makes, shown as two prices instead of a sentence.
+ *
+ * "From 300 000" is the cheapest competing product, so the saving is stated as
+ * a floor rather than a flat figure — claiming a precise saving against a range
+ * would be the kind of number a reader can catch us out on.
+ */
+const MARKET_PRICE = 300_000;
+const OUR_PRICE = 199_000;
+const SAVING = (MARKET_PRICE - OUR_PRICE).toLocaleString('ru-RU').replace(/\u00A0/g, ' ');
+
 export function LandingPricing() {
   const t = useTranslations('landing');
   const guarantees = (t.raw('pricing.guarantees') as string[] | undefined) ?? [];
@@ -41,6 +60,40 @@ export function LandingPricing() {
           title={t('pricing.title')}
           subtitle={t('pricing.subtitle')}
         />
+
+        {/* The same comparison as the headline, but as two prices side by side:
+            a struck-out number next to ours is read in a glance, where a
+            sentence about market rates has to be parsed. */}
+        <div className="mx-auto mt-7 flex max-w-lg flex-col items-stretch gap-3 sm:mt-8 sm:flex-row sm:items-center sm:justify-center">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card/40 px-4 py-3 sm:flex-col sm:items-start sm:gap-0.5">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {t('pricing.compare.others')}
+            </span>
+            <span className="text-lg font-bold tabular-nums text-muted-foreground line-through">
+              {MARKET_PRICE.toLocaleString('ru-RU').replace(/\u00A0/g, ' ')}
+            </span>
+          </div>
+
+          <ArrowRight className="mx-auto hidden h-5 w-5 shrink-0 text-muted-foreground sm:block" />
+
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-primary bg-primary/[0.06] px-4 py-3 sm:flex-col sm:items-start sm:gap-0.5">
+            <span className="text-xs font-medium uppercase tracking-wider text-primary">
+              {t('pricing.compare.ours')}
+            </span>
+            <span className="flex items-baseline gap-1.5">
+              <span className="text-lg font-black tabular-nums text-foreground">
+                {OUR_PRICE.toLocaleString('ru-RU').replace(/\u00A0/g, ' ')}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {t('pricing.som')} / {t('pricing.perMonth')}
+              </span>
+            </span>
+          </div>
+        </div>
+
+        <p className="mt-3 text-center text-sm font-medium text-primary">
+          {t('pricing.compare.save', { amount: SAVING })}
+        </p>
 
         <div className="mx-auto mt-10 grid max-w-5xl items-stretch gap-5 sm:mt-14 sm:gap-6 lg:grid-cols-3">
           {TIERS.map((tier, i) => {

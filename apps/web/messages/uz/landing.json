@@ -230,8 +230,13 @@
     "dashboard": "Boshqaruv paneliga o'tish"
   },
   "pricing": {
-    "title": "Bozordagi MIS-lar — oyiga 300 000 so‘mdan. AviShifo — 199 000 so‘m.",
-    "subtitle": "Narx so‘mda qat’iy — dollar kursiga bog‘liq emas. Birinchi hafta bepul.",
+    "title": "Klinika dasturlari oyiga 300 000 so‘mdan. AviShifo — 199 000 so‘m.",
+    "subtitle": "Xuddi shu ish, arzonroq narxda. Narx so‘mda — dollar kursi ko‘tarilsa ham o‘zgarmaydi. Birinchi hafta bepul.",
+    "compare": {
+      "others": "Boshqa dasturlarda",
+      "ours": "AviShifoda",
+      "save": "Kamida oyiga {amount} so‘m tejaysiz"
+    },
     "popular": "Eng ommabop",
     "som": "so‘m",
     "perMonth": "oy",
