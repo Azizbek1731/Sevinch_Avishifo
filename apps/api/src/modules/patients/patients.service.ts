@@ -1,3 +1,4 @@
+import type { AuthUser } from '@avishifo/shared';
 import { Injectable } from '@nestjs/common';
 import { Prisma, type Patient } from '@prisma/client';
 import {
@@ -52,6 +53,8 @@ export interface PatientResponse {
   balance: string;
   createdAt: string;
   updatedAt: string;
+  /** Set when the card was removed; only management ever sees these. */
+  deletedAt: string | null;
 }
 
 export interface PatientCardResponse extends PatientResponse {
@@ -95,6 +98,7 @@ function mapPatient(p: Patient): PatientResponse {
     balance: p.balance.toFixed(2),
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
+    deletedAt: p.deletedAt ? p.deletedAt.toISOString() : null,
   };
 }
 
@@ -110,8 +114,12 @@ export class PatientsService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(query: PatientQueryInput): Promise<PaginatedResult<PatientResponse>> {
+  async list(query: PatientQueryInput, user?: AuthUser): Promise<PaginatedResult<PatientResponse>> {
     const { skip, take } = skipTake(query);
+    // The flag only asks; holding records.viewDeleted is what decides. Without
+    // it a removed card stays removed no matter what the client sends.
+    const showDeleted =
+      query.deleted === true && user?.permissions.includes('records.viewDeleted') === true;
 
     if (query.search) {
       // Trigram search path (pg_trgm GIN indexes on "fullName"/"phone").
@@ -124,7 +132,7 @@ export class PatientsService {
         SELECT *, (COUNT(*) OVER())::int AS "total"
         FROM "Patient"
         WHERE "clinicId" = ${clinicId}
-          AND "deletedAt" IS NULL
+          AND (${showDeleted}::boolean OR "deletedAt" IS NULL)
           AND (
             "fullName" ILIKE '%' || ${q} || '%'
             OR (${digits} <> '' AND "phone" LIKE '%' || ${digits} || '%')
@@ -139,7 +147,7 @@ export class PatientsService {
     }
 
     const where: Prisma.PatientWhereInput = {
-      deletedAt: null,
+      ...(showDeleted ? {} : { deletedAt: null }),
       ...(query.tag ? { tags: { has: query.tag } } : {}),
     };
     const sort = parseSort(query.sort, { field: 'createdAt', dir: 'desc' });

@@ -47,6 +47,7 @@ export interface Patient {
   balance: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 }
 
 export interface PatientCard extends Patient {
@@ -146,6 +147,8 @@ export interface PatientListQuery {
   limit: number;
   search?: string;
   tag?: string;
+  /** Include cards the front desk removed. Honoured only with records.viewDeleted. */
+  deleted?: boolean;
   sort?: string;
 }
 

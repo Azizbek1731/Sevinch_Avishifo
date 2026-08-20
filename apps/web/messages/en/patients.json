@@ -237,5 +237,7 @@
     "summary": "All visits, invoices and documents of {duplicate} will be moved into {primary}, then the duplicate will be archived.",
     "confirm": "Merge",
     "merged": "Patients merged"
-  }
+  },
+  "deletedBadge": "Deleted",
+  "showDeleted": "Deleted"
 }

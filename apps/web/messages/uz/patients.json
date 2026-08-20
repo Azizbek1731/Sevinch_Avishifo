@@ -237,5 +237,7 @@
     "summary": "{duplicate} kartasidagi barcha tashriflar, hisoblar va hujjatlar {primary} kartasiga o'tkaziladi, so'ng dublikat arxivlanadi.",
     "confirm": "Birlashtirish",
     "merged": "Bemorlar birlashtirildi"
-  }
+  },
+  "deletedBadge": "O‘chirilgan",
+  "showDeleted": "O‘chirilganlar"
 }

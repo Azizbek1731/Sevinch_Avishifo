@@ -125,5 +125,16 @@
     "balanced": "{total} in total — fully allocated",
     "remaining": "{amount} still unallocated",
     "over": "{amount} over — reduce the amounts"
+  },
+  "void": {
+    "action": "Void payment",
+    "title": "Void this payment?",
+    "description": "The {amount} paid by {method} will be reversed and put back on the invoice. This is not a refund — the payment is marked as entered in error.",
+    "reason": "Reason (optional)",
+    "reasonPlaceholder": "For example: wrong amount entered",
+    "confirm": "Void payment",
+    "cancel": "Close",
+    "working": "Working…",
+    "done": "Payment voided"
   }
 }

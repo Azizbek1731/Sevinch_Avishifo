@@ -42,6 +42,11 @@ export type UpdatePatientInput = z.infer<typeof updatePatientSchema>;
 export const patientQuerySchema = paginationQuerySchema.extend({
   search: z.string().min(1).optional(),
   tag: z.string().min(1).optional(),
+  /**
+   * Show the cards the front desk removed. Honoured only for callers holding
+   * records.viewDeleted — the flag asks, the server decides.
+   */
+  deleted: z.coerce.boolean().optional(),
   sort: sortQuerySchema(['createdAt', 'fullName', 'mrn']),
 });
 export type PatientQueryInput = z.infer<typeof patientQuerySchema>;

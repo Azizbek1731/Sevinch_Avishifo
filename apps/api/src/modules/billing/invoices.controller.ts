@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '@avishifo/shared';
 import { CurrentUser, RequirePermissions } from '../../common/decorators';
@@ -7,6 +7,7 @@ import { InvoicesService } from './invoices.service';
 import {
   AddPaymentDto,
   AddPaymentsDto,
+  VoidPaymentDto,
   CreateInvoiceDto,
   CreateRefundDto,
   InvoiceQueryDto,
@@ -39,8 +40,11 @@ export class InvoicesController {
 
   @Get(':id')
   @RequirePermissions('invoices.read')
-  getById(@Param('id') id: string): Promise<Record<string, unknown>> {
-    return this.invoices.getById(id);
+  getById(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Record<string, unknown>> {
+    return this.invoices.getById(id, user);
   }
 
   @Post(':id/issue')
@@ -74,6 +78,18 @@ export class InvoicesController {
     @CurrentUser() user: AuthUser,
   ): Promise<Record<string, unknown>> {
     return this.invoices.addPayments(id, dto.payments, dto.idempotencyKey, user);
+  }
+
+  /** Reverse a payment entered by mistake. Not a refund — see voidPayment. */
+  @Post('payments/:paymentId/void')
+  @RequirePermissions('payments.void')
+  @HttpCode(200)
+  voidPayment(
+    @Param('paymentId') paymentId: string,
+    @Body() dto: VoidPaymentDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Record<string, unknown>> {
+    return this.invoices.voidPayment(paymentId, dto.reason, user);
   }
 
   @Post(':id/refunds')

@@ -33,7 +33,8 @@
     "PENDING": "Kutilmoqda",
     "COMPLETED": "Bajarildi",
     "FAILED": "Xato",
-    "REFUNDED": "Qaytarilgan"
+    "REFUNDED": "Qaytarilgan",
+    "VOIDED": "Bekor qilingan"
   },
   "lab": {
     "ORDERED": "Buyurtma qilingan",

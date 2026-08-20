@@ -40,8 +40,8 @@ export class PatientsController {
 
   @Get()
   @RequirePermissions('patients.read')
-  list(@Query() query: PatientQueryDto) {
-    return this.patients.list(query);
+  list(@Query() query: PatientQueryDto, @CurrentUser() user: AuthUser) {
+    return this.patients.list(query, user);
   }
 
   @Post()

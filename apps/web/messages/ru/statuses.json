@@ -33,7 +33,8 @@
     "PENDING": "Ожидает",
     "COMPLETED": "Выполнен",
     "FAILED": "Ошибка",
-    "REFUNDED": "Возвращён"
+    "REFUNDED": "Возвращён",
+    "VOIDED": "Отменён"
   },
   "lab": {
     "ORDERED": "Заказан",

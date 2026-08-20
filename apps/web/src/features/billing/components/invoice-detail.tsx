@@ -29,6 +29,7 @@ import {
 import { billingApi } from '../api';
 import { useApiErrorToast, useInvalidateBilling, usePermission } from '../hooks';
 import { PayDialog } from './pay-dialog';
+import { VoidPaymentButton } from './void-payment-button';
 import { RefundDialog } from './refund-dialog';
 
 export function InvoiceDetailView({ id }: { id: string }) {
@@ -224,21 +225,36 @@ export function InvoiceDetailView({ id }: { id: string }) {
                     <TableHead>{t('pay.method')}</TableHead>
                     <TableHead>{tc('status')}</TableHead>
                     <TableHead className="text-right">{t('pay.amount')}</TableHead>
+                    <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {inv.payments.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>{formatTz(p.paidAt)}</TableCell>
-                      <TableCell>{t(`methods.${p.method}`)}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={p.status} />
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatUZS(p.amount)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {inv.payments.map((p) => {
+                    const voided = p.status === 'VOIDED';
+                    return (
+                      // A voided row only reaches management, and it should read
+                      // as struck out at a glance rather than as money taken.
+                      <TableRow key={p.id} className={voided ? 'text-muted-foreground' : undefined}>
+                        <TableCell>{formatTz(p.paidAt)}</TableCell>
+                        <TableCell className={voided ? 'line-through' : undefined}>
+                          {t(`methods.${p.method}`)}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={p.status} />
+                        </TableCell>
+                        <TableCell
+                          className={`text-right font-medium ${voided ? 'line-through' : ''}`}
+                        >
+                          {formatUZS(p.amount)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {!voided && can('payments.void') ? (
+                            <VoidPaymentButton payment={p} />
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}

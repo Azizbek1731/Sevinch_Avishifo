@@ -4,6 +4,7 @@ import type {
   AddDepositInput,
   AddPaymentInput,
   AddPaymentsInput,
+  VoidPaymentInput,
   ApiMeta,
   CloseShiftInput,
   CreateInvoiceInput,
@@ -257,6 +258,9 @@ export const billingApi = {
       `/invoices/${id}/payments/split`,
       body,
     ),
+  /** Reverse a payment entered by mistake (not a refund — no money moves back). */
+  voidPayment: (paymentId: string, body: VoidPaymentInput) =>
+    api.post<{ payment: InvoicePayment }>(`/invoices/payments/${paymentId}/void`, body),
   addRefund: (id: string, body: CreateRefundInput) =>
     api.post<{ refund: InvoiceRefund; invoice: InvoiceSummary }>(`/invoices/${id}/refunds`, body),
   getReceipt: (id: string) => api.get<ReceiptPayload>(`/invoices/${id}/receipt`),

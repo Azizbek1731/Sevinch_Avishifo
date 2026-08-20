@@ -174,3 +174,9 @@ export const expenseQuerySchema = paginationQuerySchema.extend({
   to: dateOnlySchema.optional(),
 });
 export type ExpenseQueryInput = z.infer<typeof expenseQuerySchema>;
+
+/** Reversing a payment that should never have been recorded. */
+export const voidPaymentSchema = z.object({
+  reason: z.string().trim().max(300).optional(),
+});
+export type VoidPaymentInput = z.infer<typeof voidPaymentSchema>;

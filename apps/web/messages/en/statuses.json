@@ -33,7 +33,8 @@
     "PENDING": "Pending",
     "COMPLETED": "Completed",
     "FAILED": "Failed",
-    "REFUNDED": "Refunded"
+    "REFUNDED": "Refunded",
+    "VOIDED": "Voided"
   },
   "lab": {
     "ORDERED": "Ordered",

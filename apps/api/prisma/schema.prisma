@@ -159,6 +159,10 @@ enum PaymentStatus {
   COMPLETED
   FAILED
   REFUNDED
+  /// Entered by mistake and reversed. Distinct from REFUNDED, which means money
+  /// actually went back to the patient — a void says it never should have been
+  /// recorded. The row is kept so the correction stays visible to the clinic.
+  VOIDED
 }
 
 enum BalanceTransactionType {
@@ -1154,6 +1158,11 @@ model Payment {
   receivedById   String?
   paidAt         DateTime      @default(now()) @db.Timestamptz(6)
   createdAt      DateTime      @default(now()) @db.Timestamptz(6)
+  /// Set when the payment was voided. Money rows are never actually deleted —
+  /// the front desk stops seeing them, the clinic's own people still can.
+  voidedAt       DateTime?     @db.Timestamptz(6)
+  voidedById     String?
+  voidReason     String?
 
   invoice Invoice       @relation(fields: [invoiceId], references: [id])
   shift   CashierShift? @relation(fields: [shiftId], references: [id])

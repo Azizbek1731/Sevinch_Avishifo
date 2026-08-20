@@ -167,11 +167,19 @@ export async function createTestClinic(prisma: PrismaClient, suffix: string): Pr
 // ---------------------------------------------------------------- auth utils
 
 let ipSeq = 0;
+/**
+ * A per-run prefix, because the throttle counters live in Redis and outlive the
+ * process. Restarting the sequence at 10.99.0.1 every run meant a second run
+ * inside the throttle window replayed the same addresses and started getting
+ * 429s partway through the suite — a failure that looked like a broken test and
+ * was really just the previous run's bookkeeping.
+ */
+const ipRun = Math.floor(Math.random() * 200);
 
 /** Unique source IP per call — defeats the per-IP auth throttle in tests. */
 export function uniqueIp(): string {
   ipSeq += 1;
-  return `10.99.${Math.floor(ipSeq / 200) % 200}.${(ipSeq % 200) + 1}`;
+  return `10.${ipRun + 20}.${Math.floor(ipSeq / 200) % 200}.${(ipSeq % 200) + 1}`;
 }
 
 export interface LoginResult {

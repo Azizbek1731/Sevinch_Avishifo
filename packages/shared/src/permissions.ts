@@ -37,6 +37,13 @@ export const PERMISSIONS = [
   'invoices.write',
   'invoices.cancel',
   'payments.create',
+  /**
+   * Reversing a payment entered by mistake. Separate from refunds.create: a
+   * refund gives money back, a void says it was never taken. The people who
+   * mistype an amount are the ones who must be able to correct it, so this sits
+   * with the front desk rather than with the owner.
+   */
+  'payments.void',
   'refunds.create',
   'shifts.manage',
   'debts.read',
@@ -71,6 +78,13 @@ export const PERMISSIONS = [
   'feedback.read',
   // Audit (M16)
   'audit.read',
+  /**
+   * Seeing what the front desk deleted. A voided payment or a removed patient
+   * vanishes for whoever removed it and stays visible, marked, for the clinic's
+   * own management — otherwise a correction is indistinguishable from a
+   * takings shortfall nobody can explain.
+   */
+  'records.viewDeleted',
   // AviShifo AI — asking questions about this clinic's own data in natural
   // language. Separate from reports.read: the assistant can only ever surface
   // what the caller could already open in the panel, but sending anything to a
@@ -98,8 +112,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'patients.merge',
     'patients.export',
     'patients.documents.write',
+    'patients.delete',
     'patients.recordAccess.manage',
     'ai.use',
+    'payments.void',
+    // The clinic's own management is who "deleted" stays visible for.
+    'records.viewDeleted',
     'appointments.read',
     'appointments.write',
     'appointments.cancel',
@@ -156,6 +174,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   [UserRole.RECEPTIONIST]: [
     'patients.read',
     'patients.write',
+    'patients.delete',
     'patients.documents.write',
     'appointments.read',
     'appointments.write',
@@ -166,16 +185,19 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'invoices.read',
     'invoices.write',
     'payments.create',
+    'payments.void',
     'shifts.manage',
     'debts.read',
     'schedules.read',
   ],
   [UserRole.CASHIER]: [
     'patients.read',
+    'patients.delete',
     'invoices.read',
     'invoices.write',
     'invoices.cancel',
     'payments.create',
+    'payments.void',
     'refunds.create',
     'shifts.manage',
     'debts.read',

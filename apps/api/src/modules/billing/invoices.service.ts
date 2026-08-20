@@ -94,6 +94,12 @@ function legKey(base: string, index: number): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
 
+
+/** Whether this caller keeps seeing what the front desk removed. */
+function canSeeDeleted(user?: AuthUser): boolean {
+  return user?.permissions.includes('records.viewDeleted') === true;
+}
+
 @Injectable()
 export class InvoicesService {
   private readonly logger = new Logger(InvoicesService.name);
@@ -470,6 +476,105 @@ export class InvoicesService {
     return last as Record<string, unknown>;
   }
 
+  /**
+   * Reverses a payment that should never have been recorded — a mistyped amount,
+   * the wrong method, the wrong patient.
+   *
+   * Not a refund. A refund means money went back to the patient and both legs
+   * belong in the books; a void says the money was never taken in the first
+   * place, so the invoice must look exactly as it did beforehand. The row is
+   * kept rather than deleted: whoever made the mistake stops seeing it, and the
+   * clinic's own management still does, because a takings figure that quietly
+   * changed with nothing to show for it is worse than the mistake.
+   */
+  async voidPayment(
+    paymentId: string,
+    reason: string | undefined,
+    user: AuthUser,
+  ): Promise<Record<string, unknown>> {
+    const payment = await this.prisma.db.payment.findFirst({ where: { id: paymentId } });
+    if (!payment) throw new AppException(ErrorCode.NOT_FOUND, 'To‘lov topilmadi', 404);
+
+    if (payment.status === 'VOIDED') {
+      // Already done — most likely a double-click, so report the existing state
+      // rather than reversing the invoice a second time.
+      return this.paymentResponse(payment.id);
+    }
+    if (payment.status !== 'COMPLETED') {
+      throw new AppException(
+        ErrorCode.INVOICE_INVALID_STATE,
+        'Faqat bajarilgan to‘lovni bekor qilish mumkin',
+        409,
+      );
+    }
+
+    const invoice = await this.prisma.db.invoice.findFirst({ where: { id: payment.invoiceId } });
+    if (!invoice) throw new AppException(ErrorCode.INVOICE_NOT_FOUND, 'Invoice not found', 404);
+
+    // A refunded invoice has already had money move back out; unwinding the
+    // original payment underneath that would leave the two records disagreeing.
+    const refunded = await this.prisma.db.refund.count({ where: { invoiceId: invoice.id } });
+    if (refunded > 0) {
+      throw new AppException(
+        ErrorCode.INVOICE_INVALID_STATE,
+        'Bu hisob bo‘yicha qaytarish qilingan — to‘lovni bekor qilib bo‘lmaydi',
+        409,
+      );
+    }
+
+    const newPaidTotal = invoice.paidTotal.sub(payment.amount);
+    // Back to what the invoice looked like before this payment landed.
+    const newStatus = newPaidTotal.lte(0) ? 'ISSUED' : 'PARTIALLY_PAID';
+
+    await this.prisma.db.$transaction(async (tx) => {
+      if (payment.method === 'BALANCE') {
+        // The money came off the patient's account, so it has to go back on.
+        await tx.patient.update({
+          where: { id: invoice.patientId },
+          data: { balance: { increment: payment.amount } },
+        });
+        await tx.patientBalanceTransaction.create({
+          data: {
+            clinicId: invoice.clinicId,
+            patientId: invoice.patientId,
+            type: 'ADJUSTMENT',
+            amount: payment.amount,
+            invoiceId: invoice.id,
+            note: `Voided payment on invoice ${invoice.number}`,
+            createdById: user.id,
+          },
+        });
+      }
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'VOIDED',
+          voidedAt: new Date(),
+          voidedById: user.id,
+          voidReason: reason ?? null,
+          // Freed so the same idempotency key can be used again by a corrected
+          // re-entry, which is exactly what the cashier does next.
+          idempotencyKey: null,
+        },
+      });
+      await tx.invoice.update({
+        where: { id: invoice.id },
+        data: { paidTotal: newPaidTotal.lt(0) ? new Prisma.Decimal(0) : newPaidTotal, status: newStatus },
+      });
+    });
+
+    await this.audit.log({
+      action: AuditAction.UPDATE,
+      entity: 'Payment',
+      entityId: payment.id,
+      clinicId: invoice.clinicId,
+      before: { status: payment.status, amount: payment.amount.toFixed(2), method: payment.method },
+      after: { status: 'VOIDED', reason: reason ?? null, invoice: invoice.number },
+    });
+
+    return this.paymentResponse(payment.id);
+  }
+
   async list(q: InvoiceQueryInput): Promise<PaginatedResult<Record<string, unknown>>> {
     const where: Prisma.InvoiceWhereInput = {
       ...(q.status ? { status: q.status } : {}),
@@ -499,7 +604,7 @@ export class InvoicesService {
     );
   }
 
-  async getById(id: string): Promise<Record<string, unknown>> {
+  async getById(id: string, user?: AuthUser): Promise<Record<string, unknown>> {
     const invoice = await this.prisma.db.invoice.findFirst({
       where: { id },
       include: {
@@ -514,7 +619,13 @@ export class InvoicesService {
       ...this.mapInvoice(invoice),
       patient: invoice.patient,
       lines: invoice.lines.map((l) => this.mapLine(l)),
-      payments: invoice.payments.map((p) => this.mapPayment(p)),
+      // A voided payment stays on the record for the clinic's own management and
+      // disappears for the desk that entered it — the correction has to be
+      // traceable by someone, or an unexplained change in the day's takings is
+      // all that is left of it.
+      payments: invoice.payments
+        .filter((p) => p.status !== 'VOIDED' || canSeeDeleted(user))
+        .map((p) => this.mapPayment(p)),
       refunds: invoice.refunds.map((r) => this.mapRefund(r)),
     };
   }

@@ -4,6 +4,7 @@ import {
   addDepositSchema,
   addPaymentSchema,
   addPaymentsSchema,
+  voidPaymentSchema,
   CashierShiftStatus,
   closeShiftSchema,
   createExpenseSchema,
@@ -25,6 +26,7 @@ export class QuickInvoiceDto extends createZodDto(quickInvoiceSchema) {}
 export class InvoiceQueryDto extends createZodDto(invoiceQuerySchema) {}
 export class AddPaymentDto extends createZodDto(addPaymentSchema) {}
 export class AddPaymentsDto extends createZodDto(addPaymentsSchema) {}
+export class VoidPaymentDto extends createZodDto(voidPaymentSchema) {}
 export class CreateRefundDto extends createZodDto(createRefundSchema) {}
 
 // ---- Cashier shifts

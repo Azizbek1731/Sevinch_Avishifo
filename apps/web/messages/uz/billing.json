@@ -125,5 +125,16 @@
     "balanced": "Jami {total} — to‘liq taqsimlandi",
     "remaining": "Yana {amount} taqsimlanmagan",
     "over": "{amount} ortiqcha — summani kamaytiring"
+  },
+  "void": {
+    "action": "To‘lovni bekor qilish",
+    "title": "To‘lovni bekor qilasizmi?",
+    "description": "{method} orqali {amount} to‘lov bekor qilinadi va hisobga qaytariladi. Bu pul qaytarish emas — to‘lov xato kiritilgan deb belgilanadi.",
+    "reason": "Sababi (ixtiyoriy)",
+    "reasonPlaceholder": "Masalan: summa xato kiritildi",
+    "confirm": "Bekor qilish",
+    "cancel": "Yopish",
+    "working": "Bajarilmoqda…",
+    "done": "To‘lov bekor qilindi"
   }
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useTranslations } from 'next-intl';
-import { Plus, Search, Users } from 'lucide-react';
+import { Plus, Search, Trash2, Users } from 'lucide-react';
 import { PATIENT_TAGS, formatPhone, formatUZS } from '@avishifo/shared';
 import { useRouter } from '@/i18n/routing';
 import { DataTable } from '@/components/data-table';
@@ -38,6 +38,9 @@ export function PatientsList() {
   const [tag, setTag] = useState<string>(ALL);
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
+  // Only management can ask for these, and only they are offered the switch.
+  const canSeeDeleted = can('records.viewDeleted');
+  const [showDeleted, setShowDeleted] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -52,6 +55,7 @@ export function PatientsList() {
     limit: PAGE_LIMIT,
     search: debouncedSearch || undefined,
     tag: tag === ALL ? undefined : tag,
+    deleted: showDeleted || undefined,
   });
 
   const items = useMemo(() => query.data?.data ?? [], [query.data]);
@@ -67,7 +71,22 @@ export function PatientsList() {
       {
         accessorKey: 'fullName',
         header: t('table.fullName'),
-        cell: ({ row }) => <span className="font-medium">{row.original.fullName}</span>,
+        cell: ({ row }) => (
+          <span className="flex items-center gap-2">
+            {/* Struck through, and labelled: management is looking at a record
+                the front desk removed, not at an active patient. */}
+            <span
+              className={`font-medium ${row.original.deletedAt ? 'text-muted-foreground line-through' : ''}`}
+            >
+              {row.original.fullName}
+            </span>
+            {row.original.deletedAt ? (
+              <Badge variant="outline" className="shrink-0">
+                {t('deletedBadge')}
+              </Badge>
+            ) : null}
+          </span>
+        ),
       },
       {
         accessorKey: 'phone',
@@ -180,6 +199,19 @@ export function PatientsList() {
             ))}
           </SelectContent>
         </Select>
+        {canSeeDeleted ? (
+          <Button
+            type="button"
+            variant={showDeleted ? 'default' : 'outline'}
+            onClick={() => {
+              setShowDeleted((v) => !v);
+              setPage(1);
+            }}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {t('showDeleted')}
+          </Button>
+        ) : null}
       </div>
 
       {showEmpty ? (
