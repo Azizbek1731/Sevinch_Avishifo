@@ -7,20 +7,25 @@ import { localizedText } from '@/lib/localized';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import type { ReceiptPayload, ReceiptSettings } from '../api';
+import { ThermalLogo } from './thermal-logo';
 
 /**
  * Receipt-body font size, per paper width and the clinic's fontScale setting.
  *
  * Font size and paper width are one decision, not two. A 58mm roll prints 48mm
- * wide, and a monospace glyph advances about 0.6em — so 10px gives roughly the
- * 30-odd characters per line a thermal printer natively lays down, while the
- * 13px that looked right on screen fits barely 23 and wrapped service names and
- * amounts onto extra lines. 80mm paper has half again the width and can carry
- * the larger sizes.
+ * wide and a monospace glyph advances about 0.6em, so the size directly sets
+ * how many characters fit: 11px gives 27 per line, 15px gives 20.
+ *
+ * These tiers are deliberately larger than the ~32 characters a thermal printer
+ * lays down natively: a receipt is read at arm's length across a counter, often
+ * by someone who did not bring their glasses. But the ceiling is real. At 16px
+ * a 48mm strip carries 18 characters, which is fewer than "To'langan  130 000"
+ * needs, and every money row then breaks in half. 15px buys 19 and is the most
+ * a 58mm roll will take while keeping a label and its figure side by side.
  */
 const FONT_SCALE: Record<'58' | '80', Record<NonNullable<ReceiptSettings['fontScale']>, string>> = {
-  '58': { sm: 'text-[9px]', md: 'text-[10px]', lg: 'text-[11px]' },
-  '80': { sm: 'text-[11px]', md: 'text-[12px]', lg: 'text-[13px]' },
+  '58': { sm: 'text-[12px]', md: 'text-[13px]', lg: 'text-[15px]' },
+  '80': { sm: 'text-[14px]', md: 'text-[16px]', lg: 'text-[18px]' },
 };
 
 /** A full-width rule made of dashes — a thermal head renders these crisply. */
@@ -35,9 +40,11 @@ function Rule() {
 /**
  * One `label ......... amount` line.
  *
- * The amount is the part that must never wrap: a total broken across two lines
- * reads as two different numbers. So the label may shrink and ellipsise while
- * the figure keeps its own line to itself.
+ * Neither half may be broken: an amount split across two lines reads as two
+ * different numbers, and a label clipped to "Che…" tells the reader nothing. So
+ * when the pair will not fit the strip — which is often, at the larger sizes on
+ * 58mm paper — the value drops to its own line and stays right-aligned there,
+ * rather than either side being cut.
  */
 function Row({
   label,
@@ -49,9 +56,14 @@ function Row({
   strong?: boolean;
 }) {
   return (
-    <div className={cn('flex items-baseline justify-between gap-2', strong && 'receipt-strong font-bold')}>
-      <span className="min-w-0 truncate">{label}</span>
-      <span className="shrink-0 whitespace-nowrap tabular-nums">{value}</span>
+    <div
+      className={cn(
+        'flex flex-wrap items-baseline justify-between gap-x-2',
+        strong && 'receipt-strong font-bold',
+      )}
+    >
+      <span className="whitespace-nowrap">{label}</span>
+      <span className="ml-auto whitespace-nowrap tabular-nums">{value}</span>
     </div>
   );
 }
@@ -114,11 +126,17 @@ export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
       >
         <div className="space-y-0.5 text-center">
           {showLogo && data.clinic?.logoUrl ? (
-            <img
+            <ThermalLogo
               src={data.clinic.logoUrl}
               alt={data.clinic?.name ?? ''}
-              /* Small and centred: a large logo dithers into a grey smear. */
-              className="mx-auto mb-1 max-h-10 w-auto object-contain"
+              /*
+               * Constrained by WIDTH, not height. Clinic logos are usually wide
+               * — a mark beside a name — and capping the height squeezed one to
+               * about two thirds of the strip, which is where the lettering
+               * inside it stopped being readable. The height cap is only a
+               * guard for the rare tall logo.
+               */
+              className="mx-auto mb-1 h-auto max-h-24 w-full object-contain"
             />
           ) : null}
           <p className="receipt-strong text-[1.15em] font-bold uppercase leading-tight">
@@ -139,17 +157,30 @@ export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
 
         <Rule />
 
-        <div>
-          <Row label={t('receipt.receiptNo')} value={data.invoice.number} strong />
-          <Row label={t('receipt.date')} value={formatTz(data.printedAt)} />
-          <Row
-            label={t('receipt.patient')}
-            value={
-              showPatientMrn ? `${data.patient.fullName} · ${data.patient.mrn}` : data.patient.fullName
-            }
-          />
-          {showCashier && user ? <Row label={t('receipt.cashier')} value={user.fullName} /> : null}
-        </div>
+        {/*
+          Not a two-column block. At the larger sizes a 48mm strip carries about
+          twenty characters, and "Chek №" beside a fifteen-character invoice
+          number does not fit in that — laid out as a row it pushed every value
+          onto its own line anyway, just without saying so. The number is the
+          thing a customer quotes back, so it leads, and the rest reads as
+          ordinary sentences that wrap where they need to.
+        */}
+        <p className="text-center leading-tight">{t('receipt.receiptNo')}</p>
+        {/* Never broken: half an invoice number on each of two lines is not an
+            invoice number. */}
+        <p className="receipt-strong whitespace-nowrap text-center font-bold">
+          {data.invoice.number}
+        </p>
+        <p className="text-center">{formatTz(data.printedAt)}</p>
+        <p className="mt-1 leading-tight">
+          {t('receipt.patient')}: {data.patient.fullName}
+          {showPatientMrn ? ` · ${data.patient.mrn}` : ''}
+        </p>
+        {showCashier && user ? (
+          <p className="leading-tight">
+            {t('receipt.cashier')}: {user.fullName}
+          </p>
+        ) : null}
 
         <Rule />
 
@@ -159,10 +190,12 @@ export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
               {/* The name gets its own line so it can wrap without ever pushing
                   the figures around. */}
               <p className="leading-tight">{localizedText(l.title, locale)}</p>
-              <Row
-                label={`${l.quantity} × ${money(l.unitPrice)}`}
-                value={money(l.lineTotal)}
-              />
+              {l.quantity === 1 ? (
+                // A single unit needs no "1 ×" — just the price, under the name.
+                <p className="text-right tabular-nums">{money(l.lineTotal)}</p>
+              ) : (
+                <Row label={`${l.quantity} × ${money(l.unitPrice)}`} value={money(l.lineTotal)} />
+              )}
             </div>
           ))}
         </div>
@@ -170,7 +203,9 @@ export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
         <Rule />
 
         <div>
-          <Row label={t('receipt.subtotal')} value={money(data.totals.subtotal)} />
+          {/* With no discount the subtotal is the total said twice, and it owns
+              the longest label on the slip — so it only appears when it differs. */}
+          {hasDiscount ? <Row label={t('receipt.subtotal')} value={money(data.totals.subtotal)} /> : null}
           {hasDiscount ? (
             <Row label={t('receipt.discount')} value={`− ${money(data.totals.discountTotal)}`} />
           ) : null}
