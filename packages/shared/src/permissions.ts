@@ -46,6 +46,15 @@ export const PERMISSIONS = [
   'payments.void',
   'refunds.create',
   'shifts.manage',
+  /**
+   * See every register in the clinic, live, without holding one.
+   *
+   * Deliberately separate from shifts.manage, which means "I am holding a
+   * drawer". An owner who only wants to check the till should not have to open
+   * a drawer of their own — doing exactly that is what made two accounts show
+   * two different totals.
+   */
+  'shifts.oversee',
   'debts.read',
   'expenses.read',
   'expenses.write',
@@ -134,6 +143,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'lab.orders.read',
     'reports.read',
     'reports.export',
+    'shifts.oversee',
     'staff.read',
     'staff.write',
     'schedules.read',
@@ -229,6 +239,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'payroll.write',
     'services.read',
     'shifts.manage',
+    'shifts.oversee',
   ],
   [UserRole.PATIENT]: [],
 };

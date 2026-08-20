@@ -18,7 +18,22 @@
     "actualCash": "Kassadagi haqiqiy naqd",
     "note": "Izoh",
     "closeSuccess": "Smena yopildi",
-    "expenseOut": "Chiqim"
+    "expenseOut": "Chiqim",
+    "cashDeposits": "Depozit",
+    "transferRefunds": "Qaytarilgan",
+    "otherDrawers": "Bu filialda yana {count} ta kassa ochiq. Yuqoridagi raqamlar faqat sizniki.",
+    "closedButOthers": "Sizda ochiq kassa yo‘q. Bu filialda boshqa {count} ta kassa ochiq.",
+    "secondDrawerHint": "Alohida kassa ochsangiz, siz faqat o‘zingiz qabul qilgan pulni ko‘rasiz. Klinikaning umumiy summasi «Kassa nazorati» sahifasida.",
+    "openAnyway": "Baribir ochish",
+    "loadFailedTitle": "Kassa ma’lumoti yuklanmadi",
+    "loadFailedDesc": "Bu kassangiz yopiq degani emas. Qayta urinib ko‘ring.",
+    "retry": "Qayta urinish",
+    "transferExpected": "Tizim bo‘yicha",
+    "actualTransfer": "Terminal / ilova hisoboti bo‘yicha",
+    "actualTransferPlaceholder": "Sverkadagi summa",
+    "transferUnchecked": "Terminal ma’lumoti yo‘q",
+    "transferReason": "Sababi",
+    "transferReasonPlaceholder": "Nega tekshirib bo‘lmadi"
   },
   "report": {
     "title": "Smena hisoboti (X/Z)",
@@ -35,7 +50,12 @@
     "amount": "Summa",
     "print": "Chop etish",
     "done": "Yopish",
-    "expenseOut": "Chiqim"
+    "expenseOut": "Chiqim",
+    "transferIn": "O‘tkazma tushum",
+    "expectedTransfer": "Tizim bo‘yicha",
+    "actualTransfer": "Terminal bo‘yicha",
+    "transferDifference": "Farq — tekshirish kerak",
+    "transferNotChecked": "Tekshirilmadi"
   },
   "tabs": {
     "pending": "To'lov kutilmoqda",
@@ -62,13 +82,42 @@
     "amount": "Summa",
     "note": "Izoh",
     "submit": "Depozit qo'shish",
-    "success": "Depozit qabul qilindi. Yangi balans: {balance}"
+    "success": "Depozit qabul qilindi. Yangi balans: {balance}",
+    "method": "To‘lov turi"
   },
   "registers": {
     "cash": "Naqd kassa",
     "transfer": "O'tkazma kassa",
     "inDrawer": "Kassada (kutilayotgan naqd)",
     "received": "Smena davomida qabul qilindi",
-    "noTransfer": "Hozircha o'tkazma to'lovlar yo'q"
+    "noTransfer": "Hozircha o'tkazma to'lovlar yo'q",
+    "myCash": "Mening kassam — {name}",
+    "throughShift": "Smena davomida o‘tgan",
+    "openingTransfer": "Boshlang‘ich qoldiq",
+    "transferHint": "O‘tkazma kassa har smenada 0 dan boshlanadi — pul bankda, qo‘lda emas."
+  },
+  "payments": {
+    "title": "Shu smenada qabul qilingan to‘lovlar",
+    "count": "{count} ta",
+    "voided": "Bekor qilingan",
+    "showAll": "Hammasini ko‘rsatish ({count})",
+    "showLess": "Yig‘ish"
+  },
+  "overview": {
+    "title": "Kassa nazorati",
+    "description": "Filialdagi barcha ochiq kassalar va klinikaning umumiy summasi.",
+    "noneOpen": "Hozir ochiq kassa yo‘q.",
+    "totalCash": "Naqd — jami",
+    "totalCashHint": "Barcha ochiq kassalardagi kutilayotgan naqd",
+    "totalTransfer": "O‘tkazma — jami",
+    "totalTransferHint": "Smenalar davomida o‘tgan karta va onlayn to‘lovlar",
+    "openDrawers": "Ochiq kassalar",
+    "openDrawersHint": "Hozir javobgar xodimlar soni",
+    "cashier": "Kassir",
+    "openedAt": "Ochilgan",
+    "cash": "Naqd",
+    "transfer": "O‘tkazma",
+    "unattached": "Bugungi onlayn to‘lovlar (kassasiz)",
+    "unattachedHint": "Bemor ilovadan to‘lagan — hech kim qabul qilmagan, shuning uchun hech qaysi kassaga tegishli emas."
   }
 }

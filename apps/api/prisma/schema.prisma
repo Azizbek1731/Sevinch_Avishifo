@@ -268,17 +268,17 @@ enum StockMovementType {
 // ============================================================ PLATFORM (no clinicId)
 
 model SubscriptionPlan {
-  id            String   @id @default(uuid(7))
-  code          String   @unique // starter | standard | pro
-  name          String
-  priceMonthly  Decimal  @db.Decimal(14, 2)
-  maxBranches   Int      @default(1)
-  maxUsers      Int      @default(10)
+  id           String   @id @default(uuid(7))
+  code         String   @unique // starter | standard | pro
+  name         String
+  priceMonthly Decimal  @db.Decimal(14, 2)
+  maxBranches  Int      @default(1)
+  maxUsers     Int      @default(10)
   /// Enabled module keys, e.g. ["lab","portal","telegram","analytics"]
-  modules       String[]
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+  modules      String[]
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
 
   subscriptions ClinicSubscription[]
 }
@@ -312,12 +312,12 @@ model FeatureFlag {
 
 /// ICD-10 directory — global, read-only for tenants.
 model Icd10Code {
-  id       String  @id @default(uuid(7))
-  code     String  @unique // e.g. "J06.9"
-  nameUz   String
-  nameRu   String
-  nameEn   String?
-  chapter  String?
+  id      String  @id @default(uuid(7))
+  code    String  @unique // e.g. "J06.9"
+  nameUz  String
+  nameRu  String
+  nameEn  String?
+  chapter String?
 
   diagnoses Diagnosis[]
 }
@@ -325,29 +325,29 @@ model Icd10Code {
 // ============================================================ TENANT ROOT
 
 model Clinic {
-  id             String       @id @default(uuid(7))
-  name           String
-  legalName      String?
+  id            String       @id @default(uuid(7))
+  name          String
+  legalName     String?
   /// INN/STIR tax id
-  taxId          String?
-  logoUrl        String?
-  phone          String?
-  email          String?
-  address        String?
-  defaultLocale  Locale       @default(uz)
-  smsSenderName  String?
-  status         ClinicStatus @default(ACTIVE)
+  taxId         String?
+  logoUrl       String?
+  phone         String?
+  email         String?
+  address       String?
+  defaultLocale Locale       @default(uz)
+  smsSenderName String?
+  status        ClinicStatus @default(ACTIVE)
   /// Free-form clinic settings: queue behavior, invoice numbering format,
   /// VAT settings, visit lock hours, doctor patient-access mode, etc.
-  settings       Json         @default("{}")
-  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime     @updatedAt @db.Timestamptz(6)
+  settings      Json         @default("{}")
+  createdAt     DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime     @updatedAt @db.Timestamptz(6)
 
-  branches        Branch[]
-  users           User[]
-  subscriptions   ClinicSubscription[]
-  featureFlags    FeatureFlag[]
-  counters        ClinicCounter[]
+  branches      Branch[]
+  users         User[]
+  subscriptions ClinicSubscription[]
+  featureFlags  FeatureFlag[]
+  counters      ClinicCounter[]
 }
 
 /// Per-clinic named counters (mrn, invoice number, ...) incremented transactionally.
@@ -405,41 +405,41 @@ model Room {
 // ============================================================ USERS & STAFF
 
 model User {
-  id           String     @id @default(uuid(7))
+  id                  String     @id @default(uuid(7))
   /// null only for SUPER_ADMIN (platform scope)
-  clinicId     String?
-  phone        String?
-  email        String?
-  passwordHash String?
-  fullName     String
-  avatarUrl    String?
-  role         UserRole
-  status       UserStatus @default(ACTIVE)
-  locale       Locale     @default(uz)
+  clinicId            String?
+  phone               String?
+  email               String?
+  passwordHash        String?
+  fullName            String
+  avatarUrl           String?
+  role                UserRole
+  status              UserStatus @default(ACTIVE)
+  locale              Locale     @default(uz)
   /// { "grant": ["x.y"], "revoke": ["a.b"] }
-  permissionOverrides Json @default("{}")
+  permissionOverrides Json       @default("{}")
   /// For PATIENT-role users: link to the patient card
-  patientId    String?    @unique
+  patientId           String?    @unique
   /// Telegram binding for STAFF and SUPER_ADMIN (patients bind via PortalAccount
   /// / TelegramLink instead). One chat serves at most one staff identity.
-  telegramChatId   String?   @unique
-  telegramUsername String?
-  telegramLinkedAt DateTime? @db.Timestamptz(6)
+  telegramChatId      String?    @unique
+  telegramUsername    String?
+  telegramLinkedAt    DateTime?  @db.Timestamptz(6)
   /// Opt-in second factor: after the password, a code is sent to the linked
   /// Telegram chat. Ignored while telegramChatId is null — a user can never be
   /// locked out by enabling this before linking.
-  twoFactorEnabled Boolean   @default(false)
-  failedLoginCount Int    @default(0)
-  lockedUntil  DateTime?  @db.Timestamptz(6)
-  createdAt    DateTime   @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime   @updatedAt @db.Timestamptz(6)
-  deletedAt    DateTime?  @db.Timestamptz(6)
+  twoFactorEnabled    Boolean    @default(false)
+  failedLoginCount    Int        @default(0)
+  lockedUntil         DateTime?  @db.Timestamptz(6)
+  createdAt           DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime   @updatedAt @db.Timestamptz(6)
+  deletedAt           DateTime?  @db.Timestamptz(6)
 
-  clinic        Clinic?        @relation(fields: [clinicId], references: [id])
-  patient       Patient?       @relation(fields: [patientId], references: [id])
-  staffProfile  StaffProfile?
-  branches      UserBranch[]
-  sessions      AuthSession[]
+  clinic       Clinic?       @relation(fields: [clinicId], references: [id])
+  patient      Patient?      @relation(fields: [patientId], references: [id])
+  staffProfile StaffProfile?
+  branches     UserBranch[]
+  sessions     AuthSession[]
 
   doctorSchedules     DoctorSchedule[]
   scheduleExceptions  ScheduleException[]
@@ -461,21 +461,21 @@ model User {
 }
 
 model StaffProfile {
-  id         String    @id @default(uuid(7))
-  clinicId   String
-  userId     String    @unique
-  specialty  String?
-  licenseNo  String?
-  hireDate   DateTime? @db.Timestamptz(6)
-  photoUrl   String?
-  bio        String?
+  id            String    @id @default(uuid(7))
+  clinicId      String
+  userId        String    @unique
+  specialty     String?
+  licenseNo     String?
+  hireDate      DateTime? @db.Timestamptz(6)
+  photoUrl      String?
+  bio           String?
   /// Default appointment slot length in minutes (overrides service duration)
-  slotMinutes Int?
+  slotMinutes   Int?
   /// Doctor's default consultation room — shown on the queue board and used as
   /// the room when the doctor calls the next patient without picking one.
   defaultRoomId String?
-  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt  DateTime  @updatedAt @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
 
   user        User  @relation(fields: [userId], references: [id])
   defaultRoom Room? @relation("StaffDefaultRoom", fields: [defaultRoomId], references: [id])
@@ -516,14 +516,14 @@ model AuthSession {
 
 /// Phone OTP codes (portal login/registration, password reset).
 model OtpCode {
-  id        String   @id @default(uuid(7))
+  id        String    @id @default(uuid(7))
   phone     String
   codeHash  String
   purpose   String // portal_login | portal_register | password_reset
-  attempts  Int      @default(0)
-  expiresAt DateTime @db.Timestamptz(6)
+  attempts  Int       @default(0)
+  expiresAt DateTime  @db.Timestamptz(6)
   usedAt    DateTime? @db.Timestamptz(6)
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
 
   @@index([phone, purpose])
 }
@@ -534,27 +534,27 @@ model OtpCode {
 /// Verification state is persisted here (phoneVerifiedAt) instead of only in a
 /// short-lived token, so a "registered" patient is a first-class concept.
 model PortalAccount {
-  id               String    @id @default(uuid(7))
-  phone            String    @unique
-  firstName        String?
-  lastName         String?
-  email            String?
-  dob              DateTime? @db.Date
-  gender           Gender?
-  preferredLocale  Locale    @default(uz)
-  phoneVerifiedAt  DateTime? @db.Timestamptz(6)
+  id                 String    @id @default(uuid(7))
+  phone              String    @unique
+  firstName          String?
+  lastName           String?
+  email              String?
+  dob                DateTime? @db.Date
+  gender             Gender?
+  preferredLocale    Locale    @default(uz)
+  phoneVerifiedAt    DateTime? @db.Timestamptz(6)
   /// Linked Telegram chat (bound via web deep-link token or in-bot contact share).
-  telegramChatId   String?   @unique
-  telegramUsername String?
-  telegramLinkedAt DateTime? @db.Timestamptz(6)
+  telegramChatId     String?   @unique
+  telegramUsername   String?
+  telegramLinkedAt   DateTime? @db.Timestamptz(6)
   /// Notification opt-ins (per event family).
-  notifyAppointments Boolean @default(true)
-  notifyResults      Boolean @default(true)
-  notifyPayments     Boolean @default(true)
-  notifyPromos       Boolean @default(false)
-  lastLoginAt      DateTime? @db.Timestamptz(6)
-  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt        DateTime  @updatedAt @db.Timestamptz(6)
+  notifyAppointments Boolean   @default(true)
+  notifyResults      Boolean   @default(true)
+  notifyPayments     Boolean   @default(true)
+  notifyPromos       Boolean   @default(false)
+  lastLoginAt        DateTime? @db.Timestamptz(6)
+  createdAt          DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @db.Timestamptz(6)
 }
 
 /// Short-lived token that links a Telegram chat to a portal account from the
@@ -575,38 +575,38 @@ model PortalLinkToken {
 // ============================================================ PATIENTS
 
 model Patient {
-  id            String      @id @default(uuid(7))
-  clinicId      String
+  id                String     @id @default(uuid(7))
+  clinicId          String
   /// Auto number per clinic, e.g. "P-000123"
-  mrn           String
-  firstName     String
-  lastName      String
-  middleName    String?
+  mrn               String
+  firstName         String
+  lastName          String
+  middleName        String?
   /// Denormalized "lastName firstName middleName" for trigram search
-  fullName      String
-  dob           DateTime?   @db.Date
-  gender        Gender?
-  phone         String?
-  phoneAlt      String?
-  address       String?
-  passportId    String?
-  bloodGroup    BloodGroup  @default(UNKNOWN)
+  fullName          String
+  dob               DateTime?  @db.Date
+  gender            Gender?
+  phone             String?
+  phoneAlt          String?
+  address           String?
+  passportId        String?
+  bloodGroup        BloodGroup @default(UNKNOWN)
   /// [{ name: "Penicillin", severity: "high", note: "" }]
-  allergies     Json        @default("[]")
+  allergies         Json       @default("[]")
   /// ["Diabetes type 2", ...]
-  chronicConditions Json    @default("[]")
-  notes         String?
-  photoUrl      String?
-  source        String?
-  tags          String[]
+  chronicConditions Json       @default("[]")
+  notes             String?
+  photoUrl          String?
+  source            String?
+  tags              String[]
   /// Patient reliability: no-show counters
-  noShowCount   Int         @default(0)
-  visitCount    Int         @default(0)
+  noShowCount       Int        @default(0)
+  visitCount        Int        @default(0)
   /// Current balance: positive = advance/deposit, negative = debt
-  balance       Decimal     @default(0) @db.Decimal(14, 2)
-  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime    @updatedAt @db.Timestamptz(6)
-  deletedAt     DateTime?   @db.Timestamptz(6)
+  balance           Decimal    @default(0) @db.Decimal(14, 2)
+  createdAt         DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime   @updatedAt @db.Timestamptz(6)
+  deletedAt         DateTime?  @db.Timestamptz(6)
 
   user                User?
   documents           PatientDocument[]
@@ -627,17 +627,17 @@ model Patient {
 }
 
 model PatientDocument {
-  id         String           @id @default(uuid(7))
-  clinicId   String
-  patientId  String
-  category   DocumentCategory @default(OTHER)
-  title      String
-  fileKey    String // storage path: {clinicId}/patients/{uuid}
-  fileName   String
-  mimeType   String
-  sizeBytes  Int
+  id           String           @id @default(uuid(7))
+  clinicId     String
+  patientId    String
+  category     DocumentCategory @default(OTHER)
+  title        String
+  fileKey      String // storage path: {clinicId}/patients/{uuid}
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
   uploadedById String?
-  createdAt  DateTime         @default(now()) @db.Timestamptz(6)
+  createdAt    DateTime         @default(now()) @db.Timestamptz(6)
 
   patient Patient @relation(fields: [patientId], references: [id])
 
@@ -732,26 +732,26 @@ model ScheduleException {
 }
 
 model Appointment {
-  id            String            @id @default(uuid(7))
-  clinicId      String
-  branchId      String
-  patientId     String
-  doctorUserId  String
-  roomId        String?
-  startAt       DateTime          @db.Timestamptz(6)
-  endAt         DateTime          @db.Timestamptz(6)
-  status        AppointmentStatus @default(SCHEDULED)
-  note          String?
+  id               String            @id @default(uuid(7))
+  clinicId         String
+  branchId         String
+  patientId        String
+  doctorUserId     String
+  roomId           String?
+  startAt          DateTime          @db.Timestamptz(6)
+  endAt            DateTime          @db.Timestamptz(6)
+  status           AppointmentStatus @default(SCHEDULED)
+  note             String?
   /// Recurring course grouping (e.g. physiotherapy 10 sessions)
   recurringGroupId String?
-  createdById   String?
-  cancelledReason String?
-  createdAt     DateTime          @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime          @updatedAt @db.Timestamptz(6)
+  createdById      String?
+  cancelledReason  String?
+  createdAt        DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime          @updatedAt @db.Timestamptz(6)
 
-  patient   Patient @relation(fields: [patientId], references: [id])
-  doctor    User    @relation("DoctorAppointments", fields: [doctorUserId], references: [id])
-  createdBy User?   @relation("AppointmentCreator", fields: [createdById], references: [id])
+  patient   Patient              @relation(fields: [patientId], references: [id])
+  doctor    User                 @relation("DoctorAppointments", fields: [doctorUserId], references: [id])
+  createdBy User?                @relation("AppointmentCreator", fields: [createdById], references: [id])
   services  AppointmentService[]
   ticket    QueueTicket?
   visit     Visit?
@@ -834,31 +834,31 @@ model QueueTicket {
 // ============================================================ VISITS / EHR (M6)
 
 model Visit {
-  id            String      @id @default(uuid(7))
-  clinicId      String
-  branchId      String
-  patientId     String
-  doctorUserId  String
-  appointmentId String?     @unique
-  ticketId      String?     @unique
-  status        VisitStatus @default(IN_PROGRESS)
+  id             String      @id @default(uuid(7))
+  clinicId       String
+  branchId       String
+  patientId      String
+  doctorUserId   String
+  appointmentId  String?     @unique
+  ticketId       String?     @unique
+  status         VisitStatus @default(IN_PROGRESS)
   // SOAP
-  subjective    String?
-  objective     String?
+  subjective     String?
+  objective      String?
   assessmentNote String?
-  plan          String?
-  startedAt     DateTime    @default(now()) @db.Timestamptz(6)
-  completedAt   DateTime?   @db.Timestamptz(6)
+  plan           String?
+  startedAt      DateTime    @default(now()) @db.Timestamptz(6)
+  completedAt    DateTime?   @db.Timestamptz(6)
   /// completedAt + clinic.visitLockHours → read-only; edits become amendments
-  lockedAt      DateTime?   @db.Timestamptz(6)
-  nextVisitAt   DateTime?   @db.Timestamptz(6)
-  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime    @updatedAt @db.Timestamptz(6)
+  lockedAt       DateTime?   @db.Timestamptz(6)
+  nextVisitAt    DateTime?   @db.Timestamptz(6)
+  createdAt      DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime    @updatedAt @db.Timestamptz(6)
 
-  patient       Patient       @relation(fields: [patientId], references: [id])
-  doctor        User          @relation("DoctorVisits", fields: [doctorUserId], references: [id])
-  appointment   Appointment?  @relation(fields: [appointmentId], references: [id])
-  ticket        QueueTicket?  @relation(fields: [ticketId], references: [id])
+  patient       Patient          @relation(fields: [patientId], references: [id])
+  doctor        User             @relation("DoctorVisits", fields: [doctorUserId], references: [id])
+  appointment   Appointment?     @relation(fields: [appointmentId], references: [id])
+  ticket        QueueTicket?     @relation(fields: [ticketId], references: [id])
   vitals        VisitVital?
   diagnoses     Diagnosis[]
   prescriptions Prescription[]
@@ -874,31 +874,31 @@ model Visit {
 }
 
 model VisitVital {
-  id          String  @id @default(uuid(7))
-  clinicId    String
-  visitId     String  @unique
-  heightCm    Float?
-  weightKg    Float?
-  bpSystolic  Int?
-  bpDiastolic Int?
-  pulseBpm    Int?
+  id           String   @id @default(uuid(7))
+  clinicId     String
+  visitId      String   @unique
+  heightCm     Float?
+  weightKg     Float?
+  bpSystolic   Int?
+  bpDiastolic  Int?
+  pulseBpm     Int?
   temperatureC Float?
-  spo2        Int?
-  note        String?
+  spo2         Int?
+  note         String?
   recordedById String?
-  recordedAt  DateTime @default(now()) @db.Timestamptz(6)
+  recordedAt   DateTime @default(now()) @db.Timestamptz(6)
 
   visit Visit @relation(fields: [visitId], references: [id], onDelete: Cascade)
 }
 
 model Diagnosis {
-  id          String   @id @default(uuid(7))
-  clinicId    String
-  visitId     String
-  icd10Id     String
-  isPrimary   Boolean  @default(false)
-  note        String?
-  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  id        String   @id @default(uuid(7))
+  clinicId  String
+  visitId   String
+  icd10Id   String
+  isPrimary Boolean  @default(false)
+  note      String?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
 
   visit Visit     @relation(fields: [visitId], references: [id], onDelete: Cascade)
   icd10 Icd10Code @relation(fields: [icd10Id], references: [id])
@@ -926,12 +926,12 @@ model Prescription {
 
 /// Drug autocomplete directory: global rows (clinicId null) + clinic-added rows.
 model DrugDirectory {
-  id        String  @id @default(uuid(7))
-  clinicId  String?
-  name      String
-  form      String? // tabletka, sirop...
-  strength  String? // "500 mg"
-  isActive  Boolean @default(true)
+  id       String  @id @default(uuid(7))
+  clinicId String?
+  name     String
+  form     String? // tabletka, sirop...
+  strength String? // "500 mg"
+  isActive Boolean @default(true)
 
   prescriptions Prescription[]
 
@@ -939,19 +939,19 @@ model DrugDirectory {
 }
 
 model Referral {
-  id            String       @id @default(uuid(7))
-  clinicId      String
-  visitId       String
-  type          ReferralType
+  id                 String       @id @default(uuid(7))
+  clinicId           String
+  visitId            String
+  type               ReferralType
   /// SPECIALIST: target specialty / doctor
-  targetSpecialty String?
+  targetSpecialty    String?
   targetDoctorUserId String?
   /// LAB: created lab order
-  labOrderId    String?      @unique
+  labOrderId         String?      @unique
   /// draft appointment created from referral
-  appointmentId String?
-  note          String?
-  createdAt     DateTime     @default(now()) @db.Timestamptz(6)
+  appointmentId      String?
+  note               String?
+  createdAt          DateTime     @default(now()) @db.Timestamptz(6)
 
   visit Visit @relation(fields: [visitId], references: [id], onDelete: Cascade)
 
@@ -959,15 +959,15 @@ model Referral {
 }
 
 model VisitTemplate {
-  id         String   @id @default(uuid(7))
-  clinicId   String
-  specialty  String?
-  name       String
+  id        String   @id @default(uuid(7))
+  clinicId  String
+  specialty String?
+  name      String
   /// Pre-filled SOAP fields { subjective, objective, plan }
-  content    Json     @default("{}")
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+  content   Json     @default("{}")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
   @@index([clinicId, specialty])
 }
@@ -1072,18 +1072,18 @@ model PackageItem {
 }
 
 model DiscountRule {
-  id           String       @id @default(uuid(7))
-  clinicId     String
-  name         String
-  type         DiscountType
-  value        Decimal      @db.Decimal(14, 2) // percent (0-100) or fixed amount
+  id         String       @id @default(uuid(7))
+  clinicId   String
+  name       String
+  type       DiscountType
+  value      Decimal      @db.Decimal(14, 2) // percent (0-100) or fixed amount
   /// Applies automatically for patients with this tag (e.g. VIP)
-  patientTag   String?
-  promoCode    String?
+  patientTag String?
+  promoCode  String?
   /// Max discount percent a role may grant manually
-  maxForRole   Json         @default("{}")
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now()) @db.Timestamptz(6)
+  maxForRole Json         @default("{}")
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now()) @db.Timestamptz(6)
 
   @@index([clinicId, promoCode])
 }
@@ -1091,23 +1091,23 @@ model DiscountRule {
 // ============================================================ BILLING (M8)
 
 model Invoice {
-  id           String        @id @default(uuid(7))
-  clinicId     String
-  branchId     String
+  id            String        @id @default(uuid(7))
+  clinicId      String
+  branchId      String
   /// e.g. "INV-2026-000123" per clinic settings format
-  number       String
-  patientId    String
-  visitId      String?
-  status       InvoiceStatus @default(DRAFT)
-  subtotal     Decimal       @default(0) @db.Decimal(14, 2)
-  discountTotal Decimal      @default(0) @db.Decimal(14, 2)
-  total        Decimal       @default(0) @db.Decimal(14, 2)
-  paidTotal    Decimal       @default(0) @db.Decimal(14, 2)
-  note         String?
-  issuedAt     DateTime?     @db.Timestamptz(6)
-  createdById  String?
-  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime      @updatedAt @db.Timestamptz(6)
+  number        String
+  patientId     String
+  visitId       String?
+  status        InvoiceStatus @default(DRAFT)
+  subtotal      Decimal       @default(0) @db.Decimal(14, 2)
+  discountTotal Decimal       @default(0) @db.Decimal(14, 2)
+  total         Decimal       @default(0) @db.Decimal(14, 2)
+  paidTotal     Decimal       @default(0) @db.Decimal(14, 2)
+  note          String?
+  issuedAt      DateTime?     @db.Timestamptz(6)
+  createdById   String?
+  createdAt     DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(6)
 
   patient  Patient       @relation(fields: [patientId], references: [id])
   visit    Visit?        @relation(fields: [visitId], references: [id])
@@ -1122,16 +1122,16 @@ model Invoice {
 }
 
 model InvoiceLine {
-  id         String  @id @default(uuid(7))
-  clinicId   String
-  invoiceId  String
-  serviceId  String?
+  id              String  @id @default(uuid(7))
+  clinicId        String
+  invoiceId       String
+  serviceId       String?
   /// Snapshot of the name at billing time { uz, ru, en } or plain string
-  title      Json
-  quantity   Int     @default(1)
-  unitPrice  Decimal @db.Decimal(14, 2)
-  discount   Decimal @default(0) @db.Decimal(14, 2)
-  lineTotal  Decimal @db.Decimal(14, 2)
+  title           Json
+  quantity        Int     @default(1)
+  unitPrice       Decimal @db.Decimal(14, 2)
+  discount        Decimal @default(0) @db.Decimal(14, 2)
+  lineTotal       Decimal @db.Decimal(14, 2)
   /// Doctor who performed the service (for KPI/commission)
   performerUserId String?
 
@@ -1170,63 +1170,102 @@ model Payment {
   @@unique([clinicId, idempotencyKey])
   @@index([clinicId, branchId, paidAt])
   @@index([clinicId, invoiceId])
+  /// Non-cash rows are fetched by shift now too, not just cash ones.
+  @@index([shiftId, method, status])
 }
 
 model Refund {
-  id          String   @id @default(uuid(7))
-  clinicId    String
-  invoiceId   String
-  amount      Decimal  @db.Decimal(14, 2)
-  method      PaymentMethod
-  reason      String
-  shiftId     String?
+  id           String        @id @default(uuid(7))
+  clinicId     String
+  invoiceId    String
+  amount       Decimal       @db.Decimal(14, 2)
+  method       PaymentMethod
+  reason       String
+  shiftId      String?
   approvedById String?
-  createdById String?
-  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  createdById  String?
+  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
 
   invoice Invoice       @relation(fields: [invoiceId], references: [id])
   shift   CashierShift? @relation(fields: [shiftId], references: [id])
 
   @@index([clinicId, invoiceId])
+  @@index([shiftId, method])
 }
 
 /// Patient advance/deposit & debt ledger. balance on Patient is the cached sum.
 model PatientBalanceTransaction {
-  id        String                 @id @default(uuid(7))
-  clinicId  String
-  patientId String
-  type      BalanceTransactionType
+  id          String                 @id @default(uuid(7))
+  clinicId    String
+  patientId   String
+  type        BalanceTransactionType
   /// Positive = credit to patient balance, negative = debit
-  amount    Decimal                @db.Decimal(14, 2)
-  invoiceId String?
-  note      String?
+  amount      Decimal                @db.Decimal(14, 2)
+  invoiceId   String?
+  note        String?
   createdById String?
-  createdAt DateTime               @default(now()) @db.Timestamptz(6)
+  createdAt   DateTime               @default(now()) @db.Timestamptz(6)
 
-  patient Patient @relation(fields: [patientId], references: [id])
+  /// Which drawer this money landed in, and how it arrived.
+  ///
+  /// Taking a deposit has always required an open shift, precisely because the
+  /// cash goes into that drawer — but nothing recorded WHICH drawer, so the
+  /// register closed over by the deposit amount every time. NULL on rows that
+  /// move no money at the desk (applying a balance to an invoice, an
+  /// adjustment, a refund credit) and on every row written before this field
+  /// existed.
+  shiftId String?
+  method  PaymentMethod?
+
+  patient Patient       @relation(fields: [patientId], references: [id])
+  shift   CashierShift? @relation(fields: [shiftId], references: [id])
 
   @@index([clinicId, patientId, createdAt])
+  @@index([clinicId, shiftId])
 }
 
 model CashierShift {
-  id           String             @id @default(uuid(7))
-  clinicId     String
-  branchId     String
+  id            String             @id @default(uuid(7))
+  clinicId      String
+  branchId      String
   cashierUserId String
-  status       CashierShiftStatus @default(OPEN)
-  openedAt     DateTime           @default(now()) @db.Timestamptz(6)
-  closedAt     DateTime?          @db.Timestamptz(6)
-  openingCash  Decimal            @default(0) @db.Decimal(14, 2)
-  expectedCash Decimal?           @db.Decimal(14, 2)
-  actualCash   Decimal?           @db.Decimal(14, 2)
-  note         String?
+  status        CashierShiftStatus @default(OPEN)
+  openedAt      DateTime           @default(now()) @db.Timestamptz(6)
+  closedAt      DateTime?          @db.Timestamptz(6)
+  openingCash   Decimal            @default(0) @db.Decimal(14, 2)
+  expectedCash  Decimal?           @db.Decimal(14, 2)
+  actualCash    Decimal?           @db.Decimal(14, 2)
+  note          String?
 
-  cashier  User      @relation(fields: [cashierUserId], references: [id])
-  payments Payment[]
-  refunds  Refund[]
-  expenses Expense[]
+  /// --- O'tkazma kassa: a TURNOVER register, not a balance register. ---
+  /// There is deliberately no openingTransfer. Transfer money sits in the
+  /// clinic's bank and PSP accounts, never in anyone's hands, so there is no
+  /// float to hand over at shift change and nothing an opening figure could
+  /// honestly refer to. The register starts every shift at zero.
+  ///
+  /// What our own ledger says was routed through the acquiring channels during
+  /// this shift. NULL on shifts closed before this existed.
+  expectedTransfer         Decimal? @db.Decimal(14, 2)
+  /// What the terminal sverka and the PSP cabinets actually reported. NULL
+  /// means nobody checked, which is an honest answer. A gap here is a
+  /// RECORDING error, never a shortage — nobody can be short of money they
+  /// never held.
+  actualTransfer           Decimal? @db.Decimal(14, 2)
+  /// Set exactly when the shift was closed without a transfer count. Kept so
+  /// the exception is visible to management instead of being absorbed.
+  transferUnverifiedReason String?
+  /// Who pressed close. Normally the cashier; differs when a supervisor closes
+  /// a drawer that was left open.
+  closedById               String?
+
+  cashier             User                        @relation(fields: [cashierUserId], references: [id])
+  payments            Payment[]
+  refunds             Refund[]
+  expenses            Expense[]
+  balanceTransactions PatientBalanceTransaction[]
 
   @@index([clinicId, branchId, status])
+  @@index([clinicId, branchId, openedAt])
 }
 
 model ExpenseCategory {
@@ -1241,26 +1280,26 @@ model ExpenseCategory {
 }
 
 model Expense {
-  id         String   @id @default(uuid(7))
-  clinicId   String
-  branchId   String
-  categoryId String
-  amount     Decimal  @db.Decimal(14, 2)
+  id          String        @id @default(uuid(7))
+  clinicId    String
+  branchId    String
+  categoryId  String
+  amount      Decimal       @db.Decimal(14, 2)
   /// How the money left. CASH means it came out of a cashier's drawer, which is
   /// why those rows carry a shiftId — anything else left the clinic's account
   /// and the drawer never sees it.
-  method     PaymentMethod @default(CASH)
+  method      PaymentMethod @default(CASH)
   /// The drawer the cash came out of. Set only for CASH, and only ever to the
   /// recording user's own open shift, so the shift that has to be counted at
   /// closing time is the one that gets charged.
-  shiftId    String?
-  date       DateTime @db.Date
-  note       String?
+  shiftId     String?
+  date        DateTime      @db.Date
+  note        String?
   createdById String?
-  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  createdAt   DateTime      @default(now()) @db.Timestamptz(6)
   /// Recorded by mistake and withdrawn. Kept rather than deleted: a shift that
   /// already reconciled against this row must still be explainable afterwards.
-  deletedAt   DateTime? @db.Timestamptz(6)
+  deletedAt   DateTime?     @db.Timestamptz(6)
   deletedById String?
 
   category ExpenseCategory @relation(fields: [categoryId], references: [id])
@@ -1289,14 +1328,14 @@ model LabTest {
 }
 
 model LabTestParameter {
-  id        String  @id @default(uuid(7))
-  clinicId  String
-  labTestId String
-  name      String
-  unit      String?
+  id              String  @id @default(uuid(7))
+  clinicId        String
+  labTestId       String
+  name            String
+  unit            String?
   /// [{ gender?: "MALE"|"FEMALE", ageMinY?: n, ageMaxY?: n, low: n, high: n }]
-  referenceRanges Json @default("[]")
-  sortOrder Int     @default(0)
+  referenceRanges Json    @default("[]")
+  sortOrder       Int     @default(0)
 
   labTest LabTest          @relation(fields: [labTestId], references: [id], onDelete: Cascade)
   values  LabResultValue[]
@@ -1305,19 +1344,19 @@ model LabTestParameter {
 }
 
 model LabOrder {
-  id           String         @id @default(uuid(7))
-  clinicId     String
-  branchId     String
+  id          String         @id @default(uuid(7))
+  clinicId    String
+  branchId    String
   /// Barcode-friendly, e.g. "L-2026-000456"
-  orderNumber  String
-  patientId    String
-  visitId      String?
-  status       LabOrderStatus @default(ORDERED)
-  orderedById  String?
-  collectedAt  DateTime?      @db.Timestamptz(6)
-  deliveredAt  DateTime?      @db.Timestamptz(6)
-  createdAt    DateTime       @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime       @updatedAt @db.Timestamptz(6)
+  orderNumber String
+  patientId   String
+  visitId     String?
+  status      LabOrderStatus @default(ORDERED)
+  orderedById String?
+  collectedAt DateTime?      @db.Timestamptz(6)
+  deliveredAt DateTime?      @db.Timestamptz(6)
+  createdAt   DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime       @updatedAt @db.Timestamptz(6)
 
   patient Patient        @relation(fields: [patientId], references: [id])
   visit   Visit?         @relation(fields: [visitId], references: [id])
@@ -1329,7 +1368,7 @@ model LabOrder {
 }
 
 model LabOrderItem {
-  id        String   @id @default(uuid(7))
+  id        String @id @default(uuid(7))
   clinicId  String
   orderId   String
   labTestId String
@@ -1419,16 +1458,16 @@ model StockBatch {
 }
 
 model StockMovement {
-  id        String            @id @default(uuid(7))
-  clinicId  String
-  branchId  String
-  itemId    String
-  batchId   String?
-  type      StockMovementType
-  quantity  Decimal           @db.Decimal(14, 3)
-  note      String?
+  id          String            @id @default(uuid(7))
+  clinicId    String
+  branchId    String
+  itemId      String
+  batchId     String?
+  type        StockMovementType
+  quantity    Decimal           @db.Decimal(14, 3)
+  note        String?
   createdById String?
-  createdAt DateTime          @default(now()) @db.Timestamptz(6)
+  createdAt   DateTime          @default(now()) @db.Timestamptz(6)
 
   item InventoryItem @relation(fields: [itemId], references: [id])
 
@@ -1438,18 +1477,18 @@ model StockMovement {
 // ============================================================ PAYROLL / KPI (M11)
 
 model CompensationRule {
-  id           String           @id @default(uuid(7))
-  clinicId     String
-  doctorUserId String
-  type         CompensationType
+  id                String           @id @default(uuid(7))
+  clinicId          String
+  doctorUserId      String
+  type              CompensationType
   /// FIXED_SALARY: monthly amount; REVENUE_PERCENT: percent 0-100; PER_SERVICE_FEE: fee
-  value        Decimal          @db.Decimal(14, 2)
+  value             Decimal          @db.Decimal(14, 2)
   /// Restrict to a service category (null = all) — for PER_SERVICE_FEE / REVENUE_PERCENT
-  serviceId    String?
+  serviceId         String?
   serviceCategoryId String?
-  effectiveFrom DateTime        @db.Timestamptz(6)
-  effectiveTo  DateTime?        @db.Timestamptz(6)
-  createdAt    DateTime         @default(now()) @db.Timestamptz(6)
+  effectiveFrom     DateTime         @db.Timestamptz(6)
+  effectiveTo       DateTime?        @db.Timestamptz(6)
+  createdAt         DateTime         @default(now()) @db.Timestamptz(6)
 
   doctor  User     @relation(fields: [doctorUserId], references: [id])
   service Service? @relation(fields: [serviceId], references: [id])

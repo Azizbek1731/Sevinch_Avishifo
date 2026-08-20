@@ -18,7 +18,22 @@
     "actualCash": "Actual cash in drawer",
     "note": "Note",
     "closeSuccess": "Shift closed",
-    "expenseOut": "Expenses"
+    "expenseOut": "Expenses",
+    "cashDeposits": "Deposits",
+    "transferRefunds": "Refunds",
+    "otherDrawers": "{count} other register(s) are open in this branch. The figures above are only yours.",
+    "closedButOthers": "You have no register open. {count} other(s) are open in this branch.",
+    "secondDrawerHint": "Your own register shows only the money you take. The clinic total is on the Register oversight page.",
+    "openAnyway": "Open anyway",
+    "loadFailedTitle": "Could not load your register",
+    "loadFailedDesc": "This does not mean it is closed. Try again.",
+    "retry": "Retry",
+    "transferExpected": "Per our records",
+    "actualTransfer": "Per the terminal / app report",
+    "actualTransferPlaceholder": "Amount on the settlement",
+    "transferUnchecked": "No terminal figure available",
+    "transferReason": "Reason",
+    "transferReasonPlaceholder": "Why it could not be checked"
   },
   "report": {
     "title": "Shift report (X/Z)",
@@ -35,7 +50,12 @@
     "amount": "Amount",
     "print": "Print",
     "done": "Close",
-    "expenseOut": "Expenses"
+    "expenseOut": "Expenses",
+    "transferIn": "Transfer takings",
+    "expectedTransfer": "Per our records",
+    "actualTransfer": "Per the terminal",
+    "transferDifference": "Gap — needs checking",
+    "transferNotChecked": "Not checked"
   },
   "tabs": {
     "pending": "Awaiting payment",
@@ -62,13 +82,42 @@
     "amount": "Amount",
     "note": "Note",
     "submit": "Add deposit",
-    "success": "Deposit accepted. New balance: {balance}"
+    "success": "Deposit accepted. New balance: {balance}",
+    "method": "Paid by"
   },
   "registers": {
     "cash": "Cash register",
     "transfer": "Transfer register",
     "inDrawer": "In drawer (expected cash)",
     "received": "Received this shift",
-    "noTransfer": "No transfer payments yet"
+    "noTransfer": "No transfer payments yet",
+    "myCash": "My register — {name}",
+    "throughShift": "Through this shift",
+    "openingTransfer": "Opening balance",
+    "transferHint": "The transfer register starts every shift at zero — the money is at the bank, not in anyone’s hands."
+  },
+  "payments": {
+    "title": "Payments taken this shift",
+    "count": "{count}",
+    "voided": "Voided",
+    "showAll": "Show all ({count})",
+    "showLess": "Show less"
+  },
+  "overview": {
+    "title": "Register oversight",
+    "description": "Every open register in the branch, and the clinic total.",
+    "noneOpen": "No register is open right now.",
+    "totalCash": "Cash — total",
+    "totalCashHint": "Expected cash across every open register",
+    "totalTransfer": "Transfer — total",
+    "totalTransferHint": "Card and online taken during these shifts",
+    "openDrawers": "Open registers",
+    "openDrawersHint": "People answerable for money right now",
+    "cashier": "Cashier",
+    "openedAt": "Opened",
+    "cash": "Cash",
+    "transfer": "Transfer",
+    "unattached": "Online payments today (no register)",
+    "unattachedHint": "The patient paid in the app — nobody took it, so it belongs to no register."
   }
 }

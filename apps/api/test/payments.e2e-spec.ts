@@ -328,7 +328,9 @@ describe('billing: invoices, payments, shift (e2e)', () => {
       .post(`${API}/shifts/open`)
       .set('Authorization', `Bearer ${recep.accessToken}`)
       .set('x-branch-id', clinic.branchId)
-      .send({ openingCash: '0' });
+      // A second drawer in the same branch is legitimate — two windows at one
+      // reception — but it has to be deliberate.
+      .send({ openingCash: '0', confirmSecondDrawer: true });
     expect(shift.status).toBe(201);
 
     const res = await request(app.getHttpServer())
@@ -437,7 +439,7 @@ describe('billing: invoices, payments, shift (e2e)', () => {
       .post(`${API}/shifts/open`)
       .set('Authorization', `Bearer ${cashier.accessToken}`)
       .set('x-branch-id', clinic.branchId)
-      .send({ openingCash: '0' });
+      .send({ openingCash: '0', confirmSecondDrawer: true });
 
     const res = await request(app.getHttpServer())
       .post(`${API}/invoices/quick`)
@@ -526,7 +528,11 @@ describe('billing: invoices, payments, shift (e2e)', () => {
       .post(`${API}/shifts/close`)
       .set('Authorization', `Bearer ${cashier.accessToken}`)
       .set('x-branch-id', clinic.branchId)
-      .send({ actualCash: '0' });
+      // This drawer took card money earlier in the suite, so closing it now
+      // needs the transfer side answered — either a counted figure or a stated
+      // reason it could not be counted.
+      .send({ actualCash: '0', transferUnverifiedReason: 'Sinov' })
+      .expect(201);
 
     const before = await request(app.getHttpServer())
       .get(`${API}/patients/${patientId}`)
@@ -564,7 +570,7 @@ describe('billing: invoices, payments, shift (e2e)', () => {
       .post(`${API}/shifts/open`)
       .set('Authorization', `Bearer ${cashier.accessToken}`)
       .set('x-branch-id', clinic.branchId)
-      .send({ openingCash: '0' });
+      .send({ openingCash: '0', confirmSecondDrawer: true });
 
     const key = randomUUID();
     const body = {

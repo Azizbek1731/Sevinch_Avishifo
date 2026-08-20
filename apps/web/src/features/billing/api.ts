@@ -112,18 +112,64 @@ export interface CashierShift {
   openingCash: MoneyString;
   expectedCash: MoneyString | null;
   actualCash: MoneyString | null;
+  /** What our ledger says went through the acquiring channels this shift. */
+  expectedTransfer: MoneyString | null;
+  /** What the terminal and PSP cabinets reported. null = nobody checked. */
+  actualTransfer: MoneyString | null;
+  transferUnverifiedReason: string | null;
+  closedById: string | null;
   note: string | null;
 }
 
 export interface CurrentShift extends CashierShift {
+  open: true;
+  /** Whose drawer this is. The screen must say so — it never used to. */
+  cashier: { id: string; fullName: string };
+  /** How many other people hold a drawer in this branch right now. */
+  otherDrawers: number;
   cashIn: MoneyString;
+  /** Deposits taken in cash — they are in the drawer like any other note. */
+  cashDeposits: MoneyString;
   cashOut: MoneyString;
   /** Clinic spending taken out of this drawer — already deducted below. */
   expenseOut: MoneyString;
   expectedCashSoFar: MoneyString;
-  /** Non-cash ("o'tkazma") total received during the shift, and its breakdown. */
+  /** Card and online money routed through this drawer, net of refunds. */
   transferTotal: MoneyString;
+  transferRefunds: MoneyString;
   transferByMethod: Array<{ method: PaymentMethod; amount: MoneyString; count: number }>;
+}
+
+/** Returned instead of a shift when this user holds none but others do. */
+export interface NoDrawer {
+  open: false;
+  otherDrawers: number;
+}
+
+export interface ShiftPaymentRow {
+  id: string;
+  amount: MoneyString;
+  method: PaymentMethod;
+  status: 'COMPLETED' | 'VOIDED';
+  paidAt: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  patientName: string | null;
+}
+
+/** Every open register in the branch — the clinic-level view. */
+export interface RegistersOverview {
+  registers: Array<{
+    shiftId: string;
+    cashier: { id: string; fullName: string };
+    openedAt: string;
+    openingCash: MoneyString;
+    expectedCash: MoneyString;
+    transferTotal: MoneyString;
+  }>;
+  totals: { expectedCash: MoneyString; transferTotal: MoneyString; openDrawers: number };
+  /** Online money that arrived with nobody at the desk — no register owns it. */
+  unattachedOnlineToday: MoneyString;
 }
 
 export interface ShiftHistoryItem extends CashierShift {
@@ -133,11 +179,24 @@ export interface ShiftHistoryItem extends CashierShift {
 export interface ShiftReport {
   openingCash: MoneyString;
   cashIn: MoneyString;
+  cashDeposits: MoneyString;
   cashOut: MoneyString;
   expenseOut: MoneyString;
   expectedCash: MoneyString;
   actualCash: MoneyString;
   difference: MoneyString;
+
+  transferIn: MoneyString;
+  transferRefunds: MoneyString;
+  expectedTransfer: MoneyString;
+  actualTransfer: MoneyString | null;
+  /**
+   * Never a shortage — nobody can be short of money they never held. A gap here
+   * means our book and the acquirer's disagree and somebody has to look.
+   */
+  transferDifference: MoneyString | null;
+  transferUnverifiedReason: string | null;
+
   byMethod: Array<{ method: PaymentMethod; amount: MoneyString; count: number }>;
 }
 
@@ -239,7 +298,9 @@ export interface InvoiceListQuery {
 
 export const billingApi = {
   // shifts
-  currentShift: () => api.get<CurrentShift | null>('/shifts/current'),
+  currentShift: () => api.get<CurrentShift | NoDrawer | null>('/shifts/current'),
+  registersOverview: () => api.get<RegistersOverview>('/shifts/overview'),
+  currentShiftPayments: () => api.get<ShiftPaymentRow[]>('/shifts/current/payments'),
   openShift: (body: OpenShiftInput) => api.post<CurrentShift>('/shifts/open', body),
   closeShift: (body: CloseShiftInput) => api.post<CloseShiftResult>('/shifts/close', body),
   shiftHistory: (q: { branchId?: string; page?: number }) =>

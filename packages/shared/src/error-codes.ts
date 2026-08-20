@@ -56,6 +56,10 @@ export const ErrorCode = {
   PAYMENT_FAILED: 'PAYMENT_FAILED',
   PAYMENT_EXCEEDS_DUE: 'PAYMENT_EXCEEDS_DUE',
   SHIFT_NOT_OPEN: 'SHIFT_NOT_OPEN',
+  /** Someone else already holds an open drawer in this branch. */
+  BRANCH_DRAWER_ALREADY_OPEN: 'BRANCH_DRAWER_ALREADY_OPEN',
+  /** The transfer register had activity, so closing needs a counted figure or a stated reason. */
+  TRANSFER_COUNT_REQUIRED: 'TRANSFER_COUNT_REQUIRED',
   SHIFT_ALREADY_OPEN: 'SHIFT_ALREADY_OPEN',
   INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
   REFUND_EXCEEDS_PAID: 'REFUND_EXCEEDS_PAID',

@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
+  AlertTriangle,
   ArrowDownLeft,
   ArrowUpRight,
   Banknote,
@@ -14,6 +15,7 @@ import {
   Lock,
   LockOpen,
   Printer,
+  Users,
   Wallet,
 } from 'lucide-react';
 import {
@@ -24,9 +26,11 @@ import {
   type OpenShiftInput,
 } from '@avishifo/shared';
 import { formatTz } from '@/lib/dates';
+import { ApiError } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -47,9 +51,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { billingApi, sanitizeMoney, type CloseShiftResult } from '../api';
+import { billingApi, sanitizeMoney, type CloseShiftResult, type CurrentShift } from '../api';
 import { useApiErrorToast, usePermission } from '../hooks';
+import { ShiftPaymentsCard } from './shift-payments-card';
 
+/**
+ * The cashier's own two registers.
+ *
+ * Everything here describes ONE person's drawer, which is why the header now
+ * says whose. It used to be labelled "Naqd kassa" with no name on it, so a
+ * manager who opened a drawer of their own read their empty one as the clinic
+ * having taken nothing all day. The clinic-wide figure lives on its own screen.
+ */
 export function ShiftPanel() {
   const t = useTranslations('cashier');
   const tb = useTranslations('billing');
@@ -61,11 +74,17 @@ export function ShiftPanel() {
   const [openDlg, setOpenDlg] = useState(false);
   const [closeDlg, setCloseDlg] = useState(false);
   const [report, setReport] = useState<CloseShiftResult | null>(null);
+  /** Set when the branch already has a drawer open and we asked about it. */
+  const [otherHolder, setOtherHolder] = useState<string | null>(null);
+  const [transferUnchecked, setTransferUnchecked] = useState(false);
 
-  const { data: shift, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['shifts', 'current', activeBranchId],
     queryFn: async () => (await billingApi.currentShift()).data,
   });
+
+  const shift: CurrentShift | null = data && 'open' in data && data.open ? data : null;
+  const otherDrawers = data && 'otherDrawers' in data ? data.otherDrawers : 0;
 
   const openForm = useForm<OpenShiftInput>({
     resolver: zodResolver(openShiftSchema),
@@ -74,7 +93,7 @@ export function ShiftPanel() {
 
   const closeForm = useForm<CloseShiftInput>({
     resolver: zodResolver(closeShiftSchema),
-    defaultValues: { actualCash: '', note: '' },
+    defaultValues: { actualCash: '', actualTransfer: '', transferUnverifiedReason: '', note: '' },
   });
 
   const openMutation = useMutation({
@@ -82,9 +101,19 @@ export function ShiftPanel() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['shifts'] });
       setOpenDlg(false);
+      setOtherHolder(null);
       toast.success(t('shift.openSuccess'));
     },
-    onError: errorToast,
+    onError: (err: unknown) => {
+      // Somebody else is already holding a drawer here. Say who, and let them
+      // decide — opening a second one by accident is what caused the confusion
+      // this whole screen was rebuilt to prevent.
+      if (err instanceof ApiError && err.code === 'BRANCH_DRAWER_ALREADY_OPEN') {
+        setOtherHolder(err.message);
+        return;
+      }
+      errorToast(err);
+    },
   });
 
   const closeMutation = useMutation({
@@ -100,15 +129,34 @@ export function ShiftPanel() {
 
   const canManage = can('shifts.manage');
 
-  if (isLoading) {
-    return <Skeleton className="h-20 w-full" />;
+  if (isLoading) return <Skeleton className="h-20 w-full" />;
+
+  // A failed request used to render the reassuring "your register is closed"
+  // card — the screen actively stated the till was shut while it was open.
+  if (isError) {
+    return (
+      <Card className="border-destructive/40 bg-destructive/5">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+            <div>
+              <p className="font-semibold">{t('shift.loadFailedTitle')}</p>
+              <p className="text-sm text-muted-foreground">{t('shift.loadFailedDesc')}</p>
+            </div>
+          </div>
+          <Button variant="outline" onClick={() => void refetch()}>
+            {t('shift.retry')}
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
     <>
       {shift ? (
         <div className="space-y-3">
-          {/* Shift status strip */}
+          {/* Whose drawer, and since when. */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-success/40 bg-success/5 px-4 py-2.5">
             <div className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-success/15">
@@ -126,7 +174,13 @@ export function ShiftPanel() {
                 size="sm"
                 variant="destructive"
                 onClick={() => {
-                  closeForm.reset({ actualCash: '', note: '' });
+                  setTransferUnchecked(false);
+                  closeForm.reset({
+                    actualCash: '',
+                    actualTransfer: '',
+                    transferUnverifiedReason: '',
+                    note: '',
+                  });
                   setCloseDlg(true);
                 }}
               >
@@ -136,14 +190,20 @@ export function ShiftPanel() {
             ) : null}
           </div>
 
-          {/* Two registers: cash drawer vs non-cash transfers */}
+          {otherDrawers > 0 ? (
+            <div className="flex items-start gap-2.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+              <Users className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <span>{t('shift.otherDrawers', { count: otherDrawers })}</span>
+            </div>
+          ) : null}
+
           <div className="grid gap-3 sm:grid-cols-2">
-            {/* Naqd kassa */}
-            <Card className="border-emerald-500/30 bg-emerald-500/[0.04]">
+            {/* Naqd kassa — a real box with real notes in it. */}
+            <Card className="border-success/30 bg-success/[0.04]">
               <CardContent className="space-y-3 p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                <div className="flex items-center gap-2 text-sm font-semibold text-success">
                   <Banknote className="h-4 w-4" />
-                  {t('registers.cash')}
+                  {t('registers.myCash', { name: shift.cashier.fullName })}
                 </div>
                 <div>
                   <p className="text-3xl font-bold tabular-nums">
@@ -151,7 +211,7 @@ export function ShiftPanel() {
                   </p>
                   <p className="text-xs text-muted-foreground">{t('registers.inDrawer')}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-2 border-t pt-2 text-sm sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2 border-t pt-2 text-sm sm:grid-cols-3">
                   <div>
                     <p className="text-xs text-muted-foreground">{t('shift.openingCash')}</p>
                     <p className="font-medium tabular-nums">
@@ -165,6 +225,15 @@ export function ShiftPanel() {
                     </p>
                     <p className="font-medium tabular-nums text-emerald-600">
                       {formatUZS(shift.cashIn, { withCurrency: false })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Wallet className="h-3 w-3 text-emerald-600" />
+                      {t('shift.cashDeposits')}
+                    </p>
+                    <p className="font-medium tabular-nums text-emerald-600">
+                      {formatUZS(shift.cashDeposits, { withCurrency: false })}
                     </p>
                   </div>
                   <div>
@@ -189,7 +258,7 @@ export function ShiftPanel() {
               </CardContent>
             </Card>
 
-            {/* O'tkazma kassa */}
+            {/* O'tkazma kassa — a turnover register. The money is at the bank. */}
             <Card className="border-primary/30 bg-primary/[0.04]">
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-primary">
@@ -200,30 +269,45 @@ export function ShiftPanel() {
                   <p className="text-3xl font-bold tabular-nums">
                     {formatUZS(shift.transferTotal)}
                   </p>
-                  <p className="text-xs text-muted-foreground">{t('registers.received')}</p>
+                  <p className="text-xs text-muted-foreground">{t('registers.throughShift')}</p>
                 </div>
-                {shift.transferByMethod.length > 0 ? (
-                  <div className="space-y-1 border-t pt-2 text-sm">
-                    {shift.transferByMethod.map((row) => (
-                      <div key={row.method} className="flex items-center justify-between gap-2">
-                        <span className="text-muted-foreground">
-                          {tb(`methods.${row.method}`)}
-                          <span className="ml-1 text-xs">({row.count})</span>
-                        </span>
-                        <span className="font-medium tabular-nums">
-                          {formatUZS(row.amount, { withCurrency: false })}
-                        </span>
-                      </div>
-                    ))}
+                <div className="space-y-1 border-t pt-2 text-sm">
+                  {/* Shown, not hidden, so the register visibly opens and closes
+                      like the cash one — its start is simply always zero. */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {t('registers.openingTransfer')}
+                    </span>
+                    <span className="tabular-nums text-muted-foreground">0</span>
                   </div>
-                ) : (
-                  <p className="border-t pt-2 text-sm text-muted-foreground">
-                    {t('registers.noTransfer')}
-                  </p>
-                )}
+                  {shift.transferByMethod.map((row) => (
+                    <div key={row.method} className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">
+                        {tb(`methods.${row.method}`)} ({row.count})
+                      </span>
+                      <span className="font-medium tabular-nums">
+                        {formatUZS(row.amount, { withCurrency: false })}
+                      </span>
+                    </div>
+                  ))}
+                  {Number(shift.transferRefunds) > 0 ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">{t('shift.transferRefunds')}</span>
+                      <span className="font-medium tabular-nums text-destructive">
+                        −{formatUZS(shift.transferRefunds, { withCurrency: false })}
+                      </span>
+                    </div>
+                  ) : null}
+                  {shift.transferByMethod.length === 0 ? (
+                    <p className="text-muted-foreground">{t('registers.noTransfer')}</p>
+                  ) : null}
+                </div>
+                <p className="text-xs text-muted-foreground">{t('registers.transferHint')}</p>
               </CardContent>
             </Card>
           </div>
+
+          <ShiftPaymentsCard />
         </div>
       ) : (
         <Card className="border-warning/40 bg-warning/5">
@@ -234,13 +318,18 @@ export function ShiftPanel() {
               </div>
               <div>
                 <p className="font-semibold">{t('shift.closedTitle')}</p>
-                <p className="text-sm text-muted-foreground">{t('shift.closedDesc')}</p>
+                <p className="text-sm text-muted-foreground">
+                  {otherDrawers > 0
+                    ? t('shift.closedButOthers', { count: otherDrawers })
+                    : t('shift.closedDesc')}
+                </p>
               </div>
             </div>
             {canManage ? (
               <Button
                 onClick={() => {
                   openForm.reset({ openingCash: '0' });
+                  setOtherHolder(null);
                   setOpenDlg(true);
                 }}
               >
@@ -252,14 +341,16 @@ export function ShiftPanel() {
         </Card>
       )}
 
-      {/* Open shift dialog */}
+      {/* Open */}
       <Dialog open={openDlg} onOpenChange={setOpenDlg}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>{t('shift.openTitle')}</DialogTitle>
           </DialogHeader>
           <form
-            onSubmit={openForm.handleSubmit((v) => openMutation.mutate(v))}
+            onSubmit={openForm.handleSubmit((v) =>
+              openMutation.mutate({ ...v, confirmSecondDrawer: otherHolder !== null }),
+            )}
             className="space-y-4"
             noValidate
           >
@@ -275,18 +366,29 @@ export function ShiftPanel() {
                 <p className="text-sm text-destructive">{tb('form.invalidAmount')}</p>
               ) : null}
             </div>
+
+            {otherHolder ? (
+              <div className="flex items-start gap-2.5 rounded-lg border border-warning/40 bg-warning/5 p-3 text-sm">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-foreground dark:text-warning" />
+                <div className="space-y-1">
+                  <p>{otherHolder}</p>
+                  <p className="text-xs text-muted-foreground">{t('shift.secondDrawerHint')}</p>
+                </div>
+              </div>
+            ) : null}
+
             <DialogFooter>
               <Button type="submit" className="w-full" disabled={openMutation.isPending}>
-                {t('shift.open')}
+                {otherHolder ? t('shift.openAnyway') : t('shift.open')}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Close shift dialog */}
+      {/* Close — both registers, counted separately. */}
       <Dialog open={closeDlg} onOpenChange={setCloseDlg}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t('shift.closeTitle')}</DialogTitle>
             {shift ? (
@@ -296,11 +398,21 @@ export function ShiftPanel() {
             ) : null}
           </DialogHeader>
           <form
-            onSubmit={closeForm.handleSubmit((v) => closeMutation.mutate(v))}
+            onSubmit={closeForm.handleSubmit((v) =>
+              closeMutation.mutate({
+                ...v,
+                actualTransfer: transferUnchecked ? undefined : v.actualTransfer,
+                transferUnverifiedReason: transferUnchecked ? v.transferUnverifiedReason : undefined,
+              }),
+            )}
             className="space-y-4"
             noValidate
           >
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-lg border border-success/30 bg-success/[0.04] p-3">
+              <p className="flex items-center gap-2 text-sm font-semibold text-success">
+                <Banknote className="h-4 w-4" />
+                {t('registers.cash')}
+              </p>
               <Label htmlFor="actual-cash">{t('shift.actualCash')}</Label>
               <Input
                 id="actual-cash"
@@ -313,10 +425,59 @@ export function ShiftPanel() {
                 <p className="text-sm text-destructive">{tb('form.invalidAmount')}</p>
               ) : null}
             </div>
+
+            <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/[0.04] p-3">
+              <p className="flex items-center gap-2 text-sm font-semibold text-primary">
+                <CreditCard className="h-4 w-4" />
+                {t('registers.transfer')}
+              </p>
+              {shift ? (
+                <p className="text-xs text-muted-foreground">
+                  {t('shift.transferExpected')}: {formatUZS(shift.transferTotal)}
+                </p>
+              ) : null}
+
+              {transferUnchecked ? (
+                <>
+                  <Label htmlFor="transfer-reason">{t('shift.transferReason')}</Label>
+                  <Input
+                    id="transfer-reason"
+                    autoComplete="off"
+                    placeholder={t('shift.transferReasonPlaceholder')}
+                    {...closeForm.register('transferUnverifiedReason')}
+                  />
+                </>
+              ) : (
+                <>
+                  <Label htmlFor="actual-transfer">{t('shift.actualTransfer')}</Label>
+                  {/* Deliberately never prefilled with the book figure: a box
+                      that gets tapped past would store a verification that was
+                      never performed, which is worse than no field at all. */}
+                  <Input
+                    id="actual-transfer"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    className="text-lg font-semibold"
+                    placeholder={t('shift.actualTransferPlaceholder')}
+                    {...closeForm.register('actualTransfer', { setValueAs: sanitizeMoney })}
+                  />
+                </>
+              )}
+
+              <label className="flex items-center gap-2 pt-1 text-sm">
+                <Checkbox
+                  checked={transferUnchecked}
+                  onCheckedChange={(v) => setTransferUnchecked(v === true)}
+                />
+                {t('shift.transferUnchecked')}
+              </label>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="close-note">{t('shift.note')}</Label>
               <Input id="close-note" autoComplete="off" {...closeForm.register('note')} />
             </div>
+
             <DialogFooter>
               <Button
                 type="submit"
@@ -331,7 +492,7 @@ export function ShiftPanel() {
         </DialogContent>
       </Dialog>
 
-      {/* X/Z report dialog */}
+      {/* X/Z report */}
       <Dialog open={report !== null} onOpenChange={(o) => !o && setReport(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -351,45 +512,64 @@ export function ShiftPanel() {
                   </div>
                 ) : null}
               </div>
+
               <Separator />
+              <p className="text-sm font-semibold text-success">{t('registers.cash')}</p>
               <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('report.openingCash')}</span>
-                  <span>{formatUZS(report.report.openingCash)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('report.cashIn')}</span>
-                  <span>{formatUZS(report.report.cashIn)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('report.cashOut')}</span>
-                  <span>{formatUZS(report.report.cashOut)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('report.expenseOut')}</span>
-                  <span>{formatUZS(report.report.expenseOut)}</span>
-                </div>
-                <div className="flex justify-between font-semibold">
-                  <span>{t('report.expectedCash')}</span>
-                  <span>{formatUZS(report.report.expectedCash)}</span>
-                </div>
-                <div className="flex justify-between font-semibold">
-                  <span>{t('report.actualCash')}</span>
-                  <span>{formatUZS(report.report.actualCash)}</span>
-                </div>
+                <Row label={t('report.openingCash')} value={report.report.openingCash} />
+                <Row label={t('report.cashIn')} value={report.report.cashIn} />
+                <Row label={t('shift.cashDeposits')} value={report.report.cashDeposits} />
+                <Row label={t('report.cashOut')} value={report.report.cashOut} />
+                <Row label={t('report.expenseOut')} value={report.report.expenseOut} />
+                <Row label={t('report.expectedCash')} value={report.report.expectedCash} bold />
+                <Row label={t('report.actualCash')} value={report.report.actualCash} bold />
                 <div className="flex justify-between font-bold">
                   <span>{t('report.difference')}</span>
                   <span
                     className={
-                      report.report.difference.startsWith('-')
-                        ? 'text-destructive'
-                        : 'text-success'
+                      report.report.difference.startsWith('-') ? 'text-destructive' : 'text-success'
                     }
                   >
                     {formatUZS(report.report.difference)}
                   </span>
                 </div>
               </div>
+
+              <Separator />
+              <p className="text-sm font-semibold text-primary">{t('registers.transfer')}</p>
+              <div className="space-y-1 text-sm">
+                <Row label={t('report.transferIn')} value={report.report.transferIn} />
+                {Number(report.report.transferRefunds) > 0 ? (
+                  <Row label={t('shift.transferRefunds')} value={report.report.transferRefunds} />
+                ) : null}
+                <Row
+                  label={t('report.expectedTransfer')}
+                  value={report.report.expectedTransfer}
+                  bold
+                />
+                {report.report.actualTransfer !== null ? (
+                  <>
+                    <Row
+                      label={t('report.actualTransfer')}
+                      value={report.report.actualTransfer}
+                      bold
+                    />
+                    {/* Neutral on purpose. A transfer gap is two ledgers
+                        disagreeing, never money missing from someone's hands —
+                        colouring it like a shortfall blames the wrong person. */}
+                    <div className="flex justify-between font-bold">
+                      <span>{t('report.transferDifference')}</span>
+                      <span>{formatUZS(report.report.transferDifference ?? '0')}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">{t('report.transferNotChecked')}</span>
+                    <span className="text-right">{report.report.transferUnverifiedReason}</span>
+                  </div>
+                )}
+              </div>
+
               <Separator />
               <p className="text-sm font-semibold">{t('report.byMethod')}</p>
               <Table>
@@ -424,5 +604,14 @@ export function ShiftPanel() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+  return (
+    <div className={`flex justify-between${bold ? ' font-semibold' : ''}`}>
+      <span className={bold ? undefined : 'text-muted-foreground'}>{label}</span>
+      <span>{formatUZS(value)}</span>
+    </div>
   );
 }

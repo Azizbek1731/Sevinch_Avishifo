@@ -507,6 +507,23 @@ export class InvoicesService {
     const invoice = await this.prisma.db.invoice.findFirst({ where: { id: payment.invoiceId } });
     if (!invoice) throw new AppException(ErrorCode.INVOICE_NOT_FOUND, 'Invoice not found', 404);
 
+    // A shift that has been counted and signed off is history. Reversing a
+    // payment inside it would silently move a closing figure somebody put their
+    // name to — the same rule expenses already follow.
+    if (payment.shiftId) {
+      const shift = await this.prisma.db.cashierShift.findFirst({
+        where: { id: payment.shiftId },
+        select: { status: true },
+      });
+      if (shift && shift.status !== 'OPEN') {
+        throw new AppException(
+          ErrorCode.INVOICE_INVALID_STATE,
+          'Bu to‘lov yopilgan smenaga tegishli — uni bekor qilib bo‘lmaydi',
+          409,
+        );
+      }
+    }
+
     // A refunded invoice has already had money move back out; unwinding the
     // original payment underneath that would leave the two records disagreeing.
     const refunded = await this.prisma.db.refund.count({ where: { invoiceId: invoice.id } });
@@ -758,15 +775,25 @@ export class InvoicesService {
       ]);
     }
 
+    // Cash and card alike are linked to the drawer that took them. Until now
+    // only cash carried this link, so the transfer register had to be
+    // re-derived on every read from "whoever received money in this branch
+    // inside the shift's window" — a guess that could disagree with itself.
+    //
+    // The requirement still differs by method, and deliberately: cash MUST have
+    // an open drawer, because the notes have to physically go somewhere. Card
+    // and online money lands in the bank whether or not anyone opened a shift,
+    // so it is linked when a drawer exists and left unattached when none does.
+    // BALANCE is never linked: no money moves now, it moved on deposit day.
     let shiftId: string | null = null;
-    if (dto.method === 'CASH') {
+    if (dto.method !== 'BALANCE') {
       const shift = await this.prisma.db.cashierShift.findFirst({
         where: { cashierUserId: user.id, branchId: invoice.branchId, status: 'OPEN' },
       });
-      if (!shift) {
+      if (!shift && dto.method === 'CASH') {
         throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'Open cashier shift required for cash payments', 409);
       }
-      shiftId = shift.id;
+      shiftId = shift?.id ?? null;
     }
 
     const newPaidTotal = invoice.paidTotal.add(amount);
@@ -855,15 +882,17 @@ export class InvoicesService {
       ]);
     }
 
+    // Same rule as payments: a card refund nets off the acquirer's own slip, so
+    // it has to reduce the same register the card payment increased.
     let shiftId: string | null = null;
-    if (dto.method === 'CASH') {
+    if (dto.method !== 'BALANCE') {
       const shift = await this.prisma.db.cashierShift.findFirst({
         where: { cashierUserId: user.id, branchId: invoice.branchId, status: 'OPEN' },
       });
-      if (!shift) {
+      if (!shift && dto.method === 'CASH') {
         throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'Open cashier shift required for cash refunds', 409);
       }
-      shiftId = shift.id;
+      shiftId = shift?.id ?? null;
     }
 
     const fullyRefunded = refundedSum.add(amount).gte(invoice.paidTotal) && invoice.paidTotal.gt(0);

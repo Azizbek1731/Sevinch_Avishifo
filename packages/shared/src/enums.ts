@@ -161,6 +161,17 @@ export const PaymentMethod = {
 } as const;
 export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];
 
+/**
+ * The methods that route money through the clinic's acquiring accounts, and so
+ * land in the transfer register.
+ *
+ * BALANCE is deliberately absent. Applying a patient's own deposit moves no
+ * money today — it was registered on the day it actually arrived, into that
+ * day's register. Counting it again here is counting the same som twice.
+ */
+export const TRANSFER_METHODS = ['CARD', 'PAYME', 'CLICK', 'UZUM'] as const;
+export type TransferMethod = (typeof TRANSFER_METHODS)[number];
+
 export const PaymentStatus = {
   PENDING: 'PENDING',
   COMPLETED: 'COMPLETED',

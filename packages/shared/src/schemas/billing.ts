@@ -117,12 +117,37 @@ export const createRefundSchema = z.object({
 export type CreateRefundInput = z.infer<typeof createRefundSchema>;
 
 export const openShiftSchema = z.object({
+  /**
+   * The float physically handed over. There is deliberately no opening figure
+   * for the transfer register: that money is in the bank and in the PSP
+   * accounts, never in anyone's hands, so there is no float to hand over and
+   * nothing an opening number could honestly refer to.
+   */
   openingCash: moneySchema.default('0'),
+  /**
+   * Set when the user has been told somebody else already holds a drawer in
+   * this branch and wants their own anyway. Without it a second drawer is
+   * refused — opening one by accident is what made two accounts show two
+   * different totals.
+   */
+  confirmSecondDrawer: z.coerce.boolean().optional(),
 });
 export type OpenShiftInput = z.infer<typeof openShiftSchema>;
 
 export const closeShiftSchema = z.object({
   actualCash: moneySchema,
+  /**
+   * What the card terminal's sverka and the PSP cabinets actually reported.
+   * Optional here because zod cannot know whether the register saw any
+   * activity; the service requires it once there is something to reconcile.
+   */
+  actualTransfer: moneySchema.optional(),
+  /**
+   * Why the transfer figure could not be counted. Stored rather than silently
+   * absorbed, because an acquirer's batch cut-off rarely lines up with a shift
+   * boundary and forcing a number there is forcing someone to invent one.
+   */
+  transferUnverifiedReason: z.string().trim().max(300).optional(),
   note: z.string().optional(),
 });
 export type CloseShiftInput = z.infer<typeof closeShiftSchema>;
@@ -130,6 +155,8 @@ export type CloseShiftInput = z.infer<typeof closeShiftSchema>;
 export const addDepositSchema = z.object({
   patientId: idSchema,
   amount: moneySchema,
+  /** How the money arrived, so it lands in the register that received it. */
+  method: z.enum(['CASH', 'CARD', 'PAYME', 'CLICK', 'UZUM']).default('CASH'),
   note: z.string().optional(),
 });
 export type AddDepositInput = z.infer<typeof addDepositSchema>;

@@ -54,10 +54,12 @@ export class BalanceService {
     });
     if (!patient) throw new AppException(ErrorCode.PATIENT_NOT_FOUND, 'Patient not found', 404);
 
+    // A deposit is money arriving at the desk, so it lands in a register like
+    // any other payment. Cash must have a drawer open — the notes go into it.
     const shift = await this.prisma.db.cashierShift.findFirst({
       where: { cashierUserId: user.id, branchId, status: 'OPEN' },
     });
-    if (!shift) {
+    if (!shift && dto.method === 'CASH') {
       throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'Open cashier shift required for cash deposits', 409);
     }
 
@@ -77,6 +79,11 @@ export class BalanceService {
           patientId,
           type: 'DEPOSIT',
           amount,
+          // Recorded so the drawer knows about it. Without this the cash was
+          // physically in the till and invisible to the system, and the shift
+          // closed over by exactly the deposit every time.
+          shiftId: shift?.id ?? null,
+          method: dto.method,
           note: dto.note ?? null,
           createdById: user.id,
         },

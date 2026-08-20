@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import {
   BarChart3,
   Banknote,
+  Vault,
   Building2,
   CalendarDays,
   ClipboardList,
@@ -58,6 +59,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { key: 'calendar', href: '/appointments', icon: CalendarDays, permissions: ['appointments.read'] },
   { key: 'cashier', href: '/cashier', icon: CreditCard, permissions: ['payments.create'] },
+  { key: 'registers', href: '/registers', icon: Vault, permissions: ['shifts.oversee'] },
   { key: 'invoices', href: '/invoices', icon: Receipt, permissions: ['invoices.read'] },
   { key: 'expenses', href: '/expenses', icon: Banknote, permissions: ['expenses.read'] },
   { key: 'lab', href: '/lab', icon: FlaskConical, permissions: ['lab.orders.read'] },

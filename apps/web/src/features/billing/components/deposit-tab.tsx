@@ -12,6 +12,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { billingApi, sanitizeMoney, type PatientBrief } from '../api';
 import { useApiErrorToast, usePermission } from '../hooks';
 import { PatientCombobox } from './patient-combobox';
@@ -27,7 +34,7 @@ export function DepositTab() {
 
   const form = useForm<AddDepositInput>({
     resolver: zodResolver(addDepositSchema),
-    defaultValues: { patientId: '', amount: '', note: '' },
+    defaultValues: { patientId: '', amount: '', method: 'CASH', note: '' },
   });
 
   const { data: balance } = useQuery({
@@ -42,7 +49,7 @@ export function DepositTab() {
       void queryClient.invalidateQueries({ queryKey: ['balance'] });
       void queryClient.invalidateQueries({ queryKey: ['shifts'] });
       toast.success(t('deposit.success', { balance: formatUZS(res.data.balance) }));
-      form.reset({ patientId: patient?.id ?? '', amount: '', note: '' });
+      form.reset({ patientId: patient?.id ?? '', amount: '', method: 'CASH', note: '' });
     },
     onError: errorToast,
   });
@@ -93,6 +100,27 @@ export function DepositTab() {
             {form.formState.errors.amount ? (
               <p className="text-sm text-destructive">{tb('form.invalidAmount')}</p>
             ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t('deposit.method')}</Label>
+            {/* A deposit is money arriving at the desk, so it has to say how —
+                cash goes into the drawer, a card goes to the bank. */}
+            <Select
+              value={form.watch('method')}
+              onValueChange={(v) => form.setValue('method', v as AddDepositInput['method'])}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(['CASH', 'CARD', 'PAYME', 'CLICK', 'UZUM'] as const).map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {tb(`methods.${m}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

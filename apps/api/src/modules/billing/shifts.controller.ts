@@ -40,6 +40,29 @@ export class ShiftsController {
     return this.shifts.current(user, branchId);
   }
 
+  /**
+   * Every open register in the branch.
+   *
+   * Behind shifts.oversee rather than shifts.manage, so a supervisor can look
+   * at the clinic's money without opening a drawer of their own — which is
+   * exactly what made two accounts show two different totals.
+   */
+  @Get('overview')
+  @RequirePermissions('shifts.oversee')
+  overview(@ActiveBranch() branchId: string): Promise<Record<string, unknown>> {
+    return this.shifts.overview(branchId);
+  }
+
+  /** What this drawer has taken so far, so a wrong entry can be found and undone. */
+  @Get('current/payments')
+  @RequirePermissions('shifts.manage')
+  currentPayments(
+    @CurrentUser() user: AuthUser,
+    @ActiveBranch() branchId: string,
+  ): Promise<Record<string, unknown>[]> {
+    return this.shifts.currentPayments(user, branchId);
+  }
+
   @Get()
   @RequirePermissions('shifts.manage')
   list(@Query() query: ShiftQueryDto): Promise<PaginatedResult<Record<string, unknown>>> {
