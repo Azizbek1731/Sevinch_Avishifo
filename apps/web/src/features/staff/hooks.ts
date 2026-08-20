@@ -3,9 +3,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import type { Permission } from '@avishifo/shared';
 import { ApiError } from '@/lib/api-client';
-import { useAuthStore } from '@/stores/auth-store';
 import { staffApi, type StaffListQuery } from './api';
 
 /** Toast an ApiError using the shared `errors` message namespace. */
@@ -17,11 +15,7 @@ export function useApiErrorToast(): (err: unknown) => void {
   };
 }
 
-/** Permission check against the authenticated user's permission set. */
-export function usePermissions(): (p: Permission) => boolean {
-  const permissions = useAuthStore((s) => s.user?.permissions);
-  return (p: Permission) => (permissions ?? []).includes(p);
-}
+export { usePermissions } from '@/hooks/use-permissions';
 
 export function useStaffList(params: StaffListQuery) {
   return useQuery({

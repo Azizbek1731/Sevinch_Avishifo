@@ -1224,6 +1224,7 @@ model CashierShift {
   cashier  User      @relation(fields: [cashierUserId], references: [id])
   payments Payment[]
   refunds  Refund[]
+  expenses Expense[]
 
   @@index([clinicId, branchId, status])
 }
@@ -1245,14 +1246,28 @@ model Expense {
   branchId   String
   categoryId String
   amount     Decimal  @db.Decimal(14, 2)
+  /// How the money left. CASH means it came out of a cashier's drawer, which is
+  /// why those rows carry a shiftId — anything else left the clinic's account
+  /// and the drawer never sees it.
+  method     PaymentMethod @default(CASH)
+  /// The drawer the cash came out of. Set only for CASH, and only ever to the
+  /// recording user's own open shift, so the shift that has to be counted at
+  /// closing time is the one that gets charged.
+  shiftId    String?
   date       DateTime @db.Date
   note       String?
   createdById String?
   createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  /// Recorded by mistake and withdrawn. Kept rather than deleted: a shift that
+  /// already reconciled against this row must still be explainable afterwards.
+  deletedAt   DateTime? @db.Timestamptz(6)
+  deletedById String?
 
   category ExpenseCategory @relation(fields: [categoryId], references: [id])
+  shift    CashierShift?   @relation(fields: [shiftId], references: [id])
 
   @@index([clinicId, branchId, date])
+  @@index([clinicId, shiftId])
 }
 
 // ============================================================ LAB (M9)

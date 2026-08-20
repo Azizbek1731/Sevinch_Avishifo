@@ -153,12 +153,21 @@ export const debtorQuerySchema = paginationQuerySchema.extend({
 });
 export type DebtorQueryInput = z.infer<typeof debtorQuerySchema>;
 
+/**
+ * How an expense was paid. BALANCE is deliberately absent: it means a patient's
+ * own deposit, which is the clinic holding someone else's money — never a
+ * source it can spend from.
+ */
+export const expenseMethodSchema = z.enum(['CASH', 'CARD', 'PAYME', 'CLICK', 'UZUM']);
+export type ExpenseMethod = z.infer<typeof expenseMethodSchema>;
+
 export const createExpenseSchema = z.object({
-  branchId: idSchema,
   categoryId: idSchema,
   amount: moneySchema,
+  /** CASH is charged to the recorder's own open shift; the rest never touch a drawer. */
+  method: expenseMethodSchema.default('CASH'),
   date: dateOnlySchema,
-  note: z.string().optional(),
+  note: z.string().trim().max(300).optional(),
 });
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
 
@@ -170,8 +179,11 @@ export type ExpenseCategoryUpsertInput = z.infer<typeof expenseCategoryUpsertSch
 export const expenseQuerySchema = paginationQuerySchema.extend({
   branchId: idSchema.optional(),
   categoryId: idSchema.optional(),
+  method: expenseMethodSchema.optional(),
   from: dateOnlySchema.optional(),
   to: dateOnlySchema.optional(),
+  /** Show withdrawn rows too. Honoured only for callers with records.viewDeleted. */
+  deleted: z.coerce.boolean().optional(),
 });
 export type ExpenseQueryInput = z.infer<typeof expenseQuerySchema>;
 

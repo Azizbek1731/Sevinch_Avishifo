@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '@avishifo/shared';
-import { CurrentUser, RequirePermissions } from '../../common/decorators';
+import { ActiveBranch, CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { PaginatedResult } from '../../common/pagination';
 import { ExpensesService } from './expenses.service';
 import { CreateExpenseDto, ExpenseCategoryUpsertDto, ExpenseQueryDto, PaginationQueryDto, UpdateExpenseDto } from './dto';
@@ -43,14 +43,21 @@ export class ExpensesController {
 
   @Get()
   @RequirePermissions('expenses.read')
-  list(@Query() query: ExpenseQueryDto): Promise<Record<string, unknown>> {
-    return this.expenses.listExpenses(query);
+  list(
+    @Query() query: ExpenseQueryDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Record<string, unknown>> {
+    return this.expenses.listExpenses(query, user);
   }
 
   @Post()
   @RequirePermissions('expenses.write')
-  create(@Body() dto: CreateExpenseDto, @CurrentUser() user: AuthUser): Promise<Record<string, unknown>> {
-    return this.expenses.createExpense(dto, user);
+  create(
+    @Body() dto: CreateExpenseDto,
+    @CurrentUser() user: AuthUser,
+    @ActiveBranch() branchId: string,
+  ): Promise<Record<string, unknown>> {
+    return this.expenses.createExpense(dto, user, branchId);
   }
 
   @Patch(':id')
@@ -61,7 +68,7 @@ export class ExpensesController {
 
   @Delete(':id')
   @RequirePermissions('expenses.write')
-  remove(@Param('id') id: string): Promise<{ id: string }> {
-    return this.expenses.removeExpense(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<{ id: string }> {
+    return this.expenses.removeExpense(id, user);
   }
 }

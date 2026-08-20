@@ -151,7 +151,7 @@ export function ShiftPanel() {
                   </p>
                   <p className="text-xs text-muted-foreground">{t('registers.inDrawer')}</p>
                 </div>
-                <div className="grid grid-cols-3 gap-2 border-t pt-2 text-sm">
+                <div className="grid grid-cols-2 gap-2 border-t pt-2 text-sm sm:grid-cols-4">
                   <div>
                     <p className="text-xs text-muted-foreground">{t('shift.openingCash')}</p>
                     <p className="font-medium tabular-nums">
@@ -174,6 +174,15 @@ export function ShiftPanel() {
                     </p>
                     <p className="font-medium tabular-nums text-destructive">
                       {formatUZS(shift.cashOut, { withCurrency: false })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Wallet className="h-3 w-3 text-destructive" />
+                      {t('shift.expenseOut')}
+                    </p>
+                    <p className="font-medium tabular-nums text-destructive">
+                      {formatUZS(shift.expenseOut, { withCurrency: false })}
                     </p>
                   </div>
                 </div>
@@ -355,6 +364,10 @@ export function ShiftPanel() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('report.cashOut')}</span>
                   <span>{formatUZS(report.report.cashOut)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{t('report.expenseOut')}</span>
+                  <span>{formatUZS(report.report.expenseOut)}</span>
                 </div>
                 <div className="flex justify-between font-semibold">
                   <span>{t('report.expectedCash')}</span>

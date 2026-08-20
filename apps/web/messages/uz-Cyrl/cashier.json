@@ -17,7 +17,8 @@
     "closeTitle": "Сменани ёпиш",
     "actualCash": "Кассадаги ҳақиқий нақд",
     "note": "Изоҳ",
-    "closeSuccess": "Смена ёпилди"
+    "closeSuccess": "Смена ёпилди",
+    "expenseOut": "Чиқим"
   },
   "report": {
     "title": "Смена ҳисоботи (X/Z)",
@@ -33,7 +34,8 @@
     "count": "Сони",
     "amount": "Сумма",
     "print": "Чоп этиш",
-    "done": "Ёпиш"
+    "done": "Ёпиш",
+    "expenseOut": "Чиқим"
   },
   "tabs": {
     "pending": "Тўлов кутилмоқда",

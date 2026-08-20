@@ -130,6 +130,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'invoices.read',
     'debts.read',
     'expenses.read',
+    'expenses.write',
     'lab.orders.read',
     'reports.read',
     'reports.export',
@@ -202,6 +203,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'shifts.manage',
     'debts.read',
     'services.read',
+    // Cash leaves the drawer through this desk, so the person holding the
+    // drawer has to be able to record it — otherwise the money is gone and the
+    // shift is short with nothing to point at.
+    'expenses.read',
+    'expenses.write',
   ],
   [UserRole.LAB_TECH]: [
     'patients.read',

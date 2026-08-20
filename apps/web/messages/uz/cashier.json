@@ -17,7 +17,8 @@
     "closeTitle": "Smenani yopish",
     "actualCash": "Kassadagi haqiqiy naqd",
     "note": "Izoh",
-    "closeSuccess": "Smena yopildi"
+    "closeSuccess": "Smena yopildi",
+    "expenseOut": "Chiqim"
   },
   "report": {
     "title": "Smena hisoboti (X/Z)",
@@ -33,7 +34,8 @@
     "count": "Soni",
     "amount": "Summa",
     "print": "Chop etish",
-    "done": "Yopish"
+    "done": "Yopish",
+    "expenseOut": "Chiqim"
   },
   "tabs": {
     "pending": "To'lov kutilmoqda",

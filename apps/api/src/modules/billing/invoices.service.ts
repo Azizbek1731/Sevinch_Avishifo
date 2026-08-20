@@ -21,6 +21,7 @@ import {
   type QuickInvoiceInput,
 } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
+import { canSeeDeleted } from '../../common/visibility';
 import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
@@ -94,11 +95,6 @@ function legKey(base: string, index: number): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
 
-
-/** Whether this caller keeps seeing what the front desk removed. */
-function canSeeDeleted(user?: AuthUser): boolean {
-  return user?.permissions.includes('records.viewDeleted') === true;
-}
 
 @Injectable()
 export class InvoicesService {

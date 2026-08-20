@@ -17,7 +17,8 @@
     "closeTitle": "Close shift",
     "actualCash": "Actual cash in drawer",
     "note": "Note",
-    "closeSuccess": "Shift closed"
+    "closeSuccess": "Shift closed",
+    "expenseOut": "Expenses"
   },
   "report": {
     "title": "Shift report (X/Z)",
@@ -33,7 +34,8 @@
     "count": "Count",
     "amount": "Amount",
     "print": "Print",
-    "done": "Close"
+    "done": "Close",
+    "expenseOut": "Expenses"
   },
   "tabs": {
     "pending": "Awaiting payment",

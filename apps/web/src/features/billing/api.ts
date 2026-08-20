@@ -118,6 +118,8 @@ export interface CashierShift {
 export interface CurrentShift extends CashierShift {
   cashIn: MoneyString;
   cashOut: MoneyString;
+  /** Clinic spending taken out of this drawer — already deducted below. */
+  expenseOut: MoneyString;
   expectedCashSoFar: MoneyString;
   /** Non-cash ("o'tkazma") total received during the shift, and its breakdown. */
   transferTotal: MoneyString;
@@ -132,6 +134,7 @@ export interface ShiftReport {
   openingCash: MoneyString;
   cashIn: MoneyString;
   cashOut: MoneyString;
+  expenseOut: MoneyString;
   expectedCash: MoneyString;
   actualCash: MoneyString;
   difference: MoneyString;

@@ -69,13 +69,19 @@ export class ShiftsService {
     const closedAt = new Date();
     const zero = new Prisma.Decimal(0);
 
-    const [cashInAgg, cashOutAgg, byMethodRows] = await Promise.all([
+    const [cashInAgg, cashOutAgg, expenseAgg, byMethodRows] = await Promise.all([
       this.prisma.db.payment.aggregate({
         where: { shiftId: shift.id, method: 'CASH', status: 'COMPLETED' },
         _sum: { amount: true },
       }),
       this.prisma.db.refund.aggregate({
         where: { shiftId: shift.id, method: 'CASH' },
+        _sum: { amount: true },
+      }),
+      // Money the clinic itself took out of this drawer. Without this the
+      // cashier counts short by exactly the amount they were told to spend.
+      this.prisma.db.expense.aggregate({
+        where: { shiftId: shift.id, method: 'CASH', deletedAt: null },
         _sum: { amount: true },
       }),
       // Breakdown of everything this cashier received during the shift window
@@ -96,7 +102,8 @@ export class ShiftsService {
 
     const cashIn = cashInAgg._sum.amount ?? zero;
     const cashOut = cashOutAgg._sum.amount ?? zero;
-    const expectedCash = shift.openingCash.add(cashIn).sub(cashOut);
+    const expenseOut = expenseAgg._sum.amount ?? zero;
+    const expectedCash = shift.openingCash.add(cashIn).sub(cashOut).sub(expenseOut);
     const actualCash = new Prisma.Decimal(dto.actualCash);
     const difference = actualCash.sub(expectedCash);
 
@@ -117,6 +124,7 @@ export class ShiftsService {
         openingCash: shift.openingCash.toFixed(2),
         cashIn: cashIn.toFixed(2),
         cashOut: cashOut.toFixed(2),
+        expenseOut: expenseOut.toFixed(2),
         expectedCash: expectedCash.toFixed(2),
         actualCash: actualCash.toFixed(2),
         difference: difference.toFixed(2),
@@ -157,13 +165,17 @@ export class ShiftsService {
     if (!shift) return null;
     const zero = new Prisma.Decimal(0);
     const now = new Date();
-    const [cashInAgg, cashOutAgg, transferRows] = await Promise.all([
+    const [cashInAgg, cashOutAgg, expenseAgg, transferRows] = await Promise.all([
       this.prisma.db.payment.aggregate({
         where: { shiftId: shift.id, method: 'CASH', status: 'COMPLETED' },
         _sum: { amount: true },
       }),
       this.prisma.db.refund.aggregate({
         where: { shiftId: shift.id, method: 'CASH' },
+        _sum: { amount: true },
+      }),
+      this.prisma.db.expense.aggregate({
+        where: { shiftId: shift.id, method: 'CASH', deletedAt: null },
         _sum: { amount: true },
       }),
       // Non-cash ("o'tkazma") received by this cashier during the shift window.
@@ -183,12 +195,14 @@ export class ShiftsService {
     ]);
     const cashIn = cashInAgg._sum.amount ?? zero;
     const cashOut = cashOutAgg._sum.amount ?? zero;
+    const expenseOut = expenseAgg._sum.amount ?? zero;
     const transferTotal = transferRows.reduce((acc, r) => acc.add(r._sum.amount ?? zero), zero);
     return {
       ...this.mapShift(shift),
       cashIn: cashIn.toFixed(2),
       cashOut: cashOut.toFixed(2),
-      expectedCashSoFar: shift.openingCash.add(cashIn).sub(cashOut).toFixed(2),
+      expenseOut: expenseOut.toFixed(2),
+      expectedCashSoFar: shift.openingCash.add(cashIn).sub(cashOut).sub(expenseOut).toFixed(2),
       transferTotal: transferTotal.toFixed(2),
       transferByMethod: transferRows.map((r) => ({
         method: r.method,
