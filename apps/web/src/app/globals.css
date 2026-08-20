@@ -95,7 +95,40 @@
     left: auto;
     width: auto;
   }
+
+  /*
+   * Default page for the A4 documents that share .print-area — the visit
+   * summary and the lab order. Receipts are not A4 and override this with their
+   * own @page rule, injected by <ReceiptDocument /> from the clinic's paper
+   * setting; a later @page wins, and only one print surface is ever on screen.
+   */
   @page {
     margin: 12mm;
+  }
+
+  /*
+   * Thermal heads are one-bit: they burn a dot or they do not. Anything grey
+   * comes out as a dither pattern that reads as smudge, so the whole receipt is
+   * forced to pure black on white and every decorative surface is dropped.
+   */
+  .receipt-print,
+  .receipt-print * {
+    color: #000 !important;
+    background: transparent !important;
+    border-color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  .receipt-print {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+  /* Print the glyphs at full weight — thin strokes drop out on a thermal head. */
+  .receipt-print .receipt-strong {
+    font-weight: 700 !important;
   }
 }
