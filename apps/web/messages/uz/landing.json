@@ -230,48 +230,57 @@
     "dashboard": "Boshqaruv paneliga o'tish"
   },
   "pricing": {
-    "title": "Sizga mos tarifni tanlang",
-    "subtitle": "Klinikangiz o'lchamiga qarab — istalgan vaqt o'zgartirasiz",
-    "popular": "Ommabop",
-    "som": "so'm",
+    "title": "Bozordagi MIS-lar — oyiga 300 000 so‘mdan. AviShifo — 199 000 so‘m.",
+    "subtitle": "Narx so‘mda qat’iy — dollar kursiga bog‘liq emas. Birinchi hafta bepul.",
+    "popular": "Eng ommabop",
+    "som": "so‘m",
     "perMonth": "oy",
-    "cta": "7 kun bepul sinash",
-    "note": "Barcha tariflar 7 kunlik bepul sinov bilan boshlanadi. Katta tarmoq uchun individual taklif: biz bilan bog‘laning.",
+    "perWeek": "hafta",
+    "yearly": "yillik to‘lovda",
+    "monthlyAlt": "oylik to‘lovda {price} so‘m",
+    "network": "Klinikalar tarmog‘i uchun — individual taklif",
+    "networkCta": "Bog‘lanish",
+    "guarantees": [
+      "7 kun bepul, karta shart emas",
+      "Excel’dan bepul ko‘chirish",
+      "Istalgan payt bekor qilish",
+      "Narx so‘mda"
+    ],
     "tiers": {
-      "starter": {
-        "name": "Starter",
-        "tagline": "Kichik klinika va kabinetlar uchun",
+      "free": {
+        "name": "BEPUL",
+        "tagline": "Yakka kabinet uchun",
+        "cta": "Bepul boshlash",
         "features": [
-          "1 filial",
-          "10 tagacha xodim",
-          "Jonli navbat + TV ekran",
-          "Bemor kartasi va EHR",
-          "Kassa va to'lovlar",
-          "Bemor portali va onlayn yozilish"
+          "1 shifokor",
+          "500 tagacha bemor",
+          "EMK + qabul jadvali"
         ]
       },
-      "standard": {
-        "name": "Standard",
-        "tagline": "O'sib borayotgan klinikalar uchun",
+      "start": {
+        "name": "START",
+        "tagline": "Ishlayotgan klinikalar uchun",
+        "cta": "7 kun bepul sinash",
         "features": [
-          "3 filialgacha",
-          "30 tagacha xodim",
-          "Starter'dagi barcha imkoniyatlar",
-          "Laboratoriya moduli",
-          "SMS + Telegram bildirishnomalar",
-          "Kengaytirilgan hisobotlar"
+          "Cheksiz shifokorlar",
+          "EMK",
+          "Onlayn yozilish",
+          "Moliya",
+          "Payme / Click",
+          "Telegram-eslatmalar",
+          "DMED integratsiyasi",
+          "Excel’dan bepul ko‘chirish"
         ]
       },
       "pro": {
-        "name": "Pro",
-        "tagline": "Tarmoqlar va yirik markazlar uchun",
+        "name": "PRO (AI)",
+        "tagline": "AI bilan ishlaydigan markazlar uchun",
+        "cta": "AI bilan sinash",
         "features": [
-          "10 filialgacha",
-          "100 tagacha xodim",
-          "Standard'dagi barcha imkoniyatlar",
-          "To'liq analitika paneli",
-          "Ustuvor qo'llab-quvvatlash",
-          "Payme / Click / Uzum onlayn to'lovlar"
+          "Hammasi START’dagidek",
+          "AI-diagnostika yordamchisi",
+          "AI-analitika",
+          "Ustuvor qo‘llab-quvvatlash"
         ]
       }
     }

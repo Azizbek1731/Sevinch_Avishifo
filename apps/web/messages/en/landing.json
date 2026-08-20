@@ -230,48 +230,57 @@
     "dashboard": "Go to dashboard"
   },
   "pricing": {
-    "title": "Choose the plan that fits",
-    "subtitle": "Sized to your clinic — change anytime",
-    "popular": "Popular",
-    "som": "UZS",
-    "perMonth": "mo",
-    "cta": "Try 7 days free",
-    "note": "Every plan starts with a 7-day free trial. For a large network we prepare an individual offer — get in touch.",
+    "title": "Other clinic systems start at 300 000 so‘m a month. AviShifo is 199 000.",
+    "subtitle": "Priced in so‘m, fixed — not tied to the dollar. First week free.",
+    "popular": "Most popular",
+    "som": "so‘m",
+    "perMonth": "month",
+    "perWeek": "week",
+    "yearly": "billed yearly",
+    "monthlyAlt": "billed monthly — {price} so‘m",
+    "network": "Running a network of clinics? We will quote you individually",
+    "networkCta": "Get in touch",
+    "guarantees": [
+      "7 days free, no card needed",
+      "Free migration from Excel",
+      "Cancel any time",
+      "Priced in so‘m"
+    ],
     "tiers": {
-      "starter": {
-        "name": "Starter",
-        "tagline": "For small clinics and single offices",
+      "free": {
+        "name": "FREE",
+        "tagline": "For a single practice",
+        "cta": "Start free",
         "features": [
-          "1 branch",
-          "Up to 10 staff",
-          "Live queue + TV screen",
-          "Patient card & EHR",
-          "Cashier & payments",
-          "Patient portal & online booking"
+          "1 doctor",
+          "Up to 500 patients",
+          "Records + appointment schedule"
         ]
       },
-      "standard": {
-        "name": "Standard",
-        "tagline": "For growing clinics",
+      "start": {
+        "name": "START",
+        "tagline": "For clinics already running",
+        "cta": "Try 7 days free",
         "features": [
-          "Up to 3 branches",
-          "Up to 30 staff",
-          "Everything in Starter",
-          "Laboratory module",
-          "SMS + Telegram notifications",
-          "Advanced reports"
+          "Unlimited doctors",
+          "Patient records",
+          "Online booking",
+          "Finance",
+          "Payme / Click",
+          "Telegram reminders",
+          "DMED integration",
+          "Free migration from Excel"
         ]
       },
       "pro": {
-        "name": "Pro",
-        "tagline": "For networks and large centers",
+        "name": "PRO (AI)",
+        "tagline": "For centres working with AI",
+        "cta": "Try it with AI",
         "features": [
-          "Up to 10 branches",
-          "Up to 100 staff",
-          "Everything in Standard",
-          "Full analytics dashboard",
-          "Priority support",
-          "Payme / Click / Uzum online payments"
+          "Everything in START",
+          "AI diagnostic assistant",
+          "AI analytics",
+          "Priority support"
         ]
       }
     }
