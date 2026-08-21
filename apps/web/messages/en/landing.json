@@ -230,20 +230,20 @@
     "dashboard": "Go to dashboard"
   },
   "pricing": {
-    "title": "Clinic software starts at {market} so‘m a month. AviShifo starts at {from}, billed yearly.",
-    "subtitle": "The same job, a cheaper start. Priced in so‘m — a rising dollar does not move it.",
+    "title": "Run your clinic in one system. From {from} so‘m a month.",
+    "subtitle": "Queue, patient records, cashier, laboratory and analytics — all included, no per-module upsell. Priced in so‘m: a rising dollar does not move it.",
     "billing": {
       "legend": "Billing period",
       "yearly": "Billed yearly",
       "monthly": "Billed monthly",
-      "save": "−{amount} so‘m/mo",
-      "flat": "Billed yearly, every plan is {monthly} so‘m a month cheaper — {yearly} so‘m over a year."
+      "save": "−{pct}%",
+      "flat": "Billed yearly, every plan is {pct}% cheaper."
     },
     "compare": {
-      "others": "Elsewhere",
-      "ours": "With us",
-      "oursNote": "START plan, {cycle}",
-      "save": "On START you save at least {amount} so‘m a month"
+      "others": "Billed monthly",
+      "ours": "Billed yearly",
+      "oursNote": "START plan — per month",
+      "save": "On START, paying yearly saves {amount} so‘m a month"
     },
     "popular": "Most popular",
     "som": "so‘m",

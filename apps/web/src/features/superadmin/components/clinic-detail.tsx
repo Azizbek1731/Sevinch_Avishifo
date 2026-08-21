@@ -2,12 +2,13 @@
 
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { ArrowLeft, Building2, LogIn, Pause, Play } from 'lucide-react';
 import { ClinicStatus, formatUZS, type UpdateSubscriptionInput } from '@avishifo/shared';
-import { Link } from '@/i18n/routing';
-import { useAuthStore } from '@/stores/auth-store';
+import { Link, useRouter } from '@/i18n/routing';
+import { api } from '@/lib/api-client';
+import { useAuthStore, type MeResponse } from '@/stores/auth-store';
 import { formatDate, formatTz } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,10 +41,10 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
 
 export function ClinicDetailView({ clinicId }: { clinicId: string }) {
   const t = useTranslations('superadmin');
-  const locale = useLocale();
   const can = usePermission();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const [planId, setPlanId] = useState<string>('');
   const [endsAtDate, setEndsAtDate] = useState<string>('');
@@ -103,11 +104,30 @@ export function ClinicDetailView({ clinicId }: { clinicId: string }) {
   });
 
   const impersonateMutation = useMutation({
-    mutationFn: () => superadminApi.impersonate(clinicId),
-    onSuccess: (res) => {
-      useAuthStore.getState().setAccessToken(res.accessToken);
+    mutationFn: async () => {
+      const res = await superadminApi.impersonate(clinicId);
+      // The token lives in memory only — the store persists nothing but the
+      // branch selection. The old code set it and then did a FULL page load,
+      // which wiped it; AuthBootstrap then refreshed from the super-admin's own
+      // cookie and put the super-admin straight back. The button looked dead
+      // because the impersonation token was thrown away before it was used.
+      const store = useAuthStore.getState();
+      store.setAccessToken(res.accessToken);
+      // Loaded with the new token, so the panel opens as the clinic owner
+      // rather than rendering the super-admin's identity against it.
+      const me = await api.get<MeResponse>('/auth/me');
+      store.setSession({ ...me.data, accessToken: res.accessToken });
+      return res;
+    },
+    onSuccess: () => {
+      // Platform answers were fetched as the super-admin; none of them belong
+      // to the clinic being entered.
+      queryClient.clear();
       toast.warning(t('detail.impersonationMode'));
-      window.location.href = `/${locale}/dashboard`;
+      // Client-side navigation: a full load would destroy the session we just
+      // built, which is the whole bug. Reloading the page is also how you leave
+      // impersonation — the refresh cookie restores the super-admin.
+      router.push('/dashboard');
     },
     onError: errorToast,
   });

@@ -230,20 +230,20 @@
     "dashboard": "Boshqaruv paneliga o'tish"
   },
   "pricing": {
-    "title": "Klinika dasturlari oyiga {market} so‘mdan. AviShifo — yillik to‘lovda {from} so‘mdan.",
-    "subtitle": "Xuddi shu ish, arzonroq boshlanadi. Narx so‘mda — dollar kursi ko‘tarilsa ham o‘zgarmaydi.",
+    "title": "Klinikangizni bitta tizimda boshqaring. Narxi — oyiga {from} so‘mdan.",
+    "subtitle": "Navbat, bemor kartasi, kassa, laboratoriya va analitika — hammasi ichida, qo‘shimcha to‘lovsiz. Narx so‘mda: dollar kursi ko‘tarilsa ham o‘zgarmaydi.",
     "billing": {
       "legend": "To‘lov davri",
       "yearly": "Yillik to‘lov",
       "monthly": "Oylik to‘lov",
-      "save": "−{amount} so‘m/oy",
-      "flat": "Yillik to‘lovda har bir tarif oyiga {monthly} so‘m arzon — yiliga {yearly} so‘m."
+      "save": "−{pct}%",
+      "flat": "Yillik to‘lovda har bir tarif {pct}% arzon."
     },
     "compare": {
-      "others": "Boshqa dasturlarda",
-      "ours": "Bizda",
-      "oursNote": "START tarifi, {cycle}",
-      "save": "START tarifida oyiga kamida {amount} so‘m tejaysiz"
+      "others": "Oylik to‘lovda",
+      "ours": "Yillik to‘lovda",
+      "oursNote": "START tarifi — oyiga hisobda",
+      "save": "START tarifida yillik to‘lov oyiga {amount} so‘m tejaydi"
     },
     "popular": "Eng ommabop",
     "som": "so‘m",

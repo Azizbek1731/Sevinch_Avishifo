@@ -34,26 +34,25 @@ interface Tier {
  * figure the others have moved on from.
  */
 const TIERS: readonly Tier[] = [
-  { key: 'start', yearly: 99_000, monthly: 149_000, popular: false },
-  { key: 'standard', yearly: 199_000, monthly: 249_000, popular: true },
-  { key: 'pro', yearly: 349_000, monthly: 399_000, popular: false },
+  { key: 'start', yearly: 390_000, monthly: 490_000, popular: false },
+  { key: 'standard', yearly: 790_000, monthly: 990_000, popular: true },
+  { key: 'pro', yearly: 2_390_000, monthly: 2_990_000, popular: false },
 ];
 
-/** What the cheapest competing product costs, for the comparison. */
-const MARKET_PRICE = 300_000;
 const START = TIERS[0]!;
 
 /**
- * The monthly saving, but only when it is the same on every tier.
+ * The annual discount, but only when it is the same on every tier.
  *
- * Today it is a flat 50 000 across all three — which is 33% of START, 20% of
- * STANDARD and 12% of PRO, so a percentage badge would be false on two cards
- * out of three and the figure is stated in so'm instead. If someone later
- * re-prices one tier so the gaps diverge, this returns null and the shared
- * claim disappears rather than quietly becoming a lie in four languages.
+ * Stated as a percentage rather than an amount: the tiers are now an order of
+ * magnitude apart, so a flat som figure would read as generous on START and
+ * trivial on PRO. Floored, never rounded, so the badge cannot claim a point
+ * more than the smallest actual discount. If a future re-price makes them
+ * diverge this returns null and both the badge and the shared sentence stop
+ * rendering rather than becoming false on two cards out of three.
  */
-const GAPS = TIERS.map((t) => t.monthly - t.yearly);
-const GAP = GAPS.every((g) => g === GAPS[0]) ? GAPS[0]! : null;
+const PCTS = TIERS.map((t) => Math.floor(((t.monthly - t.yearly) / t.monthly) * 100));
+const PCT = PCTS.every((p) => p === PCTS[0]) ? PCTS[0]! : null;
 
 /** Thousands separated by a space, the way every price on this page is written. */
 function som(n: number): string {
@@ -77,7 +76,7 @@ export function LandingPricing() {
       <div className="container">
         <SectionHeading
           eyebrow={t('nav.pricing')}
-          title={t('pricing.title', { market: som(MARKET_PRICE), from: som(START.yearly) })}
+          title={t('pricing.title', { from: som(START.yearly) })}
           subtitle={t('pricing.subtitle')}
         />
 
@@ -112,9 +111,9 @@ export function LandingPricing() {
                   )}
                 >
                   {t(`pricing.billing.${c}`)}
-                  {c === 'yearly' && GAP !== null ? (
+                  {c === 'yearly' && PCT !== null ? (
                     <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums text-primary">
-                      {t('pricing.billing.save', { amount: som(GAP) })}
+                      {t('pricing.billing.save', { pct: String(PCT) })}
                     </span>
                   ) : null}
                 </span>
@@ -123,9 +122,9 @@ export function LandingPricing() {
           </div>
         </fieldset>
 
-        {GAP !== null ? (
+        {PCT !== null ? (
           <p className="mt-3 text-center text-sm text-muted-foreground">
-            {t('pricing.billing.flat', { monthly: som(GAP), yearly: som(GAP * 12) })}
+            {t('pricing.billing.flat', { pct: String(PCT) })}
           </p>
         ) : null}
 
@@ -138,7 +137,7 @@ export function LandingPricing() {
               {t('pricing.compare.others')}
             </span>
             <s className="text-lg font-bold tabular-nums text-muted-foreground">
-              {som(MARKET_PRICE)}
+              {som(START.monthly)}
             </s>
           </div>
 
@@ -150,7 +149,7 @@ export function LandingPricing() {
             </span>
             <span className="flex items-baseline gap-1.5">
               <span className="text-lg font-black tabular-nums text-foreground">
-                {som(START[cycle])}
+                {som(START.yearly)}
               </span>
               <span className="text-xs text-muted-foreground">
                 {t('pricing.som')} / {t('pricing.perMonth')}
@@ -160,10 +159,10 @@ export function LandingPricing() {
         </div>
 
         <p className="mt-2 text-center text-xs text-muted-foreground">
-          {t('pricing.compare.oursNote', { cycle: cycleNote })}
+          {t('pricing.compare.oursNote')}
         </p>
         <p className="mt-1 text-center text-sm font-medium text-primary">
-          {t('pricing.compare.save', { amount: som(MARKET_PRICE - START[cycle]) })}
+          {t('pricing.compare.save', { amount: som(START.monthly - START.yearly) })}
         </p>
 
         <div className="mx-auto mt-10 grid max-w-5xl items-stretch gap-5 sm:mt-12 sm:gap-6 lg:grid-cols-3">
