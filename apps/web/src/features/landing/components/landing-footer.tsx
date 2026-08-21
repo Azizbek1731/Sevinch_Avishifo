@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Logo } from './logo';
 import { PanelLink } from './panel-link';
 
@@ -12,9 +12,36 @@ import { PanelLink } from './panel-link';
 const FOOTER_LINK =
   'flex min-h-11 items-center text-sm text-muted-foreground transition-colors hover:text-foreground md:min-h-0';
 
-function FooterLink({ href, children }: { href: string; children: ReactNode }) {
+/**
+ * The company site, which carries the same three languages as this one.
+ *
+ * uz-Cyrl has no page there — /uz-Cyrl 404s — so Cyrillic readers get the Latin
+ * Uzbek page rather than being dropped on an error or silently sent to Russian.
+ */
+const COMPANY_SITE = 'https://www.avilab.uz';
+const COMPANY_LOCALE: Record<string, string> = {
+  uz: 'uz',
+  'uz-Cyrl': 'uz',
+  ru: 'ru',
+  en: 'en',
+};
+
+function FooterLink({
+  href,
+  external,
+  children,
+}: {
+  href: string;
+  /** Leaves the product site, so it opens alongside rather than replacing it. */
+  external?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <a href={href} className={FOOTER_LINK}>
+    <a
+      href={href}
+      className={FOOTER_LINK}
+      {...(external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
+    >
       {children}
     </a>
   );
@@ -22,6 +49,8 @@ function FooterLink({ href, children }: { href: string; children: ReactNode }) {
 
 export function LandingFooter() {
   const t = useTranslations('landing');
+  const locale = useLocale();
+  const companyUrl = `${COMPANY_SITE}/${COMPANY_LOCALE[locale] ?? 'ru'}`;
 
   return (
     <footer className="border-t border-border bg-card/40">
@@ -54,7 +83,9 @@ export function LandingFooter() {
             <p className="flex min-h-11 items-center text-sm font-semibold text-foreground md:min-h-0">
               {t('footer.companyTitle')}
             </p>
-            <FooterLink href="#top">{t('footer.links.about')}</FooterLink>
+            <FooterLink href={companyUrl} external>
+              {t('footer.links.about')}
+            </FooterLink>
             <FooterLink href="#top">{t('footer.links.contact')}</FooterLink>
             <FooterLink href="#features">{t('footer.links.docs')}</FooterLink>
           </div>
