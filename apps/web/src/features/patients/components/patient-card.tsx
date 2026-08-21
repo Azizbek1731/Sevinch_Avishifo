@@ -24,6 +24,7 @@ import { PatientFormDialog } from './patient-form-dialog';
 import { PatientDocumentsTab } from './patient-documents-tab';
 import { PatientInvoicesTab } from './patient-invoices-tab';
 import { PatientOverviewTab } from './patient-overview-tab';
+import { ChargesPanel } from '@/features/admissions/components/charges-panel';
 import { PatientTimelineTab } from './patient-timeline-tab';
 import { PatientVisitsTab } from './patient-visits-tab';
 
@@ -169,6 +170,9 @@ export function PatientCardView({ patientId }: { patientId: string }) {
         <TabsList className="flex h-auto w-full flex-wrap justify-start">
           <TabsTrigger value="overview">{t('tabs.overview')}</TabsTrigger>
           <TabsTrigger value="timeline">{t('tabs.timeline')}</TabsTrigger>
+          {can('charges.read') ? (
+            <TabsTrigger value="charges">{t('tabs.charges')}</TabsTrigger>
+          ) : null}
           {can('visits.read') ? (
             <TabsTrigger value="visits">
               {t('tabs.visits')} ({patient.counts.visits})
@@ -189,6 +193,11 @@ export function PatientCardView({ patientId }: { patientId: string }) {
         <TabsContent value="timeline" className="mt-4">
           <PatientTimelineTab patientId={patient.id} />
         </TabsContent>
+        {can('charges.read') ? (
+          <TabsContent value="charges" className="mt-4">
+            <ChargesPanel patientId={patient.id} />
+          </TabsContent>
+        ) : null}
         {can('visits.read') ? (
           <TabsContent value="visits" className="mt-4">
             <PatientVisitsTab patientId={patient.id} />

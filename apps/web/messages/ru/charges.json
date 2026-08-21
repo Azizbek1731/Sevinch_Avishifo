@@ -1,0 +1,15 @@
+{
+  "title": "Неоплаченные услуги",
+  "owedTotal": "Всего к оплате",
+  "selectAll": "Выбрать все",
+  "selectToBill": "Отметьте для оплаты",
+  "billSelected": "{count} услуг — {amount}",
+  "billed": "Счёт готов: {number}",
+  "cancel": "Отменить",
+  "cancelled": "Услуга отменена",
+  "fromWard": "Стационар",
+  "empty": {
+    "title": "Нет неоплаченных услуг",
+    "description": "Все услуги пациента оплачены."
+  }
+}

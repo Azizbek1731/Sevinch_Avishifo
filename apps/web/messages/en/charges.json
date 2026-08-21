@@ -1,0 +1,15 @@
+{
+  "title": "Unpaid services",
+  "owedTotal": "Total owed",
+  "selectAll": "Select all",
+  "selectToBill": "Tick what is being paid",
+  "billSelected": "{count} service(s) — {amount}",
+  "billed": "Invoice ready: {number}",
+  "cancel": "Cancel",
+  "cancelled": "Service cancelled",
+  "fromWard": "Inpatient",
+  "empty": {
+    "title": "Nothing unpaid",
+    "description": "Every service written to this patient has been billed."
+  }
+}

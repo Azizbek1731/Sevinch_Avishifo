@@ -41,7 +41,8 @@
     "timeline": "История",
     "visits": "Визиты",
     "documents": "Документы",
-    "invoices": "Счета"
+    "invoices": "Счета",
+    "charges": "К оплате"
   },
   "form": {
     "createTitle": "Новый пациент",

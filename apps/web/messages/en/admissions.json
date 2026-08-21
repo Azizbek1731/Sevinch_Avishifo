@@ -1,0 +1,16 @@
+{
+  "sheet": {
+    "service": "Service",
+    "empty": "No orders yet",
+    "stop": "Stop",
+    "stopped": "Order stopped",
+    "given": "Given",
+    "skipped": "Refused",
+    "pending": "Not yet",
+    "schedules": {
+      "DAILY": "daily",
+      "EVERY_OTHER_DAY": "every other day",
+      "ONCE": "once"
+    }
+  }
+}

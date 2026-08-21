@@ -41,7 +41,8 @@
     "timeline": "Timeline",
     "visits": "Visits",
     "documents": "Documents",
-    "invoices": "Invoices"
+    "invoices": "Invoices",
+    "charges": "Unpaid"
   },
   "form": {
     "createTitle": "New patient",

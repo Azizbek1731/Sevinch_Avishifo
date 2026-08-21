@@ -1,0 +1,16 @@
+{
+  "sheet": {
+    "service": "Xizmat",
+    "empty": "Hali tayinlov yo‘q",
+    "stop": "To‘xtatish",
+    "stopped": "Tayinlov to‘xtatildi",
+    "given": "Berildi",
+    "skipped": "Olmadi",
+    "pending": "Hali yo‘q",
+    "schedules": {
+      "DAILY": "har kuni",
+      "EVERY_OTHER_DAY": "kun oshirib",
+      "ONCE": "bir marta"
+    }
+  }
+}

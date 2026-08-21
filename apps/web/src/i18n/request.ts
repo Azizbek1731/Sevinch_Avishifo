@@ -33,6 +33,8 @@ export const MESSAGE_NAMESPACES = [
   'recordAccess',
   'ai',
   'expenses',
+  'charges',
+  'admissions',
 ] as const;
 
 /**

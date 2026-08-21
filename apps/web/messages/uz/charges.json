@@ -1,0 +1,15 @@
+{
+  "title": "To‘lanmagan xizmatlar",
+  "owedTotal": "Jami qarz",
+  "selectAll": "Hammasini belgilash",
+  "selectToBill": "To‘lash uchun belgilang",
+  "billSelected": "{count} ta xizmat — {amount}",
+  "billed": "Hisob-faktura tayyor: {number}",
+  "cancel": "Bekor qilish",
+  "cancelled": "Xizmat bekor qilindi",
+  "fromWard": "Statsionar",
+  "empty": {
+    "title": "To‘lanmagan xizmat yo‘q",
+    "description": "Bemorga yozilgan barcha xizmatlar to‘langan."
+  }
+}

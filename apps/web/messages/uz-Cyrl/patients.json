@@ -41,7 +41,8 @@
     "timeline": "Тарих",
     "visits": "Ташрифлар",
     "documents": "Ҳужжатлар",
-    "invoices": "Ҳисоблар"
+    "invoices": "Ҳисоблар",
+    "charges": "Тўловлар"
   },
   "form": {
     "createTitle": "Янги бемор",

@@ -41,7 +41,8 @@
     "timeline": "Tarix",
     "visits": "Tashriflar",
     "documents": "Hujjatlar",
-    "invoices": "Hisoblar"
+    "invoices": "Hisoblar",
+    "charges": "To‘lovlar"
   },
   "form": {
     "createTitle": "Yangi bemor",
