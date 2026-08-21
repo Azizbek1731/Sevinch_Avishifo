@@ -230,62 +230,75 @@
     "dashboard": "Boshqaruv paneliga o'tish"
   },
   "pricing": {
-    "title": "Klinika dasturlari oyiga 300 000 so‘mdan. AviShifo — 199 000 so‘m.",
-    "subtitle": "Xuddi shu ish, arzonroq narxda. Narx so‘mda — dollar kursi ko‘tarilsa ham o‘zgarmaydi. Birinchi hafta bepul.",
+    "title": "Klinika dasturlari oyiga {market} so‘mdan. AviShifo — yillik to‘lovda {from} so‘mdan.",
+    "subtitle": "Xuddi shu ish, arzonroq boshlanadi. Narx so‘mda — dollar kursi ko‘tarilsa ham o‘zgarmaydi.",
+    "billing": {
+      "legend": "To‘lov davri",
+      "yearly": "Yillik to‘lov",
+      "monthly": "Oylik to‘lov",
+      "save": "−{amount} so‘m/oy",
+      "flat": "Yillik to‘lovda har bir tarif oyiga {monthly} so‘m arzon — yiliga {yearly} so‘m."
+    },
     "compare": {
       "others": "Boshqa dasturlarda",
       "ours": "Bizda",
-      "save": "Kamida oyiga {amount} so‘m tejaysiz"
+      "oursNote": "START tarifi, {cycle}",
+      "save": "START tarifida oyiga kamida {amount} so‘m tejaysiz"
     },
     "popular": "Eng ommabop",
     "som": "so‘m",
     "perMonth": "oy",
-    "perWeek": "hafta",
-    "yearly": "yillik to‘lovda",
-    "monthlyAlt": "oylik to‘lovda {price} so‘m",
+    "billedYearly": "yillik to‘lovda",
+    "billedMonthly": "oylik to‘lovda",
+    "monthlyStruck": "Oylik to‘lovda {price} so‘m",
+    "yearlyInvite": "Yillik to‘lovda {price} so‘m / oy",
+    "planLater": "Tarifni 7 kunlik bepul sinovdan keyin tanlaysiz — hozir karta shart emas.",
     "network": "Klinikalar tarmog‘i uchun — individual taklif",
     "networkCta": "Bog‘lanish",
     "guarantees": [
       "7 kun bepul, karta shart emas",
       "Excel jadvalidan bepul ko‘chirish",
-      "Istalgan payt bekor qilish",
+      "Oylik to‘lovda istalgan payt bekor qilish",
       "Narx so‘mda"
     ],
     "tiers": {
-      "free": {
-        "name": "BEPUL",
-        "tagline": "Yakka kabinet uchun",
-        "cta": "Bepul boshlash",
-        "features": [
-          "1 shifokor",
-          "500 tagacha bemor",
-          "EMK + qabul jadvali"
-        ]
-      },
       "start": {
         "name": "START",
-        "tagline": "Ishlayotgan klinikalar uchun",
+        "tagline": "Yangi ochilgan klinikalar uchun",
         "cta": "7 kun bepul sinash",
         "features": [
-          "Cheksiz shifokorlar",
-          "EMK",
-          "Onlayn yozilish",
-          "Moliya",
-          "Payme / Click",
-          "Telegram-eslatmalar",
-          "Excel jadvalidan bepul ko‘chirish"
+          "3 ta xodim",
+          "Jonli navbat + TV ekran",
+          "100 bemor kartasi va EHR",
+          "Kassa va to‘lovlar",
+          "Bemor portali va onlayn yozilish"
+        ]
+      },
+      "standard": {
+        "name": "STANDARD",
+        "tagline": "O‘sib borayotgan klinikalar uchun",
+        "cta": "7 kun bepul sinash",
+        "features": [
+          "2 filialgacha",
+          "30 tagacha xodim",
+          "START tarifidagi barcha modullar",
+          "Laboratoriya moduli",
+          "SMS + Telegram bildirishnomalar",
+          "Kengaytirilgan hisobotlar"
         ]
       },
       "pro": {
         "name": "PRO (AI)",
-        "tagline": "AI bilan ishlaydigan markazlar uchun",
+        "tagline": "Tarmoqlar va yirik markazlar uchun",
         "cta": "AI bilan sinash",
         "features": [
-          "START tarifidagi hammasi",
+          "10 filialgacha",
+          "100 tagacha xodim",
+          "STANDARD tarifidagi barcha modullar",
           "AI-diagnostika yordamchisi",
           "AI-analitika",
-          "DMED integratsiyasi",
-          "Ustuvor qo‘llab-quvvatlash"
+          "Ustuvor qo‘llab-quvvatlash",
+          "DMED integratsiyasi"
         ]
       }
     }

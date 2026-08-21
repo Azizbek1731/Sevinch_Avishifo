@@ -230,62 +230,75 @@
     "dashboard": "Go to dashboard"
   },
   "pricing": {
-    "title": "Clinic software starts at 300 000 so‘m a month. AviShifo is 199 000.",
-    "subtitle": "The same job for less. Priced in so‘m — a rising dollar does not move it. First week free.",
+    "title": "Clinic software starts at {market} so‘m a month. AviShifo starts at {from}, billed yearly.",
+    "subtitle": "The same job, a cheaper start. Priced in so‘m — a rising dollar does not move it.",
+    "billing": {
+      "legend": "Billing period",
+      "yearly": "Billed yearly",
+      "monthly": "Billed monthly",
+      "save": "−{amount} so‘m/mo",
+      "flat": "Billed yearly, every plan is {monthly} so‘m a month cheaper — {yearly} so‘m over a year."
+    },
     "compare": {
       "others": "Elsewhere",
-      "ours": "At AviShifo",
-      "save": "You save at least {amount} so‘m a month"
+      "ours": "With us",
+      "oursNote": "START plan, {cycle}",
+      "save": "On START you save at least {amount} so‘m a month"
     },
     "popular": "Most popular",
     "som": "so‘m",
     "perMonth": "month",
-    "perWeek": "week",
-    "yearly": "billed yearly",
-    "monthlyAlt": "billed monthly — {price} so‘m",
+    "billedYearly": "billed yearly",
+    "billedMonthly": "billed monthly",
+    "monthlyStruck": "Billed monthly — {price} so‘m",
+    "yearlyInvite": "Billed yearly — {price} so‘m / month",
+    "planLater": "You choose a plan after the 7-day free trial — no card needed now.",
     "network": "Running a network of clinics? We will quote you individually",
     "networkCta": "Get in touch",
     "guarantees": [
       "7 days free, no card needed",
       "Free migration from Excel",
-      "Cancel any time",
+      "Billed monthly — cancel any time",
       "Priced in so‘m"
     ],
     "tiers": {
-      "free": {
-        "name": "FREE",
-        "tagline": "For a single practice",
-        "cta": "Start free",
-        "features": [
-          "1 doctor",
-          "Up to 500 patients",
-          "Records + appointment schedule"
-        ]
-      },
       "start": {
         "name": "START",
-        "tagline": "For clinics already running",
+        "tagline": "For a clinic just opening",
         "cta": "Try 7 days free",
         "features": [
-          "Unlimited doctors",
-          "Patient records",
-          "Online booking",
-          "Finance",
-          "Payme / Click",
-          "Telegram reminders",
-          "Free migration from Excel"
+          "3 staff",
+          "Live queue + waiting-room screen",
+          "100 patient records",
+          "Cashier and payments",
+          "Patient portal and online booking"
+        ]
+      },
+      "standard": {
+        "name": "STANDARD",
+        "tagline": "For a clinic that is growing",
+        "cta": "Try 7 days free",
+        "features": [
+          "Up to 2 branches",
+          "Up to 30 staff",
+          "Every module in START",
+          "Laboratory module",
+          "SMS + Telegram notifications",
+          "Extended reports"
         ]
       },
       "pro": {
         "name": "PRO (AI)",
-        "tagline": "For centres working with AI",
+        "tagline": "For networks and large centres",
         "cta": "Try it with AI",
         "features": [
-          "Everything in START",
+          "Up to 10 branches",
+          "Up to 100 staff",
+          "Every module in STANDARD",
           "AI diagnostic assistant",
           "AI analytics",
-          "DMED integration",
-          "Priority support"
+          "Priority support",
+          "DMED integration"
         ]
       }
     }
