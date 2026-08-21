@@ -214,13 +214,59 @@ describe('expenses (e2e)', () => {
   });
 
   it('refuses a caller without the permission', async () => {
-    const receptionist = await login(app, clinic.receptionist.email);
+    // Reception and the cash desk may both record spending; clinical roles may not.
+    const doctor = await login(app, clinic.doctor.email);
     await request(app.getHttpServer())
       .post(`${API}/expenses`)
-      .set('Authorization', `Bearer ${receptionist.accessToken}`)
+      .set('Authorization', `Bearer ${doctor.accessToken}`)
       .set('x-branch-id', clinic.branchId)
       .send({ categoryId, amount: '1000', method: 'CARD', date: '2026-08-21' })
       .expect(403);
+  });
+
+  it('charges reception spending to reception own drawer, not the cash desk', async () => {
+    // The case this exists for: two people hold a drawer in the same branch at
+    // the same time. Money the receptionist takes out must leave HER till —
+    // charging the cashier's would make the cashier short for a purchase she
+    // never saw, which is the exact failure the whole feature prevents.
+    const recep = await login(app, clinic.receptionist.email);
+    await request(app.getHttpServer())
+      .post(`${API}/shifts/open`)
+      .set('Authorization', `Bearer ${recep.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({ openingCash: '300000', confirmSecondDrawer: true })
+      .expect(201);
+
+    const cashierBefore = await drawer();
+
+    await request(app.getHttpServer())
+      .post(`${API}/expenses`)
+      .set('Authorization', `Bearer ${recep.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({ categoryId, amount: '70000', method: 'CASH', date: new Date().toISOString().slice(0, 10) })
+      .expect(201);
+
+    const recepDrawer = await request(app.getHttpServer())
+      .get(`${API}/shifts/current`)
+      .set('Authorization', `Bearer ${recep.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .expect(200);
+    expect(Number(recepDrawer.body.data.expenseOut)).toBe(70000);
+    expect(Number(recepDrawer.body.data.expectedCashSoFar)).toBe(230000);
+
+    const cashierAfter = await drawer();
+    expect(cashierAfter.expectedCashSoFar).toBe(cashierBefore.expectedCashSoFar);
+    expect(cashierAfter.expenseOut).toBe(cashierBefore.expenseOut);
+
+    // Leave the branch as this suite found it: the closing test below counts
+    // the cashier's drawer and a second open one changes nothing for it, but
+    // an abandoned drawer would confuse anything added after.
+    await request(app.getHttpServer())
+      .post(`${API}/shifts/close`)
+      .set('Authorization', `Bearer ${recep.accessToken}`)
+      .set('x-branch-id', clinic.branchId)
+      .send({ actualCash: '230000', transferUnverifiedReason: 'Sinov' })
+      .expect(201);
   });
 
   // ------------------------------------------------------------ closing time

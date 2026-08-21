@@ -198,6 +198,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'payments.create',
     'payments.void',
     'shifts.manage',
+    // Reception holds a drawer too — it has shifts.manage and takes payments —
+    // so money leaving that drawer has to be recordable by the person holding
+    // it. Cash expenses still come out of their OWN open shift, so nothing
+    // here lets one desk spend from another's till.
+    'expenses.read',
+    'expenses.write',
     'debts.read',
     'schedules.read',
   ],
