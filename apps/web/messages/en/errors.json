@@ -53,5 +53,6 @@
   "TELEGRAM_NOT_LINKED": "Telegram bot is not linked",
   "RECORD_ACCESS_REQUIRED": "Ask the clinic to release your medical history",
   "APPOINTMENT_NOT_FOUND": "Appointment not found",
-  "QUEUE_CLOSED": "The queue is closed"
+  "QUEUE_CLOSED": "The queue is closed",
+  "TRANSFER_COUNT_REQUIRED": "Enter the closing figure for the transfer book, or say why it could not be checked"
 }

@@ -57,6 +57,7 @@ export class ShiftsService {
       openedAt: s.openedAt.toISOString(),
       closedAt: s.closedAt ? s.closedAt.toISOString() : null,
       openingCash: s.openingCash.toFixed(2),
+      openingTransfer: s.openingTransfer.toFixed(2),
       expectedCash: s.expectedCash ? s.expectedCash.toFixed(2) : null,
       actualCash: s.actualCash ? s.actualCash.toFixed(2) : null,
       expectedTransfer: s.expectedTransfer ? s.expectedTransfer.toFixed(2) : null,
@@ -76,34 +77,37 @@ export class ShiftsService {
    * and the number printed when the drawer closed were produced by two
    * different rules and were free to disagree.
    */
-  private async registerTotals(shiftId: string): Promise<RegisterTotals> {
+  private async registerTotals(
+    shiftId: string,
+    db: Pick<typeof this.prisma.db, 'payment' | 'refund' | 'expense' | 'patientBalanceTransaction'> = this.prisma.db,
+  ): Promise<RegisterTotals> {
     const [cashInAgg, cashRefundAgg, expenseAgg, depositAgg, transferRows, transferRefundAgg] =
       await Promise.all([
-        this.prisma.db.payment.aggregate({
+        db.payment.aggregate({
           where: { shiftId, method: 'CASH', status: 'COMPLETED' },
           _sum: { amount: true },
           _count: { _all: true },
         }),
-        this.prisma.db.refund.aggregate({
+        db.refund.aggregate({
           where: { shiftId, method: 'CASH' },
           _sum: { amount: true },
         }),
-        this.prisma.db.expense.aggregate({
+        db.expense.aggregate({
           where: { shiftId, method: 'CASH', deletedAt: null },
           _sum: { amount: true },
         }),
         // Cash handed over as a deposit is in the drawer like any other note.
-        this.prisma.db.patientBalanceTransaction.aggregate({
+        db.patientBalanceTransaction.aggregate({
           where: { shiftId, method: 'CASH' },
           _sum: { amount: true },
         }),
-        this.prisma.db.payment.groupBy({
+        db.payment.groupBy({
           by: ['method'],
           where: { shiftId, status: 'COMPLETED', method: { in: [...TRANSFER_METHODS] } },
           _sum: { amount: true },
           _count: { _all: true },
         }),
-        this.prisma.db.refund.aggregate({
+        db.refund.aggregate({
           where: { shiftId, method: { in: [...TRANSFER_METHODS] } },
           _sum: { amount: true },
         }),
@@ -141,98 +145,120 @@ export class ShiftsService {
   }
 
   async open(dto: OpenShiftInput, user: AuthUser, branchId: string): Promise<Record<string, unknown>> {
-    const mine = await this.prisma.db.cashierShift.findFirst({
-      where: { cashierUserId: user.id, branchId, status: 'OPEN' },
+    // ONE register per branch. Per-user drawers made the owner, reception and
+    // the cashier each see "the" register and each see a different one; the
+    // clinics this is sold to run one physical box, so the model matches that
+    // now. A partial unique index backs this check against a race.
+    const open = await this.prisma.db.cashierShift.findFirst({
+      where: { branchId, status: 'OPEN' },
+      include: { cashier: { select: { fullName: true } } },
     });
-    if (mine) {
-      throw new AppException(ErrorCode.SHIFT_ALREADY_OPEN, 'You already have an open shift in this branch', 409);
+    if (open) {
+      throw new AppException(
+        ErrorCode.SHIFT_ALREADY_OPEN,
+        `Kassa allaqachon ochiq (${open.cashier.fullName} ochgan). Avval uni yoping.`,
+        409,
+      );
     }
 
-    // Somebody else already holding a drawer here is legitimate — two windows
-    // at one reception is a real arrangement — but it is far more often a
-    // manager opening one by accident and then reading their own empty drawer
-    // as the clinic's takings. So it is allowed, once it has been said out loud.
-    if (!dto.confirmSecondDrawer) {
-      const other = await this.prisma.db.cashierShift.findFirst({
-        where: { branchId, status: 'OPEN' },
-        include: { cashier: { select: { fullName: true } } },
+    // The header value is checked against the caller's branch list, but an
+    // owner's empty list means "all branches" — of their OWN clinic. The
+    // partial unique index is global, so an unvalidated id could lock another
+    // clinic's register.
+    const branch = await this.prisma.db.branch.findFirst({ where: { id: branchId } });
+    if (!branch) throw new AppException(ErrorCode.NOT_FOUND, 'Branch not found', 404);
+
+    try {
+      const shift = await this.prisma.db.cashierShift.create({
+        // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
+        data: {
+          clinicId: TenantContext.requireClinicId(),
+          branchId,
+          cashierUserId: user.id,
+          status: 'OPEN',
+          openingCash: new Prisma.Decimal(dto.openingCash ?? '0'),
+          openingTransfer: new Prisma.Decimal(dto.openingTransfer ?? '0'),
+        },
       });
-      if (other) {
-        throw new AppException(
-          ErrorCode.BRANCH_DRAWER_ALREADY_OPEN,
-          `${other.cashier.fullName} bu filialda kassa ochgan. O‘zingizga alohida kassa ochmoqchimisiz?`,
-          409,
-        );
+      return this.mapShift(shift);
+    } catch (e) {
+      // Two people pressed open at once: the partial unique index caught what
+      // the check above raced past. Same answer as the slow path, not a 500.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new AppException(ErrorCode.SHIFT_ALREADY_OPEN, 'Kassa allaqachon ochiq.', 409);
       }
+      throw e;
     }
-
-    const shift = await this.prisma.db.cashierShift.create({
-      // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
-      data: {
-        clinicId: TenantContext.requireClinicId(),
-        branchId,
-        cashierUserId: user.id,
-        status: 'OPEN',
-        openingCash: new Prisma.Decimal(dto.openingCash ?? '0'),
-      },
-    });
-    return this.mapShift(shift);
   }
 
-  /** Close the current shift and return the X/Z reconciliation report. */
+  /** Close the branch register and return the X/Z reconciliation report. */
   async close(dto: CloseShiftInput, user: AuthUser, branchId: string): Promise<Record<string, unknown>> {
+    // Not filtered by opener: the register belongs to the branch, and whoever
+    // holds shifts.manage may count it out. closedById records who did.
     const shift = await this.prisma.db.cashierShift.findFirst({
-      where: { cashierUserId: user.id, branchId, status: 'OPEN' },
+      where: { branchId, status: 'OPEN' },
     });
     if (!shift) {
       throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'No open shift in this branch', 409);
     }
 
-    const totals = await this.registerTotals(shift.id);
-    const expectedCash = shift.openingCash.add(totals.expectedCash);
-    const actualCash = new Prisma.Decimal(dto.actualCash);
-    const expectedTransfer = totals.expectedTransfer;
-
-    // A transfer figure can be counted — off the terminal's own sverka and the
-    // PSP cabinets — and that comparison catches real errors: a payment taken
-    // on the terminal and never keyed in, a receipt entered twice, a card
-    // payment recorded as cash. But an acquirer's batch cut-off rarely lines up
-    // with a shift boundary, so "I could not check" has to be a first-class
-    // answer rather than a number someone was forced to invent.
-    const counted = dto.actualTransfer !== undefined && dto.actualTransfer !== '';
-    const reason = dto.transferUnverifiedReason?.trim();
-    if (expectedTransfer.gt(0) && !counted && !reason) {
-      throw new AppException(
-        ErrorCode.TRANSFER_COUNT_REQUIRED,
-        'O‘tkazma kassada harakat bo‘lgan — terminal hisobotidagi summani kiriting yoki sababini yozing',
-        400,
-      );
-    }
-    const actualTransfer = counted ? new Prisma.Decimal(dto.actualTransfer as string) : null;
-    const unverifiedReason = counted
-      ? null
-      : (reason ?? 'O‘tkazma harakati bo‘lmagan');
-
+    // One closer wins. The status flip is the claim: it is guarded, so a
+    // second simultaneous closer gets a 409 instead of silently overwriting a
+    // signed-off Z-report, and it holds the row lock, so a payment that
+    // re-checks the register FOR SHARE either commits before the flip (and is
+    // counted below) or sees CLOSED and refuses. Totals are computed inside
+    // the same transaction for exactly that reason.
     const closedAt = new Date();
-    const closed = await this.prisma.db.cashierShift.update({
-      where: { id: shift.id },
-      data: {
-        status: 'CLOSED',
-        closedAt,
-        closedById: user.id,
-        expectedCash,
-        actualCash,
-        expectedTransfer,
-        actualTransfer,
-        transferUnverifiedReason: unverifiedReason,
-        note: dto.note ?? null,
-      },
+    const closed = await this.prisma.db.$transaction(async (tx) => {
+      const claimed = await tx.cashierShift.updateMany({
+        where: { id: shift.id, status: 'OPEN' },
+        data: { status: 'CLOSED', closedAt, closedById: user.id },
+      });
+      if (claimed.count === 0) {
+        throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'No open shift in this branch', 409);
+      }
+
+      const totals = await this.registerTotals(shift.id, tx);
+      const expectedCash = shift.openingCash.add(totals.expectedCash);
+      const actualCash = new Prisma.Decimal(dto.actualCash);
+      const expectedTransfer = shift.openingTransfer.add(totals.expectedTransfer);
+
+      // Both books opened with a counted figure, so both close with one — or
+      // with a stated reason. Throwing here rolls the claim back and the
+      // register stays open.
+      const counted = dto.actualTransfer !== undefined && dto.actualTransfer !== '';
+      const reason = dto.transferUnverifiedReason?.trim();
+      if (expectedTransfer.gt(0) && !counted && !reason) {
+        throw new AppException(
+          ErrorCode.TRANSFER_COUNT_REQUIRED,
+          'O‘tkazma kassasi uchun yakuniy summani kiriting yoki nima uchun aniqlab bo‘lmaganini yozing',
+          400,
+        );
+      }
+      const actualTransfer = counted ? new Prisma.Decimal(dto.actualTransfer as string) : null;
+      const unverifiedReason = counted ? null : (reason ?? 'O‘tkazma harakati bo‘lmagan');
+
+      const row = await tx.cashierShift.update({
+        where: { id: shift.id },
+        data: {
+          expectedCash,
+          actualCash,
+          expectedTransfer,
+          actualTransfer,
+          transferUnverifiedReason: unverifiedReason,
+          note: dto.note ?? null,
+        },
+      });
+      return { row, totals, expectedCash, actualCash, expectedTransfer, actualTransfer, unverifiedReason };
     });
 
+    const { totals, expectedCash, actualCash, expectedTransfer, actualTransfer, unverifiedReason } = closed;
+
     return {
-      shift: this.mapShift(closed),
+      shift: this.mapShift(closed.row),
       report: {
         openingCash: shift.openingCash.toFixed(2),
+        openingTransfer: shift.openingTransfer.toFixed(2),
         cashIn: totals.cashIn.toFixed(2),
         cashDeposits: totals.cashDeposits.toFixed(2),
         cashOut: totals.cashRefunds.toFixed(2),
@@ -282,29 +308,25 @@ export class ShiftsService {
     );
   }
 
-  /** Current user's open shift in the active branch (null when none). */
-  async current(user: AuthUser, branchId: string): Promise<Record<string, unknown> | null> {
+  /**
+   * The branch register (null when none is open).
+   *
+   * Deliberately NOT filtered by caller: everyone in the branch reads the same
+   * register, which is the entire point of the redesign — two accounts showing
+   * two different totals for "the" kassa is the confusion this replaces.
+   */
+  async current(_user: AuthUser, branchId: string): Promise<Record<string, unknown> | null> {
     const shift = await this.prisma.db.cashierShift.findFirst({
-      where: { cashierUserId: user.id, branchId, status: 'OPEN' },
+      where: { branchId, status: 'OPEN' },
       include: { cashier: { select: { id: true, fullName: true } } },
     });
-    if (!shift) {
-      // Whether anyone else is holding a drawer here, so the screen can say so
-      // instead of leaving a manager to conclude the clinic has taken nothing.
-      const others = await this.prisma.db.cashierShift.count({
-        where: { branchId, status: 'OPEN' },
-      });
-      return others > 0 ? { open: false, otherDrawers: others } : null;
-    }
+    if (!shift) return null;
 
     const totals = await this.registerTotals(shift.id);
     return {
       ...this.mapShift(shift),
       open: true,
       cashier: shift.cashier,
-      otherDrawers: await this.prisma.db.cashierShift.count({
-        where: { branchId, status: 'OPEN', id: { not: shift.id } },
-      }),
 
       cashIn: totals.cashIn.toFixed(2),
       cashDeposits: totals.cashDeposits.toFixed(2),
@@ -312,7 +334,7 @@ export class ShiftsService {
       expenseOut: totals.cashExpenses.toFixed(2),
       expectedCashSoFar: shift.openingCash.add(totals.expectedCash).toFixed(2),
 
-      transferTotal: totals.expectedTransfer.toFixed(2),
+      transferTotal: shift.openingTransfer.add(totals.expectedTransfer).toFixed(2),
       transferRefunds: totals.transferRefunds.toFixed(2),
       transferByMethod: totals.transferByMethod.map((r) => ({
         method: r.method,
@@ -330,9 +352,9 @@ export class ShiftsService {
    * list the moment it is settled, so at the exact moment somebody notices the
    * mistake there is no way to reach it. This is that way.
    */
-  async currentPayments(user: AuthUser, branchId: string): Promise<Record<string, unknown>[]> {
+  async currentPayments(_user: AuthUser, branchId: string): Promise<Record<string, unknown>[]> {
     const shift = await this.prisma.db.cashierShift.findFirst({
-      where: { cashierUserId: user.id, branchId, status: 'OPEN' },
+      where: { branchId, status: 'OPEN' },
       select: { id: true },
     });
     if (!shift) return [];
@@ -383,8 +405,9 @@ export class ShiftsService {
           cashier: s.cashier,
           openedAt: s.openedAt.toISOString(),
           openingCash: s.openingCash.toFixed(2),
+          openingTransfer: s.openingTransfer.toFixed(2),
           expectedCash: s.openingCash.add(t.expectedCash).toFixed(2),
-          transferTotal: t.expectedTransfer.toFixed(2),
+          transferTotal: s.openingTransfer.add(t.expectedTransfer).toFixed(2),
         };
       }),
     );

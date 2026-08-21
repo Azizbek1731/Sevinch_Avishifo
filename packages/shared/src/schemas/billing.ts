@@ -117,20 +117,10 @@ export const createRefundSchema = z.object({
 export type CreateRefundInput = z.infer<typeof createRefundSchema>;
 
 export const openShiftSchema = z.object({
-  /**
-   * The float physically handed over. There is deliberately no opening figure
-   * for the transfer register: that money is in the bank and in the PSP
-   * accounts, never in anyone's hands, so there is no float to hand over and
-   * nothing an opening number could honestly refer to.
-   */
+  /** Cash physically in the box when the branch register opens. */
   openingCash: moneySchema.default('0'),
-  /**
-   * Set when the user has been told somebody else already holds a drawer in
-   * this branch and wants their own anyway. Without it a second drawer is
-   * refused — opening one by accident is what made two accounts show two
-   * different totals.
-   */
-  confirmSecondDrawer: z.coerce.boolean().optional(),
+  /** What the transfer account holds at opening, read off the terminal/PSP. */
+  openingTransfer: moneySchema.default('0'),
 });
 export type OpenShiftInput = z.infer<typeof openShiftSchema>;
 

@@ -96,6 +96,31 @@ function legKey(base: string, index: number): string {
 }
 
 
+/**
+ * Re-checks, INSIDE the writer's transaction, that the register a money row is
+ * about to join is still open — and takes a share lock on it so a concurrent
+ * close() waits for this write to commit and therefore counts it.
+ *
+ * Returns the shiftId to write: unchanged when the register is live, null when
+ * it closed mid-request and the method may float free (transfer methods),
+ * throwing for CASH, which must never be booked into a counted-out drawer.
+ */
+async function reverifyShift(
+  tx: { $queryRaw: (q: TemplateStringsArray, ...v: unknown[]) => Promise<unknown> },
+  shiftId: string | null,
+  method: string,
+): Promise<string | null> {
+  if (!shiftId) return null;
+  const rows = (await tx.$queryRaw`
+    SELECT "id" FROM "CashierShift" WHERE "id" = ${shiftId} AND "status" = 'OPEN' FOR SHARE
+  `) as unknown[];
+  if (rows.length > 0) return shiftId;
+  if (method === 'CASH') {
+    throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'Kassa hozirgina yopildi — smenani qayta oching', 409);
+  }
+  return null;
+}
+
 @Injectable()
 export class InvoicesService {
   private readonly logger = new Logger(InvoicesService.name);
@@ -450,7 +475,7 @@ export class InvoicesService {
     // its card leg has already been taken.
     if (parts.some((p) => p.method === 'CASH')) {
       const shift = await this.prisma.db.cashierShift.findFirst({
-        where: { cashierUserId: user.id, branchId: invoice.branchId, status: 'OPEN' },
+        where: { branchId: invoice.branchId, status: 'OPEN' },
       });
       if (!shift) {
         throw new AppException(
@@ -785,10 +810,16 @@ export class InvoicesService {
     // and online money lands in the bank whether or not anyone opened a shift,
     // so it is linked when a drawer exists and left unattached when none does.
     // BALANCE is never linked: no money moves now, it moved on deposit day.
+    // A user pinned to specific branches settles only those branches' invoices;
+    // an empty list still means every branch of the clinic.
+    if (user.branchIds.length > 0 && !user.branchIds.includes(invoice.branchId)) {
+      throw new AppException(ErrorCode.FORBIDDEN, 'No access to this branch', 403);
+    }
+
     let shiftId: string | null = null;
     if (dto.method !== 'BALANCE') {
       const shift = await this.prisma.db.cashierShift.findFirst({
-        where: { cashierUserId: user.id, branchId: invoice.branchId, status: 'OPEN' },
+        where: { branchId: invoice.branchId, status: 'OPEN' },
       });
       if (!shift && dto.method === 'CASH') {
         throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'Open cashier shift required for cash payments', 409);
@@ -827,6 +858,7 @@ export class InvoicesService {
             },
           });
         }
+        const liveShiftId = await reverifyShift(tx as never, shiftId, dto.method);
         const created = await tx.payment.create({
           // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
           data: {
@@ -836,7 +868,7 @@ export class InvoicesService {
             amount,
             method: dto.method,
             status: 'COMPLETED',
-            shiftId,
+            shiftId: liveShiftId,
             idempotencyKey: dto.idempotencyKey,
             receivedById: user.id,
           },
@@ -884,10 +916,16 @@ export class InvoicesService {
 
     // Same rule as payments: a card refund nets off the acquirer's own slip, so
     // it has to reduce the same register the card payment increased.
+    // A user pinned to specific branches settles only those branches' invoices;
+    // an empty list still means every branch of the clinic.
+    if (user.branchIds.length > 0 && !user.branchIds.includes(invoice.branchId)) {
+      throw new AppException(ErrorCode.FORBIDDEN, 'No access to this branch', 403);
+    }
+
     let shiftId: string | null = null;
     if (dto.method !== 'BALANCE') {
       const shift = await this.prisma.db.cashierShift.findFirst({
-        where: { cashierUserId: user.id, branchId: invoice.branchId, status: 'OPEN' },
+        where: { branchId: invoice.branchId, status: 'OPEN' },
       });
       if (!shift && dto.method === 'CASH') {
         throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'Open cashier shift required for cash refunds', 409);
@@ -897,6 +935,7 @@ export class InvoicesService {
 
     const fullyRefunded = refundedSum.add(amount).gte(invoice.paidTotal) && invoice.paidTotal.gt(0);
     const refund = await this.prisma.db.$transaction(async (tx) => {
+      const liveShiftId = await reverifyShift(tx as never, shiftId, dto.method);
       const created = await tx.refund.create({
         // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
         data: {
@@ -905,7 +944,7 @@ export class InvoicesService {
           amount,
           method: dto.method,
           reason: dto.reason,
-          shiftId,
+          shiftId: liveShiftId,
           createdById: user.id,
         },
       });

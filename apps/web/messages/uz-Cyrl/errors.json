@@ -53,5 +53,6 @@
   "TELEGRAM_NOT_LINKED": "Telegram бот уланмаган",
   "RECORD_ACCESS_REQUIRED": "Касаллик тарихини кўриш учун клиникадан рухсат олинг",
   "APPOINTMENT_NOT_FOUND": "Қабул топилмади",
-  "QUEUE_CLOSED": "Навбат ёпилган"
+  "QUEUE_CLOSED": "Навбат ёпилган",
+  "TRANSFER_COUNT_REQUIRED": "Ўтказма кассаси учун якуний суммани киритинг ёки сабабини ёзинг"
 }

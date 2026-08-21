@@ -53,5 +53,6 @@
   "TELEGRAM_NOT_LINKED": "Telegram bot ulanmagan",
   "RECORD_ACCESS_REQUIRED": "Kasallik tarixini ko‘rish uchun klinikadan ruxsat oling",
   "APPOINTMENT_NOT_FOUND": "Qabul topilmadi",
-  "QUEUE_CLOSED": "Navbat yopilgan"
+  "QUEUE_CLOSED": "Navbat yopilgan",
+  "TRANSFER_COUNT_REQUIRED": "O‘tkazma kassasi uchun yakuniy summani kiriting yoki sababini yozing"
 }

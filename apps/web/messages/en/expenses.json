@@ -11,7 +11,7 @@
   "noCategoriesHint": "Add a category first",
   "method": "Paid by",
   "methodLocked": "The payment method cannot be changed — delete the expense and enter it again",
-  "cashHint": "This comes out of your open register and is counted when the shift closes",
+  "cashHint": "This comes out of the branch register and is counted when it closes",
   "date": "Date",
   "note": "Note",
   "notePlaceholder": "What it was spent on",

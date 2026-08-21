@@ -323,14 +323,13 @@ describe('billing: invoices, payments, shift (e2e)', () => {
     expect(res.status).toBe(400);
   });
 
-  it('receptionist opens their own shift and a quick sale settles on the spot', async () => {
+  it('receptionist opens the branch register and a quick sale settles on the spot', async () => {
+    // One register per branch now: reception opens THE register, not their own.
     const shift = await request(app.getHttpServer())
       .post(`${API}/shifts/open`)
       .set('Authorization', `Bearer ${recep.accessToken}`)
       .set('x-branch-id', clinic.branchId)
-      // A second drawer in the same branch is legitimate — two windows at one
-      // reception — but it has to be deliberate.
-      .send({ openingCash: '0', confirmSecondDrawer: true });
+      .send({ openingCash: '0' });
     expect(shift.status).toBe(201);
 
     const res = await request(app.getHttpServer())
@@ -435,11 +434,8 @@ describe('billing: invoices, payments, shift (e2e)', () => {
   // two payments — the shape a front desk actually deals with.
 
   it('splits one sale across two payment methods', async () => {
-    await request(app.getHttpServer())
-      .post(`${API}/shifts/open`)
-      .set('Authorization', `Bearer ${cashier.accessToken}`)
-      .set('x-branch-id', clinic.branchId)
-      .send({ openingCash: '0', confirmSecondDrawer: true });
+    // The branch register is already open (reception opened it above); with
+    // one register per branch the cashier simply works the same till.
 
     const res = await request(app.getHttpServer())
       .post(`${API}/invoices/quick`)
@@ -570,7 +566,7 @@ describe('billing: invoices, payments, shift (e2e)', () => {
       .post(`${API}/shifts/open`)
       .set('Authorization', `Bearer ${cashier.accessToken}`)
       .set('x-branch-id', clinic.branchId)
-      .send({ openingCash: '0', confirmSecondDrawer: true });
+      .send({ openingCash: '0' });
 
     const key = randomUUID();
     const body = {

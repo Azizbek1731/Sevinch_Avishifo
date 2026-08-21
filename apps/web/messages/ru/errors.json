@@ -53,5 +53,6 @@
   "TELEGRAM_NOT_LINKED": "Telegram-бот не привязан",
   "RECORD_ACCESS_REQUIRED": "Получите разрешение клиники на просмотр истории болезни",
   "APPOINTMENT_NOT_FOUND": "Приём не найден",
-  "QUEUE_CLOSED": "Очередь закрыта"
+  "QUEUE_CLOSED": "Очередь закрыта",
+  "TRANSFER_COUNT_REQUIRED": "Укажите итоговую сумму по кассе переводов или причину, почему её нельзя проверить"
 }

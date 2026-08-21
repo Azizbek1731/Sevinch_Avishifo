@@ -33,11 +33,6 @@ done
 echo "==> [2/4] install deps + prisma client"
 run_ssh "cd ${REMOTE_DIR} && pnpm install --frozen-lockfile >/dev/null 2>&1 && pnpm --filter @avishifo/api db:generate >/dev/null 2>&1 && echo deps-ok"
 
-if [ "${1:-}" = "--migrate" ]; then
-  echo "==> [2b] prisma migrate deploy"
-  run_ssh "cd ${REMOTE_DIR}/apps/api && npx prisma migrate deploy 2>&1 | tail -2"
-fi
-
 echo "==> [3/4] clean build (rm dist/.next → no stale bundles) — a few minutes"
 # NEXT_PUBLIC_* are inlined at BUILD time and Next.js only reads env files inside
 # apps/<app>/, never the repo-root .env — so the root .env must be sourced into
@@ -49,6 +44,16 @@ run_ssh "cd ${REMOTE_DIR} && export NODE_OPTIONS=--max-old-space-size=1536 && \
   for pkg in shared api web display portal; do \
     echo \"  building \$pkg...\"; pnpm --filter @avishifo/\$pkg build >/dev/null 2>&1 || { echo \"BUILD FAILED: \$pkg\"; exit 1; }; \
   done && echo build-ok"
+
+if [ "${1:-}" = "--migrate" ]; then
+  # Right before the restart, not before the build: the old code keeps serving
+  # during the build, and minutes of old code against a migrated schema is how
+  # money rows quietly stop linking. This shrinks that window to seconds. No
+  # pipe after the command — a masked migrate failure ships code against the
+  # old schema, which is worse than a loud abort.
+  echo "==> [3b] prisma migrate deploy"
+  run_ssh "cd ${REMOTE_DIR}/apps/api && npx prisma migrate deploy"
+fi
 
 echo "==> [4/4] restart pm2 + health check"
 # The API needs ~10-20s to boot on the 2GB box (Nest + Prisma + Redis + the

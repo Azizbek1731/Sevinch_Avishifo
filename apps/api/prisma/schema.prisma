@@ -1224,25 +1224,30 @@ model PatientBalanceTransaction {
   @@index([clinicId, shiftId])
 }
 
+/// THE branch register. One may be open per branch at a time (partial unique
+/// index, hand-written in SQL — Prisma cannot express it). cashierUserId is
+/// who opened it, closedById who closed it; anyone with shifts.manage may do
+/// either. Every payment still records its own receiver, so per-person
+/// attribution survives inside the shared till.
 model CashierShift {
-  id            String             @id @default(uuid(7))
-  clinicId      String
-  branchId      String
-  cashierUserId String
-  status        CashierShiftStatus @default(OPEN)
-  openedAt      DateTime           @default(now()) @db.Timestamptz(6)
-  closedAt      DateTime?          @db.Timestamptz(6)
-  openingCash   Decimal            @default(0) @db.Decimal(14, 2)
-  expectedCash  Decimal?           @db.Decimal(14, 2)
-  actualCash    Decimal?           @db.Decimal(14, 2)
-  note          String?
+  id              String             @id @default(uuid(7))
+  clinicId        String
+  branchId        String
+  cashierUserId   String
+  status          CashierShiftStatus @default(OPEN)
+  openedAt        DateTime           @default(now()) @db.Timestamptz(6)
+  closedAt        DateTime?          @db.Timestamptz(6)
+  openingCash     Decimal            @default(0) @db.Decimal(14, 2)
+  /// What the transfer account held when the register opened, entered by the
+  /// person opening it. The owner decided both books open and close the same
+  /// way, with a starting figure each — this overrides the earlier
+  /// turnover-only design below.
+  openingTransfer Decimal            @default(0) @db.Decimal(14, 2)
+  expectedCash    Decimal?           @db.Decimal(14, 2)
+  actualCash      Decimal?           @db.Decimal(14, 2)
+  note            String?
 
-  /// --- O'tkazma kassa: a TURNOVER register, not a balance register. ---
-  /// There is deliberately no openingTransfer. Transfer money sits in the
-  /// clinic's bank and PSP accounts, never in anyone's hands, so there is no
-  /// float to hand over at shift change and nothing an opening figure could
-  /// honestly refer to. The register starts every shift at zero.
-  ///
+  /// --- O'tkazma kassa ---
   /// What our own ledger says was routed through the acquiring channels during
   /// this shift. NULL on shifts closed before this existed.
   expectedTransfer         Decimal? @db.Decimal(14, 2)

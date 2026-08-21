@@ -86,15 +86,13 @@ export class ExpensesService {
   // ============================================================ expenses
 
   /**
-   * The drawer this user is currently responsible for in this branch.
-   *
-   * Cash can only come out of a register someone has open, and only out of
-   * their own — charging a colleague's drawer would leave them short at
-   * closing time for money they never handled.
+   * The branch register. Cash can only come out of a register that is open —
+   * there is one per branch now, shared by everyone who works the desk, so a
+   * reception expense and a cashier expense charge the same till.
    */
-  private async requireOwnOpenShift(user: AuthUser, branchId: string): Promise<string> {
+  private async requireOpenShift(branchId: string): Promise<string> {
     const shift = await this.prisma.db.cashierShift.findFirst({
-      where: { cashierUserId: user.id, branchId, status: 'OPEN' },
+      where: { branchId, status: 'OPEN' },
     });
     if (!shift) {
       throw new AppException(
@@ -123,22 +121,35 @@ export class ExpensesService {
 
     // Resolved before the write, so a cash expense with no open drawer is
     // refused outright rather than recorded as money out of nowhere.
-    const shiftId = dto.method === 'CASH' ? await this.requireOwnOpenShift(user, branchId) : null;
+    const shiftId = dto.method === 'CASH' ? await this.requireOpenShift(branchId) : null;
 
-    const expense = await this.prisma.db.expense.create({
-      // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
-      data: {
-        clinicId: TenantContext.requireClinicId(),
-        branchId,
-        categoryId: dto.categoryId,
-        amount,
-        method: dto.method,
-        shiftId,
-        date: new Date(dto.date),
-        note: dto.note ?? null,
-        createdById: user.id,
-      },
-      include: { category: { select: { id: true, name: true } } },
+    const expense = await this.prisma.db.$transaction(async (tx) => {
+      // Re-checked inside the transaction with a share lock, so a close() that
+      // races this write either waits and counts it, or already won — in which
+      // case cash out of a counted-out drawer is refused.
+      if (shiftId) {
+        const rows = (await tx.$queryRaw`
+          SELECT "id" FROM "CashierShift" WHERE "id" = ${shiftId} AND "status" = 'OPEN' FOR SHARE
+        `) as unknown[];
+        if (rows.length === 0) {
+          throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'Kassa hozirgina yopildi — smenani qayta oching', 409);
+        }
+      }
+      return tx.expense.create({
+        // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
+        data: {
+          clinicId: TenantContext.requireClinicId(),
+          branchId,
+          categoryId: dto.categoryId,
+          amount,
+          method: dto.method,
+          shiftId,
+          date: new Date(dto.date),
+          note: dto.note ?? null,
+          createdById: user.id,
+        },
+        include: { category: { select: { id: true, name: true } } },
+      });
     });
     return this.mapExpense(expense);
   }

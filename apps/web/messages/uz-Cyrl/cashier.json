@@ -21,19 +21,17 @@
     "expenseOut": "Чиқим",
     "cashDeposits": "Депозит",
     "transferRefunds": "Қайтарилган",
-    "otherDrawers": "Бу филиалда яна {count} та касса очиқ. Юқоридаги рақамлар фақат сизники.",
-    "closedButOthers": "Сизда очиқ касса йўқ. Бу филиалда бошқа {count} та касса очиқ.",
-    "secondDrawerHint": "Алоҳида касса очсангиз, сиз фақат ўзингиз қабул қилган пулни кўрасиз. Клиниканинг умумий суммаси «Касса назорати» саҳифасида.",
-    "openAnyway": "Барибир очиш",
     "loadFailedTitle": "Касса маълумоти юкланмади",
     "loadFailedDesc": "Бу кассангиз ёпиқ дегани эмас. Қайта уриниб кўринг.",
     "retry": "Қайта уриниш",
     "transferExpected": "Тизим бўйича",
-    "actualTransfer": "Терминал / илова ҳисоботи бўйича",
-    "actualTransferPlaceholder": "Сверкадаги сумма",
+    "actualTransfer": "Ҳозир ўтказма ҳисобида (терминал/ҳисоб бўйича)",
+    "actualTransferPlaceholder": "Ҳисобдаги якуний сумма",
     "transferUnchecked": "Терминал маълумоти йўқ",
     "transferReason": "Сабаби",
-    "transferReasonPlaceholder": "Нега текшириб бўлмади"
+    "transferReasonPlaceholder": "Нега текшириб бўлмади",
+    "openedBy": "Очган: {name}",
+    "openingTransfer": "Ўтказма бошланғич (терминал/ҳисоб бўйича)"
   },
   "report": {
     "title": "Смена ҳисоботи (X/Z)",
@@ -53,9 +51,10 @@
     "expenseOut": "Чиқим",
     "transferIn": "Ўтказма тушум",
     "expectedTransfer": "Тизим бўйича",
-    "actualTransfer": "Терминал бўйича",
+    "actualTransfer": "Ҳисоб бўйича (якуний)",
     "transferDifference": "Фарқ — текшириш керак",
-    "transferNotChecked": "Текширилмади"
+    "transferNotChecked": "Текширилмади",
+    "openingTransfer": "Бошланғич ўтказма"
   },
   "tabs": {
     "pending": "Тўлов кутилмоқда",
@@ -91,10 +90,8 @@
     "inDrawer": "Кассада (кутилаётган нақд)",
     "received": "Смена давомида қабул қилинди",
     "noTransfer": "Ҳозирча ўтказма тўловлар йўқ",
-    "myCash": "Менинг кассам — {name}",
-    "throughShift": "Смена давомида ўтган",
-    "openingTransfer": "Бошланғич қолдиқ",
-    "transferHint": "Ўтказма касса ҳар сменада 0 дан бошланади — пул банкда, қўлда эмас."
+    "throughShift": "Ҳозир ўтказма ҳисобида",
+    "openingTransfer": "Бошланғич қолдиқ"
   },
   "payments": {
     "title": "Шу сменада қабул қилинган тўловлар",

@@ -21,19 +21,17 @@
     "expenseOut": "Chiqim",
     "cashDeposits": "Depozit",
     "transferRefunds": "Qaytarilgan",
-    "otherDrawers": "Bu filialda yana {count} ta kassa ochiq. Yuqoridagi raqamlar faqat sizniki.",
-    "closedButOthers": "Sizda ochiq kassa yo‘q. Bu filialda boshqa {count} ta kassa ochiq.",
-    "secondDrawerHint": "Alohida kassa ochsangiz, siz faqat o‘zingiz qabul qilgan pulni ko‘rasiz. Klinikaning umumiy summasi «Kassa nazorati» sahifasida.",
-    "openAnyway": "Baribir ochish",
     "loadFailedTitle": "Kassa ma’lumoti yuklanmadi",
     "loadFailedDesc": "Bu kassangiz yopiq degani emas. Qayta urinib ko‘ring.",
     "retry": "Qayta urinish",
     "transferExpected": "Tizim bo‘yicha",
-    "actualTransfer": "Terminal / ilova hisoboti bo‘yicha",
-    "actualTransferPlaceholder": "Sverkadagi summa",
+    "actualTransfer": "Hozir o‘tkazma hisobida (terminal/hisob bo‘yicha)",
+    "actualTransferPlaceholder": "Hisobdagi yakuniy summa",
     "transferUnchecked": "Terminal ma’lumoti yo‘q",
     "transferReason": "Sababi",
-    "transferReasonPlaceholder": "Nega tekshirib bo‘lmadi"
+    "transferReasonPlaceholder": "Nega tekshirib bo‘lmadi",
+    "openedBy": "Ochgan: {name}",
+    "openingTransfer": "O‘tkazma boshlang‘ich (terminal/hisob bo‘yicha)"
   },
   "report": {
     "title": "Smena hisoboti (X/Z)",
@@ -53,9 +51,10 @@
     "expenseOut": "Chiqim",
     "transferIn": "O‘tkazma tushum",
     "expectedTransfer": "Tizim bo‘yicha",
-    "actualTransfer": "Terminal bo‘yicha",
+    "actualTransfer": "Hisob bo‘yicha (yakuniy)",
     "transferDifference": "Farq — tekshirish kerak",
-    "transferNotChecked": "Tekshirilmadi"
+    "transferNotChecked": "Tekshirilmadi",
+    "openingTransfer": "Boshlang‘ich o‘tkazma"
   },
   "tabs": {
     "pending": "To'lov kutilmoqda",
@@ -91,10 +90,8 @@
     "inDrawer": "Kassada (kutilayotgan naqd)",
     "received": "Smena davomida qabul qilindi",
     "noTransfer": "Hozircha o'tkazma to'lovlar yo'q",
-    "myCash": "Mening kassam — {name}",
-    "throughShift": "Smena davomida o‘tgan",
-    "openingTransfer": "Boshlang‘ich qoldiq",
-    "transferHint": "O‘tkazma kassa har smenada 0 dan boshlanadi — pul bankda, qo‘lda emas."
+    "throughShift": "Hozir o‘tkazma hisobida",
+    "openingTransfer": "Boshlang‘ich qoldiq"
   },
   "payments": {
     "title": "Shu smenada qabul qilingan to‘lovlar",

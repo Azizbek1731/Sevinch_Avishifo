@@ -15,7 +15,6 @@ import {
   Lock,
   LockOpen,
   Printer,
-  Users,
   Wallet,
 } from 'lucide-react';
 import {
@@ -26,7 +25,6 @@ import {
   type OpenShiftInput,
 } from '@avishifo/shared';
 import { formatTz } from '@/lib/dates';
-import { ApiError } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -56,12 +54,13 @@ import { useApiErrorToast, usePermission } from '../hooks';
 import { ShiftPaymentsCard } from './shift-payments-card';
 
 /**
- * The cashier's own two registers.
+ * The branch register — one per branch, shared.
  *
- * Everything here describes ONE person's drawer, which is why the header now
- * says whose. It used to be labelled "Naqd kassa" with no name on it, so a
- * manager who opened a drawer of their own read their empty one as the clinic
- * having taken nothing all day. The clinic-wide figure lives on its own screen.
+ * Everyone with access reads the SAME register: per-user drawers made the
+ * owner, reception and the cashier each see "the" kassa and each see a
+ * different one. Both books open and close with a counted figure — cash out of
+ * the box, transfer off the terminal/PSP report — and the strip names who
+ * opened it, since anyone with shifts.manage may open or close.
  */
 export function ShiftPanel() {
   const t = useTranslations('cashier');
@@ -74,8 +73,6 @@ export function ShiftPanel() {
   const [openDlg, setOpenDlg] = useState(false);
   const [closeDlg, setCloseDlg] = useState(false);
   const [report, setReport] = useState<CloseShiftResult | null>(null);
-  /** Set when the branch already has a drawer open and we asked about it. */
-  const [otherHolder, setOtherHolder] = useState<string | null>(null);
   const [transferUnchecked, setTransferUnchecked] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -83,17 +80,16 @@ export function ShiftPanel() {
     queryFn: async () => (await billingApi.currentShift()).data,
   });
 
-  const shift: CurrentShift | null = data && 'open' in data && data.open ? data : null;
-  const otherDrawers = data && 'otherDrawers' in data ? data.otherDrawers : 0;
+  const shift: CurrentShift | null = data && data.open ? data : null;
 
   const openForm = useForm<OpenShiftInput>({
     resolver: zodResolver(openShiftSchema),
-    defaultValues: { openingCash: '0' },
+    defaultValues: { openingCash: '0', openingTransfer: '0' },
   });
 
   const closeForm = useForm<CloseShiftInput>({
     resolver: zodResolver(closeShiftSchema),
-    defaultValues: { actualCash: '', actualTransfer: '', transferUnverifiedReason: '', note: '' },
+    defaultValues: { actualCash: '', transferUnverifiedReason: '', note: '' },
   });
 
   const openMutation = useMutation({
@@ -101,18 +97,13 @@ export function ShiftPanel() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['shifts'] });
       setOpenDlg(false);
-      setOtherHolder(null);
       toast.success(t('shift.openSuccess'));
     },
     onError: (err: unknown) => {
-      // Somebody else is already holding a drawer here. Say who, and let them
-      // decide — opening a second one by accident is what caused the confusion
-      // this whole screen was rebuilt to prevent.
-      if (err instanceof ApiError && err.code === 'BRANCH_DRAWER_ALREADY_OPEN') {
-        setOtherHolder(err.message);
-        return;
-      }
       errorToast(err);
+      // Somebody else opened it first: the "closed" card on screen is stale.
+      void queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      setOpenDlg(false);
     },
   });
 
@@ -167,6 +158,9 @@ export function ShiftPanel() {
                 <span className="ml-2 text-muted-foreground">
                   {t('shift.openedAt')}: {formatTz(shift.openedAt)}
                 </span>
+                <span className="ml-2 text-muted-foreground">
+                  {t('shift.openedBy', { name: shift.cashier.fullName })}
+                </span>
               </div>
             </div>
             {canManage ? (
@@ -175,12 +169,7 @@ export function ShiftPanel() {
                 variant="destructive"
                 onClick={() => {
                   setTransferUnchecked(false);
-                  closeForm.reset({
-                    actualCash: '',
-                    actualTransfer: '',
-                    transferUnverifiedReason: '',
-                    note: '',
-                  });
+                  closeForm.reset({ actualCash: '', transferUnverifiedReason: '', note: '' });
                   setCloseDlg(true);
                 }}
               >
@@ -190,20 +179,13 @@ export function ShiftPanel() {
             ) : null}
           </div>
 
-          {otherDrawers > 0 ? (
-            <div className="flex items-start gap-2.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
-              <Users className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <span>{t('shift.otherDrawers', { count: otherDrawers })}</span>
-            </div>
-          ) : null}
-
           <div className="grid gap-3 sm:grid-cols-2">
             {/* Naqd kassa — a real box with real notes in it. */}
             <Card className="border-success/30 bg-success/[0.04]">
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-success">
                   <Banknote className="h-4 w-4" />
-                  {t('registers.myCash', { name: shift.cashier.fullName })}
+                  {t('registers.cash')}
                 </div>
                 <div>
                   <p className="text-3xl font-bold tabular-nums">
@@ -272,13 +254,13 @@ export function ShiftPanel() {
                   <p className="text-xs text-muted-foreground">{t('registers.throughShift')}</p>
                 </div>
                 <div className="space-y-1 border-t pt-2 text-sm">
-                  {/* Shown, not hidden, so the register visibly opens and closes
-                      like the cash one — its start is simply always zero. */}
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-muted-foreground">
                       {t('registers.openingTransfer')}
                     </span>
-                    <span className="tabular-nums text-muted-foreground">0</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {formatUZS(shift.openingTransfer, { withCurrency: false })}
+                    </span>
                   </div>
                   {shift.transferByMethod.map((row) => (
                     <div key={row.method} className="flex items-center justify-between gap-2">
@@ -302,7 +284,6 @@ export function ShiftPanel() {
                     <p className="text-muted-foreground">{t('registers.noTransfer')}</p>
                   ) : null}
                 </div>
-                <p className="text-xs text-muted-foreground">{t('registers.transferHint')}</p>
               </CardContent>
             </Card>
           </div>
@@ -318,18 +299,13 @@ export function ShiftPanel() {
               </div>
               <div>
                 <p className="font-semibold">{t('shift.closedTitle')}</p>
-                <p className="text-sm text-muted-foreground">
-                  {otherDrawers > 0
-                    ? t('shift.closedButOthers', { count: otherDrawers })
-                    : t('shift.closedDesc')}
-                </p>
+                <p className="text-sm text-muted-foreground">{t('shift.closedDesc')}</p>
               </div>
             </div>
             {canManage ? (
               <Button
                 onClick={() => {
-                  openForm.reset({ openingCash: '0' });
-                  setOtherHolder(null);
+                  openForm.reset({ openingCash: '0', openingTransfer: '0' });
                   setOpenDlg(true);
                 }}
               >
@@ -348,18 +324,22 @@ export function ShiftPanel() {
             <DialogTitle>{t('shift.openTitle')}</DialogTitle>
           </DialogHeader>
           <form
-            onSubmit={openForm.handleSubmit((v) =>
-              openMutation.mutate({ ...v, confirmSecondDrawer: otherHolder !== null }),
-            )}
+            onSubmit={openForm.handleSubmit((v) => openMutation.mutate(v))}
             className="space-y-4"
             noValidate
           >
-            <div className="space-y-2">
-              <Label htmlFor="opening-cash">{t('shift.openingCash')}</Label>
+            {/* Both books open with a counted figure — the owner's decision:
+                cash out of the box, transfer off the terminal/PSP report. */}
+            <div className="space-y-2 rounded-lg border border-success/30 bg-success/[0.04] p-3">
+              <Label htmlFor="opening-cash" className="flex items-center gap-2 font-semibold text-success">
+                <Banknote className="h-4 w-4" />
+                {t('shift.openingCash')}
+              </Label>
               <Input
                 id="opening-cash"
                 inputMode="decimal"
                 autoComplete="off"
+                className="text-lg font-semibold"
                 {...openForm.register('openingCash', { setValueAs: sanitizeMoney })}
               />
               {openForm.formState.errors.openingCash ? (
@@ -367,19 +347,26 @@ export function ShiftPanel() {
               ) : null}
             </div>
 
-            {otherHolder ? (
-              <div className="flex items-start gap-2.5 rounded-lg border border-warning/40 bg-warning/5 p-3 text-sm">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-foreground dark:text-warning" />
-                <div className="space-y-1">
-                  <p>{otherHolder}</p>
-                  <p className="text-xs text-muted-foreground">{t('shift.secondDrawerHint')}</p>
-                </div>
-              </div>
-            ) : null}
+            <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/[0.04] p-3">
+              <Label htmlFor="opening-transfer" className="flex items-center gap-2 font-semibold text-primary">
+                <CreditCard className="h-4 w-4" />
+                {t('shift.openingTransfer')}
+              </Label>
+              <Input
+                id="opening-transfer"
+                inputMode="decimal"
+                autoComplete="off"
+                className="text-lg font-semibold"
+                {...openForm.register('openingTransfer', { setValueAs: sanitizeMoney })}
+              />
+              {openForm.formState.errors.openingTransfer ? (
+                <p className="text-sm text-destructive">{tb('form.invalidAmount')}</p>
+              ) : null}
+            </div>
 
             <DialogFooter>
               <Button type="submit" className="w-full" disabled={openMutation.isPending}>
-                {otherHolder ? t('shift.openAnyway') : t('shift.open')}
+                {t('shift.open')}
               </Button>
             </DialogFooter>
           </form>
@@ -459,15 +446,30 @@ export function ShiftPanel() {
                     autoComplete="off"
                     className="text-lg font-semibold"
                     placeholder={t('shift.actualTransferPlaceholder')}
-                    {...closeForm.register('actualTransfer', { setValueAs: sanitizeMoney })}
+                    {...closeForm.register('actualTransfer', {
+                      setValueAs: (v) => {
+                        const m = sanitizeMoney(v);
+                        return m === '' ? undefined : m;
+                      },
+                    })}
                   />
+                  {closeForm.formState.errors.actualTransfer ? (
+                    <p className="text-sm text-destructive">{tb('form.invalidAmount')}</p>
+                  ) : null}
                 </>
               )}
 
               <label className="flex items-center gap-2 pt-1 text-sm">
                 <Checkbox
                   checked={transferUnchecked}
-                  onCheckedChange={(v) => setTransferUnchecked(v === true)}
+                  onCheckedChange={(v) => {
+                    const on = v === true;
+                    setTransferUnchecked(on);
+                    if (on) {
+                      closeForm.setValue('actualTransfer', undefined);
+                      closeForm.clearErrors('actualTransfer');
+                    }
+                  }}
                 />
                 {t('shift.transferUnchecked')}
               </label>
@@ -538,6 +540,7 @@ export function ShiftPanel() {
               <Separator />
               <p className="text-sm font-semibold text-primary">{t('registers.transfer')}</p>
               <div className="space-y-1 text-sm">
+                <Row label={t('report.openingTransfer')} value={report.report.openingTransfer} />
                 <Row label={t('report.transferIn')} value={report.report.transferIn} />
                 {Number(report.report.transferRefunds) > 0 ? (
                   <Row label={t('shift.transferRefunds')} value={report.report.transferRefunds} />

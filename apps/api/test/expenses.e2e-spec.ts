@@ -93,11 +93,14 @@ describe('expenses (e2e)', () => {
     expect(after.expenseOut).toBe(before.expenseOut);
   });
 
-  it('refuses cash with no drawer open rather than inventing one', async () => {
-    // The owner has expenses.write but has not opened a register.
-    const res = await addExpense({ amount: '10000', method: 'CASH' }, owner.accessToken);
-    expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe('SHIFT_NOT_OPEN');
+  it('charges an owner cash expense to the one branch register', async () => {
+    // One register per branch: the owner does not open a drawer of their own —
+    // cash they take out leaves the till the cashier opened, and the register
+    // knows about it immediately.
+    const before = await drawer();
+    await addExpense({ amount: '10000', method: 'CASH' }, owner.accessToken).expect(201);
+    const after = await drawer();
+    expect(Number(after.expectedCashSoFar)).toBe(Number(before.expectedCashSoFar) - 10000);
   });
 
   it('still lets the owner record spending that did not come from a till', async () => {
@@ -224,20 +227,23 @@ describe('expenses (e2e)', () => {
       .expect(403);
   });
 
-  it('charges reception spending to reception own drawer, not the cash desk', async () => {
-    // The case this exists for: two people hold a drawer in the same branch at
-    // the same time. Money the receptionist takes out must leave HER till —
-    // charging the cashier's would make the cashier short for a purchase she
-    // never saw, which is the exact failure the whole feature prevents.
+  it('shows reception and the cashier the same register, and charges it once', async () => {
+    // The property the shared model exists for: everyone at the desk reads THE
+    // branch register. A reception expense moves the same numbers the cashier
+    // sees — two accounts showing two different totals is the confusion this
+    // design replaced.
     const recep = await login(app, clinic.receptionist.email);
-    await request(app.getHttpServer())
+
+    // A second register cannot be opened while one is up.
+    const second = await request(app.getHttpServer())
       .post(`${API}/shifts/open`)
       .set('Authorization', `Bearer ${recep.accessToken}`)
       .set('x-branch-id', clinic.branchId)
-      .send({ openingCash: '300000', confirmSecondDrawer: true })
-      .expect(201);
+      .send({ openingCash: '300000' });
+    expect(second.status).toBe(409);
+    expect(second.body.error.code).toBe('SHIFT_ALREADY_OPEN');
 
-    const cashierBefore = await drawer();
+    const before = await drawer();
 
     await request(app.getHttpServer())
       .post(`${API}/expenses`)
@@ -246,27 +252,17 @@ describe('expenses (e2e)', () => {
       .send({ categoryId, amount: '70000', method: 'CASH', date: new Date().toISOString().slice(0, 10) })
       .expect(201);
 
-    const recepDrawer = await request(app.getHttpServer())
+    // Reception's view and the cashier's view are the same register, so the
+    // 70 000 appears in both — once.
+    const recepView = await request(app.getHttpServer())
       .get(`${API}/shifts/current`)
       .set('Authorization', `Bearer ${recep.accessToken}`)
       .set('x-branch-id', clinic.branchId)
       .expect(200);
-    expect(Number(recepDrawer.body.data.expenseOut)).toBe(70000);
-    expect(Number(recepDrawer.body.data.expectedCashSoFar)).toBe(230000);
-
-    const cashierAfter = await drawer();
-    expect(cashierAfter.expectedCashSoFar).toBe(cashierBefore.expectedCashSoFar);
-    expect(cashierAfter.expenseOut).toBe(cashierBefore.expenseOut);
-
-    // Leave the branch as this suite found it: the closing test below counts
-    // the cashier's drawer and a second open one changes nothing for it, but
-    // an abandoned drawer would confuse anything added after.
-    await request(app.getHttpServer())
-      .post(`${API}/shifts/close`)
-      .set('Authorization', `Bearer ${recep.accessToken}`)
-      .set('x-branch-id', clinic.branchId)
-      .send({ actualCash: '230000', transferUnverifiedReason: 'Sinov' })
-      .expect(201);
+    const cashierView = await drawer();
+    expect(recepView.body.data.expectedCashSoFar).toBe(cashierView.expectedCashSoFar);
+    expect(Number(cashierView.expectedCashSoFar)).toBe(Number(before.expectedCashSoFar) - 70000);
+    expect(Number(cashierView.expenseOut)).toBe(Number(before.expenseOut) + 70000);
   });
 
   // ------------------------------------------------------------ closing time
@@ -299,5 +295,11 @@ describe('expenses (e2e)', () => {
       .delete(`${API}/expenses/${lastId}`)
       .set('Authorization', `Bearer ${cashier.accessToken}`)
       .expect(409);
+
+    // And with no register open anywhere in the branch, cash spending is
+    // refused outright rather than booked as money out of nowhere.
+    const refused = await addExpense({ amount: '10000', method: 'CASH' }, owner.accessToken);
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.code).toBe('SHIFT_NOT_OPEN');
   });
 });

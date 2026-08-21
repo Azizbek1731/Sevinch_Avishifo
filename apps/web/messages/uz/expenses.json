@@ -11,7 +11,7 @@
   "noCategoriesHint": "Avval turkum qo‘shing",
   "method": "To‘lov turi",
   "methodLocked": "To‘lov turini o‘zgartirib bo‘lmaydi — chiqimni o‘chirib, qaytadan kiriting",
-  "cashHint": "Bu summa ochiq kassangizdan yechiladi va smena yopilishida hisobga olinadi",
+  "cashHint": "Bu summa filialning ochiq kassasidan yechiladi va smena yopilishida hisobga olinadi",
   "date": "Sana",
   "note": "Izoh",
   "notePlaceholder": "Nima uchun sarflandi",

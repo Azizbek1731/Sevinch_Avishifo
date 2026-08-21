@@ -21,19 +21,17 @@
     "expenseOut": "Expenses",
     "cashDeposits": "Deposits",
     "transferRefunds": "Refunds",
-    "otherDrawers": "{count} other register(s) are open in this branch. The figures above are only yours.",
-    "closedButOthers": "You have no register open. {count} other(s) are open in this branch.",
-    "secondDrawerHint": "Your own register shows only the money you take. The clinic total is on the Register oversight page.",
-    "openAnyway": "Open anyway",
     "loadFailedTitle": "Could not load your register",
     "loadFailedDesc": "This does not mean it is closed. Try again.",
     "retry": "Retry",
     "transferExpected": "Per our records",
-    "actualTransfer": "Per the terminal / app report",
-    "actualTransferPlaceholder": "Amount on the settlement",
+    "actualTransfer": "In the transfer book now (per terminal/account)",
+    "actualTransferPlaceholder": "Closing figure on the account",
     "transferUnchecked": "No terminal figure available",
     "transferReason": "Reason",
-    "transferReasonPlaceholder": "Why it could not be checked"
+    "transferReasonPlaceholder": "Why it could not be checked",
+    "openedBy": "Opened by {name}",
+    "openingTransfer": "Opening transfer (per terminal/account)"
   },
   "report": {
     "title": "Shift report (X/Z)",
@@ -53,9 +51,10 @@
     "expenseOut": "Expenses",
     "transferIn": "Transfer takings",
     "expectedTransfer": "Per our records",
-    "actualTransfer": "Per the terminal",
+    "actualTransfer": "Per the account (closing)",
     "transferDifference": "Gap — needs checking",
-    "transferNotChecked": "Not checked"
+    "transferNotChecked": "Not checked",
+    "openingTransfer": "Opening transfer"
   },
   "tabs": {
     "pending": "Awaiting payment",
@@ -91,10 +90,8 @@
     "inDrawer": "In drawer (expected cash)",
     "received": "Received this shift",
     "noTransfer": "No transfer payments yet",
-    "myCash": "My register — {name}",
-    "throughShift": "Through this shift",
-    "openingTransfer": "Opening balance",
-    "transferHint": "The transfer register starts every shift at zero — the money is at the bank, not in anyone’s hands."
+    "throughShift": "In the transfer book now",
+    "openingTransfer": "Opening balance"
   },
   "payments": {
     "title": "Payments taken this shift",

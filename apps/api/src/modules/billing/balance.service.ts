@@ -57,7 +57,7 @@ export class BalanceService {
     // A deposit is money arriving at the desk, so it lands in a register like
     // any other payment. Cash must have a drawer open — the notes go into it.
     const shift = await this.prisma.db.cashierShift.findFirst({
-      where: { cashierUserId: user.id, branchId, status: 'OPEN' },
+      where: { branchId, status: 'OPEN' },
     });
     if (!shift && dto.method === 'CASH') {
       throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'Open cashier shift required for cash deposits', 409);
@@ -67,6 +67,16 @@ export class BalanceService {
     if (amount.lte(0)) throw new AppException(ErrorCode.VALIDATION_ERROR, 'Amount must be positive', 400);
 
     const { tx, balance } = await this.prisma.db.$transaction(async (db) => {
+      // Same rule as payments: the register must still be open when the row
+      // lands, and the share lock makes a racing close() count this deposit.
+      if (shift) {
+        const rows = (await db.$queryRaw`
+          SELECT "id" FROM "CashierShift" WHERE "id" = ${shift.id} AND "status" = 'OPEN' FOR SHARE
+        `) as unknown[];
+        if (rows.length === 0 && dto.method === 'CASH') {
+          throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'Kassa hozirgina yopildi — smenani qayta oching', 409);
+        }
+      }
       const updated = await db.patient.update({
         where: { id: patientId },
         data: { balance: { increment: amount } },

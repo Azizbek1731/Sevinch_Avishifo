@@ -110,6 +110,8 @@ export interface CashierShift {
   openedAt: string;
   closedAt: string | null;
   openingCash: MoneyString;
+  /** What the transfer account held at opening, entered by whoever opened. */
+  openingTransfer: MoneyString;
   expectedCash: MoneyString | null;
   actualCash: MoneyString | null;
   /** What our ledger says went through the acquiring channels this shift. */
@@ -123,10 +125,8 @@ export interface CashierShift {
 
 export interface CurrentShift extends CashierShift {
   open: true;
-  /** Whose drawer this is. The screen must say so — it never used to. */
+  /** Who opened the branch register — shown so the handover is traceable. */
   cashier: { id: string; fullName: string };
-  /** How many other people hold a drawer in this branch right now. */
-  otherDrawers: number;
   cashIn: MoneyString;
   /** Deposits taken in cash — they are in the drawer like any other note. */
   cashDeposits: MoneyString;
@@ -134,17 +134,12 @@ export interface CurrentShift extends CashierShift {
   /** Clinic spending taken out of this drawer — already deducted below. */
   expenseOut: MoneyString;
   expectedCashSoFar: MoneyString;
-  /** Card and online money routed through this drawer, net of refunds. */
+  /** Opening figure plus card/online turnover, net of refunds. */
   transferTotal: MoneyString;
   transferRefunds: MoneyString;
   transferByMethod: Array<{ method: PaymentMethod; amount: MoneyString; count: number }>;
 }
 
-/** Returned instead of a shift when this user holds none but others do. */
-export interface NoDrawer {
-  open: false;
-  otherDrawers: number;
-}
 
 export interface ShiftPaymentRow {
   id: string;
@@ -164,6 +159,7 @@ export interface RegistersOverview {
     cashier: { id: string; fullName: string };
     openedAt: string;
     openingCash: MoneyString;
+    openingTransfer: MoneyString;
     expectedCash: MoneyString;
     transferTotal: MoneyString;
   }>;
@@ -178,6 +174,7 @@ export interface ShiftHistoryItem extends CashierShift {
 
 export interface ShiftReport {
   openingCash: MoneyString;
+  openingTransfer: MoneyString;
   cashIn: MoneyString;
   cashDeposits: MoneyString;
   cashOut: MoneyString;
@@ -298,7 +295,7 @@ export interface InvoiceListQuery {
 
 export const billingApi = {
   // shifts
-  currentShift: () => api.get<CurrentShift | NoDrawer | null>('/shifts/current'),
+  currentShift: () => api.get<CurrentShift | null>('/shifts/current'),
   registersOverview: () => api.get<RegistersOverview>('/shifts/overview'),
   currentShiftPayments: () => api.get<ShiftPaymentRow[]>('/shifts/current/payments'),
   openShift: (body: OpenShiftInput) => api.post<CurrentShift>('/shifts/open', body),

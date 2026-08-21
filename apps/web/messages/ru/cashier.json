@@ -21,19 +21,17 @@
     "expenseOut": "Расход",
     "cashDeposits": "Депозит",
     "transferRefunds": "Возвраты",
-    "otherDrawers": "В этом филиале открыто ещё {count} касс. Цифры выше — только ваши.",
-    "closedButOthers": "У вас нет открытой кассы. В филиале открыто ещё {count}.",
-    "secondDrawerHint": "Открыв свою кассу, вы увидите только принятые вами деньги. Общая сумма клиники — на странице «Контроль касс».",
-    "openAnyway": "Всё равно открыть",
     "loadFailedTitle": "Не удалось загрузить кассу",
     "loadFailedDesc": "Это не значит, что касса закрыта. Попробуйте ещё раз.",
     "retry": "Повторить",
     "transferExpected": "По системе",
-    "actualTransfer": "По отчёту терминала / приложения",
-    "actualTransferPlaceholder": "Сумма по сверке",
+    "actualTransfer": "Сейчас на счёте переводов (по терминалу/счёту)",
+    "actualTransferPlaceholder": "Итоговая сумма на счёте",
     "transferUnchecked": "Нет данных терминала",
     "transferReason": "Причина",
-    "transferReasonPlaceholder": "Почему не удалось проверить"
+    "transferReasonPlaceholder": "Почему не удалось проверить",
+    "openedBy": "Открыл(а): {name}",
+    "openingTransfer": "Переводы на начало (по терминалу/счёту)"
   },
   "report": {
     "title": "Отчёт по смене (X/Z)",
@@ -53,9 +51,10 @@
     "expenseOut": "Расход",
     "transferIn": "Поступления переводом",
     "expectedTransfer": "По системе",
-    "actualTransfer": "По терминалу",
+    "actualTransfer": "По счёту (итог)",
     "transferDifference": "Разница — нужна проверка",
-    "transferNotChecked": "Не проверено"
+    "transferNotChecked": "Не проверено",
+    "openingTransfer": "Переводы на начало"
   },
   "tabs": {
     "pending": "Ожидают оплаты",
@@ -91,10 +90,8 @@
     "inDrawer": "В кассе (ожидаемая наличность)",
     "received": "Принято за смену",
     "noTransfer": "Пока нет безналичных платежей",
-    "myCash": "Моя касса — {name}",
-    "throughShift": "Прошло за смену",
-    "openingTransfer": "Начальный остаток",
-    "transferHint": "Касса переводов каждую смену начинается с 0 — деньги в банке, а не на руках."
+    "throughShift": "Сейчас на счёте переводов",
+    "openingTransfer": "Начальный остаток"
   },
   "payments": {
     "title": "Платежи, принятые в эту смену",
