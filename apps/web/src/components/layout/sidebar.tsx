@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import {
   BarChart3,
   Banknote,
+  BedDouble,
   Vault,
   Building2,
   CalendarDays,
@@ -51,6 +52,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'doctor', href: '/doctor', icon: Stethoscope, permissions: ['queue.call'], roles: ['DOCTOR'] },
   { key: 'queue', href: '/queue', icon: ListOrdered, permissions: ['queue.read'] },
   { key: 'patients', href: '/patients', icon: Users, permissions: ['patients.read'] },
+  { key: 'admissions', href: '/admissions', icon: BedDouble, permissions: ['admissions.read'] },
   {
     key: 'recordAccess',
     href: '/patients/record-access',

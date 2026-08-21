@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { GitMerge, Pencil, Plus, Trash2, UserX } from 'lucide-react';
+import { BedDouble, GitMerge, Pencil, Plus, Trash2, UserX } from 'lucide-react';
 import { formatPhone, formatUZS } from '@avishifo/shared';
 import { useRouter } from '@/i18n/routing';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -24,6 +24,7 @@ import { PatientFormDialog } from './patient-form-dialog';
 import { PatientDocumentsTab } from './patient-documents-tab';
 import { PatientInvoicesTab } from './patient-invoices-tab';
 import { PatientOverviewTab } from './patient-overview-tab';
+import { AdmitDialog } from '@/features/admissions/components/admit-dialog';
 import { ChargesPanel } from '@/features/admissions/components/charges-panel';
 import { PatientTimelineTab } from './patient-timeline-tab';
 import { PatientVisitsTab } from './patient-visits-tab';
@@ -39,6 +40,7 @@ function initials(fullName: string): string {
 
 export function PatientCardView({ patientId }: { patientId: string }) {
   const t = useTranslations('patients');
+  const tAdm = useTranslations('admissions');
   const router = useRouter();
   const queryClient = useQueryClient();
   const can = usePermissions();
@@ -51,6 +53,7 @@ export function PatientCardView({ patientId }: { patientId: string }) {
   const [mergeOpen, setMergeOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [addServicesOpen, setAddServicesOpen] = useState(false);
+  const [admitOpen, setAdmitOpen] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: () => patientsApi.remove(patientId),
@@ -151,6 +154,12 @@ export function PatientCardView({ patientId }: { patientId: string }) {
               {t('card.merge')}
             </Button>
           ) : null}
+          {can('admissions.write') && patient.careType === 'AMBULATORY' ? (
+            <Button variant="outline" onClick={() => setAdmitOpen(true)}>
+              <BedDouble className="mr-2 h-4 w-4" />
+              {tAdm('admit')}
+            </Button>
+          ) : null}
           {can('patients.delete') ? (
             <Button
               variant="outline"
@@ -220,6 +229,13 @@ export function PatientCardView({ patientId }: { patientId: string }) {
           </TabsContent>
         ) : null}
       </Tabs>
+
+      <AdmitDialog
+        open={admitOpen}
+        onOpenChange={setAdmitOpen}
+        patientId={patient.id}
+        patientName={patient.fullName}
+      />
 
       <AddServicesDialog
         open={addServicesOpen}

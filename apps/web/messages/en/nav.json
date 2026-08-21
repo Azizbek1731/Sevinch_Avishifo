@@ -3,6 +3,7 @@
   "reception": "Reception",
   "queue": "Queue",
   "patients": "Patients",
+  "admissions": "Inpatients",
   "appointments": "Appointments",
   "calendar": "Calendar",
   "doctor": "Doctor cockpit",

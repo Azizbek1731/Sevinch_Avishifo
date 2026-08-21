@@ -12,5 +12,77 @@
       "EVERY_OTHER_DAY": "через день",
       "ONCE": "однократно"
     }
+  },
+  "title": "Стационар",
+  "description": "Пациенты в стационаре и истории болезни",
+  "admit": "Госпитализировать",
+  "admitTitle": "{name} — госпитализация",
+  "admitted": "История болезни открыта: {number}",
+  "discharge": "Выписать",
+  "discharged": "Пациент выписан",
+  "dischargeHint": "Перед выпиской все неоплаченные услуги должны быть включены в счёт.",
+  "addOrder": "Добавить назначение",
+  "orderAdded": "Назначение добавлено",
+  "addNote": "Записать дневник",
+  "noteAdded": "Дневник записан",
+  "noNotes": "Записей дневника нет",
+  "back": "К списку",
+  "print": "Печать",
+  "status": {
+    "ACTIVE": "В стационаре",
+    "DISCHARGED": "Выписан"
+  },
+  "empty": {
+    "title": "В стационаре нет пациентов",
+    "description": "Госпитализируйте из карты пациента."
+  },
+  "table": {
+    "history": "История №",
+    "patient": "Пациент",
+    "place": "Место",
+    "admitted": "Поступил",
+    "days": "Дней"
+  },
+  "tabs": {
+    "sheet": "Лист назначений",
+    "history": "История болезни",
+    "notes": "Дневник"
+  },
+  "sections": {
+    "diagnoses": "Диагнозы",
+    "anamnesis": "Анамнез и осмотр"
+  },
+  "outcomes": {
+    "RECOVERED": "Выздоровление",
+    "IMPROVED": "Улучшение",
+    "UNCHANGED": "Без перемен",
+    "WORSE": "Ухудшение",
+    "TRANSFERRED": "Переведён",
+    "DIED": "Умер"
+  },
+  "fields": {
+    "department": "Отделение",
+    "ward": "Палата",
+    "bed": "Койка",
+    "referredBy": "Кем направлен",
+    "referralDiagnosis": "Диагноз направившего учреждения",
+    "admissionDiagnosis": "Диагноз при поступлении",
+    "clinicalDiagnosis": "Клинический диагноз",
+    "preliminaryDiagnosis": "Предварительный диагноз",
+    "finalDiagnosisMain": "Заключительный диагноз — основной",
+    "outcome": "Исход заболевания",
+    "complaints": "Жалобы",
+    "anamnesisMorbi": "Анамнез заболевания",
+    "anamnesisVitae": "Анамнез жизни",
+    "objectiveStatus": "Объективный осмотр",
+    "treatmentPlan": "План лечения",
+    "epicrisis": "Эпикриз",
+    "service": "Услуга",
+    "schedule": "Режим",
+    "startDate": "Дата начала",
+    "times": "Сколько раз",
+    "condition": "Общее состояние",
+    "temperature": "t°",
+    "pulse": "Ps"
   }
 }

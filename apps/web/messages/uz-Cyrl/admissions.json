@@ -12,5 +12,77 @@
       "EVERY_OTHER_DAY": "кун ошириб",
       "ONCE": "бир марта"
     }
+  },
+  "title": "Стационар",
+  "description": "Ётган беморлар ва касаллик тарихлари",
+  "admit": "Стационарга ётқизиш",
+  "admitTitle": "{name} — стационарга ётқизиш",
+  "admitted": "Касаллик тарихи очилди: {number}",
+  "discharge": "Чиқариш",
+  "discharged": "Бемор чиқарилди",
+  "dischargeHint": "Чиқаришдан олдин барча тўланмаган хизматлар ҳисоб-фактурага киритилиши керак.",
+  "addOrder": "Тайинлов қўшиш",
+  "orderAdded": "Тайинлов қўшилди",
+  "addNote": "Кундалик ёзиш",
+  "noteAdded": "Кундалик ёзилди",
+  "noNotes": "Кундалик ёзувлари йўқ",
+  "back": "Рўйхатга",
+  "print": "Чоп этиш",
+  "status": {
+    "ACTIVE": "Ётибди",
+    "DISCHARGED": "Чиқарилган"
+  },
+  "empty": {
+    "title": "Стационарда бемор йўқ",
+    "description": "Бемор картасидан стационарга ётқизинг."
+  },
+  "table": {
+    "history": "Тарих №",
+    "patient": "Бемор",
+    "place": "Жойи",
+    "admitted": "Ётқизилган",
+    "days": "Кун"
+  },
+  "tabs": {
+    "sheet": "Муолажалар варағи",
+    "history": "Касаллик тарихи",
+    "notes": "Кундалик"
+  },
+  "sections": {
+    "diagnoses": "Ташхислар",
+    "anamnesis": "Анамнез ва кўрик"
+  },
+  "outcomes": {
+    "RECOVERED": "Тузалиб чиқди",
+    "IMPROVED": "Яхшиланди",
+    "UNCHANGED": "Ўзгаришсиз",
+    "WORSE": "Ёмонлашди",
+    "TRANSFERRED": "Бошқа муассасага ўтказилди",
+    "DIED": "Вафот этди"
+  },
+  "fields": {
+    "department": "Бўлим",
+    "ward": "Палата",
+    "bed": "Ўрин",
+    "referredBy": "Ким юборди",
+    "referralDiagnosis": "Юборган муассаса ташхиси",
+    "admissionDiagnosis": "Қабулда қўйилган ташхис",
+    "clinicalDiagnosis": "Клиник ташхис",
+    "preliminaryDiagnosis": "Дастлабки ташхис",
+    "finalDiagnosisMain": "Якуний ташхис — асосий касаллик",
+    "outcome": "Касаллик оқибати",
+    "complaints": "Шикоятлар",
+    "anamnesisMorbi": "Касаллик анамнези",
+    "anamnesisVitae": "Ҳаёт анамнези",
+    "objectiveStatus": "Обектив кўрик",
+    "treatmentPlan": "Даволаш режаси",
+    "epicrisis": "Эпикриз",
+    "service": "Хизмат",
+    "schedule": "Тартиби",
+    "startDate": "Бошланиш санаси",
+    "times": "Неча марта",
+    "condition": "Умумий аҳволи",
+    "temperature": "т°",
+    "pulse": "Пс"
   }
 }

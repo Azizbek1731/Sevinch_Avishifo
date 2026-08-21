@@ -12,5 +12,77 @@
       "EVERY_OTHER_DAY": "every other day",
       "ONCE": "once"
     }
+  },
+  "title": "Inpatients",
+  "description": "Patients in beds and their medical histories",
+  "admit": "Admit",
+  "admitTitle": "Admit {name}",
+  "admitted": "History opened: {number}",
+  "discharge": "Discharge",
+  "discharged": "Patient discharged",
+  "dischargeHint": "Every unpaid service must be invoiced before discharge.",
+  "addOrder": "Add order",
+  "orderAdded": "Order added",
+  "addNote": "Add note",
+  "noteAdded": "Note added",
+  "noNotes": "No daily notes",
+  "back": "Back to list",
+  "print": "Print",
+  "status": {
+    "ACTIVE": "In hospital",
+    "DISCHARGED": "Discharged"
+  },
+  "empty": {
+    "title": "No inpatients",
+    "description": "Admit from a patient card."
+  },
+  "table": {
+    "history": "History №",
+    "patient": "Patient",
+    "place": "Place",
+    "admitted": "Admitted",
+    "days": "Days"
+  },
+  "tabs": {
+    "sheet": "Treatment sheet",
+    "history": "Medical history",
+    "notes": "Daily notes"
+  },
+  "sections": {
+    "diagnoses": "Diagnoses",
+    "anamnesis": "Anamnesis and examination"
+  },
+  "outcomes": {
+    "RECOVERED": "Recovered",
+    "IMPROVED": "Improved",
+    "UNCHANGED": "Unchanged",
+    "WORSE": "Worse",
+    "TRANSFERRED": "Transferred",
+    "DIED": "Died"
+  },
+  "fields": {
+    "department": "Department",
+    "ward": "Ward",
+    "bed": "Bed",
+    "referredBy": "Referred by",
+    "referralDiagnosis": "Referral diagnosis",
+    "admissionDiagnosis": "Admission diagnosis",
+    "clinicalDiagnosis": "Clinical diagnosis",
+    "preliminaryDiagnosis": "Preliminary diagnosis",
+    "finalDiagnosisMain": "Final diagnosis — main",
+    "outcome": "Outcome",
+    "complaints": "Complaints",
+    "anamnesisMorbi": "History of the illness",
+    "anamnesisVitae": "Life history",
+    "objectiveStatus": "Objective examination",
+    "treatmentPlan": "Treatment plan",
+    "epicrisis": "Epicrisis",
+    "service": "Service",
+    "schedule": "Schedule",
+    "startDate": "Start date",
+    "times": "How many times",
+    "condition": "General condition",
+    "temperature": "t°",
+    "pulse": "Ps"
   }
 }

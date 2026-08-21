@@ -12,5 +12,77 @@
       "EVERY_OTHER_DAY": "kun oshirib",
       "ONCE": "bir marta"
     }
+  },
+  "title": "Statsionar",
+  "description": "Yotgan bemorlar va kasallik tarixlari",
+  "admit": "Statsionarga yotqizish",
+  "admitTitle": "{name} — statsionarga yotqizish",
+  "admitted": "Kasallik tarixi ochildi: {number}",
+  "discharge": "Chiqarish",
+  "discharged": "Bemor chiqarildi",
+  "dischargeHint": "Chiqarishdan oldin barcha to‘lanmagan xizmatlar hisob-fakturaga kiritilishi kerak.",
+  "addOrder": "Tayinlov qo‘shish",
+  "orderAdded": "Tayinlov qo‘shildi",
+  "addNote": "Kundalik yozish",
+  "noteAdded": "Kundalik yozildi",
+  "noNotes": "Kundalik yozuvlari yo‘q",
+  "back": "Ro‘yxatga",
+  "print": "Chop etish",
+  "status": {
+    "ACTIVE": "Yotibdi",
+    "DISCHARGED": "Chiqarilgan"
+  },
+  "empty": {
+    "title": "Statsionarda bemor yo‘q",
+    "description": "Bemor kartasidan statsionarga yotqizing."
+  },
+  "table": {
+    "history": "Tarix №",
+    "patient": "Bemor",
+    "place": "Joyi",
+    "admitted": "Yotqizilgan",
+    "days": "Kun"
+  },
+  "tabs": {
+    "sheet": "Muolajalar varag‘i",
+    "history": "Kasallik tarixi",
+    "notes": "Kundalik"
+  },
+  "sections": {
+    "diagnoses": "Tashxislar",
+    "anamnesis": "Anamnez va ko‘rik"
+  },
+  "outcomes": {
+    "RECOVERED": "Tuzalib chiqdi",
+    "IMPROVED": "Yaxshilandi",
+    "UNCHANGED": "O‘zgarishsiz",
+    "WORSE": "Yomonlashdi",
+    "TRANSFERRED": "Boshqa muassasaga o‘tkazildi",
+    "DIED": "Vafot etdi"
+  },
+  "fields": {
+    "department": "Bo‘lim",
+    "ward": "Palata",
+    "bed": "O‘rin",
+    "referredBy": "Kim yubordi",
+    "referralDiagnosis": "Yuborgan muassasa tashxisi",
+    "admissionDiagnosis": "Qabulda qo‘yilgan tashxis",
+    "clinicalDiagnosis": "Klinik tashxis",
+    "preliminaryDiagnosis": "Dastlabki tashxis",
+    "finalDiagnosisMain": "Yakuniy tashxis — asosiy kasallik",
+    "outcome": "Kasallik oqibati",
+    "complaints": "Shikoyatlar",
+    "anamnesisMorbi": "Kasallik anamnezi",
+    "anamnesisVitae": "Hayot anamnezi",
+    "objectiveStatus": "Obyektiv ko‘rik",
+    "treatmentPlan": "Davolash rejasi",
+    "epicrisis": "Epikriz",
+    "service": "Xizmat",
+    "schedule": "Tartibi",
+    "startDate": "Boshlanish sanasi",
+    "times": "Necha marta",
+    "condition": "Umumiy ahvoli",
+    "temperature": "t°",
+    "pulse": "Ps"
   }
 }
