@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { X } from 'lucide-react';
+import { BedDouble, Stethoscope, X } from 'lucide-react';
 import {
   BloodGroup,
   Gender,
@@ -70,6 +70,7 @@ function buildFormSchema(msg: { required: string; invalidPhone: string }) {
     .string()
     .refine((v) => v.trim() === '' || normalizePhone(v) !== null, { message: msg.invalidPhone });
   return z.object({
+    careType: z.enum(['AMBULATORY', 'INPATIENT']),
     lastName: z.string().min(1, msg.required),
     firstName: z.string().min(1, msg.required),
     middleName: z.string(),
@@ -92,6 +93,7 @@ type PatientFormValues = z.infer<ReturnType<typeof buildFormSchema>>;
 
 function emptyValues(): PatientFormValues {
   return {
+    careType: 'AMBULATORY' as const,
     lastName: '',
     firstName: '',
     middleName: '',
@@ -112,6 +114,7 @@ function emptyValues(): PatientFormValues {
 
 function valuesFromPatient(p: Patient): PatientFormValues {
   return {
+    careType: p.careType,
     lastName: p.lastName,
     firstName: p.firstName,
     middleName: p.middleName ?? '',
@@ -138,6 +141,9 @@ const optEnum = (v: string): string | undefined => (v === UNSET || v === '' ? un
 /** Final payload is re-validated against the shared schema (source of truth). */
 function toPayload(v: PatientFormValues): CreatePatientInput {
   return createPatientSchema.parse({
+    // Without this the schema default silently wins and every patient is
+    // filed as ambulatory, whatever the form said.
+    careType: v.careType,
     firstName: v.firstName.trim(),
     lastName: v.lastName.trim(),
     middleName: opt(v.middleName),
@@ -264,6 +270,35 @@ export function PatientFormDialog({ open, onOpenChange, patient }: PatientFormDi
             <DialogTitle>{patient ? t('form.editTitle') : t('form.createTitle')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4" noValidate>
+            {/* First question on the form, because it decides what the rest of
+                the card looks like: an inpatient gets a treatment sheet and a
+                003 history, an outpatient does not. */}
+            <div className="space-y-1.5">
+              <Label>{t('form.careType')}</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['AMBULATORY', 'INPATIENT'] as const).map((ct) => (
+                  <button
+                    key={ct}
+                    type="button"
+                    onClick={() => form.setValue('careType', ct)}
+                    className={cn(
+                      'flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors',
+                      form.watch('careType') === ct
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:bg-accent',
+                    )}
+                  >
+                    {ct === 'AMBULATORY' ? (
+                      <Stethoscope className="h-4 w-4" />
+                    ) : (
+                      <BedDouble className="h-4 w-4" />
+                    )}
+                    {t(`form.careTypes.${ct}`)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
                 <Label htmlFor="pf-lastName">{t('form.lastName')} *</Label>

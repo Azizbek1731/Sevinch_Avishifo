@@ -71,7 +71,12 @@
     "invalidPhone": "Invalid phone number",
     "cancel": "Cancel",
     "save": "Save",
-    "create": "Create"
+    "create": "Create",
+    "careType": "Care type",
+    "careTypes": {
+      "AMBULATORY": "Outpatient",
+      "INPATIENT": "Inpatient"
+    }
   },
   "gender": {
     "MALE": "Male",

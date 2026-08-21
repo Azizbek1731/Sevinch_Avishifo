@@ -71,7 +71,12 @@
     "invalidPhone": "Неверный номер телефона",
     "cancel": "Отмена",
     "save": "Сохранить",
-    "create": "Создать"
+    "create": "Создать",
+    "careType": "Тип лечения",
+    "careTypes": {
+      "AMBULATORY": "Амбулаторно",
+      "INPATIENT": "Стационар"
+    }
   },
   "gender": {
     "MALE": "Мужской",

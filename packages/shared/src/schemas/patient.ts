@@ -18,6 +18,8 @@ export const allergySchema = z.object({
 export type AllergyInput = z.infer<typeof allergySchema>;
 
 export const createPatientSchema = z.object({
+  /** Ambulator (seen and sent home) or statsionar (admitted). */
+  careType: z.enum(['AMBULATORY', 'INPATIENT']).default('AMBULATORY'),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   middleName: z.string().min(1).optional(),

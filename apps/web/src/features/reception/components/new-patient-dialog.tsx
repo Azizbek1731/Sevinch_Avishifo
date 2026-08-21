@@ -90,6 +90,9 @@ export function NewPatientDialog({ open, onOpenChange, onCreated }: NewPatientDi
         phone: normalizePhone(values.phone) ?? undefined,
         dob: values.dob || undefined,
         gender: values.gender || undefined,
+        // The reception quick-add is the walk-in path; admitting happens on
+        // the patient card, where the ward and bed are chosen too.
+        careType: 'AMBULATORY',
         allergies: [],
         chronicConditions: [],
         tags: [],

@@ -22,6 +22,8 @@ export interface PatientAllergy {
 }
 
 export interface Patient {
+  /** Ambulator or statsionar — decides which screens the card shows. */
+  careType: 'AMBULATORY' | 'INPATIENT';
   id: string;
   mrn: string;
   firstName: string;

@@ -574,6 +574,200 @@ model PortalLinkToken {
 
 // ============================================================ PATIENTS
 
+// ===================================================================
+// Statsionar (inpatient) care
+// ===================================================================
+
+/// How the patient is being treated. Chosen when they are registered and
+/// shown throughout: an inpatient's screens carry the treatment sheet and the
+/// 003 history, an outpatient's do not.
+enum CareType {
+  AMBULATORY
+  INPATIENT
+}
+
+enum AdmissionStatus {
+  ACTIVE
+  DISCHARGED
+}
+
+/// How often an ordered service is administered. The two the wards actually
+/// use, plus ONCE — anything irregular is written as separate ONCE orders.
+enum OrderSchedule {
+  DAILY
+  EVERY_OTHER_DAY
+  ONCE
+}
+
+enum AdministrationStatus {
+  GIVEN
+  SKIPPED
+}
+
+/// Discharge outcome, as printed on the 003 title page.
+enum AdmissionOutcome {
+  RECOVERED
+  IMPROVED
+  UNCHANGED
+  WORSE
+  TRANSFERRED
+  DIED
+}
+
+enum ChargeStatus {
+  PENDING
+  INVOICED
+  CANCELLED
+}
+
+/// One hospital stay — the unit the 003 medical history is written about.
+/// A patient can have many over the years; at most one ACTIVE at a time.
+model Admission {
+  id            String          @id @default(uuid(7))
+  clinicId      String
+  branchId      String
+  patientId     String
+  /// Kasallik tarixi raqami, per clinic: "KT-2026-0001"
+  historyNumber String
+  status        AdmissionStatus @default(ACTIVE)
+
+  department            String?
+  ward                  String? // palata
+  bed                   String? // o'rin
+  attendingDoctorUserId String?
+
+  admittedAt   DateTime  @db.Timestamptz(6)
+  dischargedAt DateTime? @db.Timestamptz(6)
+
+  // ------- 003 title page -------
+  referredBy                 String? // kim yuborgan
+  referralDiagnosis          String? // yuborgan muassasa tashxisi
+  admissionDiagnosis         String? // qabulda qo'yilgan tashxis
+  clinicalDiagnosis          String?
+  clinicalDiagnosisAt        DateTime?         @db.Date
+  finalDiagnosisMain         String?
+  finalDiagnosisComplication String?
+  finalDiagnosisComorbid     String?
+  /// Shu kasallik bilan bu yil birinchi marta yotqizilganmi
+  firstTimeThisYear          Boolean?
+  outcome                    AdmissionOutcome?
+
+  // ------- anamnez (filled by the attending doctor) -------
+  complaints           String? // shikoyatlar
+  anamnesisMorbi       String? // kasallik anamnezi
+  anamnesisVitae       String? // hayot anamnezi
+  objectiveStatus      String? // obyektiv ko'rik
+  preliminaryDiagnosis String?
+  treatmentPlan        String?
+  epicrisis            String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  patient     Patient              @relation(fields: [patientId], references: [id])
+  orders      TreatmentOrder[]
+  dailyNotes  AdmissionDailyNote[]
+  chargeItems ChargeItem[]
+
+  @@unique([clinicId, historyNumber])
+  @@index([clinicId, status])
+  @@index([clinicId, patientId])
+}
+
+/// Muolajalar varag'i (list naznacheniy): one ordered service on a schedule.
+model TreatmentOrder {
+  id           String        @id @default(uuid(7))
+  clinicId     String
+  admissionId  String
+  serviceId    String
+  doctorUserId String
+  schedule     OrderSchedule
+  startDate    DateTime      @db.Date
+  /// Planned number of administrations, not calendar days.
+  timesPlanned Int
+  note         String?
+  stoppedAt    DateTime?     @db.Timestamptz(6)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
+
+  admission       Admission                 @relation(fields: [admissionId], references: [id])
+  service         Service                   @relation(fields: [serviceId], references: [id])
+  administrations TreatmentAdministration[]
+
+  @@index([clinicId, admissionId])
+}
+
+/// One planned day of one order, marked off by the ward/desk. GIVEN creates
+/// the charge; SKIPPED is the record that it was offered and not taken — the
+/// difference between "not billed" and "forgotten".
+model TreatmentAdministration {
+  id         String               @id @default(uuid(7))
+  clinicId   String
+  orderId    String
+  date       DateTime             @db.Date
+  status     AdministrationStatus
+  markedById String?
+  createdAt  DateTime             @default(now()) @db.Timestamptz(6)
+
+  order  TreatmentOrder @relation(fields: [orderId], references: [id])
+  charge ChargeItem?
+
+  @@unique([orderId, date])
+  @@index([clinicId, date])
+}
+
+/// A service written to the patient's account but not necessarily paid yet.
+/// The payment screen lists PENDING ones with checkboxes — pay all, or a few.
+/// Inpatient charges come from administrations; outpatient ones are written
+/// directly (visitId set when from a consultation).
+model ChargeItem {
+  id               String       @id @default(uuid(7))
+  clinicId         String
+  branchId         String
+  patientId        String
+  admissionId      String?
+  visitId          String?
+  administrationId String?      @unique
+  serviceId        String?
+  /// Name snapshot at write time { uz, ru, en }
+  title            Json
+  date             DateTime     @db.Date
+  quantity         Int          @default(1)
+  unitPrice        Decimal      @db.Decimal(14, 2)
+  status           ChargeStatus @default(PENDING)
+  invoiceLineId    String?
+  createdById      String?
+  createdAt        DateTime     @default(now()) @db.Timestamptz(6)
+
+  patient        Patient                  @relation(fields: [patientId], references: [id])
+  admission      Admission?               @relation(fields: [admissionId], references: [id])
+  administration TreatmentAdministration? @relation(fields: [administrationId], references: [id])
+  service        Service?                 @relation(fields: [serviceId], references: [id])
+
+  @@index([clinicId, patientId, status])
+  @@index([clinicId, admissionId])
+}
+
+/// Kundalik — the daily note in the 003 history.
+model AdmissionDailyNote {
+  id           String   @id @default(uuid(7))
+  clinicId     String
+  admissionId  String
+  doctorUserId String
+  date         DateTime @db.Date
+  /// Umumiy ahvoli
+  condition    String
+  temperatureC Float?
+  pulseBpm     Int?
+  bpSystolic   Int?
+  bpDiastolic  Int?
+  note         String?
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+
+  admission Admission @relation(fields: [admissionId], references: [id])
+
+  @@index([clinicId, admissionId, date])
+}
+
 model Patient {
   id                String     @id @default(uuid(7))
   clinicId          String
@@ -590,6 +784,7 @@ model Patient {
   phoneAlt          String?
   address           String?
   passportId        String?
+  careType          CareType   @default(AMBULATORY)
   bloodGroup        BloodGroup @default(UNKNOWN)
   /// [{ name: "Penicillin", severity: "high", note: "" }]
   allergies         Json       @default("[]")
@@ -619,6 +814,8 @@ model Patient {
   balanceTransactions PatientBalanceTransaction[]
   labOrders           LabOrder[]
   feedbacks           Feedback[]
+  admissions          Admission[]
+  chargeItems         ChargeItem[]
   telegramLinks       TelegramLink[]
 
   @@unique([clinicId, mrn])
@@ -1023,6 +1220,8 @@ model Service {
   appointmentServices AppointmentService[]
   labTest             LabTest?
   compensationRules   CompensationRule[]
+  treatmentOrders     TreatmentOrder[]
+  chargeItems         ChargeItem[]
 
   @@unique([clinicId, code])
   @@index([clinicId, categoryId])

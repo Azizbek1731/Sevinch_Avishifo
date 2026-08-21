@@ -39,6 +39,7 @@ import { QueueModule } from './modules/queue/queue.module';
 import { VisitsModule } from './modules/visits/visits.module';
 import { ServicesModule } from './modules/services/services.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { AdmissionsModule } from './modules/admissions/admissions.module';
 import { LabModule } from './modules/lab/lab.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ReportsModule } from './modules/reports/reports.module';
@@ -122,6 +123,7 @@ import { AiModule } from './modules/ai/ai.module';
     VisitsModule,
     ServicesModule,
     BillingModule,
+    AdmissionsModule,
     LabModule,
     NotificationsModule,
     ReportsModule,

@@ -71,7 +71,12 @@
     "invalidPhone": "Telefon raqami noto'g'ri",
     "cancel": "Bekor qilish",
     "save": "Saqlash",
-    "create": "Yaratish"
+    "create": "Yaratish",
+    "careType": "Davolash turi",
+    "careTypes": {
+      "AMBULATORY": "Ambulator",
+      "INPATIENT": "Statsionar"
+    }
   },
   "gender": {
     "MALE": "Erkak",

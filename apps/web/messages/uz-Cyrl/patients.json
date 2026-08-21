@@ -71,7 +71,12 @@
     "invalidPhone": "Телефон рақами нотўғри",
     "cancel": "Бекор қилиш",
     "save": "Сақлаш",
-    "create": "Яратиш"
+    "create": "Яратиш",
+    "careType": "Даволаш тури",
+    "careTypes": {
+      "AMBULATORY": "Амбулатор",
+      "INPATIENT": "Стационар"
+    }
   },
   "gender": {
     "MALE": "Эркак",

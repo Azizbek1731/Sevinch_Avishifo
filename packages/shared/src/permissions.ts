@@ -45,6 +45,13 @@ export const PERMISSIONS = [
    */
   'payments.void',
   'refunds.create',
+  // Statsionar
+  'admissions.read',
+  'admissions.write',
+  /// Marking the treatment sheet — the ward nurse and the desk, not only doctors.
+  'admissions.administer',
+  'charges.read',
+  'charges.write',
   'shifts.manage',
   /**
    * See every register in the clinic, live, without holding one.
@@ -117,6 +124,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   [UserRole.CLINIC_OWNER]: ALL_CLINIC_PERMISSIONS,
   [UserRole.CLINIC_ADMIN]: [
     'patients.read',
+    'admissions.read',
+    'admissions.write',
+    'admissions.administer',
+    'charges.read',
+    'charges.write',
     'patients.write',
     'patients.merge',
     'patients.export',
@@ -157,6 +169,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   ],
   [UserRole.DOCTOR]: [
     'patients.read',
+    'admissions.read',
+    'admissions.write',
+    'charges.read',
+    'charges.write',
     'patients.recordAccess.manage',
     'appointments.read',
     'queue.read',
@@ -172,6 +188,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   ],
   [UserRole.NURSE]: [
     'patients.read',
+    'admissions.read',
+    'admissions.administer',
+    'charges.read',
     'appointments.read',
     'queue.read',
     'visits.read',
@@ -184,6 +203,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   // cashier/owner (they need a second pair of eyes).
   [UserRole.RECEPTIONIST]: [
     'patients.read',
+    'admissions.read',
+    'admissions.write',
+    'admissions.administer',
+    'charges.read',
+    'charges.write',
     'patients.write',
     'patients.delete',
     'patients.documents.write',
@@ -209,6 +233,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   ],
   [UserRole.CASHIER]: [
     'patients.read',
+    'admissions.read',
+    'charges.read',
+    'charges.write',
     'patients.delete',
     'invoices.read',
     'invoices.write',
@@ -236,6 +263,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   ],
   [UserRole.ACCOUNTANT]: [
     'invoices.read',
+    'admissions.read',
+    'charges.read',
     'debts.read',
     'expenses.read',
     'expenses.write',
