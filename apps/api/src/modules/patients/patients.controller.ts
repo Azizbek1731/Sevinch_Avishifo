@@ -116,6 +116,13 @@ export class PatientsController {
 
   // ------------------------------------------------------------- timeline
 
+  /** Ambulator karta (025/h) uchun to'liq ma'lumot: titul + barcha tashriflar. */
+  @Get(':id/card-print')
+  @RequirePermissions('patients.read')
+  cardPrint(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<Record<string, unknown>> {
+    return this.patients.cardPrintPayload(id, user);
+  }
+
   @Get(':id/timeline')
   @RequirePermissions('patients.read')
   getTimeline(@Param('id') id: string, @Query() query: PatientTimelineQueryDto) {

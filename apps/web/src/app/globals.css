@@ -97,6 +97,23 @@
   }
 
   /*
+   * Multi-page documents opt out of the absolute positioning above.
+   *
+   * `position: absolute; inset: 0` takes the surface out of flow, and an
+   * out-of-flow box does not paginate — the browser prints its first page and
+   * silently drops the rest. That was invisible while every print surface was a
+   * one-page summary; the 003 medical history runs to four or more, so it stays
+   * in normal flow and its page breaks are honoured.
+   */
+  .print-area.print-flow {
+    position: static;
+    inset: auto;
+  }
+  .print-area.print-flow .page-break {
+    break-before: page;
+  }
+
+  /*
    * Default page for the A4 documents that share .print-area — the visit
    * summary and the lab order. Receipts are not A4 and override this with their
    * own @page rule, injected by <ReceiptDocument /> from the clinic's paper

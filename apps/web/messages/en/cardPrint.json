@@ -1,0 +1,32 @@
+{
+  "ministry": "Ministry of Health of the Republic of Uzbekistan",
+  "docLabel": "Medical record",
+  "formNo": "Form 025/h",
+  "title": "Outpatient medical card",
+  "fullName": "Full name",
+  "gender": "Sex",
+  "dob": "Date of birth",
+  "address": "Address, phone",
+  "passport": "Passport / PINFL",
+  "registeredAt": "Registered on",
+  "signalMarks": "Standing (signal) marks",
+  "bloodGroup": "Blood group and Rh",
+  "allergy": "Allergy / drug intolerance",
+  "chronic": "Chronic conditions",
+  "visitsTitle": "Visit records",
+  "noVisits": "No visits recorded",
+  "date": "Date",
+  "record": "Entry",
+  "diagnosis": "Diagnosis (ICD-10)",
+  "doctor": "Doctor",
+  "complaints": "Complaints",
+  "objective": "Objective",
+  "plan": "Advice",
+  "prescriptions": "Prescriptions",
+  "nextVisit": "Next visit",
+  "genders": {
+    "MALE": "male",
+    "FEMALE": "female",
+    "OTHER": "other"
+  }
+}

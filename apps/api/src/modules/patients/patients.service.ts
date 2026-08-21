@@ -432,4 +432,87 @@ export class PatientsService {
     if (!patient) throw new AppException(ErrorCode.PATIENT_NOT_FOUND, 'Patient not found', 404);
     return patient;
   }
+  /**
+   * Everything the 025 outpatient card needs: the title page plus every visit.
+   *
+   * The paper card is one booklet per patient with the visits written into it
+   * in order, so the print view fetches them all rather than a page at a time —
+   * a card printed with only the last twenty visits is not the card.
+   */
+  async cardPrintPayload(id: string, _user: AuthUser): Promise<Record<string, unknown>> {
+    const patient = await this.prisma.db.patient.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!patient) throw new AppException(ErrorCode.PATIENT_NOT_FOUND, 'Bemor topilmadi', 404);
+
+    // Clinic is not tenant-auto-scoped — justified letterhead read of own clinic row.
+    const clinic = await this.prisma.unscoped.clinic.findUnique({
+      where: { id: TenantContext.requireClinicId() },
+      select: { name: true, logoUrl: true, address: true, phone: true },
+    });
+
+    const visits = await this.prisma.db.visit.findMany({
+      where: { patientId: id },
+      orderBy: { startedAt: 'asc' },
+      take: 500,
+      include: {
+        doctor: { select: { fullName: true } },
+        vitals: true,
+        diagnoses: { include: { icd10: { select: { code: true, nameUz: true, nameRu: true } } } },
+        prescriptions: true,
+      },
+    });
+
+    return {
+      clinic: {
+        name: clinic?.name ?? '',
+        logoUrl: clinic?.logoUrl ?? null,
+        address: clinic?.address ?? null,
+        phone: clinic?.phone ?? null,
+      },
+      patient: {
+        mrn: patient.mrn,
+        fullName: patient.fullName,
+        dob: patient.dob ? patient.dob.toISOString().slice(0, 10) : null,
+        gender: patient.gender,
+        address: patient.address,
+        phone: patient.phone,
+        passportId: patient.passportId,
+        bloodGroup: patient.bloodGroup,
+        allergies: patient.allergies,
+        chronicConditions: patient.chronicConditions,
+        createdAt: patient.createdAt.toISOString(),
+      },
+      visits: visits.map((v) => ({
+        date: v.startedAt.toISOString(),
+        doctor: v.doctor.fullName,
+        subjective: v.subjective,
+        objective: v.objective,
+        assessmentNote: v.assessmentNote,
+        plan: v.plan,
+        nextVisitAt: v.nextVisitAt ? v.nextVisitAt.toISOString().slice(0, 10) : null,
+        vitals: v.vitals
+          ? {
+              temperatureC: v.vitals.temperatureC,
+              pulseBpm: v.vitals.pulseBpm,
+              bpSystolic: v.vitals.bpSystolic,
+              bpDiastolic: v.vitals.bpDiastolic,
+            }
+          : null,
+        diagnoses: v.diagnoses.map((d) => ({
+          code: d.icd10.code,
+          name: d.icd10.nameUz,
+          nameRu: d.icd10.nameRu,
+          isPrimary: d.isPrimary,
+        })),
+        prescriptions: v.prescriptions.map((rx) => ({
+          drugName: rx.drugName,
+          dosage: rx.dosage,
+          frequency: rx.frequency,
+          durationDays: rx.durationDays,
+        })),
+      })),
+    };
+  }
+
 }

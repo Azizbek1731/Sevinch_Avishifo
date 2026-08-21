@@ -264,6 +264,90 @@ export class AdmissionsService {
     };
   }
 
+  /**
+   * Everything the 003 form needs on one page, letterhead included.
+   *
+   * The print view is a faithful reproduction of the paper form, so it needs
+   * the clinic header, the full patient identity block (the paper form asks
+   * for address and passport, which the detail view does not show), the
+   * attending doctor, and every narrative field at once.
+   */
+  async printPayload(id: string): Promise<Record<string, unknown>> {
+    const a = await this.prisma.db.admission.findFirst({
+      where: { id },
+      include: {
+        patient: true,
+        orders: {
+          orderBy: { createdAt: 'asc' },
+          include: { service: { select: { name: true } }, administrations: { orderBy: { date: 'asc' } } },
+        },
+        dailyNotes: { orderBy: { date: 'asc' } },
+      },
+    });
+    if (!a) throw new AppException(ErrorCode.NOT_FOUND, 'Kasallik tarixi topilmadi', 404);
+
+    // Clinic is not tenant-auto-scoped — justified letterhead read of own clinic row.
+    const clinic = await this.prisma.unscoped.clinic.findUnique({
+      where: { id: TenantContext.requireClinicId() },
+      select: { name: true, logoUrl: true, address: true, phone: true },
+    });
+    const doctor = a.attendingDoctorUserId
+      ? await this.prisma.db.user.findFirst({
+          where: { id: a.attendingDoctorUserId },
+          select: { fullName: true },
+        })
+      : null;
+
+    return {
+      clinic: {
+        name: clinic?.name ?? '',
+        logoUrl: clinic?.logoUrl ?? null,
+        address: clinic?.address ?? null,
+        phone: clinic?.phone ?? null,
+      },
+      admission: {
+        ...this.map(a),
+        // Bed-days as the ward counts them: the day of admission counts.
+        bedDays: Math.max(
+          1,
+          Math.ceil(
+            ((a.dischargedAt ?? new Date()).getTime() - a.admittedAt.getTime()) / 86_400_000,
+          ),
+        ),
+      },
+      patient: {
+        fullName: a.patient.fullName,
+        mrn: a.patient.mrn,
+        dob: a.patient.dob ? a.patient.dob.toISOString().slice(0, 10) : null,
+        gender: a.patient.gender,
+        address: a.patient.address,
+        phone: a.patient.phone,
+        passportId: a.patient.passportId,
+        bloodGroup: a.patient.bloodGroup,
+        allergies: a.patient.allergies,
+      },
+      doctor: { fullName: doctor?.fullName ?? null },
+      orders: a.orders.map((o) => ({
+        service: o.service.name,
+        schedule: o.schedule,
+        startDate: o.startDate.toISOString().slice(0, 10),
+        timesPlanned: o.timesPlanned,
+        days: plannedDates(o).map((date) => {
+          const done = o.administrations.find((x) => x.date.toISOString().slice(0, 10) === date);
+          return { date, status: done ? done.status : null };
+        }),
+      })),
+      dailyNotes: a.dailyNotes.map((n) => ({
+        date: n.date.toISOString().slice(0, 10),
+        condition: n.condition,
+        temperatureC: n.temperatureC,
+        pulseBpm: n.pulseBpm,
+        bpSystolic: n.bpSystolic,
+        bpDiastolic: n.bpDiastolic,
+      })),
+    };
+  }
+
   // ------------------------------------------------------- treatment sheet
 
   async createOrder(admissionId: string, dto: CreateOrderInput, user: AuthUser): Promise<Record<string, unknown>> {

@@ -1,0 +1,32 @@
+{
+  "ministry": "O‘zbekiston Respublikasi Sog‘liqni saqlash vazirligi",
+  "docLabel": "Tibbiy hujjat",
+  "formNo": "025/h shakl",
+  "title": "Ambulator bemorning tibbiy kartasi",
+  "fullName": "Familiyasi, ismi, otasining ismi",
+  "gender": "Jinsi",
+  "dob": "Tug‘ilgan sanasi",
+  "address": "Yashash manzili, telefon",
+  "passport": "Pasport / JShShIR",
+  "registeredAt": "Ro‘yxatga olingan sana",
+  "signalMarks": "Doimiy (signal) belgilar",
+  "bloodGroup": "Qon guruhi va rezus",
+  "allergy": "Allergiya / dorilarni ko‘tara olmaslik",
+  "chronic": "Surunkali kasalliklar",
+  "visitsTitle": "Qabullar (tashriflar) yozuvi",
+  "noVisits": "Tashriflar qayd etilmagan",
+  "date": "Sana",
+  "record": "Yozuv",
+  "diagnosis": "Tashxis (KXT-10)",
+  "doctor": "Shifokor",
+  "complaints": "Shikoyatlar",
+  "objective": "Obyektiv",
+  "plan": "Tavsiyalar",
+  "prescriptions": "Retseptlar",
+  "nextVisit": "Keyingi tashrif",
+  "genders": {
+    "MALE": "erkak",
+    "FEMALE": "ayol",
+    "OTHER": "boshqa"
+  }
+}

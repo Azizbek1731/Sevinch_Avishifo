@@ -34,6 +34,12 @@ export class AdmissionsController {
     return this.admissions.getById(id);
   }
 
+  @Get(':id/print')
+  @RequirePermissions('admissions.read')
+  print(@Param('id') id: string): Promise<Record<string, unknown>> {
+    return this.admissions.printPayload(id);
+  }
+
   @Post()
   @RequirePermissions('admissions.write')
   admit(

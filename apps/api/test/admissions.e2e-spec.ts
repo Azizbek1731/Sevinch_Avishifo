@@ -333,6 +333,46 @@ describe('admissions and charges (e2e)', () => {
     expect([409, 400]).toContain(res.status);
   });
 
+  it('builds the 003 print payload with the form fields and the marked sheet', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`${API}/admissions/${admissionId}/print`)
+      .set(auth(doctor))
+      .expect(200);
+
+    const d = res.body.data as {
+      clinic: { name: string };
+      admission: Record<string, unknown>;
+      patient: { fullName: string; mrn: string };
+      orders: Array<{ days: Array<{ date: string; status: string | null }> }>;
+    };
+    // The letterhead and the identity block the paper form asks for.
+    expect(d.clinic.name).toBeTruthy();
+    expect(d.patient.fullName).toBe('Statsionar Bemor');
+    expect(d.admission.historyNumber).toMatch(/^KT-/);
+    // Bed-days: the day of admission counts, so a same-day stay is 1, never 0.
+    expect(Number(d.admission.bedDays)).toBeGreaterThanOrEqual(1);
+    // The sheet carries its marks, including the refusal — that is the whole
+    // reason it is printed rather than re-derived.
+    const marks = d.orders.flatMap((o) => o.days.map((x) => x.status));
+    expect(marks).toContain('SKIPPED');
+  });
+
+  it('builds the 025 card payload with the title page and every visit', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`${API}/patients/${patientId}/card-print`)
+      .set(auth(doctor))
+      .expect(200);
+
+    const d = res.body.data as {
+      clinic: { name: string };
+      patient: { mrn: string; fullName: string; bloodGroup: string };
+      visits: unknown[];
+    };
+    expect(d.clinic.name).toBeTruthy();
+    expect(d.patient.mrn).toBeTruthy();
+    expect(Array.isArray(d.visits)).toBe(true);
+  });
+
   it('lets the cash desk read the ward list without letting it write the history', async () => {
     await request(app.getHttpServer()).get(`${API}/admissions`).set(auth(cashier)).expect(200);
     await request(app.getHttpServer())

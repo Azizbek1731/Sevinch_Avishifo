@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { BedDouble, GitMerge, Pencil, Plus, Trash2, UserX } from 'lucide-react';
+import { BedDouble, GitMerge, Pencil, Plus, Printer, Trash2, UserX } from 'lucide-react';
 import { formatPhone, formatUZS } from '@avishifo/shared';
-import { useRouter } from '@/i18n/routing';
+import { Link, useRouter } from '@/i18n/routing';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -41,6 +41,7 @@ function initials(fullName: string): string {
 export function PatientCardView({ patientId }: { patientId: string }) {
   const t = useTranslations('patients');
   const tAdm = useTranslations('admissions');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const queryClient = useQueryClient();
   const can = usePermissions();
@@ -154,6 +155,12 @@ export function PatientCardView({ patientId }: { patientId: string }) {
               {t('card.merge')}
             </Button>
           ) : null}
+          <Button variant="outline" asChild>
+            <Link href={`/patients/${patient.id}/print`}>
+              <Printer className="mr-2 h-4 w-4" />
+              {tCommon('print')}
+            </Link>
+          </Button>
           {can('admissions.write') && patient.careType === 'AMBULATORY' ? (
             <Button variant="outline" onClick={() => setAdmitOpen(true)}>
               <BedDouble className="mr-2 h-4 w-4" />
