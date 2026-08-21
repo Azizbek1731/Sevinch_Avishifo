@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "avishifo",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "port": 3000
+    },
+    {
+      "name": "avishifo-display",
+      "port": 3002,
+      "url": "http://localhost:3002"
+    },
+    {
+      "name": "avishifo-portal",
+      "port": 3003,
+      "url": "http://localhost:3003"
+    }
+  ]
+}
