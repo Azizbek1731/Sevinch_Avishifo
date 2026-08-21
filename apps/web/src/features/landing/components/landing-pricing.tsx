@@ -34,9 +34,9 @@ interface Tier {
  * figure the others have moved on from.
  */
 const TIERS: readonly Tier[] = [
-  { key: 'start', yearly: 390_000, monthly: 490_000, popular: false },
-  { key: 'standard', yearly: 790_000, monthly: 990_000, popular: true },
-  { key: 'pro', yearly: 2_390_000, monthly: 2_990_000, popular: false },
+  { key: 'start', yearly: 199_000, monthly: 249_000, popular: false },
+  { key: 'standard', yearly: 359_000, monthly: 449_000, popular: true },
+  { key: 'pro', yearly: 679_000, monthly: 849_000, popular: false },
 ];
 
 const START = TIERS[0]!;
