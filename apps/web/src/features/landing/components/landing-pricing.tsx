@@ -87,11 +87,15 @@ export function LandingPricing() {
           screen reader says "1 of 2, selected" without a line of keyboard code.
           A switch would announce "off" without ever naming what off costs.
         */}
-        <fieldset className="mx-auto mt-8 w-full max-w-xs sm:w-auto sm:max-w-none">
+        <fieldset className="mt-8">
           <legend className="sr-only">{t('pricing.billing.legend')}</legend>
-          <div className="mx-auto flex w-full items-stretch rounded-xl border border-border bg-muted p-1 sm:w-auto">
+          {/* w-fit, not w-auto: the pill is a block-level flex box, and w-auto
+              on a block fills the row — which left the two options packed
+              against the left edge of a full-width track. Shrinking to content
+              is what lets mx-auto actually centre it. */}
+          <div className="mx-auto flex w-full max-w-xs flex-col items-stretch rounded-xl border border-border bg-muted p-1 sm:w-fit sm:max-w-none sm:flex-row">
             {(['yearly', 'monthly'] as const).map((c) => (
-              <label key={c} className="flex flex-1 cursor-pointer sm:flex-none">
+              <label key={c} className="flex cursor-pointer sm:flex-none">
                 <input
                   type="radio"
                   name={`${uid}-billing`}
