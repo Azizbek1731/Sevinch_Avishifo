@@ -33,6 +33,25 @@ export interface PermissionsDialogProps {
   user: UserRow | null;
 }
 
+/**
+ * Permissions whose plain label still leaves a real question — a one-line hint
+ * appears under those, and only those. Everything else reads for itself, and a
+ * second line on all fifty-nine would bury the eight that matter.
+ */
+const HINTED: readonly Permission[] = [
+  'patients.delete',
+  'patients.recordAccess.manage',
+  'visits.read.all',
+  'payments.void',
+  'admissions.administer',
+  'shifts.oversee',
+  'records.viewDeleted',
+  'ai.use',
+];
+
+/** next-intl splits message keys on dots, so a permission code becomes underscores. */
+const msgKey = (p: Permission): string => p.replace(/\./g, '_');
+
 /** Clinic-scope permissions grouped by module prefix (platform.* excluded). */
 const GROUPS: { module: string; permissions: Permission[] }[] = (() => {
   const map = new Map<string, Permission[]>();
@@ -121,18 +140,35 @@ export function PermissionsDialog({ open, onOpenChange, user }: PermissionsDialo
                 <div className="grid gap-1.5 sm:grid-cols-2">
                   {group.permissions.map((p) => {
                     const isDefault = roleDefaults.has(p);
+                    const key = msgKey(p);
                     return (
                       <label
                         key={p}
-                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted"
+                        // The raw code stays reachable on hover for support, but it is
+                        // not what a clinic owner should have to read to decide.
+                        title={p}
+                        className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                       >
                         <Checkbox
+                          className="mt-0.5 shrink-0"
                           checked={checked.has(p)}
                           onCheckedChange={(v) => toggle(p, v === true)}
                         />
-                        <code className="font-mono text-xs">{p}</code>
+                        <span className="min-w-0 flex-1">
+                          <span className="block leading-snug">
+                            {t(`permissions.labels.${key}` as never)}
+                          </span>
+                          {HINTED.includes(p) ? (
+                            <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                              {t(`permissions.hints.${key}` as never)}
+                            </span>
+                          ) : null}
+                        </span>
                         {isDefault ? (
-                          <Badge variant="outline" className="ml-auto text-[10px] text-muted-foreground">
+                          <Badge
+                            variant="outline"
+                            className="mt-0.5 shrink-0 text-[10px] text-muted-foreground"
+                          >
                             {t('permissions.default')}
                           </Badge>
                         ) : null}
