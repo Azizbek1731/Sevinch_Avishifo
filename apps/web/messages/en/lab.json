@@ -120,5 +120,12 @@
   "criticalValueTitle": "Critical value:",
   "criticalValueBody": "notify the clinician immediately.",
   "criticalValueHint": "Critical (panic) value",
-  "catalogLoadFailed": "The catalogue could not be loaded. Try reloading the page."
+  "catalogLoadFailed": "The catalogue could not be loaded. Try reloading the page.",
+  "pdfFailed": "Could not prepare the PDF",
+  "attachmentsTitle": "Attached files",
+  "attachmentsEmpty": "No files yet. Upload the analyser printout or a scan here.",
+  "attachmentUpload": "Upload file",
+  "attachmentUploaded": "File saved — also visible in the patient's documents",
+  "attachmentDownload": "Download",
+  "attachmentDownloadFailed": "Could not download the file"
 }

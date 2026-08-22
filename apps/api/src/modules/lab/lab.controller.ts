@@ -1,10 +1,28 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+  StreamableFile,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
-import type { AuthUser } from '@avishifo/shared';
+import { UPLOAD_LIMITS, type AuthUser } from '@avishifo/shared';
 import { CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { PaginatedResult } from '../../common/pagination';
 import { LabService } from './lab.service';
 import { LabCatalogService } from './catalog.service';
+import { ResultPdfService, type PdfLocale, type ResultPdfData } from './result-pdf.service';
+import { DocumentsService } from '../patients/documents.service';
 import { ResultsService } from './results.service';
 import {
   CreateLabOrderDto,
@@ -82,6 +100,8 @@ export class LabOrdersController {
   constructor(
     private readonly lab: LabService,
     private readonly results: ResultsService,
+    private readonly pdf_: ResultPdfService,
+    private readonly documents: DocumentsService,
   ) {}
 
   @Post()
@@ -123,6 +143,37 @@ export class LabOrdersController {
     return this.lab.updateStatus(id, dto);
   }
 
+  /**
+   * A file straight off the bench — an analyser printout, a scanned form. Stored
+   * as a patient document (it IS the patient's), linked to this order so the
+   * order can show it, and visible in the patient's Hujjatlar like any other.
+   */
+  @Post(':id/attachments')
+  @RequirePermissions('lab.results.write')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: UPLOAD_LIMITS.MAX_FILE_SIZE_MB * 1024 * 1024 },
+    }),
+  )
+  async uploadAttachment(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body('title') title: string | undefined,
+    @CurrentUser() user: AuthUser,
+  ): Promise<unknown> {
+    if (!file) throw new BadRequestException('file is required');
+    const order = await this.lab.getOrder(id);
+    const cleanTitle = (title ?? '').trim() || file.originalname;
+    return this.documents.upload(
+      order['patientId'] as string,
+      { buffer: file.buffer, originalname: file.originalname },
+      { category: 'ANALYSIS', title: cleanTitle.slice(0, 200) },
+      user.id,
+      id,
+    );
+  }
+
   @Post('items/:itemId/results')
   @RequirePermissions('lab.results.write')
   enterResults(
@@ -152,5 +203,25 @@ export class LabOrdersController {
   @RequirePermissions('lab.orders.read')
   print(@Param('id') id: string): Promise<Record<string, unknown>> {
     return this.lab.printPayload(id);
+  }
+
+  /** The result as a file — the same PDF the patient gets in the portal and the bot. */
+  @Get(':id/pdf')
+  @RequirePermissions('lab.orders.read')
+  async pdf(
+    @Param('id') id: string,
+    @Query('locale') locale: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const payload = (await this.lab.printPayload(id)) as unknown as ResultPdfData & {
+      order: { orderNumber: string };
+    };
+    const loc: PdfLocale = locale === 'ru' || locale === 'en' ? locale : 'uz';
+    const buffer = await this.pdf_.render(payload, loc);
+    res.setHeader('Cache-Control', 'no-store');
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="natija-${payload.order.orderNumber}.pdf"`,
+    });
   }
 }

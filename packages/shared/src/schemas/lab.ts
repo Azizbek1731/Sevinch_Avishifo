@@ -138,6 +138,8 @@ export type EnterLabResultsInput = z.infer<typeof enterLabResultsSchema>;
 export const labOrderQuerySchema = paginationQuerySchema.extend({
   status: z.nativeEnum(LabOrderStatus).optional(),
   branchId: idSchema.optional(),
+  /** One patient's orders — the patient card's lab tab. */
+  patientId: idSchema.optional(),
   from: isoDateTimeSchema.optional(),
   to: isoDateTimeSchema.optional(),
   search: z.string().min(1).optional(),

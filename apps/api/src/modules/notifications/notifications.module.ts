@@ -9,6 +9,10 @@ import { SmsChannel } from './channels/sms.channel';
 import { TelegramChannel } from './channels/telegram.channel';
 import { TelegramGatewayChannel } from './channels/telegram-gateway.channel';
 import { TelegramBotService } from './telegram-bot.service';
+// Provided here directly rather than via LabModule: LabModule imports
+// NotificationsModule, so importing it back would be a cycle. The renderer is a
+// stateless class with no dependencies — a second provider instance is free.
+import { ResultPdfService } from '../lab/result-pdf.service';
 
 /**
  * M13 — notifications hub: BullMQ delivery + reminder queues, SMS (Eskiz) and
@@ -29,6 +33,7 @@ import { TelegramBotService } from './telegram-bot.service';
     TelegramChannel,
     TelegramGatewayChannel,
     TelegramBotService,
+    ResultPdfService,
   ],
   // SmsChannel is exported so the portal can deliver OTP codes over real SMS
   // (Eskiz) instead of the log-only dev fallback.

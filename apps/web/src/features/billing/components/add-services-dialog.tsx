@@ -149,9 +149,15 @@ export function AddServicesDialog({
       }),
     onSuccess: (res) => {
       const { invoice, paid } = res.data;
+      const labOrder = (res.data as { labOrder?: { orderNumber: string } | null }).labOrder;
       invalidateBilling();
       void queryClient.invalidateQueries({ queryKey: ['patients'] });
       onOpenChange(false);
+      // A sold lab service just landed on the laboratory worklist — say so,
+      // or the desk walks the patient to a lab that has never heard of them.
+      if (labOrder) {
+        toast.info(t('quick.labOrdered', { number: labOrder.orderNumber }));
+      }
       if (paid) {
         setPrintInvoiceId(invoice.id);
         toast.success(t('quick.paidSuccess', { number: invoice.number }), {

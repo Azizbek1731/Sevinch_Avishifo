@@ -149,6 +149,14 @@ export interface LabOrderDetail {
     phone: string | null;
   };
   items: LabOrderItem[];
+  attachments: Array<{
+    id: string;
+    title: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    createdAt: string | null;
+  }>;
 }
 
 export interface LabPrintPayload {

@@ -888,11 +888,16 @@ model PatientDocument {
   mimeType     String
   sizeBytes    Int
   uploadedById String?
+  /// Set when the file is a lab attachment (an analyser printout, a scan) so the
+  /// order shows its own files; the document still lives in the patient's folder.
+  labOrderId   String?
   createdAt    DateTime         @default(now()) @db.Timestamptz(6)
 
-  patient Patient @relation(fields: [patientId], references: [id])
+  patient  Patient   @relation(fields: [patientId], references: [id])
+  labOrder LabOrder? @relation(fields: [labOrderId], references: [id])
 
   @@index([clinicId, patientId])
+  @@index([labOrderId])
 }
 
 enum RecordAccessStatus {
@@ -1669,9 +1674,10 @@ model LabOrder {
   createdAt          DateTime            @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime            @updatedAt @db.Timestamptz(6)
 
-  patient Patient        @relation(fields: [patientId], references: [id])
-  visit   Visit?         @relation(fields: [visitId], references: [id])
-  items   LabOrderItem[]
+  patient     Patient           @relation(fields: [patientId], references: [id])
+  visit       Visit?            @relation(fields: [visitId], references: [id])
+  items       LabOrderItem[]
+  attachments PatientDocument[]
 
   @@unique([clinicId, orderNumber])
   @@index([clinicId, branchId, status])

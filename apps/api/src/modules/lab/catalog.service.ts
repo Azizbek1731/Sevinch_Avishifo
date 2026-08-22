@@ -142,6 +142,123 @@ export class LabCatalogService {
   }
 
   /**
+   * Give a LAB-kind service the lab test that makes it real on the worklist.
+   *
+   * Called from service creation, inside its transaction, so a lab service can
+   * never exist half-made — priced but invisible to the laboratory. With a
+   * catalogue code the test is copied whole (analytes, reference intervals);
+   * without one a minimal test with a single free-text "Natija" analyte is
+   * created, because a service the catalogue does not know still needs a place
+   * for the technician to type the answer.
+   */
+  async ensureTestForService(
+    db: Prisma.TransactionClient,
+    input: {
+      serviceId: string;
+      serviceCode: string;
+      serviceName: Prisma.InputJsonValue;
+      labCatalogCode?: string;
+    },
+  ): Promise<{ labTestId: string }> {
+    const clinicId = TenantContext.requireClinicId();
+
+    if (input.labCatalogCode) {
+      // Shared dictionary — justified unscoped read of a table with no clinicId.
+      const cat = await this.prisma.unscoped.labCatalogTest.findUnique({
+        where: { code: input.labCatalogCode },
+        include: { parameters: true },
+      });
+      if (!cat) {
+        throw new AppException(ErrorCode.NOT_FOUND, 'Katalogda bunday tekshiruv yo‘q', 404);
+      }
+      const existing = await db.labTest.findFirst({
+        where: { clinicId, OR: [{ catalogCode: cat.code }, { code: cat.code }] },
+        select: { id: true, serviceId: true },
+      });
+      if (existing) {
+        if (existing.serviceId && existing.serviceId !== input.serviceId) {
+          throw new AppException(
+            ErrorCode.CONFLICT,
+            'Bu tahlil allaqachon boshqa xizmatga bog‘langan',
+            409,
+          );
+        }
+        await db.labTest.update({
+          where: { id: existing.id },
+          data: { serviceId: input.serviceId, isActive: true },
+        });
+        return { labTestId: existing.id };
+      }
+      const created = await db.labTest.create({
+        data: {
+          clinicId,
+          serviceId: input.serviceId,
+          code: cat.code,
+          name: { uz: cat.nameUz, ru: cat.nameRu, en: cat.nameEn ?? undefined },
+          specimenType: cat.biomaterial.toLowerCase(),
+          biomaterial: cat.biomaterial,
+          category: cat.category,
+          catalogCode: cat.code,
+          parameters: {
+            // Nested creates are not auto-stamped by the tenant extension.
+            create: [...cat.parameters]
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((p, idx) => ({
+                clinicId,
+                name: p.nameUz,
+                code: p.code,
+                unit: p.unit,
+                valueType: p.valueType,
+                referenceRanges: p.referenceRanges as Prisma.InputJsonValue,
+                sortOrder: idx,
+              })),
+          },
+        },
+        select: { id: true },
+      });
+      return { labTestId: created.id };
+    }
+
+    // Hand-written lab service: a bare test with one free-text answer field.
+    //
+    // The existing-code lookup runs BEFORE the create, not in a P2002 catch:
+    // this executes inside the service-creation transaction, and on Postgres a
+    // unique violation aborts the whole transaction — every query after it,
+    // including the adoption lookup, would die with 25P02 and surface as a 500.
+    const orphan = await db.labTest.findFirst({
+      where: { clinicId, code: input.serviceCode },
+      select: { id: true, serviceId: true },
+    });
+    if (orphan) {
+      if (orphan.serviceId && orphan.serviceId !== input.serviceId) {
+        throw new AppException(
+          ErrorCode.CONFLICT,
+          'Bu kod bilan tahlil allaqachon bor va boshqa xizmatga bog‘langan',
+          409,
+        );
+      }
+      await db.labTest.update({
+        where: { id: orphan.id },
+        data: { serviceId: input.serviceId, isActive: true },
+      });
+      return { labTestId: orphan.id };
+    }
+    const created = await db.labTest.create({
+      data: {
+        clinicId,
+        serviceId: input.serviceId,
+        code: input.serviceCode,
+        name: input.serviceName,
+        parameters: {
+          create: [{ clinicId, name: 'Natija', valueType: 'TEXT', sortOrder: 0 }],
+        },
+      },
+      select: { id: true },
+    });
+    return { labTestId: created.id };
+  }
+
+  /**
    * Copy catalogue tests into this clinic's own LabTest rows.
    *
    * The copy is deliberate rather than a reference: from here the clinic may retune an

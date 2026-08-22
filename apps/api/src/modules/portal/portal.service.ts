@@ -21,6 +21,8 @@ import {
   type PortalVerifyOtpInput,
 } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
+import { RESULT_PDF_INCLUDE, buildResultPdfData } from '../lab/result-pdf.data';
+import { ResultPdfService } from '../lab/result-pdf.service';
 import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
@@ -326,6 +328,7 @@ export class PortalService {
     private readonly notifications: NotificationsService,
     private readonly sms: SmsChannel,
     private readonly storage: StorageService,
+    private readonly resultPdf: ResultPdfService,
     private readonly config: AppConfigService,
     private readonly recordAccess: RecordAccessService,
     private readonly telegram: TelegramChannel,
@@ -658,6 +661,58 @@ export class PortalService {
       mimeType: doc.mimeType,
       fileName: doc.fileName,
     };
+  }
+
+  /**
+   * The result as the same PDF the clinic itself prints. Only APPROVED or
+   * DELIVERED orders leave the building: a half-entered result is not a
+   * document, and handing it out would put unchecked numbers in front of a
+   * patient with nobody standing next to them.
+   */
+  async labResultPdf(
+    phone: string,
+    orderId: string,
+  ): Promise<{ buffer: Buffer; fileName: string }> {
+    const patients = await this.ownPatients(phone);
+    const patientIds = patients.map((p) => p.id);
+    // prisma.unscoped justified: portal runs pre-tenant; scoping is the phone->patient set.
+    const order = patientIds.length
+      ? await this.prisma.unscoped.labOrder.findFirst({
+          where: {
+            id: orderId,
+            patientId: { in: patientIds },
+            status: { in: ['APPROVED', 'DELIVERED'] },
+          },
+          include: RESULT_PDF_INCLUDE,
+        })
+      : null;
+    if (!order) throw new AppException(ErrorCode.NOT_FOUND, 'Natija topilmadi', 404);
+
+    const clinic = await this.prisma.unscoped.clinic.findUnique({
+      where: { id: order.clinicId },
+      select: { name: true, legalName: true, address: true, phone: true },
+    });
+    const approvedById =
+      order.items.map((it) => it.result?.approvedById).find((v): v is string => Boolean(v)) ?? null;
+    const approver = approvedById
+      ? await this.prisma.unscoped.user.findFirst({
+          where: { id: approvedById, clinicId: order.clinicId },
+          select: { fullName: true },
+        })
+      : null;
+
+    const data = buildResultPdfData(
+      order,
+      {
+        name: clinic?.name ?? '',
+        legalName: clinic?.legalName ?? null,
+        address: clinic?.address ?? null,
+        phone: clinic?.phone ?? null,
+      },
+      approver,
+    );
+    const buffer = await this.resultPdf.render(data, 'uz');
+    return { buffer, fileName: `natija-${order.orderNumber}.pdf` };
   }
 
   // --------------------------------------------------------------- telegram

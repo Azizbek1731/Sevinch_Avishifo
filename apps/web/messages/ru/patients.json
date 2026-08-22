@@ -42,7 +42,8 @@
     "visits": "Визиты",
     "documents": "Документы",
     "invoices": "Счета",
-    "charges": "К оплате"
+    "charges": "К оплате",
+    "lab": "Лабораторные данные"
   },
   "form": {
     "createTitle": "Новый пациент",
@@ -245,5 +246,16 @@
     "merged": "Пациенты объединены"
   },
   "deletedBadge": "Удалён",
-  "showDeleted": "Удалённые"
+  "showDeleted": "Удалённые",
+  "lab": {
+    "emptyTitle": "Лабораторных исследований нет",
+    "emptyDescription": "Заказ появится здесь, когда пациенту добавят лабораторную услугу.",
+    "colOrder": "Заказ №",
+    "colDate": "Дата",
+    "colTests": "Анализы",
+    "colStatus": "Статус",
+    "colActions": "Действия",
+    "open": "Открыть",
+    "downloadFailed": "Не удалось скачать PDF"
+  }
 }

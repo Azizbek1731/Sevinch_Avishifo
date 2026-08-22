@@ -42,7 +42,8 @@
     "visits": "Ташрифлар",
     "documents": "Ҳужжатлар",
     "invoices": "Ҳисоблар",
-    "charges": "Тўловлар"
+    "charges": "Тўловлар",
+    "lab": "Лаборатор маълумотлар"
   },
   "form": {
     "createTitle": "Янги бемор",
@@ -245,5 +246,16 @@
     "merged": "Беморлар бирлаштирилди"
   },
   "deletedBadge": "Ўчирилган",
-  "showDeleted": "Ўчирилганлар"
+  "showDeleted": "Ўчирилганлар",
+  "lab": {
+    "emptyTitle": "Лаборатор текширувлар йўқ",
+    "emptyDescription": "Беморга лаборатория хизмати қўшилганда буюртма шу ерда кўринади.",
+    "colOrder": "Буюртма №",
+    "colDate": "Сана",
+    "colTests": "Таҳлиллар",
+    "colStatus": "Ҳолат",
+    "colActions": "Амаллар",
+    "open": "Очиш",
+    "downloadFailed": "PDF юклаб олинмади"
+  }
 }

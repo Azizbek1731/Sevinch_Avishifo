@@ -1,14 +1,16 @@
 import { Module } from '@nestjs/common';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PatientsModule } from '../patients/patients.module';
 import { LabService } from './lab.service';
 import { LabCatalogService } from './catalog.service';
+import { ResultPdfService } from './result-pdf.service';
 import { ResultsService } from './results.service';
 import { LabCatalogController, LabOrdersController, LabTestsController } from './lab.controller';
 
 @Module({
-  imports: [NotificationsModule],
+  imports: [NotificationsModule, PatientsModule],
   controllers: [LabCatalogController, LabTestsController, LabOrdersController],
-  providers: [LabService, LabCatalogService, ResultsService],
-  exports: [LabService],
+  providers: [LabService, LabCatalogService, ResultsService, ResultPdfService],
+  exports: [LabService, LabCatalogService, ResultPdfService],
 })
 export class LabModule {}

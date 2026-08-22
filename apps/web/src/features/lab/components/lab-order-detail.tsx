@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, CheckCheck, CheckCircle2, FlaskConical, Play, Printer, Syringe } from 'lucide-react';
+import { ArrowLeft, CheckCheck, CheckCircle2, FileDown, FlaskConical, Play, Printer, Syringe } from 'lucide-react';
 import { Gender, LabOrderStatus, PhysiologicalState, formatPhone } from '@avishifo/shared';
 import { Link } from '@/i18n/routing';
 import { formatDate, formatTz } from '@/lib/dates';
@@ -31,6 +31,9 @@ import {
   useUpdateOrderStatus,
 } from '../hooks';
 import { OrderItemCard } from './order-item-card';
+import { OrderAttachments } from './order-attachments';
+import { toast } from 'sonner';
+import { api } from '@/lib/api-client';
 
 const LOCKED_STATUSES: readonly LabOrderStatus[] = [
   LabOrderStatus.APPROVED,
@@ -53,6 +56,7 @@ export function LabOrderDetail({ id }: { id: string }) {
   const deliver = useDeliverOrder();
   const setContext = useSetOrderContext();
   const [approveOpen, setApproveOpen] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [deliverOpen, setDeliverOpen] = useState(false);
 
   useSocketEvent('lab.order.updated', (p) => {
@@ -144,6 +148,35 @@ export function LabOrderDetail({ id }: { id: string }) {
             {tc('print')}
           </Link>
         </Button>
+        {/* Before any result exists the PDF is an empty table with an
+            "unapproved" stamp — nothing anyone would hand to a patient. */}
+        {(
+          [LabOrderStatus.RESULTED, LabOrderStatus.APPROVED, LabOrderStatus.DELIVERED] as LabOrderStatus[]
+        ).includes(order.status) ? (
+        <Button
+          variant="outline"
+          disabled={pdfBusy}
+          onClick={async () => {
+            setPdfBusy(true);
+            try {
+              const blob = await api.get<Blob>(`/lab-orders/${id}/pdf`);
+              const url = URL.createObjectURL(blob.data);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `natija-${order.orderNumber}.pdf`;
+              a.click();
+              URL.revokeObjectURL(url);
+            } catch {
+              toast.error(t('pdfFailed'));
+            } finally {
+              setPdfBusy(false);
+            }
+          }}
+        >
+          <FileDown className="h-4 w-4" />
+          PDF
+        </Button>
+        ) : null}
       </PageHeader>
 
       <Card>
@@ -212,6 +245,12 @@ export function LabOrderDetail({ id }: { id: string }) {
           <OrderItemCard key={item.id} item={item} locked={locked} canEnter={canEnterResults} />
         ))}
       </div>
+
+      <OrderAttachments
+        orderId={id}
+        attachments={order.attachments ?? []}
+        canUpload={canEnterResults && !locked}
+      />
 
       <ConfirmDialog
         open={approveOpen}

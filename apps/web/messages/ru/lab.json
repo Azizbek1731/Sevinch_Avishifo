@@ -120,5 +120,12 @@
   "criticalValueTitle": "Критическое значение:",
   "criticalValueBody": "немедленно сообщите врачу.",
   "criticalValueHint": "Критическое («паническое») значение",
-  "catalogLoadFailed": "Не удалось загрузить каталог. Обновите страницу."
+  "catalogLoadFailed": "Не удалось загрузить каталог. Обновите страницу.",
+  "pdfFailed": "Не удалось подготовить PDF",
+  "attachmentsTitle": "Прикреплённые файлы",
+  "attachmentsEmpty": "Файлов нет. Загрузите сюда распечатку анализатора или скан.",
+  "attachmentUpload": "Загрузить файл",
+  "attachmentUploaded": "Файл сохранён — виден и в документах пациента",
+  "attachmentDownload": "Скачать",
+  "attachmentDownloadFailed": "Не удалось скачать файл"
 }

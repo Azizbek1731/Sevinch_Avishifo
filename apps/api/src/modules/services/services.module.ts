@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LabModule } from '../lab/lab.module';
 import { ServicesController } from './services.controller';
 import { ServicesService } from './services.service';
 import { PricingService } from './pricing.service';
@@ -9,6 +10,7 @@ import { PricingService } from './pricing.service';
  * PricingService is exported for billing/appointments/lab price resolution.
  */
 @Module({
+  imports: [LabModule],
   controllers: [ServicesController],
   providers: [ServicesService, PricingService],
   exports: [PricingService],

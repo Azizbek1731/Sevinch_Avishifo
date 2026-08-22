@@ -203,6 +203,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   // cashier/owner (they need a second pair of eyes).
   [UserRole.RECEPTIONIST]: [
     'patients.read',
+    // The desk answers "tahlil tayyormi?" from the patient card's lab tab and
+    // downloads the ready PDF for the patient standing in front of them.
+    'lab.orders.read',
     'admissions.read',
     'admissions.write',
     'admissions.administer',

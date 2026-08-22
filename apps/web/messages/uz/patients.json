@@ -42,7 +42,8 @@
     "visits": "Tashriflar",
     "documents": "Hujjatlar",
     "invoices": "Hisoblar",
-    "charges": "To‘lovlar"
+    "charges": "To‘lovlar",
+    "lab": "Laborator ma'lumotlar"
   },
   "form": {
     "createTitle": "Yangi bemor",
@@ -245,5 +246,16 @@
     "merged": "Bemorlar birlashtirildi"
   },
   "deletedBadge": "O‘chirilgan",
-  "showDeleted": "O‘chirilganlar"
+  "showDeleted": "O‘chirilganlar",
+  "lab": {
+    "emptyTitle": "Laborator tekshiruvlar yo'q",
+    "emptyDescription": "Bemorga laboratoriya xizmati qo'shilganda buyurtma shu yerda ko'rinadi.",
+    "colOrder": "Buyurtma №",
+    "colDate": "Sana",
+    "colTests": "Tahlillar",
+    "colStatus": "Holat",
+    "colActions": "Amallar",
+    "open": "Ochish",
+    "downloadFailed": "PDF yuklab olinmadi"
+  }
 }

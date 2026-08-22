@@ -71,7 +71,13 @@
     "invalidDuration": "Invalid duration",
     "invalidPrice": "Invalid price",
     "created": "Service created",
-    "updated": "Service saved"
+    "updated": "Service saved",
+    "labCatalog": "Pick from the standard catalogue",
+    "labCatalogPlaceholder": "Search a test (e.g. haemoglobin)...",
+    "labCatalogHint": "Picking from the catalogue fills the name, code and reference values. Not there? Type it below.",
+    "labCatalogEmpty": "Not in the catalogue — fill the fields by hand.",
+    "labCatalogClear": "Clear selection",
+    "labCatalogTaken": "Already in clinic"
   },
   "prices": {
     "title": "Price history — {name}",

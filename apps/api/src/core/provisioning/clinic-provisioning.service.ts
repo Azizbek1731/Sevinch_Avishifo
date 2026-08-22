@@ -104,6 +104,13 @@ export class ClinicProvisioningService {
         data: { clinicId: clinic.id, name: FIRST_BRANCH_NAME },
       });
 
+      // Every clinic starts with a Laboratoriya category: lab services made from
+      // the standard catalogue need a home before anyone has thought about
+      // categories, and asking a new clinic to invent one first is a dead end.
+      await tx.serviceCategory.create({
+        data: { clinicId: clinic.id, name: 'Laboratoriya', kind: 'LAB', sortOrder: 90 },
+      });
+
       const owner = await tx.user.create({
         data: {
           clinicId: clinic.id,

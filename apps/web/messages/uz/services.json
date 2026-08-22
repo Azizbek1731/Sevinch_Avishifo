@@ -71,7 +71,13 @@
     "invalidDuration": "Davomiylik noto'g'ri",
     "invalidPrice": "Narx noto'g'ri kiritildi",
     "created": "Xizmat yaratildi",
-    "updated": "Xizmat saqlandi"
+    "updated": "Xizmat saqlandi",
+    "labCatalog": "Standart katalogdan tanlash",
+    "labCatalogPlaceholder": "Tahlil nomi bo'yicha qidiring (masalan: gemoglobin)...",
+    "labCatalogHint": "Katalogdan tanlansa — nomi, kodi va normalari o'zi keladi. Topilmasa, pastda qo'lda yozing.",
+    "labCatalogEmpty": "Katalogda topilmadi — pastdagi maydonlarga qo'lda yozing.",
+    "labCatalogClear": "Tanlovni bekor qilish",
+    "labCatalogTaken": "Klinikada bor"
   },
   "prices": {
     "title": "Narx tarixi — {name}",

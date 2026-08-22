@@ -203,6 +203,20 @@ export class PortalController {
     });
   }
 
+  /** The approved lab result as a downloadable PDF. */
+  @Get('me/lab-results/:id/download')
+  @UseGuards(PortalAuthGuard)
+  async downloadLabResult(
+    @PortalPhone() phone: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<StreamableFile> {
+    const { buffer, fileName } = await this.portal.labResultPdf(phone, id);
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${encodeURIComponent(fileName)}"`,
+    });
+  }
+
   // ---------------------------------------------------- medical-record access
 
   /**

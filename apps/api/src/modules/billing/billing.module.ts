@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ServicesModule } from '../services/services.module';
+import { LabModule } from '../lab/lab.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { InvoicesService } from './invoices.service';
 import { InvoicesController } from './invoices.controller';
@@ -17,7 +18,7 @@ import { FISCALIZATION_SERVICE, NoopFiscalizationService } from './fiscalization
 
 /** Billing, invoicing & payments (spec §M8). */
 @Module({
-  imports: [ServicesModule, NotificationsModule],
+  imports: [ServicesModule, LabModule, NotificationsModule],
   controllers: [
     InvoicesController,
     ShiftsController,

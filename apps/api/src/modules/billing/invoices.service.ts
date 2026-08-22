@@ -29,6 +29,7 @@ import { EventsService } from '../../core/realtime/events.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { SequenceService } from '../../core/sequence/sequence.service';
 import { PricingService } from '../services/pricing.service';
+import { LabService } from '../lab/lab.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { FISCALIZATION_SERVICE, type FiscalizationService } from './fiscalization.service';
 
@@ -133,6 +134,7 @@ export class InvoicesService {
     private readonly pricing: PricingService,
     private readonly notifications: NotificationsService,
     @Inject(FISCALIZATION_SERVICE) private readonly fiscalization: FiscalizationService,
+    private readonly lab: LabService,
   ) {}
 
   // ============================================================ mapping
@@ -398,13 +400,45 @@ export class InvoicesService {
     const invoiceId = created.id as string;
     const issued = await this.issue(invoiceId);
 
+    // Selling a lab service IS the lab referral: any invoice line whose service
+    // carries a linked lab test lands on the laboratory worklist as one order.
+    // Failure here must not kill the sale — the money is already right, and the
+    // desk can still order the test by hand — so it degrades to a logged error.
+    let labOrder: { id: string; orderNumber: string } | null = null;
+    try {
+      const serviceIds = [
+        ...new Set(
+          (created.lines as Array<{ serviceId: string | null }>)
+            .map((l) => l.serviceId)
+            .filter((id): id is string => id !== null),
+        ),
+      ];
+      if (serviceIds.length > 0) {
+        const labTests = await this.prisma.db.labTest.findMany({
+          where: { serviceId: { in: serviceIds }, isActive: true },
+          select: { id: true },
+        });
+        if (labTests.length > 0) {
+          labOrder = await this.lab.createOrderFromReferral({
+            patientId: dto.patientId,
+            branchId: dto.branchId,
+            visitId: dto.visitId,
+            testIds: labTests.map((t) => t.id),
+            orderedById: user.id,
+          });
+        }
+      }
+    } catch (err: unknown) {
+      this.logger.error(`quick invoice lab order failed: ${String(err)}`);
+    }
+
     if (
       dto.settle === 'DEBT' ||
       dto.payments === undefined ||
       dto.payments.length === 0 ||
       dto.idempotencyKey === undefined
     ) {
-      return { invoice: issued, lines: created.lines, paid: false };
+      return { invoice: issued, lines: created.lines, paid: false, labOrder };
     }
 
     const settled = await this.addPayments(
@@ -416,7 +450,7 @@ export class InvoicesService {
       // anything less belongs on the patient's account as debt instead.
       { requireFull: true },
     );
-    return { ...settled, lines: created.lines, paid: true };
+    return { ...settled, lines: created.lines, paid: true, labOrder };
   }
 
   /**

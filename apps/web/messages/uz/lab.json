@@ -120,5 +120,12 @@
   "criticalValueTitle": "Xavfli qiymat:",
   "criticalValueBody": "shifokorga darhol xabar bering.",
   "criticalValueHint": "Xavfli (kritik) qiymat",
-  "catalogLoadFailed": "Katalogni yuklab bo'lmadi. Sahifani yangilab ko'ring."
+  "catalogLoadFailed": "Katalogni yuklab bo'lmadi. Sahifani yangilab ko'ring.",
+  "pdfFailed": "PDF tayyorlashda xatolik",
+  "attachmentsTitle": "Biriktirilgan fayllar",
+  "attachmentsEmpty": "Fayl biriktirilmagan. Analizator chiqargan varaq yoki skanni shu yerga yuklang.",
+  "attachmentUpload": "Fayl yuklash",
+  "attachmentUploaded": "Fayl saqlandi — bemor hujjatlarida ham ko'rinadi",
+  "attachmentDownload": "Yuklab olish",
+  "attachmentDownloadFailed": "Faylni yuklab olib bo'lmadi"
 }

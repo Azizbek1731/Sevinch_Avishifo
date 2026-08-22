@@ -35,6 +35,13 @@ export const createServiceSchema = z.object({
   price: moneySchema,
   /** Branch override for the initial price; omit for clinic default. */
   branchId: idSchema.optional(),
+  /**
+   * Standard-catalogue code this lab service is made from (e.g. "CBC"). Only
+   * meaningful in a LAB-kind category: the server copies the catalogue test —
+   * analytes and reference intervals included — and links it to the service, so
+   * selling the service is what puts it on the lab worklist.
+   */
+  labCatalogCode: z.string().min(1).max(64).optional(),
 });
 export type CreateServiceInput = z.infer<typeof createServiceSchema>;
 

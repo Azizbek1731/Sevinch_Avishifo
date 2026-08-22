@@ -73,7 +73,8 @@
     "paidSuccess": "{number} — payment accepted, printing the receipt",
     "debtSuccess": "{number} — added to the patient's debt",
     "viewInvoice": "Open invoice",
-    "shiftRequired": "Open a cashier shift before taking cash"
+    "shiftRequired": "Open a cashier shift before taking cash",
+    "labOrdered": "Tests sent to the laboratory ({number})"
   },
   "refundDlg": {
     "title": "Refund — {number}",

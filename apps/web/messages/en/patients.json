@@ -42,7 +42,8 @@
     "visits": "Visits",
     "documents": "Documents",
     "invoices": "Invoices",
-    "charges": "Unpaid"
+    "charges": "Unpaid",
+    "lab": "Laboratory data"
   },
   "form": {
     "createTitle": "New patient",
@@ -245,5 +246,16 @@
     "merged": "Patients merged"
   },
   "deletedBadge": "Deleted",
-  "showDeleted": "Deleted"
+  "showDeleted": "Deleted",
+  "lab": {
+    "emptyTitle": "No laboratory tests",
+    "emptyDescription": "An order appears here once a lab service is added to the patient.",
+    "colOrder": "Order #",
+    "colDate": "Date",
+    "colTests": "Tests",
+    "colStatus": "Status",
+    "colActions": "Actions",
+    "open": "Open",
+    "downloadFailed": "PDF download failed"
+  }
 }

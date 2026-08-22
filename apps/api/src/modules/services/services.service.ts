@@ -15,6 +15,7 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { AuditService } from '../../core/audit/audit.service';
 import { PricingService } from './pricing.service';
+import { LabCatalogService } from '../lab/catalog.service';
 import { CreatePackageDto, CreateServiceCategoryDto, CreateServiceDto, DiscountRuleUpsertDto, ListQueryDto, ServiceQueryDto, SetServicePriceDto, UpdatePackageDto, UpdateServiceCategoryDto, UpdateServiceDto } from './dto';
 
 // ---------------------------------------------------------------- responses
@@ -137,6 +138,7 @@ export class ServicesService {
     private readonly prisma: PrismaService,
     private readonly pricing: PricingService,
     private readonly audit: AuditService,
+    private readonly labCatalog: LabCatalogService,
   ) {}
 
   // ------------------------------------------------------------ categories
@@ -231,32 +233,53 @@ export class ServicesService {
   }
 
   async createService(dto: CreateServiceDto): Promise<ServiceResponse> {
-    await this.requireCategory(dto.categoryId);
+    const category = await this.requireCategory(dto.categoryId);
+    if (dto.labCatalogCode && category.kind !== 'LAB') {
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'labCatalogCode faqat laboratoriya (LAB) kategoriyasida ishlatiladi',
+        400,
+      );
+    }
     const effectiveFrom = new Date();
     let service: Service & { category: ServiceCategory; prices: ServicePrice[] };
     try {
-      service = await this.prisma.db.service.create({
-        // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
-        data: {
-          clinicId: TenantContext.requireClinicId(),
-          categoryId: dto.categoryId,
-          code: dto.code,
-          name: dto.name,
-          durationMin: dto.durationMin,
-          vatIncluded: dto.vatIncluded,
-          prices: {
-            create: {
-              // Nested creates are NOT auto-stamped by the tenant extension.
-              clinicId: TenantContext.requireClinicId(),
-              branchId: dto.branchId ?? null,
-              price: new Prisma.Decimal(dto.price),
-              effectiveFrom,
+      // One transaction with the lab test: a LAB service must never exist
+      // half-made — priced in the catalogue but invisible to the laboratory.
+      service = await this.prisma.db.$transaction(async (tx) => {
+        const created = await tx.service.create({
+          // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
+          data: {
+            clinicId: TenantContext.requireClinicId(),
+            categoryId: dto.categoryId,
+            code: dto.code,
+            name: dto.name,
+            durationMin: dto.durationMin,
+            vatIncluded: dto.vatIncluded,
+            prices: {
+              create: {
+                // Nested creates are NOT auto-stamped by the tenant extension.
+                clinicId: TenantContext.requireClinicId(),
+                branchId: dto.branchId ?? null,
+                price: new Prisma.Decimal(dto.price),
+                effectiveFrom,
+              },
             },
           },
-        },
-        include: { category: true, prices: true },
+          include: { category: true, prices: true },
+        });
+        if (category.kind === 'LAB') {
+          await this.labCatalog.ensureTestForService(tx as never, {
+            serviceId: created.id,
+            serviceCode: created.code,
+            serviceName: created.name as Prisma.InputJsonValue,
+            labCatalogCode: dto.labCatalogCode,
+          });
+        }
+        return created;
       });
     } catch (err) {
+      if (err instanceof AppException) throw err;
       throw this.mapUniqueError(err, 'Service code already exists in this clinic');
     }
     await this.audit.log({
@@ -597,9 +620,10 @@ export class ServicesService {
     };
   }
 
-  private async requireCategory(id: string): Promise<void> {
+  private async requireCategory(id: string): Promise<ServiceCategory> {
     const category = await this.prisma.db.serviceCategory.findFirst({ where: { id } });
     if (!category) throw new AppException(ErrorCode.NOT_FOUND, 'Service category not found', 404);
+    return category;
   }
 
   private async requireServicesExist(serviceIds: string[]): Promise<void> {

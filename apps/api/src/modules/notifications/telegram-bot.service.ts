@@ -1,5 +1,5 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { Bot, InputFile, Keyboard, type Context } from 'grammy';
+import { Bot, InlineKeyboard, InputFile, Keyboard, type Context } from 'grammy';
 import { formatInTimeZone } from 'date-fns-tz';
 import {
   AuditAction,
@@ -13,6 +13,8 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { AuditService } from '../../core/audit/audit.service';
 import { StorageService } from '../../core/storage/storage.service';
+import { RESULT_PDF_INCLUDE, buildResultPdfData } from '../lab/result-pdf.data';
+import { ResultPdfService } from '../lab/result-pdf.service';
 import { NotificationsService } from './notifications.service';
 
 /** Buttons a linked patient sees. */
@@ -107,6 +109,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly storage: StorageService,
+    private readonly resultPdf: ResultPdfService,
   ) {}
 
   onModuleInit(): void {
@@ -144,6 +147,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     bot.hears('🏥 Klinikalar', (ctx) => this.handlePlatformClinics(ctx));
     bot.hears('🆕 Yangi ro‘yxatdan o‘tganlar', (ctx) => this.handlePlatformSignups(ctx));
     bot.callbackQuery(/^(confirm|cancel):(.+)$/, (ctx) => this.handleAppointmentAction(ctx));
+    // A ready lab result as a PDF document.
+    bot.callbackQuery(/^labpdf:(.+)$/, (ctx) => this.handleResultPdf(ctx, ctx.match[1] ?? ''));
     // Patient asks a clinic to release their history.
     bot.callbackQuery(/^ra_req:(.+)$/, (ctx) => this.handleHistoryRequest(ctx));
     // Doctor / clinic admin decides, straight from the notification.
@@ -508,6 +513,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       orderBy: { createdAt: 'desc' },
       take: 3,
       select: {
+        id: true,
         orderNumber: true,
         createdAt: true,
         items: {
@@ -541,7 +547,71 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       });
       return [header, ...lines].join('\n');
     });
-    await ctx.reply(blocks.join('\n\n'), { reply_markup: PATIENT_KEYBOARD });
+    // The keyboard swap is deliberate: the persistent reply keyboard survives on
+    // the chat, while the inline buttons ride on this one message.
+    const pdfButtons = new InlineKeyboard();
+    for (const o of orders) pdfButtons.text(`📄 ${o.orderNumber} — PDF`, `labpdf:${o.id}`).row();
+    await ctx.reply(blocks.join('\n\n'), { reply_markup: pdfButtons });
+  }
+
+  /**
+   * "📄 L-000123 — PDF" pressed: render the result and hand the file over.
+   *
+   * Ownership is re-checked at press time, not trusted from the button — a
+   * forwarded message carries the same callback data into someone else's chat.
+   */
+  private async handleResultPdf(ctx: Context, orderId: string): Promise<void> {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    await ctx.answerCallbackQuery().catch(() => undefined);
+    const patientIds = await this.linkedPatientIds(chatId);
+    // prisma.unscoped justified: bot is cross-clinic; scoping is the chat's own patient set.
+    const order = patientIds.length
+      ? await this.prisma.unscoped.labOrder.findFirst({
+          where: {
+            id: orderId,
+            patientId: { in: patientIds },
+            status: { in: ['APPROVED', 'DELIVERED'] },
+          },
+          include: RESULT_PDF_INCLUDE,
+        })
+      : null;
+    if (!order) {
+      await ctx.reply('Bu natija topilmadi.');
+      return;
+    }
+    try {
+      const clinic = await this.prisma.unscoped.clinic.findUnique({
+        where: { id: order.clinicId },
+        select: { name: true, legalName: true, address: true, phone: true },
+      });
+      const approvedById =
+        order.items.map((it) => it.result?.approvedById).find((v): v is string => Boolean(v)) ??
+        null;
+      const approver = approvedById
+        ? await this.prisma.unscoped.user.findFirst({
+            where: { id: approvedById, clinicId: order.clinicId },
+            select: { fullName: true },
+          })
+        : null;
+      const data = buildResultPdfData(
+        order,
+        {
+          name: clinic?.name ?? '',
+          legalName: clinic?.legalName ?? null,
+          address: clinic?.address ?? null,
+          phone: clinic?.phone ?? null,
+        },
+        approver,
+      );
+      const buffer = await this.resultPdf.render(data, 'uz');
+      await ctx.replyWithDocument(new InputFile(buffer, `natija-${order.orderNumber}.pdf`), {
+        caption: `🧪 ${order.orderNumber}`,
+      });
+    } catch (err: unknown) {
+      this.logger.error(`lab result pdf failed for order ${orderId}: ${String(err)}`);
+      await ctx.reply('PDF tayyorlashda xatolik yuz berdi. Birozdan keyin urinib ko‘ring.');
+    }
   }
 
   private async handleMyDocuments(ctx: Context): Promise<void> {

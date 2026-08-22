@@ -73,7 +73,8 @@
     "paidSuccess": "{number} — to'lov qabul qilindi, chek chop etilmoqda",
     "debtSuccess": "{number} — bemor qarziga yozildi",
     "viewInvoice": "Hisobni ochish",
-    "shiftRequired": "Naqd to'lovni qabul qilish uchun avval kassa smenasini oching"
+    "shiftRequired": "Naqd to'lovni qabul qilish uchun avval kassa smenasini oching",
+    "labOrdered": "Tahlillar laboratoriyaga yuborildi ({number})"
   },
   "refundDlg": {
     "title": "Qaytarish — {number}",

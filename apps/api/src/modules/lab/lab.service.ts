@@ -50,6 +50,16 @@ type LabOrderDetailRow = Prisma.LabOrderGetPayload<{
         result: { include: { values: true } };
       };
     };
+    attachments: {
+      select: {
+        id: true;
+        title: true;
+        fileName: true;
+        mimeType: true;
+        sizeBytes: true;
+        createdAt: true;
+      };
+    };
   };
 }>;
 
@@ -196,6 +206,14 @@ export class LabService {
               })),
             }
           : null,
+      })),
+      attachments: o.attachments.map((a) => ({
+        id: a.id,
+        title: a.title,
+        fileName: a.fileName,
+        mimeType: a.mimeType,
+        sizeBytes: a.sizeBytes,
+        createdAt: iso(a.createdAt),
       })),
     };
   }
@@ -399,6 +417,14 @@ export class LabService {
     });
     if (!patient) throw new AppException(ErrorCode.PATIENT_NOT_FOUND, 'Patient not found', 404);
 
+    // The branch column has no FK — without this, any UUID (another clinic's
+    // included) would be stamped onto the order and its worklist room.
+    const branch = await this.prisma.db.branch.findFirst({
+      where: { id: input.branchId },
+      select: { id: true },
+    });
+    if (!branch) throw new AppException(ErrorCode.NOT_FOUND, 'Branch not found', 404);
+
     if (input.visitId) {
       const visit = await this.prisma.db.visit.findUnique({
         where: { id: input.visitId },
@@ -457,12 +483,13 @@ export class LabService {
     return this.getOrder(id);
   }
 
-  /** Cross-module contract (visits referrals). Caller must have TenantContext set. */
+  /** Cross-module contract (visit referrals, billing). Caller must have TenantContext set. */
   async createOrderFromReferral(i: {
     patientId: string;
     branchId: string;
     visitId?: string;
     testIds: string[];
+    orderedById?: string;
   }): Promise<{ id: string; orderNumber: string }> {
     return this.createOrderInternal(i);
   }
@@ -471,6 +498,7 @@ export class LabService {
     const where: Prisma.LabOrderWhereInput = {};
     if (query.status) where.status = query.status;
     if (query.branchId) where.branchId = query.branchId;
+    if (query.patientId) where.patientId = query.patientId;
     if (query.from || query.to) {
       where.createdAt = {
         ...(query.from ? { gte: new Date(query.from) } : {}),
@@ -509,6 +537,10 @@ export class LabService {
             labTest: { include: { parameters: true } },
             result: { include: { values: true } },
           },
+        },
+        attachments: {
+          select: { id: true, title: true, fileName: true, mimeType: true, sizeBytes: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
         },
       },
     });

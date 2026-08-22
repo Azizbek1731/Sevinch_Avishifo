@@ -33,6 +33,7 @@ export interface LabCatalogQuery {
 export interface LabOrdersQuery {
   status?: LabOrderStatus;
   branchId?: string;
+  patientId?: string;
   search?: string;
   page?: number;
   limit?: number;
@@ -43,6 +44,7 @@ export const labApi = {
     api.get<LabOrderListItem[]>('/lab-orders', {
       status: q.status,
       branchId: q.branchId,
+      patientId: q.patientId,
       search: q.search || undefined,
       page: q.page,
       limit: q.limit,

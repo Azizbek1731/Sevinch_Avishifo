@@ -12,6 +12,6 @@ import { TimelineService } from './timeline.service';
 @Module({
   controllers: [PatientsController],
   providers: [PatientsService, DocumentsService, TimelineService],
-  exports: [PatientsService],
+  exports: [PatientsService, DocumentsService],
 })
 export class PatientsModule {}

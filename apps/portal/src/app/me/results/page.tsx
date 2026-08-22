@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, FlaskConical } from 'lucide-react';
+import { ChevronDown, FileDown, FlaskConical } from 'lucide-react';
 import type { ResultFlag } from '@avishifo/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, downloadFile, errorMessage } from '@/lib/api';
 import type { PortalLabResult } from '@/lib/types';
 import { formatDate } from '@/lib/dates';
 import { useRequireAuth } from '@/hooks/use-require-auth';
@@ -16,9 +16,12 @@ const FLAG_META: Record<ResultFlag, { short: string; className: string } | null>
   HIGH: { short: 'H', className: 'bg-red-50 text-red-600' },
   LOW: { short: 'L', className: 'bg-blue-50 text-blue-600' },
   ABNORMAL: { short: 'A', className: 'bg-amber-50 text-amber-700' },
+  CRITICAL_HIGH: { short: 'H!', className: 'bg-red-600 text-white' },
+  CRITICAL_LOW: { short: 'L!', className: 'bg-red-600 text-white' },
 };
 
 function valueClass(flag: ResultFlag | null): string {
+  if (flag === 'CRITICAL_HIGH' || flag === 'CRITICAL_LOW') return 'font-bold text-red-600';
   if (flag === 'HIGH') return 'font-semibold text-red-600';
   if (flag === 'LOW') return 'font-semibold text-blue-600';
   if (flag === 'ABNORMAL') return 'font-semibold text-amber-700';
@@ -28,6 +31,24 @@ function valueClass(flag: ResultFlag | null): string {
 export default function ResultsPage() {
   const authStatus = useRequireAuth();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  const downloadPdf = async (order: { id: string; orderNumber: string }): Promise<void> => {
+    setDownloadingId(order.id);
+    setDownloadError(null);
+    try {
+      await downloadFile(
+        `/portal/me/lab-results/${order.id}/download`,
+        `natija-${order.orderNumber}.pdf`,
+      );
+    } catch {
+      // downloadFile redirects on 401 itself; everything else deserves a word.
+      setDownloadError(order.id);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const resultsQ = useQuery({
     queryKey: ['portal-lab-results'],
@@ -88,6 +109,20 @@ export default function ResultsPage() {
                   </button>
                   {isOpen && (
                     <div className="space-y-4 border-t border-slate-100 p-4">
+                      <button
+                        type="button"
+                        disabled={downloadingId === order.id}
+                        onClick={() => void downloadPdf(order)}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 font-semibold text-white transition-opacity disabled:opacity-60"
+                      >
+                        <FileDown className="h-5 w-5" />
+                        {downloadingId === order.id ? 'Yuklanmoqda…' : 'PDF yuklab olish'}
+                      </button>
+                      {downloadError === order.id && (
+                        <p className="text-center text-sm text-red-600">
+                          Yuklab olib bo'lmadi. Birozdan keyin qayta urinib ko'ring.
+                        </p>
+                      )}
                       {order.items.map((item) => (
                         <div key={item.testName}>
                           <p className="mb-1 font-medium">{item.testName}</p>

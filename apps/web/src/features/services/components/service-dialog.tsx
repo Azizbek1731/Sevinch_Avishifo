@@ -1,12 +1,16 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { createServiceSchema, type CreateServiceInput } from '@avishifo/shared';
+import { useQuery } from '@tanstack/react-query';
+import { Search, X } from 'lucide-react';
+import { ServiceKind, createServiceSchema, type CreateServiceInput } from '@avishifo/shared';
+import { api } from '@/lib/api-client';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -48,6 +52,8 @@ export function ServiceDialog({
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
   const isEdit = service !== null;
+  const [catalogPick, setCatalogPick] = useState<{ code: string; label: string } | null>(null);
+  const [catalogQuery, setCatalogQuery] = useState('');
 
   const form = useForm<CreateServiceInput>({
     resolver: zodResolver(createServiceSchema),
@@ -63,6 +69,8 @@ export function ServiceDialog({
 
   useEffect(() => {
     if (!open) return;
+    setCatalogPick(null);
+    setCatalogQuery('');
     if (service) {
       form.reset({
         categoryId: service.categoryId,
@@ -107,8 +115,26 @@ export function ServiceDialog({
     onError: errorToast,
   });
 
-  const onSubmit = form.handleSubmit((values) => mutation.mutate(values));
+  const onSubmit = form.handleSubmit((values) =>
+    mutation.mutate(catalogPick ? { ...values, labCatalogCode: catalogPick.code } : values),
+  );
   const categoryId = form.watch('categoryId');
+  const activeKind = useMemo(
+    () => categories.find((c) => c.id === categoryId)?.kind ?? null,
+    [categories, categoryId],
+  );
+  const isLab = activeKind === ServiceKind.LAB;
+
+  const catalogSearch = useQuery({
+    queryKey: ['services', 'lab-catalog-pick', catalogQuery],
+    queryFn: async () =>
+      (
+        await api.get<
+          Array<{ code: string; name: { uz: string; ru?: string }; parameterCount: number; imported?: boolean }>
+        >('/lab-catalog', { search: catalogQuery || undefined, limit: 8 })
+      ).data,
+    enabled: open && !isEdit && isLab && catalogQuery.trim().length >= 2,
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -138,6 +164,82 @@ export function ServiceDialog({
               <p className="text-sm text-destructive">{t('form.categoryRequired')}</p>
             ) : null}
           </div>
+
+          {/* A LAB service starts in the standard catalogue: pick the test and the
+              name, code, analytes and reference intervals all come with it. Typing
+              it by hand stays possible — the catalogue does not know every test. */}
+          {!isEdit && isLab ? (
+            <div className="space-y-2 rounded-md border bg-muted/40 p-3">
+              <Label>{t('form.labCatalog')}</Label>
+              {catalogPick ? (
+                <div className="flex items-center justify-between gap-2 rounded-md border bg-background px-3 py-2">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">{catalogPick.label}</span>
+                    <span className="text-xs text-muted-foreground">{catalogPick.code}</span>
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t('form.labCatalogClear')}
+                    onClick={() => {
+                      // The pick filled these fields; leaving them behind would
+                      // create a bare hand-written test wearing a catalogue name.
+                      if (form.getValues('code') === catalogPick.code) form.setValue('code', '');
+                      if (form.getValues('name.uz') === catalogPick.label)
+                        form.setValue('name.uz', '');
+                      setCatalogPick(null);
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={catalogQuery}
+                      onChange={(e) => setCatalogQuery(e.target.value)}
+                      placeholder={t('form.labCatalogPlaceholder')}
+                      className="pl-9"
+                    />
+                  </div>
+                  {(catalogSearch.data ?? []).length > 0 ? (
+                    <div className="max-h-44 overflow-y-auto rounded-md border bg-background">
+                      {(catalogSearch.data ?? []).map((c) => (
+                        <button
+                          key={c.code}
+                          type="button"
+                          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                          onClick={() => {
+                            setCatalogPick({ code: c.code, label: c.name.uz });
+                            form.setValue('code', c.code, { shouldValidate: true });
+                            form.setValue('name.uz', c.name.uz, { shouldValidate: true });
+                            if (c.name.ru) form.setValue('name.ru', c.name.ru);
+                          }}
+                        >
+                          <span className="truncate">{c.name.uz}</span>
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            {c.imported ? (
+                              <Badge variant="secondary" className="text-[10px]">
+                                {t('form.labCatalogTaken')}
+                              </Badge>
+                            ) : null}
+                            <span className="font-mono text-xs text-muted-foreground">{c.code}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : catalogQuery.trim().length >= 2 && catalogSearch.isFetched ? (
+                    <p className="text-xs text-muted-foreground">{t('form.labCatalogEmpty')}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">{t('form.labCatalogHint')}</p>
+                  )}
+                </>
+              )}
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">

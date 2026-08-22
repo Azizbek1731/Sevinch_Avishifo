@@ -65,6 +65,8 @@ export class DocumentsService {
     file: { buffer: Buffer; originalname: string },
     meta: DocumentMetaInput,
     uploadedById: string,
+    /** Set when the file is a lab attachment, so the order lists its own files. */
+    labOrderId?: string,
   ): Promise<DocumentResponse> {
     await this.patients.requirePatient(patientId);
 
@@ -103,6 +105,7 @@ export class DocumentsService {
         mimeType,
         sizeBytes: buffer.length,
         uploadedById,
+        labOrderId: labOrderId ?? null,
       },
     });
 

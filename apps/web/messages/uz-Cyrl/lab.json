@@ -120,5 +120,12 @@
   "criticalValueTitle": "Хавфли қиймат:",
   "criticalValueBody": "шифокорга дарҳол хабар беринг.",
   "criticalValueHint": "Хавфли (критик) қиймат",
-  "catalogLoadFailed": "Каталогни юклаб бўлмади. Саҳифани янгилаб кўринг."
+  "catalogLoadFailed": "Каталогни юклаб бўлмади. Саҳифани янгилаб кўринг.",
+  "pdfFailed": "PDF тайёрлашда хатолик",
+  "attachmentsTitle": "Бириктирилган файллар",
+  "attachmentsEmpty": "Файл бириктирилмаган. Анализатор чиқарган варақ ёки сканни шу ерга юкланг.",
+  "attachmentUpload": "Файл юклаш",
+  "attachmentUploaded": "Файл сақланди — бемор ҳужжатларида ҳам кўринади",
+  "attachmentDownload": "Юклаб олиш",
+  "attachmentDownloadFailed": "Файлни юклаб олиб бўлмади"
 }

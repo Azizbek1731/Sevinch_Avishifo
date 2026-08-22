@@ -25,6 +25,7 @@ import { PatientDocumentsTab } from './patient-documents-tab';
 import { PatientInvoicesTab } from './patient-invoices-tab';
 import { PatientOverviewTab } from './patient-overview-tab';
 import { AdmitDialog } from '@/features/admissions/components/admit-dialog';
+import { PatientLabTab } from './patient-lab-tab';
 import { ChargesPanel } from '@/features/admissions/components/charges-panel';
 import { PatientTimelineTab } from './patient-timeline-tab';
 import { PatientVisitsTab } from './patient-visits-tab';
@@ -194,6 +195,9 @@ export function PatientCardView({ patientId }: { patientId: string }) {
               {t('tabs.visits')} ({patient.counts.visits})
             </TabsTrigger>
           ) : null}
+          {can('lab.orders.read') ? (
+            <TabsTrigger value="lab">{t('tabs.lab')}</TabsTrigger>
+          ) : null}
           <TabsTrigger value="documents">
             {t('tabs.documents')} ({patient.counts.documents})
           </TabsTrigger>
@@ -217,6 +221,11 @@ export function PatientCardView({ patientId }: { patientId: string }) {
         {can('visits.read') ? (
           <TabsContent value="visits" className="mt-4">
             <PatientVisitsTab patientId={patient.id} />
+          </TabsContent>
+        ) : null}
+        {can('lab.orders.read') ? (
+          <TabsContent value="lab" className="mt-4">
+            <PatientLabTab patientId={patient.id} />
           </TabsContent>
         ) : null}
         <TabsContent value="documents" className="mt-4">
