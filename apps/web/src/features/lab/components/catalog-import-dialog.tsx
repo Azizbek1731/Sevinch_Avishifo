@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
@@ -163,7 +162,11 @@ export function CatalogImportDialog({
           </div>
         </div>
 
-        <ScrollArea className="min-h-0 flex-1 rounded-md border">
+        {/* A plain overflow container, not <ScrollArea>: Radix sizes its viewport with
+            height:100%, which resolves to auto when the parent's height comes from flex
+            — the viewport then grew to all 130 rows and there was nothing left to
+            scroll. A flex item with min-h-0 gets a definite height and scrolls natively. */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-md border">
           {catalog.isPending ? (
             <div className="space-y-2 p-3">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -190,7 +193,7 @@ export function CatalogImportDialog({
               ))}
             </ul>
           )}
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
