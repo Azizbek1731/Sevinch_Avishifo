@@ -29,7 +29,8 @@ interface PrintPayload {
     schedule: string;
     startDate: string;
     timesPlanned: number;
-    days: Array<{ date: string; status: string | null }>;
+    timesPerDay: number;
+    days: Array<{ date: string; slots: Array<{ slot: number; status: string | null }> }>;
   }>;
   dailyNotes: Array<{
     date: string;
@@ -211,33 +212,57 @@ export function AdmissionPrint({ admissionId }: { admissionId: string }) {
         {p.orders.length > 0 ? (
           <div className="page-break mt-6">
             <h2 className="mb-3 text-center text-[14px] font-bold uppercase">{tp('sheetTitle')}</h2>
-            <table className="w-full border-collapse text-[11px]">
-              <thead>
-                <tr>
-                  <th className="border border-black px-1 py-1 text-left">{tp('service')}</th>
-                  {p.orders[0]?.days.map((d) => (
-                    <th key={d.date} className="border border-black px-1 py-1 font-normal">
-                      {d.date.slice(8)}.{d.date.slice(5, 7)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {p.orders.map((o, i) => (
-                  <tr key={i}>
-                    <td className="border border-black px-1 py-1">
-                      {o.service.uz ?? Object.values(o.service)[0] ?? '—'}
-                      <span className="ml-1 text-[10px]">({t(`sheet.schedules.${o.schedule}`)})</span>
-                    </td>
-                    {o.days.map((d) => (
-                      <td key={d.date} className="border border-black px-1 py-1 text-center">
-                        {d.status === 'GIVEN' ? '+' : d.status === 'SKIPPED' ? '−' : ''}
-                      </td>
+            {(() => {
+              // Columns are the union of every order's dates — orders that start on
+              // different days must not shift each other's marks under wrong dates.
+              const columnDates = [
+                ...new Set(p.orders.flatMap((o) => o.days.map((d) => d.date))),
+              ].sort();
+              return (
+                <table className="w-full border-collapse text-[11px]">
+                  <thead>
+                    <tr>
+                      <th className="border border-black px-1 py-1 text-left">{tp('service')}</th>
+                      {columnDates.map((date) => (
+                        <th key={date} className="border border-black px-1 py-1 font-normal">
+                          {date.slice(8)}.{date.slice(5, 7)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {p.orders.map((o, i) => (
+                      <tr key={i}>
+                        <td className="border border-black px-1 py-1">
+                          {o.service.uz ?? Object.values(o.service)[0] ?? '—'}
+                          <span className="ml-1 text-[10px]">
+                            ({t(`sheet.schedules.${o.schedule}`)}
+                            {o.timesPerDay > 1
+                              ? `, ${t('sheet.perDayShort', { count: o.timesPerDay })}`
+                              : ''}
+                            )
+                          </span>
+                        </td>
+                        {columnDates.map((date) => {
+                          const day = o.days.find((d) => d.date === date);
+                          return (
+                            <td key={date} className="border border-black px-1 py-1 text-center">
+                              {day
+                                ? day.slots
+                                    .map((sl) =>
+                                      sl.status === 'GIVEN' ? '+' : sl.status === 'SKIPPED' ? '−' : '·',
+                                    )
+                                    .join('')
+                                : ''}
+                            </td>
+                          );
+                        })}
+                      </tr>
                     ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  </tbody>
+                </table>
+              );
+            })()}
             <p className="mt-1 text-[10px]">{tp('sheetLegend')}</p>
           </div>
         ) : null}

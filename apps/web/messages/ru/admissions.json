@@ -11,7 +11,9 @@
       "DAILY": "ежедневно",
       "EVERY_OTHER_DAY": "через день",
       "ONCE": "однократно"
-    }
+    },
+    "perDayShort": "{count} раз(а) в день",
+    "doseTitle": "{n}-й приём"
   },
   "title": "Стационар",
   "description": "Пациенты в стационаре и истории болезни",
@@ -83,7 +85,11 @@
     "times": "Сколько раз",
     "condition": "Общее состояние",
     "temperature": "t°",
-    "pulse": "Ps"
+    "pulse": "Ps",
+    "durationDays": "Длительность (дней)",
+    "timesPerDay": "Раз в день",
+    "perDayOption": "{count} раз(а) в день",
+    "orderSummary": "Всего {total} процедур — {days} дней по {perDay} раз(а) в день."
   },
   "pickPatientTitle": "Госпитализировать пациента",
   "pickPatientDescription": "Найдите и выберите пациента — затем укажите отделение, палату и диагноз.",

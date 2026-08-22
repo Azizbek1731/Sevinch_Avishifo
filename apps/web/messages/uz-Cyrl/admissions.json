@@ -11,7 +11,9 @@
       "DAILY": "ҳар куни",
       "EVERY_OTHER_DAY": "кун ошириб",
       "ONCE": "бир марта"
-    }
+    },
+    "perDayShort": "кунида {count} маҳал",
+    "doseTitle": "{n}-маҳал"
   },
   "title": "Стационар",
   "description": "Ётган беморлар ва касаллик тарихлари",
@@ -83,7 +85,11 @@
     "times": "Неча марта",
     "condition": "Умумий аҳволи",
     "temperature": "т°",
-    "pulse": "Пс"
+    "pulse": "Пс",
+    "durationDays": "Давомийлиги (кун)",
+    "timesPerDay": "Кунида неча маҳал",
+    "perDayOption": "{count} маҳал",
+    "orderSummary": "Жами {total} та муолажа — {days} кун давомида кунида {perDay} маҳал."
   },
   "pickPatientTitle": "Беморни стационарга ётқизиш",
   "pickPatientDescription": "Беморни қидириб танланг — кейин бўлим, палата ва ташхис киритилади.",

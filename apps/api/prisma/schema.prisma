@@ -733,8 +733,10 @@ model TreatmentOrder {
   doctorUserId String
   schedule     OrderSchedule
   startDate    DateTime      @db.Date
-  /// Planned number of administrations, not calendar days.
+  /// Planned number of treatment DAYS ("5 kun"). Doses inside a day live in timesPerDay.
   timesPlanned Int
+  /// Doses within each planned day — "kunida 2 mahal" is 2.
+  timesPerDay  Int           @default(1)
   note         String?
   stoppedAt    DateTime?     @db.Timestamptz(6)
   createdAt    DateTime      @default(now()) @db.Timestamptz(6)
@@ -754,6 +756,8 @@ model TreatmentAdministration {
   clinicId   String
   orderId    String
   date       DateTime             @db.Date
+  /// Which dose of the day this marks, 1-based ("kunida 2 mahal" -> slots 1 and 2).
+  slot       Int                  @default(1)
   status     AdministrationStatus
   markedById String?
   createdAt  DateTime             @default(now()) @db.Timestamptz(6)
@@ -761,7 +765,7 @@ model TreatmentAdministration {
   order  TreatmentOrder @relation(fields: [orderId], references: [id])
   charge ChargeItem?
 
-  @@unique([orderId, date])
+  @@unique([orderId, date, slot])
   @@index([clinicId, date])
 }
 

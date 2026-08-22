@@ -73,8 +73,10 @@ export const createOrderSchema = z.object({
   serviceId: idSchema,
   schedule: orderScheduleSchema,
   startDate: dateOnly,
-  /** How many administrations are planned, not how many calendar days. */
+  /** Planned treatment DAYS — "5 kun davomida" is 5, whatever the schedule. */
   timesPlanned: z.coerce.number().int().min(1).max(120),
+  /** Doses within each day — "kunida 2 mahal" is 2. */
+  timesPerDay: z.coerce.number().int().min(1).max(6).default(1),
   note: z.string().trim().max(300).optional(),
 });
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
@@ -87,6 +89,8 @@ export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export const markAdministrationSchema = z.object({
   orderId: idSchema,
   date: dateOnly,
+  /** Which dose of the day, 1-based. Omitted means the only (or first) one. */
+  slot: z.coerce.number().int().min(1).max(6).default(1),
   status: z.enum(['GIVEN', 'SKIPPED']),
 });
 export type MarkAdministrationInput = z.infer<typeof markAdministrationSchema>;

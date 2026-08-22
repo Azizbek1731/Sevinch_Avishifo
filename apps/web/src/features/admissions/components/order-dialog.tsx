@@ -44,14 +44,16 @@ export function OrderDialog({
 
   const [service, setService] = useState<ServiceOption | null>(null);
   const [schedule, setSchedule] = useState<(typeof SCHEDULES)[number]>('DAILY');
-  const [times, setTimes] = useState('5');
+  const [days, setDays] = useState('5');
+  const [perDay, setPerDay] = useState('1');
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     if (!open) return;
     setService(null);
     setSchedule('DAILY');
-    setTimes('5');
+    setDays('5');
+    setPerDay('1');
     setStartDate(new Date().toISOString().slice(0, 10));
   }, [open]);
 
@@ -61,7 +63,8 @@ export function OrderDialog({
         serviceId: service?.id as string,
         schedule,
         startDate,
-        timesPlanned: Number(times),
+        timesPlanned: Number(days),
+        timesPerDay: Number(perDay),
       } as never),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admission', admissionId] });
@@ -72,6 +75,7 @@ export function OrderDialog({
   });
 
   const once = schedule === 'ONCE';
+  const totalDoses = once ? 1 : (Number(days) || 0) * (Number(perDay) || 1);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -101,24 +105,49 @@ export function OrderDialog({
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="o-start">{t('fields.startDate')}</Label>
               <Input id="o-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
-            {/* Counted in administrations, not calendar days — "10 times, every
-                other day" is 20 days, and the ward means the ten. */}
+            {/* Treatment DAYS — the ward says "5 kun davomida", so the field
+                counts days; kunora spreads those days over a longer stay. */}
             <div className="space-y-1.5">
-              <Label htmlFor="o-times">{t('fields.times')}</Label>
+              <Label htmlFor="o-days">{t('fields.durationDays')}</Label>
               <Input
-                id="o-times"
+                id="o-days"
                 inputMode="numeric"
-                value={once ? '1' : times}
+                value={once ? '1' : days}
                 disabled={once}
-                onChange={(e) => setTimes(e.target.value)}
+                onChange={(e) => setDays(e.target.value)}
               />
             </div>
+            <div className="space-y-1.5">
+              <Label>{t('fields.timesPerDay')}</Label>
+              <Select value={once ? '1' : perDay} onValueChange={setPerDay} disabled={once}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {['1', '2', '3', '4', '5', '6'].map((n) => (
+                    <SelectItem key={n} value={n}>
+                      {t('fields.perDayOption', { count: Number(n) })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
+          {totalDoses > 1 ? (
+            <p className="rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
+              {t('fields.orderSummary', {
+                total: totalDoses,
+                days: Number(days) || 0,
+                perDay: Number(perDay) || 1,
+              })}
+            </p>
+          ) : null}
         </div>
         <DialogFooter>
           <Button

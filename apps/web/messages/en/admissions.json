@@ -11,7 +11,9 @@
       "DAILY": "daily",
       "EVERY_OTHER_DAY": "every other day",
       "ONCE": "once"
-    }
+    },
+    "perDayShort": "{count}× a day",
+    "doseTitle": "Dose {n}"
   },
   "title": "Inpatients",
   "description": "Patients in beds and their medical histories",
@@ -83,7 +85,11 @@
     "times": "How many times",
     "condition": "General condition",
     "temperature": "t°",
-    "pulse": "Ps"
+    "pulse": "Ps",
+    "durationDays": "Duration (days)",
+    "timesPerDay": "Times per day",
+    "perDayOption": "{count}× a day",
+    "orderSummary": "{total} administrations in total — {days} days at {perDay}× a day."
   },
   "pickPatientTitle": "Admit a patient",
   "pickPatientDescription": "Find and select the patient — then enter the department, ward and diagnosis.",

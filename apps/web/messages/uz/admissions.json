@@ -11,7 +11,9 @@
       "DAILY": "har kuni",
       "EVERY_OTHER_DAY": "kun oshirib",
       "ONCE": "bir marta"
-    }
+    },
+    "perDayShort": "kunida {count} mahal",
+    "doseTitle": "{n}-mahal"
   },
   "title": "Statsionar",
   "description": "Yotgan bemorlar va kasallik tarixlari",
@@ -83,7 +85,11 @@
     "times": "Necha marta",
     "condition": "Umumiy ahvoli",
     "temperature": "t°",
-    "pulse": "Ps"
+    "pulse": "Ps",
+    "durationDays": "Davomiyligi (kun)",
+    "timesPerDay": "Kunida necha mahal",
+    "perDayOption": "{count} mahal",
+    "orderSummary": "Jami {total} ta muolaja — {days} kun davomida kunida {perDay} mahal."
   },
   "pickPatientTitle": "Bemorni statsionarga yotqizish",
   "pickPatientDescription": "Bemorni qidirib tanlang — keyin bo'lim, palata va tashxis kiritiladi.",

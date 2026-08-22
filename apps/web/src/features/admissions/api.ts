@@ -48,9 +48,15 @@ export interface AdmissionRow {
   patient?: { id: string; mrn: string; fullName: string; dob: string | null; gender: string | null };
 }
 
+export interface OrderSlot {
+  /** Which dose of the day, 1-based. */
+  slot: number;
+  status: 'GIVEN' | 'SKIPPED' | null;
+}
+
 export interface OrderDay {
   date: string;
-  status: 'GIVEN' | 'SKIPPED' | null;
+  slots: OrderSlot[];
 }
 
 export interface AdmissionOrder {
@@ -60,6 +66,7 @@ export interface AdmissionOrder {
   schedule: 'DAILY' | 'EVERY_OTHER_DAY' | 'ONCE';
   startDate: string;
   timesPlanned: number;
+  timesPerDay: number;
   note: string | null;
   stoppedAt: string | null;
   days: OrderDay[];

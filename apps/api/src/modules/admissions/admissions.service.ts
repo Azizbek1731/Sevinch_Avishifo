@@ -244,11 +244,18 @@ export class AdmissionsService {
         timesPlanned: o.timesPlanned,
         note: o.note,
         stoppedAt: o.stoppedAt ? o.stoppedAt.toISOString() : null,
-        /** Every planned day with its mark — the treatment sheet as a grid. */
-        days: plannedDates(o).map((date) => {
-          const done = o.administrations.find((x) => x.date.toISOString().slice(0, 10) === date);
-          return { date, status: done ? done.status : null };
-        }),
+        timesPerDay: o.timesPerDay,
+        /** Every planned day with a mark per dose — the treatment sheet as a grid. */
+        days: plannedDates(o).map((date) => ({
+          date,
+          slots: Array.from({ length: o.timesPerDay }, (_, i) => {
+            const slot = i + 1;
+            const done = o.administrations.find(
+              (x) => x.slot === slot && x.date.toISOString().slice(0, 10) === date,
+            );
+            return { slot, status: done ? done.status : null };
+          }),
+        })),
       })),
       dailyNotes: a.dailyNotes.map((n) => ({
         id: n.id,
@@ -332,10 +339,17 @@ export class AdmissionsService {
         schedule: o.schedule,
         startDate: o.startDate.toISOString().slice(0, 10),
         timesPlanned: o.timesPlanned,
-        days: plannedDates(o).map((date) => {
-          const done = o.administrations.find((x) => x.date.toISOString().slice(0, 10) === date);
-          return { date, status: done ? done.status : null };
-        }),
+        timesPerDay: o.timesPerDay,
+        days: plannedDates(o).map((date) => ({
+          date,
+          slots: Array.from({ length: o.timesPerDay }, (_, i) => {
+            const slot = i + 1;
+            const done = o.administrations.find(
+              (x) => x.slot === slot && x.date.toISOString().slice(0, 10) === date,
+            );
+            return { slot, status: done ? done.status : null };
+          }),
+        })),
       })),
       dailyNotes: a.dailyNotes.map((n) => ({
         date: n.date.toISOString().slice(0, 10),
@@ -366,6 +380,7 @@ export class AdmissionsService {
         schedule: dto.schedule,
         startDate: new Date(dto.startDate),
         timesPlanned: dto.schedule === 'ONCE' ? 1 : dto.timesPlanned,
+        timesPerDay: dto.schedule === 'ONCE' ? 1 : dto.timesPerDay,
         note: dto.note ?? null,
       },
     });
@@ -411,6 +426,13 @@ export class AdmissionsService {
         400,
       );
     }
+    if (dto.slot > order.timesPerDay) {
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        `Bu tayinlov kunida ${order.timesPerDay} mahal — ${dto.slot}-mahal jadvalda yo‘q`,
+        400,
+      );
+    }
 
     const clinicId = TenantContext.requireClinicId();
     const price = await this.prisma.db.servicePrice.findFirst({
@@ -420,7 +442,7 @@ export class AdmissionsService {
 
     return this.prisma.db.$transaction(async (tx) => {
       const existing = await tx.treatmentAdministration.findFirst({
-        where: { orderId: dto.orderId, date: new Date(dto.date) },
+        where: { orderId: dto.orderId, date: new Date(dto.date), slot: dto.slot },
         include: { charge: true },
       });
 
@@ -462,7 +484,14 @@ export class AdmissionsService {
       }
 
       const created = await tx.treatmentAdministration.create({
-        data: { clinicId, orderId: dto.orderId, date: new Date(dto.date), status: dto.status, markedById: user.id },
+        data: {
+          clinicId,
+          orderId: dto.orderId,
+          date: new Date(dto.date),
+          slot: dto.slot,
+          status: dto.status,
+          markedById: user.id,
+        },
       });
       if (dto.status === 'GIVEN') {
         await tx.chargeItem.create({

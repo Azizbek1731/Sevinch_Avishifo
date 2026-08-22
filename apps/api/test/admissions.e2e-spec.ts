@@ -135,6 +135,79 @@ describe('admissions and charges (e2e)', () => {
     expect(res.body.data.days).toEqual([day(0), day(2), day(4)]);
   });
 
+  it('runs a multi-dose order: 2 days at 2 a day, each dose billed on its own', async () => {
+    // Its own patient and stay — this test writes charges, and the billing tests
+    // below count the shared patient's ledger to the line.
+    const p2 = await prisma.patient.create({
+      data: {
+        clinicId: clinic.clinicId,
+        mrn: `AD2-${randomUUID().slice(0, 6)}`,
+        firstName: 'Ikki',
+        lastName: 'Mahal',
+        fullName: 'Ikki Mahal',
+        gender: 'FEMALE',
+      },
+    });
+    const admitted = await request(app.getHttpServer())
+      .post(`${API}/admissions`)
+      .set(auth(recep))
+      .send({ patientId: p2.id })
+      .expect(201);
+    const admission2 = admitted.body.data.id as string;
+
+    const created = await request(app.getHttpServer())
+      .post(`${API}/admissions/${admission2}/orders`)
+      .set(auth(doctor))
+      .send({ serviceId, schedule: 'DAILY', startDate: day(0), timesPlanned: 2, timesPerDay: 2 })
+      .expect(201);
+    const orderId = created.body.data.id as string;
+
+    // Morning and evening of day 0 — two separate marks, two separate charges.
+    for (const slot of [1, 2]) {
+      await request(app.getHttpServer())
+        .post(`${API}/admissions/${admission2}/administrations`)
+        .set(auth(recep))
+        .send({ orderId, date: day(0), slot, status: 'GIVEN' })
+        .expect(201);
+    }
+
+    // A dose the order never planned is refused, not silently accepted.
+    await request(app.getHttpServer())
+      .post(`${API}/admissions/${admission2}/administrations`)
+      .set(auth(recep))
+      .send({ orderId, date: day(0), slot: 3, status: 'GIVEN' })
+      .expect(400);
+
+    const detail = await request(app.getHttpServer())
+      .get(`${API}/admissions/${admission2}`)
+      .set(auth(doctor))
+      .expect(200);
+    const order = (detail.body.data.orders as Array<{
+      id: string;
+      timesPerDay: number;
+      days: Array<{ date: string; slots: Array<{ slot: number; status: string | null }> }>;
+    }>).find((o) => o.id === orderId)!;
+    expect(order.timesPerDay).toBe(2);
+    const day0 = order.days.find((d) => d.date === day(0))!;
+    expect(day0.slots.map((sl) => sl.status)).toEqual(['GIVEN', 'GIVEN']);
+    // Day 1 is planned but untouched: two open slots.
+    expect(order.days.find((d) => d.date === day(1))!.slots.map((sl) => sl.status)).toEqual([
+      null,
+      null,
+    ]);
+
+    // Exactly two pending charges came out of this order's marks.
+    const charges = await request(app.getHttpServer())
+      .get(`${API}/charges`)
+      .set(auth(recep))
+      .query({ patientId: p2.id, status: 'PENDING' })
+      .expect(200);
+    const mine = (charges.body.data.items as Array<{ admissionId: string | null }>).filter(
+      (c) => c.admissionId === admission2,
+    );
+    expect(mine).toHaveLength(2);
+  });
+
   it('bills a day only once it is marked given, and never for a refused one', async () => {
     const admission = await request(app.getHttpServer())
       .get(`${API}/admissions/${admissionId}`)
@@ -173,9 +246,12 @@ describe('admissions and charges (e2e)', () => {
       .get(`${API}/admissions/${admissionId}`)
       .set(auth(doctor))
       .expect(200);
-    const days = after.body.data.orders[0].days as Array<{ date: string; status: string | null }>;
-    expect(days.find((d) => d.date === day(2))!.status).toBe('SKIPPED');
-    expect(days.find((d) => d.date === day(4))!.status).toBeNull();
+    const days = after.body.data.orders[0].days as Array<{
+      date: string;
+      slots: Array<{ slot: number; status: string | null }>;
+    }>;
+    expect(days.find((d) => d.date === day(2))!.slots[0]!.status).toBe('SKIPPED');
+    expect(days.find((d) => d.date === day(4))!.slots[0]!.status).toBeNull();
   });
 
   it('refuses a date that is not on the order schedule', async () => {
@@ -343,7 +419,9 @@ describe('admissions and charges (e2e)', () => {
       clinic: { name: string };
       admission: Record<string, unknown>;
       patient: { fullName: string; mrn: string };
-      orders: Array<{ days: Array<{ date: string; status: string | null }> }>;
+      orders: Array<{
+        days: Array<{ date: string; slots: Array<{ slot: number; status: string | null }> }>;
+      }>;
     };
     // The letterhead and the identity block the paper form asks for.
     expect(d.clinic.name).toBeTruthy();
@@ -353,7 +431,7 @@ describe('admissions and charges (e2e)', () => {
     expect(Number(d.admission.bedDays)).toBeGreaterThanOrEqual(1);
     // The sheet carries its marks, including the refusal — that is the whole
     // reason it is printed rather than re-derived.
-    const marks = d.orders.flatMap((o) => o.days.map((x) => x.status));
+    const marks = d.orders.flatMap((o) => o.days.flatMap((x) => x.slots.map((sl) => sl.status)));
     expect(marks).toContain('SKIPPED');
   });
 
