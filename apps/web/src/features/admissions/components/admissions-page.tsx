@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { BedDouble } from 'lucide-react';
+import { BedDouble, Plus } from 'lucide-react';
 import { formatTz } from '@/lib/dates';
 import { Link } from '@/i18n/routing';
 import { PageHeader } from '@/components/page-header';
@@ -20,12 +20,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { usePermissions } from '@/hooks/use-permissions';
 import { admissionsApi } from '../api';
+import { AdmitDialog } from './admit-dialog';
+import { AdmitPickerDialog } from './admit-picker-dialog';
 
 /** The ward: who is in a bed right now, and who has been discharged. */
 export function AdmissionsPage() {
   const t = useTranslations('admissions');
+  const can = usePermissions();
   const [status, setStatus] = useState<'ACTIVE' | 'DISCHARGED'>('ACTIVE');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [admitting, setAdmitting] = useState<{ id: string; fullName: string } | null>(null);
 
   const query = useQuery({
     queryKey: ['admissions', status],
@@ -36,7 +42,14 @@ export function AdmissionsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t('title')} description={t('description')} />
+      <PageHeader title={t('title')} description={t('description')}>
+        {can('admissions.write') ? (
+          <Button onClick={() => setPickerOpen(true)}>
+            <Plus className="h-4 w-4" />
+            {t('admit')}
+          </Button>
+        ) : null}
+      </PageHeader>
 
       <div className="flex gap-2">
         {(['ACTIVE', 'DISCHARGED'] as const).map((s) => (
@@ -56,7 +69,19 @@ export function AdmissionsPage() {
       ) : rows.length === 0 ? (
         <Card>
           <CardContent className="p-8">
-            <EmptyState icon={BedDouble} title={t('empty.title')} description={t('empty.description')} />
+            <EmptyState
+              icon={BedDouble}
+              title={t('empty.title')}
+              description={t('empty.description')}
+              action={
+                can('admissions.write') ? (
+                  <Button size="sm" onClick={() => setPickerOpen(true)}>
+                    <Plus className="mr-1 h-4 w-4" />
+                    {t('admit')}
+                  </Button>
+                ) : null
+              }
+            />
           </CardContent>
         </Card>
       ) : (
@@ -105,6 +130,22 @@ export function AdmissionsPage() {
           </CardContent>
         </Card>
       )}
+
+      <AdmitPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onPick={(p) => setAdmitting(p)}
+      />
+      {admitting ? (
+        <AdmitDialog
+          open
+          onOpenChange={(v) => {
+            if (!v) setAdmitting(null);
+          }}
+          patientId={admitting.id}
+          patientName={admitting.fullName}
+        />
+      ) : null}
     </div>
   );
 }

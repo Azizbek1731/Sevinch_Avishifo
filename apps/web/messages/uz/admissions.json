@@ -34,7 +34,7 @@
   },
   "empty": {
     "title": "Statsionarda bemor yo‘q",
-    "description": "Bemor kartasidan statsionarga yotqizing."
+    "description": "Yotqizish tugmasi orqali bemorni tanlang yoki bemor kartasidan yotqizing."
   },
   "table": {
     "history": "Tarix №",
@@ -84,5 +84,10 @@
     "condition": "Umumiy ahvoli",
     "temperature": "t°",
     "pulse": "Ps"
-  }
+  },
+  "pickPatientTitle": "Bemorni statsionarga yotqizish",
+  "pickPatientDescription": "Bemorni qidirib tanlang — keyin bo'lim, palata va tashxis kiritiladi.",
+  "pickPatientPlaceholder": "Ism, telefon yoki karta raqami bo'yicha qidiring...",
+  "pickPatientEmpty": "Bemor topilmadi. Avval uni ro'yxatga oling.",
+  "pickPatientHint": "Qidirish uchun kamida 2 ta harf yozing."
 }

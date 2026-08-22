@@ -34,7 +34,7 @@
   },
   "empty": {
     "title": "No inpatients",
-    "description": "Admit from a patient card."
+    "description": "Admit via the button above, or from the patient card."
   },
   "table": {
     "history": "History №",
@@ -84,5 +84,10 @@
     "condition": "General condition",
     "temperature": "t°",
     "pulse": "Ps"
-  }
+  },
+  "pickPatientTitle": "Admit a patient",
+  "pickPatientDescription": "Find and select the patient — then enter the department, ward and diagnosis.",
+  "pickPatientPlaceholder": "Search by name, phone or card number...",
+  "pickPatientEmpty": "Patient not found. Register them first.",
+  "pickPatientHint": "Type at least 2 characters to search."
 }
