@@ -4,8 +4,11 @@ import {
   createLabOrderSchema,
   createLabTestSchema,
   enterLabResultsSchema,
+  importLabCatalogSchema,
+  labCatalogQuerySchema,
   labOrderQuerySchema,
   paginationQuerySchema,
+  updateLabOrderContextSchema,
   updateLabOrderStatusSchema,
   updateLabTestSchema,
 } from '@avishifo/shared';
@@ -22,3 +25,6 @@ export class CreateLabOrderDto extends createZodDto(createLabOrderSchema) {}
 export class UpdateLabOrderStatusDto extends createZodDto(updateLabOrderStatusSchema) {}
 export class EnterLabResultsDto extends createZodDto(enterLabResultsSchema) {}
 export class LabOrderQueryDto extends createZodDto(labOrderQuerySchema) {}
+export class UpdateLabOrderContextDto extends createZodDto(updateLabOrderContextSchema) {}
+export class LabCatalogQueryDto extends createZodDto(labCatalogQuerySchema) {}
+export class ImportLabCatalogDto extends createZodDto(importLabCatalogSchema) {}

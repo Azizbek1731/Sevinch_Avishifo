@@ -4,7 +4,12 @@ import {
   AuditAction,
   ErrorCode,
   LabOrderStatus,
+  LabValueType,
   NotificationEvent,
+  ageInDays,
+  flagValue,
+  matchReferenceRange,
+  type PatientContext,
 } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
 import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
@@ -14,7 +19,16 @@ import { EventsService } from '../../core/realtime/events.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { SequenceService } from '../../core/sequence/sequence.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { CreateLabOrderDto, CreateLabTestDto, LabOrderQueryDto, LabTestQueryDto, UpdateLabOrderStatusDto, UpdateLabTestDto } from './dto';
+import { parseReferenceRanges } from './reference-ranges';
+import {
+  CreateLabOrderDto,
+  CreateLabTestDto,
+  LabOrderQueryDto,
+  LabTestQueryDto,
+  UpdateLabOrderContextDto,
+  UpdateLabOrderStatusDto,
+  UpdateLabTestDto,
+} from './dto';
 
 const iso = (d: Date | null | undefined): string | null => (d ? d.toISOString() : null);
 const dateOnly = (d: Date | null | undefined): string | null =>
@@ -22,6 +36,8 @@ const dateOnly = (d: Date | null | undefined): string | null =>
 
 /** DTO payloads are plain JSON-safe data — narrow them for Prisma Json columns. */
 const toJson = (v: unknown): Prisma.InputJsonValue => v as Prisma.InputJsonValue;
+
+type PhysiologicalStateValue = PatientContext['state'];
 
 type LabTestRow = Prisma.LabTestGetPayload<{ include: { parameters: true } }>;
 
@@ -59,13 +75,35 @@ export class LabService {
 
   // ------------------------------------------------------------ mapping
 
-  private toParameter(p: LabTestRow['parameters'][number]): Record<string, unknown> {
+  private toParameter(
+    p: LabTestRow['parameters'][number],
+    ctx?: PatientContext,
+  ): Record<string, unknown> {
+    const ranges = parseReferenceRanges(p.referenceRanges);
+    // The interval that applies to THIS patient, resolved once on the server so the entry
+    // form, the printed report and the stored flag can never disagree about it.
+    const matched = ctx ? matchReferenceRange(ranges, ctx) : undefined;
     return {
       id: p.id,
       name: p.name,
+      code: p.code,
       unit: p.unit,
+      valueType: p.valueType,
       referenceRanges: p.referenceRanges,
       sortOrder: p.sortOrder,
+      ...(ctx
+        ? {
+            matchedRange: matched,
+            // Distinguishes "this analyte has no norms at all" from "the catalogue has
+            // norms but none covers a patient of this age", which the tech must see.
+            referenceMissing: matched === null && ranges.length > 0,
+            // Hormones are reported per cycle phase or trimester. With no state on the
+            // order, none of those intervals can match — so say what is missing rather
+            // than printing a blank where the norm should be.
+            requiresState:
+              matched === null && !ctx.state && ranges.some((r) => r.state !== undefined),
+          }
+        : {}),
     };
   }
 
@@ -75,6 +113,9 @@ export class LabService {
       code: t.code,
       name: t.name,
       specimenType: t.specimenType,
+      biomaterial: t.biomaterial,
+      category: t.category,
+      catalogCode: t.catalogCode,
       serviceId: t.serviceId,
       isActive: t.isActive,
       parameters: [...t.parameters]
@@ -100,6 +141,11 @@ export class LabService {
   }
 
   private toOrderDetail(o: LabOrderDetailRow): Record<string, unknown> {
+    const ctx: PatientContext = {
+      gender: o.patient.gender,
+      ageDays: ageInDays(o.patient.dob, o.collectedAt ?? o.createdAt),
+      state: o.physiologicalState,
+    };
     return {
       id: o.id,
       branchId: o.branchId,
@@ -107,6 +153,7 @@ export class LabService {
       patientId: o.patientId,
       visitId: o.visitId,
       status: o.status,
+      physiologicalState: o.physiologicalState,
       orderedById: o.orderedById,
       collectedAt: iso(o.collectedAt),
       deliveredAt: iso(o.deliveredAt),
@@ -128,9 +175,11 @@ export class LabService {
           code: it.labTest.code,
           name: it.labTest.name,
           specimenType: it.labTest.specimenType,
+          biomaterial: it.labTest.biomaterial,
+          category: it.labTest.category,
           parameters: [...it.labTest.parameters]
             .sort((a, b) => a.sortOrder - b.sortOrder)
-            .map((p) => this.toParameter(p)),
+            .map((p) => this.toParameter(p, ctx)),
         },
         result: it.result
           ? {
@@ -198,7 +247,9 @@ export class LabService {
             create: dto.parameters.map((p, idx) => ({
               clinicId,
               name: p.name,
+              code: p.code,
               unit: p.unit,
+              valueType: p.valueType,
               referenceRanges: toJson(p.referenceRanges),
               sortOrder: p.sortOrder ?? idx,
             })),
@@ -280,6 +331,10 @@ export class LabService {
                 where: { id: existing.id },
                 data: {
                   unit: incoming.unit ?? null,
+                  // The edit dialog does not show the analyte code; an omitted one keeps
+                  // its imported value instead of wiping the catalogue provenance.
+                  ...(incoming.code !== undefined ? { code: incoming.code } : {}),
+                  ...(incoming.valueType !== undefined ? { valueType: incoming.valueType } : {}),
                   referenceRanges: toJson(incoming.referenceRanges),
                   sortOrder: incoming.sortOrder ?? incoming.idx,
                 },
@@ -296,7 +351,9 @@ export class LabService {
                 clinicId,
                 labTestId: id,
                 name: p.name,
+                code: p.code,
                 unit: p.unit,
+                valueType: p.valueType,
                 referenceRanges: toJson(p.referenceRanges),
                 sortOrder: p.sortOrder ?? p.idx,
               },
@@ -333,6 +390,7 @@ export class LabService {
     branchId: string;
     visitId?: string;
     testIds: string[];
+    physiologicalState?: PhysiologicalStateValue;
     orderedById?: string | null;
   }): Promise<{ id: string; orderNumber: string }> {
     const patient = await this.prisma.db.patient.findUnique({
@@ -367,6 +425,7 @@ export class LabService {
         orderNumber,
         patientId: input.patientId,
         visitId: input.visitId,
+        physiologicalState: input.physiologicalState,
         orderedById: input.orderedById ?? undefined,
         items: {
           // Nested creates are not auto-stamped by the tenant extension.
@@ -385,6 +444,7 @@ export class LabService {
         branchId: input.branchId,
         visitId: input.visitId ?? null,
         testIds,
+        physiologicalState: input.physiologicalState ?? null,
       },
     });
     await this.emitOrderUpdated(order.id);
@@ -567,6 +627,77 @@ export class LabService {
       entityId: id,
       before: { status: order.status },
       after: { status: LabOrderStatus.DELIVERED },
+    });
+    await this.emitOrderUpdated(id);
+
+    return this.getOrder(id);
+  }
+
+  /**
+   * Correct the physiological state the specimen was drawn under.
+   *
+   * Every flag already stored on this order was decided by an interval that the state
+   * selects, so changing it re-flags each entered value in the same transaction —
+   * leaving a trimester-aware TSH marked "high" against the non-pregnant band would be
+   * a wrong flag sitting next to a right number.
+   *
+   * Refused once the order is approved or delivered: that report has been signed and
+   * handed to the patient, and quietly restating it is not a correction anyone can see.
+   */
+  async updateContext(
+    id: string,
+    dto: UpdateLabOrderContextDto,
+  ): Promise<Record<string, unknown>> {
+    const order = await this.requireOrder(id);
+    if (
+      order.status === LabOrderStatus.APPROVED ||
+      order.status === LabOrderStatus.DELIVERED ||
+      order.status === LabOrderStatus.CANCELLED
+    ) {
+      throw new AppException(
+        ErrorCode.LAB_INVALID_TRANSITION,
+        `The physiological state cannot be changed on a ${order.status} order`,
+        409,
+      );
+    }
+    const before = order.physiologicalState;
+    const state = dto.physiologicalState;
+    if (before === state) return this.toOrderDetail(order);
+
+    const ctx: PatientContext = {
+      gender: order.patient.gender,
+      ageDays: ageInDays(order.patient.dob, order.collectedAt ?? order.createdAt),
+      state,
+    };
+
+    let reflagged = 0;
+    await this.prisma.db.$transaction(async (tx) => {
+      await tx.labOrder.update({ where: { id }, data: { physiologicalState: state } });
+      for (const item of order.items) {
+        if (!item.result) continue;
+        const paramById = new Map(item.labTest.parameters.map((p) => [p.id, p]));
+        for (const v of item.result.values) {
+          const parameter = paramById.get(v.parameterId);
+          if (!parameter) continue;
+          const { flag } = flagValue(
+            v.value,
+            parseReferenceRanges(parameter.referenceRanges),
+            ctx,
+            (parameter.valueType as LabValueType | null) ?? LabValueType.NUMERIC,
+          );
+          if (flag === v.flag) continue;
+          await tx.labResultValue.update({ where: { id: v.id }, data: { flag } });
+          reflagged += 1;
+        }
+      }
+    });
+
+    await this.audit.log({
+      action: AuditAction.UPDATE,
+      entity: 'LabOrder',
+      entityId: id,
+      before: { physiologicalState: before },
+      after: { physiologicalState: state, reflaggedValues: reflagged },
     });
     await this.emitOrderUpdated(id);
 

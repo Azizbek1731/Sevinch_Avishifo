@@ -213,8 +213,63 @@ export const ResultFlag = {
   HIGH: 'HIGH',
   LOW: 'LOW',
   ABNORMAL: 'ABNORMAL',
+  CRITICAL_LOW: 'CRITICAL_LOW',
+  CRITICAL_HIGH: 'CRITICAL_HIGH',
 } as const;
 export type ResultFlag = (typeof ResultFlag)[keyof typeof ResultFlag];
+
+/** A result that must reach a clinician now, not when someone next opens the worklist. */
+export const CRITICAL_FLAGS: readonly ResultFlag[] = [
+  ResultFlag.CRITICAL_LOW,
+  ResultFlag.CRITICAL_HIGH,
+];
+
+export const Biomaterial = {
+  BLOOD: 'BLOOD',
+  URINE: 'URINE',
+  STOOL: 'STOOL',
+  SEMEN: 'SEMEN',
+  SMEAR: 'SMEAR',
+  CSF: 'CSF',
+  SPUTUM: 'SPUTUM',
+  FLUID: 'FLUID',
+} as const;
+export type Biomaterial = (typeof Biomaterial)[keyof typeof Biomaterial];
+
+export const LabCategory = {
+  HEMATOLOGY: 'HEMATOLOGY',
+  BIOCHEMISTRY: 'BIOCHEMISTRY',
+  HORMONES: 'HORMONES',
+  COAGULATION: 'COAGULATION',
+  IMMUNOLOGY: 'IMMUNOLOGY',
+  TUMOR_MARKERS: 'TUMOR_MARKERS',
+  VITAMINS: 'VITAMINS',
+  URINALYSIS: 'URINALYSIS',
+  COPROLOGY: 'COPROLOGY',
+  ANDROLOGY: 'ANDROLOGY',
+  CYTOLOGY: 'CYTOLOGY',
+  MICROBIOLOGY: 'MICROBIOLOGY',
+} as const;
+export type LabCategory = (typeof LabCategory)[keyof typeof LabCategory];
+
+export const LabValueType = {
+  NUMERIC: 'NUMERIC',
+  TEXT: 'TEXT',
+  ENUM: 'ENUM',
+} as const;
+export type LabValueType = (typeof LabValueType)[keyof typeof LabValueType];
+
+export const PhysiologicalState = {
+  PREGNANCY: 'PREGNANCY',
+  PREGNANCY_T1: 'PREGNANCY_T1',
+  PREGNANCY_T2: 'PREGNANCY_T2',
+  PREGNANCY_T3: 'PREGNANCY_T3',
+  FOLLICULAR: 'FOLLICULAR',
+  OVULATORY: 'OVULATORY',
+  LUTEAL: 'LUTEAL',
+  POSTMENOPAUSE: 'POSTMENOPAUSE',
+} as const;
+export type PhysiologicalState = (typeof PhysiologicalState)[keyof typeof PhysiologicalState];
 
 export const DocumentCategory = {
   ANALYSIS: 'ANALYSIS',

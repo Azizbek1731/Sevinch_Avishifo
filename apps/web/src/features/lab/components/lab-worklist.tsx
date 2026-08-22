@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ArrowRight, FlaskConical, Play, Plus, Syringe } from 'lucide-react';
+import { ArrowRight, BookOpen, FlaskConical, Play, Plus, Syringe } from 'lucide-react';
 import { LabOrderStatus } from '@avishifo/shared';
 import { Link } from '@/i18n/routing';
 import { formatTz } from '@/lib/dates';
@@ -26,6 +26,7 @@ import {
 import type { LabOrderListItem } from '../types';
 import { CreateOrderDialog } from './create-order-dialog';
 import { ManageTestsDialog } from './manage-tests-dialog';
+import { CatalogImportDialog } from './catalog-import-dialog';
 
 const PAGE_SIZE = 20;
 
@@ -41,6 +42,7 @@ export function LabWorklist() {
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [testsOpen, setTestsOpen] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
 
   const ordersQuery = useLabOrders({
     status,
@@ -163,6 +165,10 @@ export function LabWorklist() {
       <PageHeader title={t('title')} description={t('subtitle')}>
         {canWrite ? (
           <>
+            <Button variant="outline" onClick={() => setCatalogOpen(true)}>
+              <BookOpen className="h-4 w-4" />
+              {t('catalogButton')}
+            </Button>
             <Button variant="outline" onClick={() => setTestsOpen(true)}>
               <FlaskConical className="h-4 w-4" />
               {t('manageTests')}
@@ -229,6 +235,7 @@ export function LabWorklist() {
 
       <CreateOrderDialog open={createOpen} onOpenChange={setCreateOpen} />
       <ManageTestsDialog open={testsOpen} onOpenChange={setTestsOpen} />
+      <CatalogImportDialog open={catalogOpen} onOpenChange={setCatalogOpen} />
     </div>
   );
 }

@@ -4,13 +4,20 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, CheckCheck, CheckCircle2, FlaskConical, Play, Printer, Syringe } from 'lucide-react';
-import { LabOrderStatus, formatPhone } from '@avishifo/shared';
+import { Gender, LabOrderStatus, PhysiologicalState, formatPhone } from '@avishifo/shared';
 import { Link } from '@/i18n/routing';
 import { formatDate, formatTz } from '@/lib/dates';
 import { useSocketEvent } from '@/hooks/use-socket';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { PageHeader } from '@/components/page-header';
@@ -20,6 +27,7 @@ import {
   useDeliverOrder,
   useHasPermission,
   useLabOrder,
+  useSetOrderContext,
   useUpdateOrderStatus,
 } from '../hooks';
 import { OrderItemCard } from './order-item-card';
@@ -43,6 +51,7 @@ export function LabOrderDetail({ id }: { id: string }) {
   const updateStatus = useUpdateOrderStatus();
   const approve = useApproveOrder();
   const deliver = useDeliverOrder();
+  const setContext = useSetOrderContext();
   const [approveOpen, setApproveOpen] = useState(false);
   const [deliverOpen, setDeliverOpen] = useState(false);
 
@@ -163,6 +172,33 @@ export function LabOrderDetail({ id }: { id: string }) {
             <div>
               <p className="text-xs text-muted-foreground">{tc('phone')}</p>
               <p className="text-sm">{formatPhone(order.patient.phone)}</p>
+            </div>
+          ) : null}
+          {order.patient.gender !== Gender.MALE ? (
+            <div className="min-w-48">
+              <p className="text-xs text-muted-foreground">{t('physiologicalStateLabel')}</p>
+              <Select
+                value={order.physiologicalState ?? 'NONE'}
+                disabled={locked || !canWrite || setContext.isPending}
+                onValueChange={(v) =>
+                  setContext.mutate({
+                    id,
+                    state: v === 'NONE' ? null : (v as PhysiologicalState),
+                  })
+                }
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">{t('physiologicalState.NONE')}</SelectItem>
+                  {Object.values(PhysiologicalState).map((st) => (
+                    <SelectItem key={st} value={st}>
+                      {t(`physiologicalState.${st}` as never)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           ) : null}
           <div className="ml-auto">

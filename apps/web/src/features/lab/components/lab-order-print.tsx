@@ -14,6 +14,7 @@ import { useLabPrintPayload } from '../hooks';
 import {
   flagClass,
   flagMark,
+  rangeText,
   localizedName,
   referenceText,
   type ReferenceTextLabels,
@@ -27,7 +28,10 @@ export function LabOrderPrint({ id }: { id: string }) {
   const enumLabel = useEnumLabel();
   const refLabels: ReferenceTextLabels = {
     genderLabel: (g) => enumLabel('gender', g),
-    yearsSuffix: t('refYears'),
+    stateLabel: (st) => t(`physiologicalState.${st}` as never),
+    yearsSuffix: t('ageYearsShort'),
+    daysSuffix: t('ageDaysShort'),
+    monthsSuffix: t('ageMonthsShort'),
   };
   const printQuery = useLabPrintPayload(id);
 
@@ -151,7 +155,12 @@ export function LabOrderPrint({ id }: { id: string }) {
                       </td>
                       <td className="py-1.5 pr-2 text-muted-foreground">{param.unit ?? ''}</td>
                       <td className="py-1.5 pr-2 text-muted-foreground">
-                        {referenceText(param.referenceRanges, refLabels)}
+                        {/* The report prints the interval this patient was measured
+                            against, not the whole table — that is what a clinician
+                            reading it a year from now needs to see. */}
+                        {param.matchedRange
+                          ? rangeText(param.matchedRange, refLabels)
+                          : referenceText(param.referenceRanges, refLabels)}
                       </td>
                       <td className={cn('py-1.5 font-bold', value ? flagClass(value.flag) : '')}>
                         {value ? flagMark(value.flag) : ''}

@@ -1,13 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
 import {
   AuditAction,
+  CRITICAL_FLAGS,
   ErrorCode,
-  Gender,
   LabOrderStatus,
+  LabValueType,
   ResultFlag,
+  ageInDays,
+  flagValue,
   type AuthUser,
+  type PatientContext,
 } from '@avishifo/shared';
+import { parseReferenceRanges } from './reference-ranges';
 import { AppException } from '../../common/app.exception';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
@@ -15,88 +19,12 @@ import { AuditService } from '../../core/audit/audit.service';
 import { LabService } from './lab.service';
 import { EnterLabResultsDto } from './dto';
 
-/** Parsed LabTestParameter.referenceRanges row. */
-interface ReferenceRange {
-  gender?: Gender;
-  ageMinY?: number;
-  ageMaxY?: number;
-  low: number;
-  high: number;
-}
-
 /** Result entry is blocked once the order left the active pipeline. */
 const RESULTS_LOCKED: readonly LabOrderStatus[] = [
   LabOrderStatus.APPROVED,
   LabOrderStatus.DELIVERED,
   LabOrderStatus.CANCELLED,
 ];
-
-function ageYears(dob: Date | null): number | null {
-  if (!dob) return null;
-  const now = new Date();
-  let age = now.getUTCFullYear() - dob.getUTCFullYear();
-  const monthDiff = now.getUTCMonth() - dob.getUTCMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && now.getUTCDate() < dob.getUTCDate())) age -= 1;
-  return age;
-}
-
-function parseRanges(raw: Prisma.JsonValue): ReferenceRange[] {
-  if (!Array.isArray(raw)) return [];
-  const out: ReferenceRange[] = [];
-  for (const entry of raw) {
-    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) continue;
-    const o = entry as Record<string, unknown>;
-    if (typeof o['low'] !== 'number' || typeof o['high'] !== 'number') continue;
-    const gender =
-      o['gender'] === Gender.MALE || o['gender'] === Gender.FEMALE
-        ? (o['gender'] as Gender)
-        : undefined;
-    out.push({
-      gender,
-      ageMinY: typeof o['ageMinY'] === 'number' ? o['ageMinY'] : undefined,
-      ageMaxY: typeof o['ageMaxY'] === 'number' ? o['ageMaxY'] : undefined,
-      low: o['low'],
-      high: o['high'],
-    });
-  }
-  return out;
-}
-
-function matchRange(
-  ranges: ReferenceRange[],
-  gender: Gender | null,
-  age: number | null,
-): ReferenceRange | null {
-  const candidates = ranges.filter((r) => {
-    if (r.gender !== undefined && r.gender !== gender) return false;
-    if (r.ageMinY !== undefined && (age === null || age < r.ageMinY)) return false;
-    if (r.ageMaxY !== undefined && (age === null || age > r.ageMaxY)) return false;
-    return true;
-  });
-  if (candidates.length === 0) return null;
-  // Prefer the most specific match (more defined constraints first).
-  const specificity = (r: ReferenceRange): number =>
-    (r.gender !== undefined ? 1 : 0) +
-    (r.ageMinY !== undefined ? 1 : 0) +
-    (r.ageMaxY !== undefined ? 1 : 0);
-  return [...candidates].sort((a, b) => specificity(b) - specificity(a))[0] ?? null;
-}
-
-/** AUTO-FLAG: numeric values compared to the matched reference range; non-numeric → NORMAL. */
-function computeFlag(
-  referenceRanges: Prisma.JsonValue,
-  value: string,
-  gender: Gender | null,
-  age: number | null,
-): ResultFlag {
-  const num = Number(value.trim().replace(',', '.'));
-  if (!Number.isFinite(num) || value.trim() === '') return ResultFlag.NORMAL;
-  const range = matchRange(parseRanges(referenceRanges), gender, age);
-  if (!range) return ResultFlag.NORMAL;
-  if (num < range.low) return ResultFlag.LOW;
-  if (num > range.high) return ResultFlag.HIGH;
-  return ResultFlag.NORMAL;
-}
 
 @Injectable()
 export class ResultsService {
@@ -143,9 +71,15 @@ export class ResultsService {
       }
     }
 
-    const gender = order.patient.gender;
-    const age = ageYears(order.patient.dob);
+    const ctx: PatientContext = {
+      gender: order.patient.gender,
+      // Age at COLLECTION, not at data entry: a newborn's interval moves within days, so
+      // typing yesterday's specimen in this morning must not shift the band.
+      ageDays: ageInDays(order.patient.dob, order.collectedAt ?? order.createdAt),
+      state: order.physiologicalState,
+    };
     const clinicId = TenantContext.requireClinicId();
+    const critical: Array<{ name: string; value: string; flag: ResultFlag }> = [];
 
     const { resultId, resulted } = await this.prisma.db.$transaction(async (tx) => {
       const result = await tx.labResult.upsert({
@@ -165,7 +99,15 @@ export class ResultsService {
       for (const v of dto.values) {
         const parameter = paramById.get(v.parameterId);
         if (!parameter) continue; // validated above
-        const flag = computeFlag(parameter.referenceRanges, v.value, gender, age);
+        const { flag } = flagValue(
+          v.value,
+          parseReferenceRanges(parameter.referenceRanges),
+          ctx,
+          (parameter.valueType as LabValueType | null) ?? LabValueType.NUMERIC,
+        );
+        if (CRITICAL_FLAGS.includes(flag)) {
+          critical.push({ name: parameter.name, value: v.value, flag });
+        }
         await tx.labResultValue.upsert({
           where: {
             resultId_parameterId: { resultId: result.id, parameterId: v.parameterId },
@@ -206,6 +148,9 @@ export class ResultsService {
         enteredById: user.id,
         parameterIds: dto.values.map((v) => v.parameterId),
         resulted,
+        // Panic values are recorded in the audit trail as well as shown on screen, so
+        // "nobody told me" can be answered from the record.
+        criticalValues: critical.length > 0 ? critical : undefined,
       },
     });
     await this.lab.emitOrderUpdated(order.id);

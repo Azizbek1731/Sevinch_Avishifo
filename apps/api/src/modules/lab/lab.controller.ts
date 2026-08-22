@@ -4,8 +4,50 @@ import type { AuthUser } from '@avishifo/shared';
 import { CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { PaginatedResult } from '../../common/pagination';
 import { LabService } from './lab.service';
+import { LabCatalogService } from './catalog.service';
 import { ResultsService } from './results.service';
-import { CreateLabOrderDto, CreateLabTestDto, EnterLabResultsDto, LabOrderQueryDto, LabTestQueryDto, UpdateLabOrderStatusDto, UpdateLabTestDto } from './dto';
+import {
+  CreateLabOrderDto,
+  CreateLabTestDto,
+  EnterLabResultsDto,
+  ImportLabCatalogDto,
+  LabCatalogQueryDto,
+  LabOrderQueryDto,
+  LabTestQueryDto,
+  UpdateLabOrderContextDto,
+  UpdateLabOrderStatusDto,
+  UpdateLabTestDto,
+} from './dto';
+
+@ApiTags('lab')
+@Controller('lab-catalog')
+export class LabCatalogController {
+  constructor(private readonly catalog: LabCatalogService) {}
+
+  @Get()
+  @RequirePermissions('services.read')
+  list(@Query() query: LabCatalogQueryDto): Promise<PaginatedResult<unknown>> {
+    return this.catalog.list(query);
+  }
+
+  @Get('summary')
+  @RequirePermissions('services.read')
+  summary(): Promise<Record<string, unknown>> {
+    return this.catalog.summary();
+  }
+
+  @Get(':code')
+  @RequirePermissions('services.read')
+  getByCode(@Param('code') code: string): Promise<Record<string, unknown>> {
+    return this.catalog.getByCode(code);
+  }
+
+  @Post('import')
+  @RequirePermissions('lab.orders.write')
+  import(@Body() dto: ImportLabCatalogDto): Promise<Record<string, unknown>> {
+    return this.catalog.import(dto);
+  }
+}
 
 @ApiTags('lab')
 @Controller('lab-tests')
@@ -61,6 +103,15 @@ export class LabOrdersController {
   @RequirePermissions('lab.orders.read')
   getOrder(@Param('id') id: string): Promise<Record<string, unknown>> {
     return this.lab.getOrder(id);
+  }
+
+  @Patch(':id/context')
+  @RequirePermissions('lab.orders.write')
+  updateContext(
+    @Param('id') id: string,
+    @Body() dto: UpdateLabOrderContextDto,
+  ): Promise<Record<string, unknown>> {
+    return this.lab.updateContext(id, dto);
   }
 
   @Post(':id/status')

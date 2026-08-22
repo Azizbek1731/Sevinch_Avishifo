@@ -8,4 +8,5 @@ export * from './utils/phone';
 export * from './utils/phone-mask';
 export * from './utils/money';
 export * from './utils/ticket';
+export * from './utils/lab-ranges';
 export * from './schemas';

@@ -6,7 +6,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocale, useTranslations } from 'next-intl';
 import { z } from 'zod';
 import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react';
-import type { CreateLabTestInput, ReferenceRangeInput } from '@avishifo/shared';
+import type {
+  CreateLabTestInput,
+  LabValueType,
+  ReferenceRangeInput,
+} from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,11 +48,39 @@ const testFormSchema = z.object({
         unit: z.string(),
         low: numericText,
         high: numericText,
+        /** Analyte code and value type, carried through untouched from an import. */
+        code: z.string().optional(),
+        valueType: z.string().optional(),
+        /**
+         * The parameter's stored intervals. This form edits a single plain low/high pair,
+         * which a catalogue analyte does not have — CBC haemoglobin alone carries fourteen
+         * age, sex and trimester bands. Those are held here and written back unchanged, so
+         * opening this dialog on an imported test can never flatten them.
+         */
+        ranges: z.array(z.custom<ReferenceRangeInput>()).default([]),
       }),
     )
     .min(1),
 });
 type TestFormValues = z.infer<typeof testFormSchema>;
+
+/** True when the whole interval set is one plain low/high pair this form can edit. */
+function isSimpleRangeSet(ranges: readonly ReferenceRangeInput[]): boolean {
+  if (ranges.length === 0) return true;
+  if (ranges.length > 1) return false;
+  const r = ranges[0]!;
+  return (
+    r.gender === undefined &&
+    r.state === undefined &&
+    r.ageMinDays === undefined &&
+    r.ageMaxDays === undefined &&
+    r.ageMinY === undefined &&
+    r.ageMaxY === undefined &&
+    r.criticalLow === undefined &&
+    r.criticalHigh === undefined &&
+    r.textNorm === undefined
+  );
+}
 
 function toPayload(values: TestFormValues): CreateLabTestInput {
   return {
@@ -62,11 +94,17 @@ function toPayload(values: TestFormValues): CreateLabTestInput {
     parameters: values.parameters.map((p, idx) => {
       const low = p.low.trim().replace(',', '.');
       const high = p.high.trim().replace(',', '.');
-      const ranges: ReferenceRangeInput[] =
-        low !== '' && high !== '' ? [{ low: Number(low), high: Number(high) }] : [];
+      const simple = isSimpleRangeSet(p.ranges);
+      const ranges: ReferenceRangeInput[] = simple
+        ? low !== '' && high !== ''
+          ? [{ low: Number(low), high: Number(high) }]
+          : []
+        : p.ranges;
       return {
         name: p.name.trim(),
+        code: p.code || undefined,
         unit: p.unit.trim() || undefined,
+        valueType: (p.valueType as LabValueType | undefined) ?? undefined,
         referenceRanges: ranges,
         sortOrder: idx,
       };
@@ -81,12 +119,19 @@ function toFormValues(test: LabTest): TestFormValues {
     nameRu: test.name.ru ?? '',
     nameEn: test.name.en ?? '',
     specimenType: test.specimenType ?? '',
-    parameters: test.parameters.map((p) => ({
-      name: p.name,
-      unit: p.unit ?? '',
-      low: p.referenceRanges[0] !== undefined ? String(p.referenceRanges[0].low) : '',
-      high: p.referenceRanges[0] !== undefined ? String(p.referenceRanges[0].high) : '',
-    })),
+    parameters: test.parameters.map((p) => {
+      const simple = isSimpleRangeSet(p.referenceRanges);
+      const first = simple ? p.referenceRanges[0] : undefined;
+      return {
+        name: p.name,
+        code: p.code ?? undefined,
+        unit: p.unit ?? '',
+        valueType: p.valueType,
+        low: first?.low !== undefined ? String(first.low) : '',
+        high: first?.high !== undefined ? String(first.high) : '',
+        ranges: p.referenceRanges,
+      };
+    }),
   };
 }
 
@@ -96,7 +141,7 @@ const EMPTY_FORM: TestFormValues = {
   nameRu: '',
   nameEn: '',
   specimenType: '',
-  parameters: [{ name: '', unit: '', low: '', high: '' }],
+  parameters: [{ name: '', unit: '', low: '', high: '', ranges: [] }],
 };
 
 function TestForm({
@@ -165,7 +210,9 @@ function TestForm({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => paramsArray.append({ name: '', unit: '', low: '', high: '' })}
+            onClick={() =>
+              paramsArray.append({ name: '', unit: '', low: '', high: '', ranges: [] })
+            }
           >
             <Plus className="h-4 w-4" />
             {t('addParameter')}
@@ -178,12 +225,25 @@ function TestForm({
           <span>{t('refHigh')}</span>
           <span />
         </div>
-        {paramsArray.fields.map((field, idx) => (
+        {paramsArray.fields.map((field, idx) => {
+          const detailed = !isSimpleRangeSet(field.ranges ?? []);
+          return (
           <div key={field.id} className="grid grid-cols-[1fr_80px_70px_70px_32px] items-center gap-2">
             <Input {...form.register(`parameters.${idx}.name`)} />
             <Input {...form.register(`parameters.${idx}.unit`)} />
-            <Input inputMode="decimal" {...form.register(`parameters.${idx}.low`)} />
-            <Input inputMode="decimal" {...form.register(`parameters.${idx}.high`)} />
+            {detailed ? (
+              <span
+                className="col-span-2 truncate rounded-md border border-dashed px-2 py-2 text-center text-xs text-muted-foreground"
+                title={t('refDetailedHint')}
+              >
+                {t('refDetailed', { count: field.ranges.length })}
+              </span>
+            ) : (
+              <>
+                <Input inputMode="decimal" {...form.register(`parameters.${idx}.low`)} />
+                <Input inputMode="decimal" {...form.register(`parameters.${idx}.high`)} />
+              </>
+            )}
             <Button
               type="button"
               variant="ghost"
@@ -195,7 +255,8 @@ function TestForm({
               <Trash2 className="h-4 w-4 text-muted-foreground" />
             </Button>
           </div>
-        ))}
+          );
+        })}
         {form.formState.errors.parameters ? (
           <p className="text-xs font-medium text-destructive">{t('parametersInvalid')}</p>
         ) : null}

@@ -1,4 +1,11 @@
-import { Gender, ResultFlag, type LocalizedNameInput, type ReferenceRangeInput } from '@avishifo/shared';
+import {
+  ResultFlag,
+  formatRangeBounds,
+  type Gender,
+  type LocalizedNameInput,
+  type PhysiologicalState,
+  type ReferenceRangeInput,
+} from '@avishifo/shared';
 
 export type UiLocale = 'uz' | 'ru' | 'en';
 
@@ -9,13 +16,17 @@ export function localizedName(name: LocalizedNameInput, locale: UiLocale): strin
   return name.uz;
 }
 
-/** Short single-letter flag marker: H (high) / L (low) / A (abnormal). */
+/** Short marker beside a value: H/L for out of range, !! for a panic value. */
 export function flagMark(flag: ResultFlag): string {
   switch (flag) {
     case ResultFlag.HIGH:
       return 'H';
     case ResultFlag.LOW:
       return 'L';
+    case ResultFlag.CRITICAL_HIGH:
+      return 'H!!';
+    case ResultFlag.CRITICAL_LOW:
+      return 'L!!';
     case ResultFlag.ABNORMAL:
       return 'A';
     default:
@@ -23,9 +34,12 @@ export function flagMark(flag: ResultFlag): string {
   }
 }
 
-/** Tailwind text color for a result flag: H red, L blue, A red. */
+/** Colour for a result flag. A panic value is bold — it must not read like a mild high. */
 export function flagClass(flag: ResultFlag): string {
   switch (flag) {
+    case ResultFlag.CRITICAL_HIGH:
+    case ResultFlag.CRITICAL_LOW:
+      return 'font-bold text-destructive';
     case ResultFlag.HIGH:
     case ResultFlag.ABNORMAL:
       return 'text-destructive';
@@ -36,28 +50,52 @@ export function flagClass(flag: ResultFlag): string {
   }
 }
 
-/** Localized labels for {@link referenceText}; pass translated values from the caller. */
-export interface ReferenceTextLabels {
-  /** Label for a gender-restricted range, e.g. localized "Male"/"Female". */
-  genderLabel: (gender: Gender) => string;
-  /** Suffix after an age range, e.g. localized "y" (years). */
-  yearsSuffix: string;
+export function isCriticalFlag(flag: ResultFlag): boolean {
+  return flag === ResultFlag.CRITICAL_HIGH || flag === ResultFlag.CRITICAL_LOW;
 }
 
-/** Human reference text from a parameter's ranges, e.g. "Male: 4.5–6.2; Female: 4–5.5". */
-export function referenceText(ranges: ReferenceRangeInput[], labels: ReferenceTextLabels): string {
+/** Localized labels for {@link referenceText}; pass translated values from the caller. */
+export interface ReferenceTextLabels {
+  genderLabel: (gender: Gender) => string;
+  stateLabel: (state: PhysiologicalState) => string;
+  /** Suffix after an age range, e.g. localized "y" (years). */
+  yearsSuffix: string;
+  /** Suffix for an age range given in days, e.g. localized "d". */
+  daysSuffix: string;
+  /** Suffix for an age range given in months, e.g. localized "mo". */
+  monthsSuffix: string;
+}
+
+/** A day count as the shortest unit that stays exact: 14 d, 6 mo, 18 y. */
+function ageText(days: number, labels: ReferenceTextLabels): string {
+  if (days === 0) return `0`;
+  if (days % 365 === 0) return `${days / 365}${labels.yearsSuffix}`;
+  if (days % 30 === 0) return `${days / 30}${labels.monthsSuffix}`;
+  return `${days}${labels.daysSuffix}`;
+}
+
+/** "4.0–9.0" for one interval, with its qualifiers when it has any. */
+export function rangeText(r: ReferenceRangeInput, labels: ReferenceTextLabels): string {
+  const parts: string[] = [];
+  if (r.gender) parts.push(labels.genderLabel(r.gender));
+  if (r.state) parts.push(labels.stateLabel(r.state));
+
+  const min = r.ageMinDays ?? (r.ageMinY !== undefined ? r.ageMinY * 365 : undefined);
+  const max = r.ageMaxDays ?? (r.ageMaxY !== undefined ? (r.ageMaxY + 1) * 365 : undefined);
+  if (min !== undefined || max !== undefined) {
+    const from = min !== undefined ? ageText(min, labels) : '0';
+    const to = max !== undefined ? ageText(max, labels) : '∞';
+    parts.push(`${from}–${to}`);
+  }
+  const bounds = formatRangeBounds(r);
+  return parts.length > 0 ? `${parts.join(' ')}: ${bounds}` : bounds;
+}
+
+/** Human reference text from a parameter's intervals, one line per interval. */
+export function referenceText(
+  ranges: readonly ReferenceRangeInput[],
+  labels: ReferenceTextLabels,
+): string {
   if (ranges.length === 0) return '—';
-  return ranges
-    .map((r) => {
-      const parts: string[] = [];
-      if (r.gender === Gender.MALE) parts.push(`${labels.genderLabel(Gender.MALE)}:`);
-      else if (r.gender === Gender.FEMALE) parts.push(`${labels.genderLabel(Gender.FEMALE)}:`);
-      const age =
-        r.ageMinY !== undefined || r.ageMaxY !== undefined
-          ? `(${r.ageMinY ?? 0}–${r.ageMaxY ?? '∞'} ${labels.yearsSuffix}) `
-          : '';
-      parts.push(`${age}${r.low}–${r.high}`);
-      return parts.join(' ');
-    })
-    .join('; ');
+  return ranges.map((r) => rangeText(r, labels)).join('; ');
 }

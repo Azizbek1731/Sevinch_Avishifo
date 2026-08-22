@@ -1,18 +1,34 @@
 import type {
+  Biomaterial,
   CreateLabOrderInput,
   CreateLabTestInput,
   EnterLabResultsInput,
+  ImportLabCatalogInput,
+  LabCategory,
   LabOrderStatus,
+  PhysiologicalState,
   UpdateLabTestInput,
 } from '@avishifo/shared';
 import { api, type ApiResult } from '@/lib/api-client';
 import type {
+  LabCatalogSummary,
+  LabCatalogTest,
+  LabImportResult,
   LabOrderDetail,
   LabOrderListItem,
   LabPrintPayload,
   LabTest,
   PatientHit,
 } from './types';
+
+export interface LabCatalogQuery {
+  biomaterial?: Biomaterial;
+  category?: LabCategory;
+  search?: string;
+  onlyNew?: boolean;
+  page?: number;
+  limit?: number;
+}
 
 export interface LabOrdersQuery {
   status?: LabOrderStatus;
@@ -64,4 +80,26 @@ export const labApi = {
 
   searchPatients: (search: string): Promise<ApiResult<PatientHit[]>> =>
     api.get<PatientHit[]>('/patients', { search, limit: 8 }),
+
+  setOrderContext: (
+    id: string,
+    physiologicalState: PhysiologicalState | null,
+  ): Promise<ApiResult<LabOrderDetail>> =>
+    api.patch<LabOrderDetail>(`/lab-orders/${id}/context`, { physiologicalState }),
+
+  listCatalog: (q: LabCatalogQuery): Promise<ApiResult<LabCatalogTest[]>> =>
+    api.get<LabCatalogTest[]>('/lab-catalog', {
+      biomaterial: q.biomaterial,
+      category: q.category,
+      search: q.search || undefined,
+      onlyNew: q.onlyNew ? true : undefined,
+      page: q.page,
+      limit: q.limit ?? 50,
+    }),
+
+  catalogSummary: (): Promise<ApiResult<LabCatalogSummary>> =>
+    api.get<LabCatalogSummary>('/lab-catalog/summary'),
+
+  importCatalog: (body: ImportLabCatalogInput): Promise<ApiResult<LabImportResult>> =>
+    api.post<LabImportResult>('/lab-catalog/import', body),
 };

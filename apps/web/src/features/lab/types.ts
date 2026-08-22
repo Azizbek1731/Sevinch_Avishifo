@@ -1,7 +1,11 @@
 import type {
+  Biomaterial,
   Gender,
+  LabCategory,
   LabOrderStatus,
+  LabValueType,
   LocalizedNameInput,
+  PhysiologicalState,
   ReferenceRangeInput,
   ResultFlag,
 } from '@avishifo/shared';
@@ -9,9 +13,17 @@ import type {
 export interface LabTestParameter {
   id: string;
   name: string;
+  code: string | null;
   unit: string | null;
+  valueType: LabValueType;
   referenceRanges: ReferenceRangeInput[];
   sortOrder: number;
+  /** Set only on an order detail: the interval that applies to THAT patient. */
+  matchedRange?: ReferenceRangeInput | null;
+  /** True when the analyte has intervals but none covers this patient. */
+  referenceMissing?: boolean;
+  /** True when the missing interval is one the order's physiological state would select. */
+  requiresState?: boolean;
 }
 
 export interface LabTest {
@@ -19,9 +31,55 @@ export interface LabTest {
   code: string;
   name: LocalizedNameInput;
   specimenType: string | null;
+  biomaterial: Biomaterial | null;
+  category: LabCategory | null;
+  catalogCode: string | null;
   serviceId: string | null;
   isActive: boolean;
   parameters: LabTestParameter[];
+}
+
+// ------------------------------------------------------------ standard catalogue
+
+export interface LabCatalogParameter {
+  id: string;
+  code: string;
+  name: LocalizedNameInput;
+  unit: string | null;
+  valueType: LabValueType;
+  note: string | null;
+  referenceRanges: ReferenceRangeInput[];
+  sortOrder: number;
+}
+
+export interface LabCatalogTest {
+  id: string;
+  code: string;
+  biomaterial: Biomaterial;
+  category: LabCategory;
+  name: LocalizedNameInput;
+  specimenNote: string | null;
+  parameterCount: number;
+  /** Whether this clinic already carries a copy. */
+  imported?: boolean;
+  parameters: LabCatalogParameter[];
+}
+
+export interface LabCatalogSummary {
+  total: number;
+  importedCount: number;
+  biomaterials: Array<{ value: Biomaterial; count: number }>;
+  categories: Array<{ value: LabCategory; count: number }>;
+}
+
+export interface LabImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  createdCodes: string[];
+  updatedCodes: string[];
+  skippedCodes: string[];
+  missingCodes: string[];
 }
 
 export interface LabOrderListItem {
@@ -62,6 +120,8 @@ export interface LabOrderItem {
     code: string;
     name: LocalizedNameInput;
     specimenType: string | null;
+    biomaterial: Biomaterial | null;
+    category: LabCategory | null;
     parameters: LabTestParameter[];
   };
   result: LabResult | null;
@@ -74,6 +134,7 @@ export interface LabOrderDetail {
   patientId: string;
   visitId: string | null;
   status: LabOrderStatus;
+  physiologicalState: PhysiologicalState | null;
   orderedById: string | null;
   collectedAt: string | null;
   deliveredAt: string | null;

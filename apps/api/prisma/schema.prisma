@@ -193,6 +193,56 @@ enum ResultFlag {
   HIGH
   LOW
   ABNORMAL
+  CRITICAL_LOW
+  CRITICAL_HIGH
+}
+
+/// Specimen a lab test is run on. Mirrors the MoH catalogue's top-level split.
+enum Biomaterial {
+  BLOOD
+  URINE
+  STOOL
+  SEMEN
+  SMEAR
+  CSF
+  SPUTUM
+  FLUID
+}
+
+/// Catalogue section a test belongs to, used for grouping and filtering.
+enum LabCategory {
+  HEMATOLOGY
+  BIOCHEMISTRY
+  HORMONES
+  COAGULATION
+  IMMUNOLOGY
+  TUMOR_MARKERS
+  VITAMINS
+  URINALYSIS
+  COPROLOGY
+  ANDROLOGY
+  CYTOLOGY
+  MICROBIOLOGY
+}
+
+enum LabValueType {
+  NUMERIC
+  TEXT
+  ENUM
+}
+
+/// Physiological state that shifts a reference interval. Recorded on the ORDER, not the
+/// patient: a trimester or a cycle phase is true on the day the specimen was drawn, and a
+/// result printed next year must still show the interval that applied back then.
+enum PhysiologicalState {
+  PREGNANCY
+  PREGNANCY_T1
+  PREGNANCY_T2
+  PREGNANCY_T3
+  FOLLICULAR
+  OVULATORY
+  LUTEAL
+  POSTMENOPAUSE
 }
 
 enum DocumentCategory {
@@ -1515,14 +1565,60 @@ model Expense {
 
 // ============================================================ LAB (M9)
 
+/// Standard clinical laboratory catalogue (MoH of Uzbekistan / WHO / IFCC).
+///
+/// A shared dictionary, like Icd10Code: no clinicId, no patient data, read-only for
+/// clinics. A clinic imports the tests it actually runs, which copies them into its own
+/// LabTest rows — from then on the copy is the clinic's to edit, because reference
+/// intervals legitimately differ between analysers.
+model LabCatalogTest {
+  id           String      @id @default(uuid(7))
+  code         String      @unique
+  biomaterial  Biomaterial
+  category     LabCategory
+  nameUz       String
+  nameRu       String
+  nameEn       String?
+  /// How the specimen is collected, e.g. "Цельная кровь с ЭДТА (K2/K3-EDTA)"
+  specimenNote String?
+  sortOrder    Int         @default(0)
+
+  parameters LabCatalogParameter[]
+
+  @@index([biomaterial, category])
+}
+
+model LabCatalogParameter {
+  id              String       @id @default(uuid(7))
+  testId          String
+  code            String
+  nameUz          String
+  nameRu          String
+  nameEn          String?
+  unit            String?
+  valueType       LabValueType @default(NUMERIC)
+  note            String?
+  /// Same shape as LabTestParameter.referenceRanges — imported verbatim, one evaluator.
+  referenceRanges Json         @default("[]")
+  sortOrder       Int          @default(0)
+
+  test LabCatalogTest @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, code])
+}
+
 model LabTest {
-  id           String  @id @default(uuid(7))
+  id           String       @id @default(uuid(7))
   clinicId     String
-  serviceId    String? @unique
+  serviceId    String?      @unique
   code         String
   name         Json
   specimenType String? // blood | urine | ...
-  isActive     Boolean @default(true)
+  biomaterial  Biomaterial?
+  category     LabCategory?
+  /// Set when the test was imported from LabCatalogTest; null for hand-made tests.
+  catalogCode  String?
+  isActive     Boolean      @default(true)
 
   service    Service?           @relation(fields: [serviceId], references: [id])
   parameters LabTestParameter[]
@@ -1532,14 +1628,18 @@ model LabTest {
 }
 
 model LabTestParameter {
-  id              String  @id @default(uuid(7))
+  id              String       @id @default(uuid(7))
   clinicId        String
   labTestId       String
   name            String
+  /// Analyser/LOINC-style short code, e.g. "HGB". Set on catalogue import.
+  code            String?
   unit            String?
-  /// [{ gender?: "MALE"|"FEMALE", ageMinY?: n, ageMaxY?: n, low: n, high: n }]
-  referenceRanges Json    @default("[]")
-  sortOrder       Int     @default(0)
+  valueType       LabValueType @default(NUMERIC)
+  /// [{ gender?, ageMinDays?, ageMaxDays?, state?, low?, high?, criticalLow?,
+  ///    criticalHigh?, textNorm?, label?, note? }] — see referenceRangeSchema.
+  referenceRanges Json         @default("[]")
+  sortOrder       Int          @default(0)
 
   labTest LabTest          @relation(fields: [labTestId], references: [id], onDelete: Cascade)
   values  LabResultValue[]
@@ -1548,19 +1648,22 @@ model LabTestParameter {
 }
 
 model LabOrder {
-  id          String         @id @default(uuid(7))
-  clinicId    String
-  branchId    String
+  id                 String              @id @default(uuid(7))
+  clinicId           String
+  branchId           String
   /// Barcode-friendly, e.g. "L-2026-000456"
-  orderNumber String
-  patientId   String
-  visitId     String?
-  status      LabOrderStatus @default(ORDERED)
-  orderedById String?
-  collectedAt DateTime?      @db.Timestamptz(6)
-  deliveredAt DateTime?      @db.Timestamptz(6)
-  createdAt   DateTime       @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime       @updatedAt @db.Timestamptz(6)
+  orderNumber        String
+  patientId          String
+  visitId            String?
+  status             LabOrderStatus      @default(ORDERED)
+  /// Pregnancy trimester or cycle phase at collection time — selects the right
+  /// reference interval for hormones, haemoglobin and platelets.
+  physiologicalState PhysiologicalState?
+  orderedById        String?
+  collectedAt        DateTime?           @db.Timestamptz(6)
+  deliveredAt        DateTime?           @db.Timestamptz(6)
+  createdAt          DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(6)
 
   patient Patient        @relation(fields: [patientId], references: [id])
   visit   Visit?         @relation(fields: [visitId], references: [id])

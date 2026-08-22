@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Save } from 'lucide-react';
+import { AlertTriangle, Save } from 'lucide-react';
+import { ResultFlag, type PhysiologicalState } from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,7 +23,9 @@ import { useEnterResults } from '../hooks';
 import {
   flagClass,
   flagMark,
+  isCriticalFlag,
   localizedName,
+  rangeText,
   referenceText,
   type ReferenceTextLabels,
   type UiLocale,
@@ -44,7 +47,10 @@ export function OrderItemCard({
   const enumLabel = useEnumLabel();
   const refLabels: ReferenceTextLabels = {
     genderLabel: (g) => enumLabel('gender', g),
-    yearsSuffix: t('refYears'),
+    stateLabel: (st: PhysiologicalState) => t(`physiologicalState.${st}` as never),
+    yearsSuffix: t('ageYearsShort'),
+    daysSuffix: t('ageDaysShort'),
+    monthsSuffix: t('ageMonthsShort'),
   };
   const enterResults = useEnterResults();
 
@@ -55,6 +61,12 @@ export function OrderItemCard({
 
   const savedFlags = new Map((item.result?.values ?? []).map((v) => [v.parameterId, v.flag]));
   const editable = !locked && canEnter;
+  const criticalNames = item.labTest.parameters
+    .filter((p) => {
+      const f = savedFlags.get(p.id);
+      return f === ResultFlag.CRITICAL_LOW || f === ResultFlag.CRITICAL_HIGH;
+    })
+    .map((p) => p.name);
 
   const save = () => {
     const entries = Object.entries(values)
@@ -81,6 +93,15 @@ export function OrderItemCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        {criticalNames.length > 0 ? (
+          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2.5 text-sm">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <p>
+              <span className="font-medium">{t('criticalValueTitle')}</span>{' '}
+              {criticalNames.join(', ')} — {t('criticalValueBody')}
+            </p>
+          </div>
+        ) : null}
         <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
@@ -95,8 +116,12 @@ export function OrderItemCard({
             <TableBody>
               {item.labTest.parameters.map((param) => {
                 const flag = savedFlags.get(param.id);
+                const critical = flag !== undefined && isCriticalFlag(flag);
                 return (
-                  <TableRow key={param.id}>
+                  <TableRow
+                    key={param.id}
+                    className={critical ? 'bg-destructive/5' : undefined}
+                  >
                     <TableCell className="font-medium">{param.name}</TableCell>
                     <TableCell>
                       <Input
@@ -112,11 +137,31 @@ export function OrderItemCard({
                       {param.unit ?? '—'}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {referenceText(param.referenceRanges, refLabels)}
+                      {param.matchedRange ? (
+                        // The one interval that applies to THIS patient — their age, sex
+                        // and trimester — rather than the whole table for them to read past.
+                        <span className="text-foreground">
+                          {rangeText(param.matchedRange, refLabels)}
+                        </span>
+                      ) : param.requiresState ? (
+                        <span className="text-warning">{t('refNeedsState')}</span>
+                      ) : param.referenceMissing ? (
+                        <span title={referenceText(param.referenceRanges, refLabels)}>
+                          {t('refNotForThisPatient')}
+                        </span>
+                      ) : (
+                        referenceText(param.referenceRanges, refLabels)
+                      )}
                     </TableCell>
                     <TableCell>
                       {flag ? (
-                        <span className={cn('font-bold', flagClass(flag))}>{flagMark(flag)}</span>
+                        <span
+                          className={cn('inline-flex items-center gap-1', flagClass(flag))}
+                          title={critical ? t('criticalValueHint') : undefined}
+                        >
+                          {critical ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
+                          {flagMark(flag)}
+                        </span>
                       ) : null}
                     </TableCell>
                   </TableRow>

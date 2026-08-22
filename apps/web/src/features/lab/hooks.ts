@@ -9,12 +9,14 @@ import {
   type CreateLabOrderInput,
   type CreateLabTestInput,
   type EnterLabResultsInput,
+  type ImportLabCatalogInput,
   type Permission,
+  type PhysiologicalState,
   type UpdateLabTestInput,
 } from '@avishifo/shared';
 import { ApiError } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
-import { labApi, type LabOrdersQuery } from './api';
+import { labApi, type LabCatalogQuery, type LabOrdersQuery } from './api';
 
 /** Worklist chip statuses, in pipeline order. */
 export const WORKLIST_STATUSES = [
@@ -102,6 +104,26 @@ export function useLabTests(search?: string, enabled = true) {
   });
 }
 
+export function useLabCatalog(params: LabCatalogQuery, enabled = true) {
+  return useQuery({
+    queryKey: ['lab', 'catalog', params],
+    queryFn: () => labApi.listCatalog(params),
+    enabled,
+    // The catalogue is a shared dictionary that only changes by migration, so it is
+    // worth holding rather than refetching each time the dialog reopens.
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useLabCatalogSummary(enabled = true) {
+  return useQuery({
+    queryKey: ['lab', 'catalog', 'summary'],
+    queryFn: async () => (await labApi.catalogSummary()).data,
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
 // ------------------------------------------------------------ mutations
 
 function useInvalidateLab() {
@@ -180,6 +202,36 @@ export function useDeliverOrder() {
     onSuccess: () => {
       toast.success(t('orderDelivered'));
       void invalidate();
+    },
+    onError,
+  });
+}
+
+export function useSetOrderContext() {
+  const onError = useApiErrorToast();
+  const invalidate = useInvalidateLab();
+  return useMutation({
+    mutationFn: ({ id, state }: { id: string; state: PhysiologicalState | null }) =>
+      labApi.setOrderContext(id, state),
+    onSuccess: () => {
+      void invalidate();
+    },
+    onError,
+  });
+}
+
+export function useImportLabCatalog(onDone?: (created: number) => void) {
+  const t = useTranslations('lab');
+  const onError = useApiErrorToast();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ImportLabCatalogInput) => labApi.importCatalog(body),
+    onSuccess: (res) => {
+      const { created, updated, skipped } = res.data;
+      if (created + updated === 0) toast.info(t('importNothingNew', { count: skipped }));
+      else toast.success(t('importDone', { created, updated, skipped }));
+      void queryClient.invalidateQueries({ queryKey: ['lab'] });
+      onDone?.(created);
     },
     onError,
   });
