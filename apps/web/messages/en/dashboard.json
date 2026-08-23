@@ -30,5 +30,16 @@
   "empty": {
     "title": "No data",
     "description": "No data found for the selected period"
+  },
+  "setup": {
+    "title": "Getting the clinic ready",
+    "progress": "{done} / {total} done",
+    "items": {
+      "profileComplete": "Fill in the clinic address and phone — they print on receipts",
+      "hasPricedService": "Give at least one service a price — needed to sell at the register",
+      "hasStaff": "Add your first staff member",
+      "hasSchedule": "Set a doctor's working schedule — needed for booking",
+      "hasPatient": "Register the first patient"
+    }
   }
 }

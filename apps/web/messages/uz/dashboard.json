@@ -30,5 +30,16 @@
   "empty": {
     "title": "Ma'lumot yo'q",
     "description": "Tanlangan davr uchun ma'lumotlar topilmadi"
+  },
+  "setup": {
+    "title": "Klinikani ishga tayyorlash",
+    "progress": "{done} / {total} bajarildi",
+    "items": {
+      "profileComplete": "Klinika manzili va telefonini to'ldiring — ular chekda chiqadi",
+      "hasPricedService": "Kamida bitta xizmatga narx qo'ying — kassada sotish uchun",
+      "hasStaff": "Birinchi xodimni qo'shing",
+      "hasSchedule": "Shifokorning ish jadvalini kiriting — yozuv uchun kerak",
+      "hasPatient": "Birinchi bemorni ro'yxatga oling"
+    }
   }
 }
