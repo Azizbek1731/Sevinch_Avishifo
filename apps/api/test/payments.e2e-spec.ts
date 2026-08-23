@@ -202,6 +202,36 @@ describe('billing: invoices, payments, shift (e2e)', () => {
     expect(res.body.data.invoice.status).toBe('PAID'); // not fully refunded
   });
 
+  it('a BALANCE refund actually lands on the patient balance', async () => {
+    const before = await request(app.getHttpServer())
+      .get(`${API}/patients/${patientId}`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post(`${API}/invoices/${invoiceId}/refunds`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`)
+      .send({ amount: '30000.00', method: 'BALANCE', reason: 'E2E balansga qaytarish' })
+      .expect(201);
+
+    // The refund row alone is not the point — the money must exist on the
+    // account. It used to not: REFUND_CREDIT was designed and never wired.
+    const after = await request(app.getHttpServer())
+      .get(`${API}/patients/${patientId}`)
+      .set('Authorization', `Bearer ${cashier.accessToken}`)
+      .expect(200);
+    const delta =
+      Number(after.body.data.balance ?? 0) - Number(before.body.data.balance ?? 0);
+    expect(delta).toBe(30000);
+
+    const txRow = await prisma.patientBalanceTransaction.findFirst({
+      where: { patientId, type: 'REFUND_CREDIT' },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(txRow).not.toBeNull();
+    expect(txRow!.amount.toFixed(2)).toBe('30000.00');
+  });
+
   it('refunding more than what remains paid → REFUND_EXCEEDS_PAID', async () => {
     const res = await request(app.getHttpServer())
       .post(`${API}/invoices/${invoiceId}/refunds`)

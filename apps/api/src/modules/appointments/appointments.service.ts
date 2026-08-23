@@ -483,9 +483,17 @@ export class AppointmentsService {
       );
     }
 
-    // Object-level check: cancellation requires the dedicated permission.
-    if (to === AppointmentStatus.CANCELLED && !actor.permissions.includes('appointments.cancel')) {
-      throw new AppException(ErrorCode.FORBIDDEN, 'Missing appointments.cancel permission', 403);
+    // Transition-level checks live HERE, not on the controller: the endpoint
+    // serves two distinct rights. Cancellation needs appointments.cancel, every
+    // other transition needs appointments.write — requiring write at the
+    // controller made a cancel-only grant a dead end: the button rendered, the
+    // server refused.
+    if (to === AppointmentStatus.CANCELLED) {
+      if (!actor.permissions.includes('appointments.cancel')) {
+        throw new AppException(ErrorCode.FORBIDDEN, 'Missing appointments.cancel permission', 403);
+      }
+    } else if (!actor.permissions.includes('appointments.write')) {
+      throw new AppException(ErrorCode.FORBIDDEN, 'Missing appointments.write permission', 403);
     }
 
     await this.prisma.db.appointment.update({

@@ -1107,7 +1107,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     // that this chat is actually linked to the appointment's patient (justified).
     const appointment = await this.prisma.unscoped.appointment.findUnique({
       where: { id: appointmentId },
-      select: { id: true, clinicId: true, patientId: true, status: true },
+      select: { id: true, clinicId: true, patientId: true, status: true, startAt: true },
     });
     if (!appointment) {
       await ctx.answerCallbackQuery({ text: 'Qabul topilmadi.' });
@@ -1127,6 +1127,16 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     }
     if (appointment.status !== 'SCHEDULED' && appointment.status !== 'CONFIRMED') {
       await ctx.answerCallbackQuery({ text: 'Bu qabul holatini o‘zgartirib bo‘lmaydi.' });
+      return;
+    }
+    // Same cutoff the portal enforces: within 2 hours of the start the slot can
+    // no longer be resold, so the bot button must not offer a cancellation the
+    // cabinet would refuse.
+    if (action === 'cancel' && appointment.startAt.getTime() - Date.now() < 2 * 60 * 60 * 1000) {
+      await ctx.answerCallbackQuery({
+        text: 'Boshlanishiga 2 soatdan kam qoldi — bekor qilish uchun klinikaga qo‘ng‘iroq qiling.',
+        show_alert: true,
+      });
       return;
     }
 

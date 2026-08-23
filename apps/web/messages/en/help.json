@@ -1,0 +1,481 @@
+{
+  "title": "Help",
+  "description": "A guide to working with the system. The sections you see match your permissions — another role sees different ones.",
+  "searchPlaceholder": "Type a question (e.g. receipt, queue, result)...",
+  "all": "All",
+  "noResults": "Nothing found. Try a different word.",
+  "sections": [
+    {
+      "id": "start",
+      "title": "Getting started",
+      "topics": [
+        {
+          "id": "first-screen",
+          "title": "Signing in and the work screen",
+          "blocks": [
+            {
+              "p": "Sign in with a phone number or email and a password. With Telegram linked, a one-time code works instead of a password. Each role lands on its own screen: reception on the front desk, the doctor in the consulting room, the cashier at the register."
+            },
+            {
+              "steps": [
+                "Top-left holds the branch switcher — the queue, the register and most lists show the selected branch only",
+                "Cmd+K (or Ctrl+K) anywhere — quick patient search",
+                "The bell shows system notifications; the avatar menu holds language and Security (two-step sign-in)"
+              ]
+            },
+            {
+              "warn": "If a screen looks empty, check the branch first: what you just created may live in another one. The branch choice is remembered per computer — on a shared machine, glance at it before working."
+            },
+            {
+              "faq": {
+                "q": "Every screen is always empty — what now?",
+                "a": "Your account may not be attached to any branch. An administrator sets your branch in Settings → Staff."
+              }
+            }
+          ]
+        },
+        {
+          "id": "menu-perms",
+          "title": "Why menus differ per person",
+          "blocks": [
+            {
+              "p": "The left menu is built from your permissions: a cashier sees the Register, a lab tech sees the Laboratory. A missing item is access control, not a malfunction."
+            },
+            {
+              "tip": "The owner or an administrator can grant (or revoke) an individual permission per person: Settings → Staff → row menu → Permissions. It takes effect immediately and the menu updates on the spot."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "patients",
+      "title": "Patients",
+      "perm": "patients.read",
+      "topics": [
+        {
+          "id": "add-patient",
+          "title": "Adding a patient",
+          "perm": "patients.write",
+          "blocks": [
+            {
+              "steps": [
+                "Patients → New patient (or the quick add on the front desk)",
+                "Name and phone matter most; fill the date of birth and sex too — laboratory reference values depend on them",
+                "The Outpatient/Inpatient choice sets the patient type",
+                "Save"
+              ]
+            },
+            {
+              "warn": "Duplicates are detected only by the EXACT same phone or the EXACT same name plus birth date. \"Create anyway\" is one click — search the list first. Cleaning up afterwards is management-only."
+            },
+            {
+              "faq": {
+                "q": "A typo in the name — will fixing it break old receipts?",
+                "a": "No, fix it freely. Search, old invoices and lab results all show the corrected name immediately."
+              }
+            }
+          ]
+        },
+        {
+          "id": "merge-delete",
+          "title": "Duplicate: merge or delete?",
+          "perm": "patients.delete",
+          "blocks": [
+            {
+              "p": "They are different things. Delete hides the card — history, debt and deposit vanish with it (management still sees it marked deleted, but there is NO undo). Merge moves everything — visits, invoices, lab orders, deposits — onto the primary card."
+            },
+            {
+              "warn": "Found a duplicate — do NOT delete it; ask an administrator to Merge. Merge is irreversible too: the deposits add up and everything moves to one card. Check which card is the primary before pressing."
+            }
+          ]
+        },
+        {
+          "id": "documents",
+          "title": "Documents and consents",
+          "perm": "patients.documents.write",
+          "blocks": [
+            {
+              "p": "The patient card's Documents tab takes PDFs and photos (up to 20 MB; photos are recompressed). The Overview tab records signed consents (personal data, procedures)."
+            },
+            {
+              "warn": "Deleting a document destroys the file forever — it is not in \"deleted\" either. Download a copy first. (Deleting a patient card, by contrast, hides rather than destroys.)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "queue",
+      "title": "Queue and front desk",
+      "perm": "queue.read",
+      "topics": [
+        {
+          "id": "flow",
+          "title": "The daily flow",
+          "perm": "queue.manage",
+          "blocks": [
+            {
+              "steps": [
+                "A walk-in arrives: add them on the Reception screen — they join the queue at once",
+                "A booked patient arrives: check them in from the list and send them to the queue",
+                "The doctor works with \"Call next\"; finishing opens the visit record",
+                "The queue resets every midnight and is per branch"
+              ]
+            },
+            {
+              "tip": "Past times cannot be booked — a patient already seen at 9:00 simply goes in as a walk-in."
+            },
+            {
+              "warn": "Transferring a ticket to another doctor CHANGES its number (A-005 → B-012) — tell the patient the new number, or they will wait for one that never comes up on the screen."
+            }
+          ]
+        },
+        {
+          "id": "booking",
+          "title": "Advance booking and the schedule",
+          "perm": "appointments.write",
+          "blocks": [
+            {
+              "p": "Free slots come from the doctor's working schedule. \"No free slots\" almost always means the doctor's hours are not set up for this branch (Staff → Schedule)."
+            },
+            {
+              "warn": "Rescheduling checks only for double-booking, NOT the doctor's schedule — you can move a visit outside working hours. Watch the date and time yourself."
+            },
+            {
+              "warn": "Cancel and No-show are one-way: a wrong click means booking again. \"No-show\" also counts against the patient. A recurring course silently skips occupied dates — check the \"created X / skipped Y\" summary."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "doctor",
+      "title": "The doctor's room",
+      "perm": "queue.call",
+      "topics": [
+        {
+          "id": "visit",
+          "title": "The consultation and its record",
+          "blocks": [
+            {
+              "steps": [
+                "\"Call next\" from the queue — the patient comes in",
+                "At the end press \"Finish\" on the ticket — the visit record opens",
+                "Fill complaints, examination, diagnosis (ICD-10), prescriptions, referrals",
+                "When everything is in — \"Complete visit\""
+              ]
+            },
+            {
+              "warn": "Press \"Complete visit\" only when EVERYTHING is entered: a completed visit accepts no more diagnoses or prescriptions. A mistake noticed later goes in only as a formal amendment."
+            },
+            {
+              "tip": "Templates fill EMPTY fields only and never overwrite typed text. If a template \"did nothing\", the field was already taken."
+            },
+            {
+              "faq": {
+                "q": "I need a sick colleague's patient — they are not in my list?",
+                "a": "By default a doctor sees only their own visits. If the owner enables the \"branch-wide\" mode in Settings → Clinic, doctors of one branch see each other's visits."
+              }
+            }
+          ]
+        },
+        {
+          "id": "lab-referral",
+          "title": "Referring to the lab",
+          "perm": "lab.orders.write",
+          "blocks": [
+            {
+              "p": "A test ticked inside the visit reaches the laboratory worklist IMMEDIATELY — it does not wait for payment. Send the patient to the register first, or the tech may process an unpaid order."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cashier",
+      "title": "The register",
+      "perm": "payments.create",
+      "topics": [
+        {
+          "id": "shift",
+          "title": "The shift: opening and closing",
+          "perm": "shifts.manage",
+          "blocks": [
+            {
+              "p": "ONE register per branch. Opening takes two opening floats: cash and transfers (card/online). Closing counts both. Whoever holds the shift permission may close — not only the opener."
+            },
+            {
+              "steps": [
+                "Register → Open shift → enter the cash and transfer opening floats",
+                "During the day: cash needs an open shift; card/online go through without one but land in nobody's drawer",
+                "At closing, compare the box against the \"expected in register\" figure (it already includes the opening float)",
+                "If the transfer book holds anything — count it, or write why it could not be counted"
+              ]
+            },
+            {
+              "warn": "Once a shift closes, its payments and expenses FREEZE: no void, no edits. Review the day before counting out."
+            },
+            {
+              "tip": "A payment taken from a patient's deposit never shows in the day's takings — correct: that money was counted on the day it was deposited."
+            }
+          ]
+        },
+        {
+          "id": "void-refund",
+          "title": "Void and Refund are different verbs",
+          "blocks": [
+            {
+              "p": "VOID — \"this money was never taken\": erase a mistyped amount the same day; the invoice becomes payable again. REFUND — real money went back to the patient: it leaves the register as an outflow."
+            },
+            {
+              "warn": "Void works only while the shift is open. A refund comes out of the register open NOW: refunding yesterday's sale today closes today's drawer short by that amount — not an error."
+            },
+            {
+              "tip": "\"Refund to balance\" now genuinely credits the patient's account for future payments. A partly refunded invoice stays \"Paid\" — see the Refunds table inside the invoice for what actually went back."
+            }
+          ]
+        },
+        {
+          "id": "expense",
+          "title": "Recording expenses",
+          "perm": "expenses.write",
+          "blocks": [
+            {
+              "p": "A cash expense needs the open shift and lowers the expected cash. A card expense touches no register. The payment method cannot be changed later — pick it right the first time."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "invoices",
+      "title": "Invoices",
+      "perm": "invoices.read",
+      "topics": [
+        {
+          "id": "draft",
+          "title": "Why can't the cashier see the invoice?",
+          "blocks": [
+            {
+              "p": "The \"New invoice\" window creates a DRAFT. A draft is invisible to the register and absent from the patient's debt — it becomes payable only after \"Issue\". The front desk's quick sale does this by itself."
+            },
+            {
+              "tip": "The reception's pending strip shows the latest 50 unpaid invoices, current branch only. The complete picture of debts is in Debtors, clinic-wide."
+            }
+          ]
+        },
+        {
+          "id": "pay",
+          "title": "Paying, debt and limits",
+          "blocks": [
+            {
+              "p": "\"Pay now\" in the quick sale takes the full amount; anything less stays \"On account\". You cannot record more than what is due: change from a large note comes from the drawer, only the real amount is recorded."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ward",
+      "title": "Inpatient care",
+      "perm": "admissions.read",
+      "topics": [
+        {
+          "id": "admit",
+          "title": "Admitting and the case history",
+          "perm": "admissions.write",
+          "blocks": [
+            {
+              "steps": [
+                "On the Inpatient page — \"Admit\" → find the patient",
+                "Department, ward, bed, diagnosis — the case history (KT number) opens",
+                "The Case history tab keeps complaints, anamnesis, the daily diary",
+                "\"Print\" produces form 003"
+              ]
+            },
+            {
+              "p": "A patient can be in only one active stay. Discharge opens only once this stay's unpaid services are settled."
+            }
+          ]
+        },
+        {
+          "id": "sheet",
+          "title": "The treatment sheet — every mark moves money",
+          "perm": "admissions.administer",
+          "blocks": [
+            {
+              "p": "The doctor orders (\"5 days, twice a day\"), the sheet gets a cell per dose. \"Given\" charges the service to the patient at once; \"Refused\" cancels the charge. The price is the one in force on the DAY of the mark."
+            },
+            {
+              "warn": "A cell never returns to blank — only given↔refused. A mark already on an invoice cannot change at all. \"Stop\" fires on a single unconfirmed click and cannot be undone — the course must be ordered again."
+            },
+            {
+              "tip": "Marking is its own permission (the nurse and the front desk have it; the doctor's default set does not). A doctor who cannot press the cells — that is by design."
+            }
+          ]
+        },
+        {
+          "id": "ward-pay",
+          "title": "Pay-what-you-choose",
+          "perm": "charges.write",
+          "blocks": [
+            {
+              "p": "The patient card's Payments tab lists unpaid services. Tick what the patient pays now — the invoice reaches the register instantly, the rest stays owed."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lab",
+      "title": "Laboratory",
+      "perm": "lab.orders.read",
+      "topics": [
+        {
+          "id": "lab-flow",
+          "title": "The lab flow at a glance",
+          "blocks": [
+            {
+              "p": "Only services in a Laboratory-kind category reach the lab. The moment such a service is sold, the order appears on the tech's worklist; after results are entered and approved, the patient is notified and the PDF opens in three places: the patient card, the patient cabinet, and the Telegram bot."
+            },
+            {
+              "warn": "An approved result is FROZEN — a mistake means a new order. A refund does NOT remove the order from the lab worklist — tell the lab separately."
+            },
+            {
+              "tip": "A detailed guide exists as its own page — ask the owner for the \"Laboratory handbook\" link."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "services",
+      "title": "Services and prices",
+      "perm": "services.write",
+      "topics": [
+        {
+          "id": "prices",
+          "title": "How prices work",
+          "blocks": [
+            {
+              "p": "A price takes effect from its date; history is kept. Invoice amounts freeze at creation — later price changes never touch old invoices."
+            },
+            {
+              "warn": "Give a branch its own price and it DETACHES from the clinic-wide one: raising the default later does nothing there. After any default change, review branch prices and PACKAGES by hand — package prices do not follow."
+            },
+            {
+              "warn": "Discount rules are reference-only for now: the register does NOT apply them; discounts are typed manually at sale."
+            },
+            {
+              "tip": "Deleting a service actually deactivates it: old invoices are untouched, and the \"Inactive\" filter finds it for reactivation via edit."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reports",
+      "title": "Reports and figures",
+      "perm": "reports.read",
+      "topics": [
+        {
+          "id": "two-money",
+          "title": "Two different \"revenues\" — don't conflate them",
+          "blocks": [
+            {
+              "p": "In the Revenue report, \"by day\" and \"by method\" are money actually COLLECTED (by payment date). \"By category\" and \"by doctor\" are amounts BILLED (invoice lines), debt included. They legitimately differ."
+            },
+            {
+              "tip": "Dashboard revenue is for the ONE selected branch. The register's \"expected\" figure is another number again: it contains the opening float."
+            },
+            {
+              "faq": {
+                "q": "A patient shows both a deposit and a debt — how?",
+                "a": "The system never nets them: the deposit sits apart from the debt. Settling debt from a deposit is a deliberate act at the register."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "admin",
+      "title": "Staff and settings",
+      "perm": "clinic.settings.read",
+      "topics": [
+        {
+          "id": "staff",
+          "title": "Adding staff and permissions",
+          "perm": "users.write",
+          "blocks": [
+            {
+              "steps": [
+                "Settings → Staff → Add staff member",
+                "Pick a role — the menu is built from it",
+                "If needed: row menu → Permissions — grant or revoke individual rights"
+              ]
+            },
+            {
+              "tip": "The plan limit counts ACTIVE staff only. Hiring a replacement? Suspend (archive) the old account first — the seat frees up."
+            },
+            {
+              "warn": "The \"Administrator\" role opens Settings but cannot SAVE much of it (clinic requisites, branches — owner rights). The TV display token is owner-only too."
+            }
+          ]
+        },
+        {
+          "id": "receipt-tpl",
+          "title": "Receipt, templates, language",
+          "blocks": [
+            {
+              "p": "In receipt settings the logo saves the moment it is picked; other options need the Save button below. Messages to patients go out in the CLINIC's default language — even if the template exists in all four."
+            },
+            {
+              "warn": "The Birthday and Debt-reminder templates do not send themselves yet — those sections are groundwork for a future version."
+            }
+          ]
+        },
+        {
+          "id": "trial-end",
+          "title": "What happens when the subscription ends?",
+          "blocks": [
+            {
+              "p": "The clinic is not switched off — it goes read-only: signing in, opening cards and reports keep working, but new records will not save. Everything returns after payment."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "channels",
+      "title": "Patient apps: Telegram and the cabinet",
+      "topics": [
+        {
+          "id": "tg",
+          "title": "The Telegram bot",
+          "blocks": [
+            {
+              "p": "The patient presses /start and shares their number — matching the card's main OR alternative phone links them. From then on: appointment reminders (24h and 2h ahead), live queue position, ready lab results (with PDFs), documents."
+            },
+            {
+              "tip": "Patients can cancel an appointment from the bot, but the button closes 2 hours before the start — after that, only a phone call to the clinic."
+            }
+          ]
+        },
+        {
+          "id": "portal",
+          "title": "The patient cabinet (bemor.avishifo.uz)",
+          "blocks": [
+            {
+              "p": "The cabinet signs in by phone number and SMS code. Note: it recognises only the card's MAIN number — the alternative one works in Telegram only. Lab results are always open in the cabinet; visit history (diagnoses, prescriptions) appears after the clinic's approval — requests land in Patients → Record access."
+            },
+            {
+              "warn": "A patient says \"no code arrived\": the code goes to Telegram first; without Telegram an SMS is sent — and if the SMS provider is not yet connected (log mode), the code never reaches them at all. Advise such patients to link Telegram."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

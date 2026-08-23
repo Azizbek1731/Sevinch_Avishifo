@@ -69,7 +69,8 @@ export class AppointmentsController {
   }
 
   @Post(':id/status')
-  @RequirePermissions('appointments.write')
+  // read only at the gate — the service decides per transition (write vs cancel)
+  @RequirePermissions('appointments.read')
   changeStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ChangeAppointmentStatusDto,

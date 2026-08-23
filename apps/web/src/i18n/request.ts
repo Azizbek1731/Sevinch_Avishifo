@@ -24,6 +24,7 @@ export const MESSAGE_NAMESPACES = [
   'notifications',
   'settings',
   'feedback',
+  'help',
   'audit',
   'superadmin',
   'statuses',

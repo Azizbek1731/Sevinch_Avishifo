@@ -171,7 +171,7 @@ export class ChargesService {
     }
 
     try {
-      return await this.invoices.create(
+      const created = await this.invoices.create(
         {
           patientId,
           branchId,
@@ -179,11 +179,17 @@ export class ChargesService {
             serviceId: c.serviceId ?? undefined,
             quantity: c.quantity,
             unitPrice: c.unitPrice.toFixed(2),
+            discount: '0',
           })),
-          issue: true,
-        } as never,
+        },
         user,
       );
+      // Issued immediately: the desk ticks services to COLLECT money, and the
+      // cashier's pending list only shows issued invoices. The old `issue:
+      // true` flag was swallowed by an `as never` cast — create() never read
+      // it, the invoice stayed DRAFT, and the cashier could not see or take
+      // payment for it until someone found it and pressed Issue by hand.
+      return await this.invoices.issue(created.id as string);
     } catch (e) {
       // The invoice failed, so the claim must not stand — otherwise the
       // services are marked billed with no bill behind them.

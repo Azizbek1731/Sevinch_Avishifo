@@ -1,0 +1,481 @@
+{
+  "title": "Yordam",
+  "description": "Tizim bilan ishlash qo'llanmasi. Sizga ko'rinayotgan bo'limlar huquqlaringizga mos — boshqa rol boshqa bo'limlarni ko'radi.",
+  "searchPlaceholder": "Savolingizni yozing (masalan: chek, navbat, natija)...",
+  "all": "Hammasi",
+  "noResults": "Hech narsa topilmadi. Boshqacha so'z bilan qidirib ko'ring.",
+  "sections": [
+    {
+      "id": "start",
+      "title": "Ishni boshlash",
+      "topics": [
+        {
+          "id": "first-screen",
+          "title": "Kirish va ish ekrani",
+          "blocks": [
+            {
+              "p": "Tizimga telefon raqam yoki email va parol bilan kirasiz. Telegram bog'langan bo'lsa, parolsiz — bir martalik kod bilan ham kirish mumkin. Har rol o'z ish sahifasiga tushadi: qabulxona — Qabulxonaga, shifokor — kabinetiga, kassir — kassaga."
+            },
+            {
+              "steps": [
+                "Tepadagi chap burchakda filial tanlagichi turadi — navbat, kassa va ko'p ro'yxatlar aynan tanlangan filialni ko'rsatadi",
+                "Istalgan ekranda Cmd+K (yoki Ctrl+K) — bemorni tez qidirish",
+                "Qo'ng'iroqcha — tizim xabarlari; avatar menyusida til va Xavfsizlik (2 bosqichli kirish) turadi"
+              ]
+            },
+            {
+              "warn": "Ekran bo'm-bo'sh ko'rinsa, avval filialni tekshiring: siz yaratgan yozuv boshqa filialda bo'lishi mumkin. Filial tanlovi kompyuterda eslab qolinadi — umumiy kompyuterda ishdan oldin bir qarab qo'ying."
+            },
+            {
+              "faq": {
+                "q": "Hamma ekranlar doim bo'sh — nima qilay?",
+                "a": "Sizning hisobingiz birorta filialga biriktirilmagan bo'lishi mumkin. Administrator Sozlamalar → Xodimlar bo'limida filialingizni belgilab qo'yadi."
+              }
+            }
+          ]
+        },
+        {
+          "id": "menu-perms",
+          "title": "Menyu nega har kimda har xil",
+          "blocks": [
+            {
+              "p": "Chapdagi menyu huquqlaringizdan quriladi: kassir Kassani ko'radi, laborant Laboratoriyani. Menyuda yo'q sahifa taqiqlangani uchun yo'q — bu adashish emas."
+            },
+            {
+              "tip": "Direktor yoki administrator bitta xodimga alohida huquq berishi (yoki olib qo'yishi) mumkin: Sozlamalar → Xodimlar → qatordagi menyu → Huquqlar. O'zgarish darhol kuchga kiradi va menyu ham o'sha zahoti yangilanadi."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "patients",
+      "title": "Bemorlar",
+      "perm": "patients.read",
+      "topics": [
+        {
+          "id": "add-patient",
+          "title": "Yangi bemor qo'shish",
+          "perm": "patients.write",
+          "blocks": [
+            {
+              "steps": [
+                "Bemorlar → Yangi bemor (yoki Qabulxonadagi tez qo'shish)",
+                "Ism, telefon — asosiylari; tug'ilgan sana va jinsni ham to'ldiring: laboratoriya normalari shularga qaraydi",
+                "Ambulator/Statsionar tanlovi bemor turini belgilaydi",
+                "Saqlash"
+              ]
+            },
+            {
+              "warn": "Tizim dublikatni faqat AYNAN bir xil telefon yoki AYNAN bir xil ism+tug'ilgan sana bo'yicha sezadi. «Baribir yaratish» tugmasi bir bosim — undan oldin ro'yxatdan qidirib ko'ring. Keyin tozalash faqat rahbariyat qo'lida."
+            },
+            {
+              "faq": {
+                "q": "Ismida xato ketdi — tuzatsam, eski cheklar buziladimi?",
+                "a": "Yo'q, bemalol tuzating. Qidiruv, eski hisob-fakturalar va tahlil natijalari darhol yangi ismni ko'rsatadi."
+              }
+            }
+          ]
+        },
+        {
+          "id": "merge-delete",
+          "title": "Dublikat: birlashtirish yoki o'chirish?",
+          "perm": "patients.delete",
+          "blocks": [
+            {
+              "p": "Bular ikki xil narsa. O'chirish kartani yashiradi — tarix, qarz va depozit karta bilan birga ko'zdan yo'qoladi (rahbariyat «o'chirilganlar» rejimida ko'rib turadi, lekin QAYTARIB bo'lmaydi). Birlashtirish esa hamma narsani — tashriflar, hisoblar, tahlillar, depozitlar — asosiy kartaga ko'chiradi."
+            },
+            {
+              "warn": "Dublikat karta chiqsa — O'CHIRMANG, administratordan Birlashtirishni so'rang. Birlashtirish ham qaytmas amal: ikki depozit qo'shiladi, hammasi bitta kartaga o'tadi. Bosishdan oldin qaysi karta asosiy ekaniga qarang."
+            }
+          ]
+        },
+        {
+          "id": "documents",
+          "title": "Hujjatlar va rozilik qog'ozlari",
+          "perm": "patients.documents.write",
+          "blocks": [
+            {
+              "p": "Bemor kartasining Hujjatlar bo'limiga PDF va rasm yuklanadi (20 MB gacha; rasm avtomatik siqiladi). Kartaning Umumiy bo'limida imzolangan roziliklar (shaxsiy ma'lumot, muolaja) qayd etiladi."
+            },
+            {
+              "warn": "Hujjatni o'chirish — fayl butunlay yo'qoladi, «o'chirilganlar»da ham qolmaydi. O'chirishdan oldin nusxa yuklab oling. (Bemor kartasini o'chirish esa yashiradi, yo'qotmaydi — farqiga e'tibor bering.)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "queue",
+      "title": "Navbat va qabulxona",
+      "perm": "queue.read",
+      "topics": [
+        {
+          "id": "flow",
+          "title": "Kunlik oqim qanday",
+          "perm": "queue.manage",
+          "blocks": [
+            {
+              "steps": [
+                "Kelgan bemor: Qabulxona sahifasida walk-in qo'shasiz — u darhol navbatga tushadi",
+                "Oldindan yozilgan bemor kelganda: ro'yxatda belgilab, navbatga jo'natasiz",
+                "Shifokor o'z kabinetida «Keyingisini chaqirish» bilan ishlaydi; tugatganda tashrif yozuvi ochiladi",
+                "Navbat har kuni yarim tunda tozalanadi va filialga bog'liq"
+              ]
+            },
+            {
+              "tip": "O'tib ketgan vaqtga yozib bo'lmaydi — bugun 9:00 da kelgan bemorni walk-in sifatida kiritavering, jadvaldan joy qidirmang."
+            },
+            {
+              "warn": "Chiptani boshqa shifokorga o'tkazsangiz, raqami O'ZGARADI (A-005 → B-012) — bemorga yangi raqamini albatta ayting, yo'qsa tabloda hech qachon chiqmaydigan raqamni kutib o'tiradi."
+            }
+          ]
+        },
+        {
+          "id": "booking",
+          "title": "Oldindan yozish va jadval",
+          "perm": "appointments.write",
+          "blocks": [
+            {
+              "p": "Bo'sh vaqtlar shifokorning ish jadvalidan hisoblanadi. «Bo'sh vaqt yo'q» deyilsa, deyarli har doim sabab — shu filialda shifokorning ish soatlari kiritilmagani (Xodimlar → Jadval)."
+            },
+            {
+              "warn": "Ko'chirishda tizim faqat band-emasligini tekshiradi, shifokor jadvalini QAYTA tekshirmaydi — ish soatidan tashqariga ko'chirish mumkin. Sana-vaqtga o'zingiz qarang."
+            },
+            {
+              "warn": "Bekor qilish va Kelmadi — qaytmas: adashib bossangiz, qaytadan yozasiz. «Kelmadi» bemor obro'siga ham yoziladi. Takroriy kurs yozganda esa band kunlar jimgina tashlab ketiladi — yakunda «yaratildi X / o'tkazildi Y» sonini tekshiring."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "doctor",
+      "title": "Shifokor kabineti",
+      "perm": "queue.call",
+      "topics": [
+        {
+          "id": "visit",
+          "title": "Qabul va tashrif yozuvi",
+          "blocks": [
+            {
+              "steps": [
+                "Navbatdan «Keyingisini chaqirish» — bemor kirdi",
+                "Qabul oxirida chiptada «Yakunlash»ni bosasiz — shunda tashrif yozuvi ochiladi",
+                "Shikoyat, ko'rik, tashxis (ICD-10), retsept, yo'llanmalarni to'ldirasiz",
+                "Hammasi kiritilgach — «Tashrifni yakunlash»"
+              ]
+            },
+            {
+              "warn": "«Tashrifni yakunlash»ni faqat HAMMASI kiritilgandan keyin bosing: yakunlangan tashrifga tashxis ham, retsept ham qo'shib bo'lmaydi. Keyin sezilgan xato faqat rasmiy tuzatish (amendment) bilan kiradi."
+            },
+            {
+              "tip": "Shablon faqat BO'SH maydonlarni to'ldiradi — yozib qo'ygan matningizni hech qachon o'chirmaydi. Shablon «ishlamayotgandek» tuyulsa, maydon band, xolos."
+            },
+            {
+              "faq": {
+                "q": "Kasal bo'lgan hamkasbimning bemorini ochay desam, ro'yxatda yo'q?",
+                "a": "Odatiy sozlamada shifokor faqat o'z tashriflarini ko'radi. Direktor Sozlamalar → Klinika bo'limida «filial bo'ylab» rejimini yoqsa, bir filial shifokorlari bir-birining tashriflarini ochadi."
+              }
+            }
+          ]
+        },
+        {
+          "id": "lab-referral",
+          "title": "Tahlilga yo'llanma",
+          "perm": "lab.orders.write",
+          "blocks": [
+            {
+              "p": "Tashrif ichidan tahlil belgilasangiz, buyurtma DARHOL laboratoriya ro'yxatiga tushadi — to'lovni kutmaydi. Bemorni avval kassaga yuboring, yo'qsa laborant to'lanmagan buyurtma ustida ishlab qo'yishi mumkin."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cashier",
+      "title": "Kassa",
+      "perm": "payments.create",
+      "topics": [
+        {
+          "id": "shift",
+          "title": "Smena: ochish va yopish",
+          "perm": "shifts.manage",
+          "blocks": [
+            {
+              "p": "Filialga BITTA kassa. Ochilganda ikki boshlang'ich qoldiq kiritiladi: naqd va o'tkazma (karta/onlayn). Yopishda ikkalasi ham sanaladi. Smenani ochgan kishigina emas — huquqi bor har kim yopa oladi."
+            },
+            {
+              "steps": [
+                "Kassa → Smena ochish → naqd va o'tkazma boshlang'ich qoldiqlarini kiriting",
+                "Kun davomida: naqd to'lov — faqat ochiq smena bilan; karta/onlayn — smenasiz ham o'tadi, lekin hech kimning kassasiga yozilmaydi",
+                "Yopishda qutidagi pulni «kassada bo'lishi kerak» raqamiga solishtiring (u ochilish qoldig'ini ham o'z ichiga oladi)",
+                "O'tkazma kitobida pul bo'lsa — sanab kiritasiz yoki sanay olmaslik sababini yozasiz"
+              ]
+            },
+            {
+              "warn": "Smena yopilgach, ichidagi to'lov va chiqimlar QOTADI: void ham, tahrir ham ishlamaydi. Sanashdan oldin kunni tekshirib oling."
+            },
+            {
+              "tip": "Bemor depozitidan yechilgan to'lov kun tushumida ko'rinmaydi — bu to'g'ri: u pul depozit qilingan KUNI sanalgan, ikki marta sanalmaydi."
+            }
+          ]
+        },
+        {
+          "id": "void-refund",
+          "title": "Void va Qaytarish — ikki xil narsa",
+          "blocks": [
+            {
+              "p": "VOID — «bu pul umuman olinmagan»: xato terilgan summani o'sha kuniyoq yo'q qilasiz, hisob yana to'lanishi mumkin bo'lib qoladi. QAYTARISH (refund) — bemorga haqiqiy pul qaytdi: kassadan chiqim bo'lib tushadi."
+            },
+            {
+              "warn": "Void faqat smena ochiqligida ishlaydi. Qaytarish esa HOZIR ochiq turgan kassadan chiqadi — kechagi savdoni bugun qaytarsangiz, bugungi kassa o'sha summaga kam yopiladi; bu xato emas."
+            },
+            {
+              "tip": "«Balansga qaytarish» endi bemor hisobiga haqiqatan pul o'tkazadi va keyingi to'lovda ishlatiladi. Qisman qaytarilgan hisob «To'langan»ligicha qoladi — nima qaytarilganini hisob ichidagi Qaytarishlar jadvalidan ko'ring."
+            }
+          ]
+        },
+        {
+          "id": "expense",
+          "title": "Chiqim yozish",
+          "perm": "expenses.write",
+          "blocks": [
+            {
+              "p": "Naqd chiqim faqat ochiq smena bilan yoziladi va kassaning kutilayotgan qoldig'ini kamaytiradi. Karta chiqimi kassaga tegmaydi. To'lov usulini keyin o'zgartirib bo'lmaydi — kiritayotganda to'g'ri tanlang."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "invoices",
+      "title": "Hisob-fakturalar",
+      "perm": "invoices.read",
+      "topics": [
+        {
+          "id": "draft",
+          "title": "Nega kassir hisobni ko'rmayapti?",
+          "blocks": [
+            {
+              "p": "«Yangi hisob-faktura» oynasi QORALAMA yaratadi. Qoralama kassaga ham, bemor qarziga ham tushmaydi — uni ochib «Chiqarish» (Issue) bosilgandagina to'lanadigan bo'ladi. Qabulxonadagi tez sotuv esa buni o'zi qiladi."
+            },
+            {
+              "tip": "Qabulxonaning «kutilmoqda» lentasi eng so'nggi 50 ta to'lanmagan hisobni ko'rsatadi, faqat shu filialdan. To'liq qarzlar ro'yxati — Qarzdorlar bo'limida, u butun klinika bo'ylab."
+            }
+          ]
+        },
+        {
+          "id": "pay",
+          "title": "To'lash, qarz va limitlar",
+          "blocks": [
+            {
+              "p": "Tez sotuvda «Hozir to'lash» butun summani talab qiladi; yetmasa — «Qarzga» qoladi. Belgilangan summadan ortiq to'lov kiritolmaysiz: yirik kupyuradan qaytimni qo'ldan berasiz, tizimga faqat haqiqiy summa yoziladi."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ward",
+      "title": "Statsionar",
+      "perm": "admissions.read",
+      "topics": [
+        {
+          "id": "admit",
+          "title": "Yotqizish va kasallik tarixi",
+          "perm": "admissions.write",
+          "blocks": [
+            {
+              "steps": [
+                "Statsionar sahifasida «Statsionarga yotqizish» → bemorni qidirib tanlang",
+                "Bo'lim, palata, o'rin, tashxis — kasallik tarixi (KT-raqam) ochiladi",
+                "Kasallik tarixi bo'limida shikoyat, anamnez, kundalik yoziladi",
+                "003 shaklini «Chop etish» tugmasi beradi"
+              ]
+            },
+            {
+              "p": "Bemor bir vaqtda faqat bitta faol yotishda bo'la oladi. Chiqarish esa faqat shu yotishning to'lanmagan xizmatlari yopilgandan keyin ochiladi."
+            }
+          ]
+        },
+        {
+          "id": "sheet",
+          "title": "Muolajalar varag'i — har belgi pulga tegadi",
+          "perm": "admissions.administer",
+          "blocks": [
+            {
+              "p": "Shifokor tayinlaydi («5 kun, kunida 2 mahal»), varaqda har mahalga katakcha chiqadi. «Berildi» belgisi o'sha zahoti bemor hisobiga xizmat yozadi; «Olmadi» — yozuvni bekor qiladi. Narx belgilangan KUNNING amaldagi narxidan olinadi."
+            },
+            {
+              "warn": "Katakcha bo'shiga qaytmaydi — faqat berildi↔olmadi almashadi. Hisob-fakturaga kiritilgan belgini esa umuman o'zgartirib bo'lmaydi. «To'xtatish» tugmasi ham bir bosimda, tasdiqsiz ishlaydi va qaytarilmaydi — kurs qaytadan tayinlanadi."
+            },
+            {
+              "tip": "Belgilash alohida huquq (hamshira va qabulxonada bor, shifokorning odatiy to'plamida yo'q). Shifokor katakchalarni bosolmasa — bu qasddan shunday."
+            }
+          ]
+        },
+        {
+          "id": "ward-pay",
+          "title": "Tanlab to'lash",
+          "perm": "charges.write",
+          "blocks": [
+            {
+              "p": "Bemor kartasining To'lovlar bo'limida to'lanmagan xizmatlar ro'yxati turadi. Bemor nimaga to'lasa — shularni belgilaysiz, hisob-faktura shu zahoti kassaga tushadi, qolgani qarzda tura beradi."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lab",
+      "title": "Laboratoriya",
+      "perm": "lab.orders.read",
+      "topics": [
+        {
+          "id": "lab-flow",
+          "title": "Tahlil oqimi bir qarashda",
+          "blocks": [
+            {
+              "p": "Faqat «Laboratoriya» turidagi kategoriyadagi xizmatlar laboratoriyaga tushadi. Kassada shunday xizmat sotilishi bilan buyurtma laborant ro'yxatida paydo bo'ladi; laborant natija kiritib tasdiqlagach, bemorga xabar ketadi va PDF uch joyda ochiladi: bemor kartasida, bemor kabinetida, Telegram botda."
+            },
+            {
+              "warn": "Tasdiqlangan natija QOTADI — xato bo'lsa yangi buyurtma ochiladi. To'lov qaytarilsa, buyurtma laboratoriya ro'yxatidan O'ZI chiqib ketmaydi — laborantga alohida ayting."
+            },
+            {
+              "tip": "Batafsil qo'llanma alohida sahifada bor — «Laboratoriya qo'llanmasi»ni direktordan so'rang (havola qilib ulashiladi)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "services",
+      "title": "Xizmatlar va narxlar",
+      "perm": "services.write",
+      "topics": [
+        {
+          "id": "prices",
+          "title": "Narxlar qanday ishlaydi",
+          "blocks": [
+            {
+              "p": "Narx sanadan kuchga kiradi, tarixi saqlanadi. Hisob-fakturadagi summa yaratilgan paytda qotadi — keyin narx o'zgarsa, eski hisoblar joyida qoladi."
+            },
+            {
+              "warn": "Filialga alohida narx qo'ysangiz, o'sha filial umumiy narxdan UZILADI: keyin umumiy narxni oshirsangiz, u filialga ta'sir qilmaydi. Umumiy narxni o'zgartirganda filial narxlari va PAKETLARNI ham qo'lda ko'rib chiqing — paket narxi o'zi o'zgarmaydi."
+            },
+            {
+              "warn": "Chegirma qoidalari bo'limi hozircha ma'lumotnoma: kassa ularni O'ZI qo'llamaydi, chegirmani sotuvda qo'lda kiritasiz."
+            },
+            {
+              "tip": "Xizmatni o'chirish — aslida faolsizlantirish: eski hisoblar unga tegmaydi, «Nofaol» filtridan topib, tahrirlab qayta yoqish mumkin."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reports",
+      "title": "Hisobotlar va raqamlar",
+      "perm": "reports.read",
+      "topics": [
+        {
+          "id": "two-money",
+          "title": "Ikki xil «tushum»ni adashtirmang",
+          "blocks": [
+            {
+              "p": "Tushum hisobotida «kun bo'yicha» va «to'lov usuli bo'yicha» — haqiqatda YIG'ILGAN pul (to'lov sanasi bo'yicha). «Kategoriya» va «shifokor bo'yicha» esa — YOZILGAN summalar (hisob-faktura qatorlari), qarzga ketgani ham ichida. Ikkalasi teng chiqmasligi xato emas."
+            },
+            {
+              "tip": "Boshqaruv panelidagi tushum — tanlangan BITTA filialniki. Filiallarni solishtirish uchun tepadagi tanlagichni almashtirib ko'rasiz. Kassa kutilayotgan qoldig'i esa boshqa narsa: unda ochilish qoldig'i ham bor."
+            },
+            {
+              "faq": {
+                "q": "Bemorda ham depozit, ham qarz ko'rinyapti — bu qanday?",
+                "a": "Tizim ularni o'zi hisob-kitob qilmaydi: depozit alohida turadi, qarz alohida. Depozitdan qarzni yopish — kassadagi ongli amal."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "admin",
+      "title": "Xodimlar va sozlamalar",
+      "perm": "clinic.settings.read",
+      "topics": [
+        {
+          "id": "staff",
+          "title": "Xodim qo'shish va huquqlar",
+          "perm": "users.write",
+          "blocks": [
+            {
+              "steps": [
+                "Sozlamalar → Xodimlar → Xodim qo'shish",
+                "Rol tanlang — menyusi shunga qarab quriladi",
+                "Kerak bo'lsa: qatordagi menyu → Huquqlar — ayrim huquqni qo'shish/olish"
+              ]
+            },
+            {
+              "tip": "Tarif limiti faqat FAOL xodimlarni sanaydi. O'rniga odam olayotganda eskisini avval to'xtatib qo'ying (arxivlang) — joy bo'shaydi."
+            },
+            {
+              "warn": "«Administrator» roli sozlamalarni ochadi, lekin ko'pini SAQLAY olmaydi (klinika rekvizitlari, filiallar — direktor huquqi). TV-tablo tokenini ham faqat direktor beradi."
+            }
+          ]
+        },
+        {
+          "id": "receipt-tpl",
+          "title": "Chek, shablonlar, til",
+          "blocks": [
+            {
+              "p": "Chek sozlamalarida logotip tanlangan zahoti saqlanadi, qolgan parametrlar esa pastdagi Saqlash tugmasi bilan. Bemorlarga ketadigan xabarlar KLINIKANING asosiy tilida jo'naydi — shablonni har tilda yozib qo'ygan bo'lsangiz ham."
+            },
+            {
+              "warn": "Tug'ilgan kun va qarz eslatma shablonlari hozircha o'zi yuborilmaydi — bu bo'limlar kelgusi versiya uchun tayyorlab qo'yilgan."
+            }
+          ]
+        },
+        {
+          "id": "trial-end",
+          "title": "Obuna tugasa nima bo'ladi?",
+          "blocks": [
+            {
+              "p": "Klinika o'chirilmaydi — o'qish rejimiga o'tadi: kirish, kartalarni ochish, hisobotlarni ko'rish ishlayveradi, lekin yangi yozuvlar saqlanmaydi. To'lov yangilangach hammasi joyiga qaytadi."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "channels",
+      "title": "Bemor ilovalari: Telegram va kabinet",
+      "topics": [
+        {
+          "id": "tg",
+          "title": "Telegram bot",
+          "blocks": [
+            {
+              "p": "Bemor botga kirib /start bosadi va telefonini yuboradi — kartadagi asosiy YOKI qo'shimcha raqamga mos kelsa bog'lanadi. Shundan keyin: qabul eslatmalari (24 soat va 2 soat oldin), navbatdagi o'rni, tayyor tahlil (PDF bilan), hujjatlari."
+            },
+            {
+              "tip": "Qabulni bemor botdan bekor qila oladi, lekin boshlanishiga 2 soat qolganda tugma yopiladi — keyin faqat klinikaga qo'ng'iroq."
+            }
+          ]
+        },
+        {
+          "id": "portal",
+          "title": "Bemor kabineti (bemor.avishifo.uz)",
+          "blocks": [
+            {
+              "p": "Kabinetga bemor telefon raqami va SMS-kod bilan kiradi. Diqqat: kabinet faqat kartadagi ASOSIY raqamni taniydi — qo'shimcha raqam faqat Telegramda ishlaydi. Tahlil natijalari kabinetda doim ochiq; tashriflar tarixi (tashxis, retsept) esa klinika ruxsatidan keyin ko'rinadi — so'rovlar Bemorlar → Tarixga ruxsat bo'limiga tushadi."
+            },
+            {
+              "warn": "Bemor «kod kelmadi» desa: kod avval Telegramga boradi; Telegram yo'q bemorga SMS ketadi — SMS provayderi hali ulanmagan bo'lsa (log rejimi), unga kod umuman yetib bormaydi. Bunday bemorga Telegram bog'lashni maslahat bering."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

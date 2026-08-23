@@ -231,4 +231,50 @@ export class ClinicsService {
       smsSenderName: clinic.smsSenderName,
     };
   }
+
+  /**
+   * The first-run checklist, computed from what actually exists — never from
+   * boxes anyone ticked. "A service exists" is deliberately "a service WITH a
+   * current price": an unpriced service still leaves the cashier screen unusable.
+   */
+  async setupStatus(): Promise<Record<string, boolean | number>> {
+    const clinicId = TenantContext.requireClinicId();
+    // Clinic is not tenant-auto-scoped — justified read of OWN clinic row.
+    const clinic = await this.prisma.unscoped.clinic.findUnique({
+      where: { id: clinicId },
+      select: { address: true, phone: true },
+    });
+    const [staffCount, pricedService, schedule, patientCount] = await Promise.all([
+      // User is not tenant-auto-scoped — justified count constrained to own clinic.
+      this.prisma.unscoped.user.count({
+        where: { clinicId, deletedAt: null, role: { notIn: ['PATIENT', 'SUPER_ADMIN'] } },
+      }),
+      this.prisma.db.servicePrice.findFirst({
+        where: { effectiveTo: null },
+        select: { id: true },
+      }),
+      this.prisma.db.doctorSchedule.findFirst({ select: { id: true } }),
+      this.prisma.db.patient.count({ where: { deletedAt: null } }),
+    ]);
+
+    const profileComplete = Boolean(clinic?.address && clinic?.phone);
+    const hasStaff = staffCount > 1; // beyond the owner
+    const hasPricedService = pricedService !== null;
+    const hasSchedule = schedule !== null;
+    const hasPatient = patientCount > 0;
+    const done = [profileComplete, hasStaff, hasPricedService, hasSchedule, hasPatient].filter(
+      Boolean,
+    ).length;
+
+    return {
+      profileComplete,
+      hasStaff,
+      hasPricedService,
+      hasSchedule,
+      hasPatient,
+      done,
+      total: 5,
+      complete: done === 5,
+    };
+  }
 }

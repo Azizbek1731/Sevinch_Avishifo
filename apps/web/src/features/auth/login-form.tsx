@@ -146,7 +146,26 @@ export function LoginForm() {
     useAuthStore.getState().setAccessToken(data.accessToken);
     const me = await api.get<MeResponse>('/auth/me');
     setSession({ ...me.data, accessToken: data.accessToken });
-    router.replace(data.user.role === 'SUPER_ADMIN' ? '/platform/clinics' : '/dashboard');
+    // Everyone used to land on /dashboard, which needs reports.read — a
+    // receptionist's first screen was a spinner over 403s. Land each role where
+    // its day actually starts.
+    const home =
+      data.user.role === 'SUPER_ADMIN'
+        ? '/platform/clinics'
+        : data.user.permissions.includes('reports.read')
+          ? '/dashboard'
+          : data.user.permissions.includes('queue.manage')
+            ? '/reception'
+            : data.user.permissions.includes('queue.call')
+              ? '/doctor'
+              : data.user.permissions.includes('payments.create')
+                ? '/cashier'
+                : data.user.permissions.includes('lab.orders.write')
+                  ? '/lab'
+                  : data.user.permissions.includes('queue.read')
+                    ? '/queue'
+                    : '/patients';
+    router.replace(home);
   }
 
   async function onVerify(e: React.FormEvent): Promise<void> {

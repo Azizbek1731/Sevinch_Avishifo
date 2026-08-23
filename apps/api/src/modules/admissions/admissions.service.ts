@@ -16,6 +16,7 @@ import { AppException } from '../../common/app.exception';
 import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
+import { PricingService } from '../services/pricing.service';
 
 /** Every planned date of an order, from its schedule. */
 function plannedDates(order: Pick<TreatmentOrder, 'schedule' | 'startDate' | 'timesPlanned'>): string[] {
@@ -33,7 +34,10 @@ function plannedDates(order: Pick<TreatmentOrder, 'schedule' | 'startDate' | 'ti
 
 @Injectable()
 export class AdmissionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pricing: PricingService,
+  ) {}
 
   private map(a: Admission): Record<string, unknown> {
     return {
@@ -435,10 +439,11 @@ export class AdmissionsService {
     }
 
     const clinicId = TenantContext.requireClinicId();
-    const price = await this.prisma.db.servicePrice.findFirst({
-      where: { serviceId: order.serviceId, effectiveTo: null },
-      orderBy: { effectiveFrom: 'desc' },
-    });
+    // The clinic's real pricing rules — branch override first, future-dated
+    // rows excluded. The old raw lookup ignored both, so a ward in a branch
+    // with its own price billed the clinic-wide one, and a price scheduled for
+    // next month was charged today.
+    const priceStr = await this.pricing.getCurrentPrice(order.serviceId, a.branchId);
 
     return this.prisma.db.$transaction(async (tx) => {
       const existing = await tx.treatmentAdministration.findFirst({
@@ -475,7 +480,7 @@ export class AdmissionsService {
               title: order.service.name as Prisma.InputJsonValue,
               date: new Date(dto.date),
               quantity: 1,
-              unitPrice: price?.price ?? new Prisma.Decimal(0),
+              unitPrice: new Prisma.Decimal(priceStr ?? 0),
               createdById: user.id,
             },
           });
@@ -505,7 +510,7 @@ export class AdmissionsService {
             title: order.service.name as Prisma.InputJsonValue,
             date: new Date(dto.date),
             quantity: 1,
-            unitPrice: price?.price ?? new Prisma.Decimal(0),
+            unitPrice: new Prisma.Decimal(priceStr ?? 0),
             createdById: user.id,
           },
         });

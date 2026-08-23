@@ -22,6 +22,7 @@ import {
   Sparkles,
   ShieldCheck,
   Stethoscope,
+  LifeBuoy,
   Tags,
   UserRound,
   Users,
@@ -71,6 +72,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'feedback', href: '/feedback', icon: MessageSquareHeart, permissions: ['feedback.read'] },
   { key: 'audit', href: '/audit', icon: ScrollText, permissions: ['audit.read'] },
   { key: 'settings', href: '/settings', icon: Settings, permissions: ['clinic.settings.read'] },
+  // No permissions: help is for everyone, and its content self-filters by role.
+  { key: 'help', href: '/help', icon: LifeBuoy },
 ];
 
 const PLATFORM_ITEMS: NavItem[] = [

@@ -725,7 +725,11 @@ export class InvoicesService {
   async cancel(id: string): Promise<Record<string, unknown>> {
     const invoice = await this.prisma.db.invoice.findFirst({
       where: { id },
-      include: { _count: { select: { payments: true } } },
+      // Voided payments do not count: a void says the money was never taken,
+      // so an invoice whose only payment was voided is cancellable again.
+      // Counting them left such invoices in a dead end — cancel said "refund
+      // instead", refund said "nothing paid".
+      include: { _count: { select: { payments: { where: { status: { not: 'VOIDED' } } } } } },
     });
     if (!invoice) throw new AppException(ErrorCode.INVOICE_NOT_FOUND, 'Invoice not found', 404);
     if (invoice._count.payments > 0) {
@@ -982,6 +986,27 @@ export class InvoicesService {
           createdById: user.id,
         },
       });
+      if (dto.method === 'BALANCE') {
+        // The whole point of a BALANCE refund is that the money lands on the
+        // patient's account. The REFUND_CREDIT type existed for exactly this
+        // and was never wired — the refund row was written, the balance never
+        // moved, and the clinic believed money it had not credited.
+        await tx.patient.update({
+          where: { id: invoice.patientId },
+          data: { balance: { increment: amount } },
+        });
+        await tx.patientBalanceTransaction.create({
+          data: {
+            clinicId: invoice.clinicId,
+            patientId: invoice.patientId,
+            type: 'REFUND_CREDIT',
+            amount,
+            invoiceId: invoice.id,
+            note: `Refund to balance on invoice ${invoice.number}`,
+            createdById: user.id,
+          },
+        });
+      }
       if (fullyRefunded) {
         await tx.invoice.update({ where: { id: invoice.id }, data: { status: 'REFUNDED' } });
       }

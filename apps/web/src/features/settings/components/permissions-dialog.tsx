@@ -53,10 +53,15 @@ const HINTED: readonly Permission[] = [
 const msgKey = (p: Permission): string => p.replace(/\./g, '_');
 
 /** Clinic-scope permissions grouped by module prefix (platform.* excluded). */
+/** Permissions with no live feature behind them yet — a checkbox that changes
+ * nothing teaches owners not to trust the dialog. */
+const NOT_YET_BUILT: readonly Permission[] = ['patients.export'];
+
 const GROUPS: { module: string; permissions: Permission[] }[] = (() => {
   const map = new Map<string, Permission[]>();
   for (const p of PERMISSIONS) {
     if (p.startsWith('platform.')) continue;
+    if (NOT_YET_BUILT.includes(p)) continue;
     const moduleName = p.split('.')[0] ?? p;
     const list = map.get(moduleName) ?? [];
     list.push(p);

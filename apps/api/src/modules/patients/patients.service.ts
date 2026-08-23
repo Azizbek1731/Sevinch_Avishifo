@@ -41,6 +41,7 @@ export interface PatientResponse {
   phoneAlt: string | null;
   address: string | null;
   passportId: string | null;
+  careType: string;
   bloodGroup: string;
   allergies: unknown;
   chronicConditions: unknown;
@@ -87,6 +88,7 @@ function mapPatient(p: Patient): PatientResponse {
     address: p.address,
     passportId: p.passportId,
     bloodGroup: p.bloodGroup,
+    careType: p.careType,
     allergies: p.allergies,
     chronicConditions: p.chronicConditions,
     notes: p.notes,
@@ -204,6 +206,10 @@ export class PatientsService {
         phoneAlt: input.phoneAlt ?? null,
         address: input.address ?? null,
         passportId: input.passportId ?? null,
+        // The registration form's Ambulator/Statsionar choice — it was accepted
+        // by the schema and silently dropped here, so every patient came out
+        // AMBULATORY and the card's Admit button logic had nothing to stand on.
+        careType: input.careType ?? undefined,
         bloodGroup: input.bloodGroup ?? undefined,
         allergies: input.allergies as Prisma.InputJsonValue,
         chronicConditions: input.chronicConditions as Prisma.InputJsonValue,
@@ -275,6 +281,7 @@ export class PatientsService {
     if (input.phoneAlt !== undefined) data.phoneAlt = input.phoneAlt;
     if (input.address !== undefined) data.address = input.address;
     if (input.passportId !== undefined) data.passportId = input.passportId;
+    if (input.careType !== undefined) data.careType = input.careType;
     if (input.bloodGroup !== undefined) data.bloodGroup = input.bloodGroup;
     if (input.allergies !== undefined) data.allergies = input.allergies as Prisma.InputJsonValue;
     if (input.chronicConditions !== undefined) {
