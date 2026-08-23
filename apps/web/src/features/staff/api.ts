@@ -197,8 +197,10 @@ export const staffApi = {
     api.get<StaffMember[]>('/staff', { ...q }),
   upsertProfile: (userId: string, body: UpsertStaffProfileInput) =>
     api.put<StaffProfileResponse>(`/staff/${userId}/profile`, body),
+  listBranches: (): Promise<ApiResult<Array<{ id: string; name: string; isActive: boolean }>>> =>
+    api.get<Array<{ id: string; name: string; isActive: boolean }>>('/branches', { limit: 100 }),
   branchRooms: (branchId: string): Promise<ApiResult<BranchRoom[]>> =>
-    api.get<BranchRoom[]>(`/branches/${branchId}/rooms`),
+    api.get<BranchRoom[]>(`/branches/${branchId}/rooms`, { limit: 100 }),
 
   // schedule
   getSchedule: (userId: string, branchId?: string): Promise<ApiResult<DoctorScheduleResponse>> =>

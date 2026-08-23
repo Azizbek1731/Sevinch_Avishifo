@@ -99,7 +99,21 @@ export class UsersService {
       deletedAt: null,
       role: query.role ?? { notIn: NON_STAFF_ROLES },
       ...(query.status ? { status: query.status } : {}),
-      ...(query.branchId ? { branches: { some: { branchId: query.branchId } } } : {}),
+      // No explicit branch assignment = works in every branch (the /auth/me rule),
+      // so a branch filter must keep branchless staff visible. AND-wrapped to avoid
+      // colliding with the search OR below.
+      ...(query.branchId
+        ? {
+            AND: [
+              {
+                OR: [
+                  { branches: { some: { branchId: query.branchId } } },
+                  { branches: { none: {} } },
+                ],
+              },
+            ],
+          }
+        : {}),
       ...(query.search
         ? {
             OR: [

@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { upsertStaffProfileSchema, type UpsertStaffProfileInput } from '@avishifo/shared';
+import { Link } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -44,12 +45,22 @@ export function ProfileTab({ member }: { member: StaffMember }) {
     },
   });
 
+  // No explicit branch assignment means the user works across ALL branches
+  // (the same rule /auth/me applies), so the room selector must not go empty.
+  const branchesQ = useQuery({
+    queryKey: ['staff-all-branches'],
+    queryFn: async () => (await staffApi.listBranches()).data.filter((b) => b.isActive),
+    enabled: isDoctor && member.branches.length === 0,
+  });
+
+  const roomBranches = member.branches.length > 0 ? member.branches : (branchesQ.data ?? []);
+
   // Rooms across the doctor's branch(es) — for the "default room" selector.
   const roomsQ = useQuery({
-    queryKey: ['staff-rooms', member.branches.map((b) => b.id)],
+    queryKey: ['staff-rooms', roomBranches.map((b) => b.id)],
     queryFn: async () => {
       const perBranch = await Promise.all(
-        member.branches.map((b) =>
+        roomBranches.map((b) =>
           staffApi
             .branchRooms(b.id)
             .then((r) => r.data.filter((rm) => rm.isActive).map((rm) => ({ ...rm, branchName: b.name }))),
@@ -57,8 +68,13 @@ export function ProfileTab({ member }: { member: StaffMember }) {
       );
       return perBranch.flat();
     },
-    enabled: isDoctor && member.branches.length > 0,
+    enabled: isDoctor && roomBranches.length > 0,
   });
+
+  // Empty also covers the degenerate no-active-branches case, where roomsQ never runs.
+  const roomsEmpty = roomsQ.isSuccess
+    ? (roomsQ.data ?? []).length === 0
+    : member.branches.length === 0 && branchesQ.isSuccess && roomBranches.length === 0;
 
   const mutation = useMutation({
     mutationFn: (values: UpsertStaffProfileInput) => staffApi.upsertProfile(member.id, values),
@@ -148,14 +164,23 @@ export function ProfileTab({ member }: { member: StaffMember }) {
                           <SelectItem key={room.id} value={room.id}>
                             {room.number}-xona
                             {room.name ? ` · ${room.name}` : ''}
-                            {member.branches.length > 1 ? ` (${room.branchName})` : ''}
+                            {roomBranches.length > 1 ? ` (${room.branchName})` : ''}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   )}
                 />
-                <p className="text-xs text-muted-foreground">{t('profile.defaultRoomHint')}</p>
+                {roomsEmpty ? (
+                  <p className="text-xs text-muted-foreground">
+                    {t('profile.defaultRoomEmpty')}{' '}
+                    <Link href="/settings" className="underline underline-offset-2">
+                      {t('profile.defaultRoomEmptyLink')}
+                    </Link>
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">{t('profile.defaultRoomHint')}</p>
+                )}
               </div>
             ) : null}
           </div>

@@ -151,6 +151,7 @@
     },
     "locale": "Til",
     "branches": "Filiallar",
+    "branchesHint": "Hech biri belgilanmasa, xodim barcha filiallarda ishlay oladi",
     "status": "Holat",
     "statuses": {
       "ACTIVE": "Faol",

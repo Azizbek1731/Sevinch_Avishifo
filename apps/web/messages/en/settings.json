@@ -151,6 +151,7 @@
     },
     "locale": "Language",
     "branches": "Branches",
+    "branchesHint": "Leave all unchecked to let the staff member work in every branch",
     "status": "Status",
     "statuses": {
       "ACTIVE": "Active",

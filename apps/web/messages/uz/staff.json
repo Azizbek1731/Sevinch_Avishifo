@@ -63,7 +63,9 @@
     "saved": "Profil saqlandi",
     "defaultRoom": "Doimiy xona",
     "defaultRoomNone": "Xona tanlanmagan",
-    "defaultRoomHint": "Shifokor navbatni chaqirganda shu xona ko'rsatiladi"
+    "defaultRoomHint": "Shifokor navbatni chaqirganda shu xona ko'rsatiladi",
+    "defaultRoomEmpty": "Hozircha xona kiritilmagan.",
+    "defaultRoomEmptyLink": "Sozlamalar → Filiallar bo'limida qo'shing"
   },
   "schedule": {
     "title": "Haftalik ish jadvali",

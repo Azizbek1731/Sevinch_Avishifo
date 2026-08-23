@@ -235,7 +235,9 @@ export function UserDialog({ open, onOpenChange, user }: UserDialogProps) {
             </div>
             {form.formState.errors.branchIds ? (
               <p className="text-sm text-destructive">{t('form.required')}</p>
-            ) : null}
+            ) : (
+              <p className="text-xs text-muted-foreground">{t('users.branchesHint')}</p>
+            )}
           </div>
           <DialogFooter>
             <Button

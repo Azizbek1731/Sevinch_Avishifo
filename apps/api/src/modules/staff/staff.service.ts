@@ -172,7 +172,20 @@ export class StaffService {
       ...(query.specialty
         ? { staffProfile: { specialty: { contains: query.specialty, mode: 'insensitive' as const } } }
         : {}),
-      ...(query.branchId ? { branches: { some: { branchId: query.branchId } } } : {}),
+      // No explicit branch assignment = works in every branch (the /auth/me rule),
+      // so a branch filter must keep branchless staff visible.
+      ...(query.branchId
+        ? {
+            AND: [
+              {
+                OR: [
+                  { branches: { some: { branchId: query.branchId } } },
+                  { branches: { none: {} } },
+                ],
+              },
+            ],
+          }
+        : {}),
     };
 
     const [users, total] = await Promise.all([
