@@ -7,6 +7,12 @@
   "engines": {
     "node": ">=22"
   },
+  "pnpm": {
+    "//": "redis-memory-server exists only for scripts/dev-local.mjs. Its postinstall compiles Redis (and RedisTimeSeries) from source, which fails on a clean server and takes the whole install down with it — leaving node_modules/.bin unlinked, so `prisma` and every other binary vanish. It fetches what it needs at first use anyway.",
+    "neverBuiltDependencies": [
+      "redis-memory-server"
+    ]
+  },
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",

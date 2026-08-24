@@ -1,4 +1,4 @@
-# Deploy — AWS EC2 (joriy server: 16.16.120.67)
+# Deploy — Airnet, Toshkent (joriy server: 46.8.194.85)
 
 Server: Ubuntu 26.04, 2 vCPU / 2GB RAM (+4GB swap), eu-north-1 (Stokgolm).
 Domen: **crm.avilab.uz** (+ ixtiyoriy `tv.crm.avilab.uz`, `bemor.crm.avilab.uz`).
@@ -30,7 +30,7 @@ https://bemor.crm.avilab.uz/  → bemor portali (127.0.0.1:3003)
 Boshqa komponentlar: PostgreSQL 18 (localhost:5432) · Redis 8 (localhost:6379) ·
 pm2 (4 protsess, server qayta yoqilsa autostart) · Nginx.
 
-- Kod: `/home/ubuntu/avishifo` · Sozlamalar: `.env` (DB parol shu yerda)
+- Kod: `/srv/avishifo` · Sozlamalar: `.env` (DB parol shu yerda)
 - Nginx: `/etc/nginx/sites-available/avishifo` (+ `snippets/avishifo-*.conf`)
 - `pm2 ls` · `pm2 logs avishifo-api` · `pm2 restart all`
 
@@ -41,26 +41,26 @@ pm2 (4 protsess, server qayta yoqilsa autostart) · Nginx.
 
 | Turi | Nomi (host) | Qiymati (IP) | TTL |
 |------|-------------|--------------|-----|
-| A | `crm` | `16.16.120.67` | 300 (yoki default) |
-| A | `tv.crm` | `16.16.120.67` | 300 |
-| A | `bemor.crm` | `16.16.120.67` | 300 |
+| A | `crm` | `46.8.194.85` | 300 (yoki default) |
+| A | `tv.crm` | `46.8.194.85` | 300 |
+| A | `bemor.crm` | `46.8.194.85` | 300 |
 
 > Agar panel to'liq nom talab qilsa: `crm.avilab.uz`, `tv.crm.avilab.uz`,
 > `bemor.crm.avilab.uz`. `tv.crm` / `bemor.crm` ixtiyoriy — faqat crm ham yetadi.
 
 DNS tarqalishi 5 daqiqadan bir necha soatgacha (TTL'ga bog'liq). Tekshirish:
-`dig +short crm.avilab.uz` → `16.16.120.67` chiqishi kerak.
+`dig +short crm.avilab.uz` → `46.8.194.85` chiqishi kerak.
 
 ## HTTPS (DNS tarqalgach)
 
 crm.avilab.uz serverga ishora qilgach:
 
 ```bash
-ssh -i ~/avishifo.pem ubuntu@16.16.120.67
+ssh ubuntu@46.8.194.85
 sudo apt-get install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d crm.avilab.uz -d tv.crm.avilab.uz -d bemor.crm.avilab.uz --agree-tos -m siz@email.uz --redirect
 # Keyin cookie'ni HTTPS-only qiling:
-cd /home/ubuntu/avishifo && sed -i 's/^COOKIE_SECURE=.*/COOKIE_SECURE=true/' .env && pm2 restart avishifo-api --update-env
+cd /srv/avishifo && sed -i 's/^COOKIE_SECURE=.*/COOKIE_SECURE=true/' .env && pm2 restart avishifo-api --update-env
 ```
 
 certbot 90 kunda avtomatik yangilaydi (systemd timer o'rnatiladi).

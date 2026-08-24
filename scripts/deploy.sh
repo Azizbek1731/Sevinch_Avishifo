@@ -7,11 +7,19 @@
 # partial rsync or stale incremental cache can never ship an old bundle.
 set -euo pipefail
 
-HOST="${DEPLOY_HOST:-16.16.120.67}"
+HOST="${DEPLOY_HOST:-46.8.194.85}"
 USER="${DEPLOY_USER:-ubuntu}"
-KEY="${DEPLOY_KEY:-$HOME/avishifo.pem}"
-REMOTE_DIR="/home/${USER}/avishifo"
+KEY="${DEPLOY_KEY:-$HOME/.ssh/id_ed25519}"
+REMOTE_DIR="${DEPLOY_DIR:-/srv/avishifo}"
 SSH_OPTS="-i ${KEY} -o ServerAliveInterval=15 -o ConnectTimeout=20"
+
+# The AWS box still runs four OTHER projects and still has a stale copy of this
+# one. Shipping there would migrate a dead database and resurrect an API that
+# long-polls the same Telegram token as the live one.
+if [ "${HOST}" = "16.16.120.67" ]; then
+  echo "REFUSING: 16.16.120.67 is the retired box — AviShifo now lives on 46.8.194.85." >&2
+  exit 1
+fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 run_ssh() { ssh ${SSH_OPTS} "${USER}@${HOST}" "$@"; }
@@ -59,7 +67,10 @@ echo "==> [4/4] restart pm2 + health check"
 # The API needs ~10-20s to boot on the 2GB box (Nest + Prisma + Redis + the
 # Telegram long poll). A fixed sleep reported a failure on every deploy that was
 # in fact fine, so poll until it answers instead.
-run_ssh "cd ${REMOTE_DIR} && pm2 restart all --update-env >/dev/null 2>&1 && pm2 save >/dev/null 2>&1 && \
+# Name the four apps explicitly: `pm2 restart all` would also restart every
+# unrelated project sharing this pm2 daemon, and would start ones deliberately
+# left stopped.
+run_ssh "cd ${REMOTE_DIR} && pm2 restart avishifo-api avishifo-web avishifo-display avishifo-portal --update-env >/dev/null 2>&1 && pm2 save >/dev/null 2>&1 && \
   for i in \$(seq 1 30); do \
     out=\$(curl -s -m 5 http://localhost:3001/api/v1/health 2>/dev/null) && [ -n \"\$out\" ] && { echo \"\$out\"; exit 0; }; \
     sleep 2; \
