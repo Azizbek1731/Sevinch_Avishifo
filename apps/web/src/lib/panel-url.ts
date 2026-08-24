@@ -99,3 +99,35 @@ export function resolvePanelBaseUrl(): string {
   const { protocol, hostname, origin } = window.location;
   return panelBaseUrlFor(protocol, hostname, origin);
 }
+
+/**
+ * TV display base URL (no trailing slash) for a page served from `origin`.
+ * The panel host swaps its leading label: `crm.avishifo.uz` → `tv.avishifo.uz`.
+ * It must SWAP, not prepend — prepending yields `tv.crm.avishifo.uz`, a host
+ * that has no DNS record, and the QR code printed for the waiting-room screen
+ * then leads nowhere.
+ */
+export function displayBaseUrlFor(protocol: string, hostname: string, origin: string): string {
+  if (hostname === 'localhost' || hostname.startsWith('127.')) {
+    return `${protocol}//${hostname}:3002`;
+  }
+  if (isPanelHostname(hostname)) {
+    return `${protocol}//tv.${hostname.slice('crm.'.length)}`;
+  }
+  return origin;
+}
+
+/**
+ * Resolve the TV display base URL in the browser. Priority:
+ *  1. `NEXT_PUBLIC_DISPLAY_URL` when set (non-empty).
+ *  2. Derived from the panel's own origin — see `displayBaseUrlFor`.
+ * Returns '' on the server (resolved client-side once the dialog is open).
+ */
+export function resolveDisplayBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_DISPLAY_URL;
+  if (configured && configured.trim() !== '') return configured.trim().replace(/\/+$/, '');
+  if (typeof window === 'undefined') return '';
+
+  const { protocol, hostname, origin } = window.location;
+  return displayBaseUrlFor(protocol, hostname, origin);
+}

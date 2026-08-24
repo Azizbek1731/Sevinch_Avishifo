@@ -16,33 +16,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { resolveDisplayBaseUrl } from '@/lib/panel-url';
 import { settingsApi, type BranchRow } from '../api';
 import { useApiErrorToast } from '../hooks';
 
-/**
- * Resolve the TV display base URL (no trailing slash). Priority:
- *  1. `NEXT_PUBLIC_DISPLAY_URL` when set (non-empty).
- *  2. Derived from the panel's own origin in the browser:
- *     - `crm.<domain>`      → `tv.crm.<domain>` (same protocol) — the display subdomain.
- *     - `localhost` / 127.* → same protocol, port 3002 (dev display app).
- *     - otherwise           → the same origin.
- * Returns '' on the server (resolved client-side once the dialog is open).
- */
-export function resolveDisplayBaseUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_DISPLAY_URL;
-  if (configured && configured.trim() !== '') return configured.trim().replace(/\/+$/, '');
-
-  if (typeof window === 'undefined') return '';
-
-  const { protocol, hostname, origin } = window.location;
-  if (hostname === 'localhost' || hostname.startsWith('127.')) {
-    return `${protocol}//${hostname}:3002`;
-  }
-  if (hostname.startsWith('crm.')) {
-    return `${protocol}//tv.${hostname}`;
-  }
-  return origin;
-}
+// resolveDisplayBaseUrl lives in lib/panel-url.ts alongside the panel-host
+// logic it mirrors: a pure function there is testable without dragging this
+// dialog (and its UI imports) into the test runner.
 
 export interface DisplayTokenDialogProps {
   open: boolean;
