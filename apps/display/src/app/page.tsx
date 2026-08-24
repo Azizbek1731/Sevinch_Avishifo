@@ -57,16 +57,16 @@ export default function SetupPage() {
 
   return (
     <main className="flex h-screen items-center justify-center px-6">
-      <div className="w-full max-w-3xl rounded-[2.5rem] border border-white/10 bg-slate-900/70 p-14 shadow-2xl backdrop-blur-sm">
+      <div className="w-full max-w-3xl rounded-[2.5rem] border border-edge/10 bg-panel/70 p-14 shadow-2xl backdrop-blur-sm">
         <BrandMark subtitle="Navbat monitori" />
 
         <h1 className="mt-10 text-5xl font-black tracking-tight">Displeyni ulash</h1>
-        <p className="mt-3 text-2xl text-slate-400">
+        <p className="mt-3 text-2xl text-ink-dim">
           Ushbu ekranni klinika navbat tizimiga bir marta ulang.
         </p>
 
         {error !== null ? (
-          <p className="mt-8 rounded-2xl border border-red-500/40 bg-red-500/10 px-6 py-5 text-xl text-red-300">
+          <p className="mt-8 rounded-2xl border border-red-500/40 bg-red-500/10 px-6 py-5 text-xl text-bad">
             {error}
           </p>
         ) : null}
@@ -81,13 +81,13 @@ export default function SetupPage() {
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand/15 text-xl font-bold text-brand-bright ring-1 ring-brand/40">
                 {i + 1}
               </span>
-              <span className="text-xl leading-relaxed text-slate-300">{step}</span>
+              <span className="text-xl leading-relaxed text-ink-dim">{step}</span>
             </li>
           ))}
         </ol>
 
         <form onSubmit={handleSubmit} className="mt-10">
-          <label className="mb-3 block text-lg font-semibold uppercase tracking-widest text-slate-500">
+          <label className="mb-3 block text-lg font-semibold uppercase tracking-widest text-ink-faint">
             Displey tokeni
           </label>
           <textarea
@@ -97,7 +97,7 @@ export default function SetupPage() {
             autoFocus
             spellCheck={false}
             placeholder="Tokenni shu yerga joylashtiring…"
-            className="w-full resize-none rounded-2xl border-2 border-white/10 bg-slate-950/60 px-5 py-4 font-mono text-lg text-slate-200 outline-none transition-colors focus:border-brand"
+            className="w-full resize-none rounded-2xl border-2 border-edge/10 bg-sunken px-5 py-4 font-mono text-lg text-ink-dim outline-none transition-colors focus:border-brand"
           />
           <button
             type="submit"

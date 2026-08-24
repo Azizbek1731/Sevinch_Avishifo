@@ -215,7 +215,7 @@ function StatTile({
   return (
     <Link
       href={href}
-      className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm transition hover:border-brand"
+      className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200 bg-surface p-3 text-center shadow-sm transition hover:border-brand"
     >
       <Icon className="h-5 w-5 text-brand" />
       <span className="text-xl font-bold text-slate-900 tabular-nums">{value}</span>
@@ -542,7 +542,7 @@ function Toggle({
       }`}
     >
       <span
-        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+        className={`inline-block h-5 w-5 transform rounded-full bg-surface shadow transition ${
           checked ? 'translate-x-5' : 'translate-x-0.5'
         }`}
       />

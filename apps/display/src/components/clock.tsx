@@ -65,9 +65,9 @@ export function Clock() {
 
   return (
     <div className="text-right leading-none">
-      <div className="font-mono text-5xl font-bold tabular-nums text-white">{parts.time}</div>
+      <div className="font-mono text-5xl font-bold tabular-nums text-ink">{parts.time}</div>
       {parts.day ? (
-        <div className="mt-1.5 text-lg font-medium text-slate-400">
+        <div className="mt-1.5 text-lg font-medium text-ink-dim">
           {parts.weekday}, {parts.day}
         </div>
       ) : null}

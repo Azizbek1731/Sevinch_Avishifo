@@ -52,7 +52,7 @@ export default function VisitsPage() {
                   <li key={visit.id}>
                     <Link
                       href={`/me/visits/${visit.id}`}
-                      className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand"
+                      className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-surface p-4 shadow-sm transition hover:border-brand"
                     >
                       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
                         <Stethoscope className="h-5 w-5" />

@@ -3,6 +3,51 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * The slate ramp is mirrored rather than re-picked: every `text-slate-900`
+   * already in the markup means "the strongest text" and every `bg-slate-50`
+   * means "the page behind everything", so swapping the two ends gives a
+   * correct dark theme without touching a single component.
+   *
+   * 400 and 500 both land on slate-400 in the dark: they carry most of the
+   * secondary text, and the mirrored 600/500 would be too dim to read on a
+   * dark surface.
+   */
+  :root {
+    --s-50: 248 250 252;
+    --s-100: 241 245 249;
+    --s-200: 226 232 240;
+    --s-300: 203 213 225;
+    --s-400: 148 163 184;
+    --s-500: 100 116 139;
+    --s-600: 71 85 105;
+    --s-700: 51 65 85;
+    --s-800: 30 41 59;
+    --s-900: 15 23 42;
+    --s-950: 2 6 23;
+
+    --surface: 255 255 255;
+    --brand-light: 230 244 251;
+  }
+
+  .dark {
+    --s-50: 15 23 42;
+    --s-100: 30 41 59;
+    --s-200: 51 65 85;
+    --s-300: 71 85 105;
+    --s-400: 148 163 184;
+    --s-500: 148 163 184;
+    --s-600: 203 213 225;
+    --s-700: 226 232 240;
+    --s-800: 241 245 249;
+    --s-900: 248 250 252;
+    --s-950: 255 255 255;
+
+    /* Cards sit one step above the page, not level with it. */
+    --surface: 30 41 59;
+    --brand-light: 12 55 82;
+  }
+
   html {
     -webkit-tap-highlight-color: transparent;
   }

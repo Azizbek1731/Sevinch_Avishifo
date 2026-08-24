@@ -46,5 +46,11 @@
   "notFound": "Не найдено",
   "select": "Выберите...",
   "showPassword": "Показать пароль",
-  "hidePassword": "Скрыть пароль"
+  "hidePassword": "Скрыть пароль",
+  "theme": {
+    "label": "Оформление",
+    "light": "Светлая",
+    "dark": "Тёмная",
+    "system": "Как в системе"
+  }
 }

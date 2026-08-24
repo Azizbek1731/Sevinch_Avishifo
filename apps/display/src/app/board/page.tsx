@@ -15,6 +15,7 @@ import { WaitingList } from '@/components/waiting-list';
 import { Announcer } from '@/lib/announcer';
 import { clearDisplayToken, readDisplayToken } from '@/lib/storage';
 import { useDisplaySocket } from '@/lib/use-display-socket';
+import { useDisplayTheme } from '@/lib/use-display-theme';
 
 const PRIORITY_RANK: Record<TicketPriority, number> = {
   EMERGENCY: 0,
@@ -35,6 +36,7 @@ export default function BoardPage() {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { mode: themeMode, resolved: resolvedTheme, setMode: setThemeMode } = useDisplayTheme();
 
   useEffect(() => {
     const saved = readDisplayToken();
@@ -163,26 +165,26 @@ export default function BoardPage() {
             type="button"
             aria-label="Sozlamalar"
             onClick={() => setSettingsOpen(true)}
-            className="flex h-12 w-12 items-center justify-center rounded-xl text-2xl text-slate-600 transition-colors hover:bg-white/5 hover:text-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className="flex h-12 w-12 items-center justify-center rounded-xl text-2xl text-ink-faint transition-colors hover:bg-raise/5 hover:text-ink-dim focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             ⚙
           </button>
         </div>
       </header>
 
-      <div className="mx-12 h-px shrink-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      <div className="mx-12 h-px shrink-0 bg-gradient-to-r from-transparent via-edge/10 to-transparent" />
 
       <div className="flex min-h-0 flex-1 gap-8 px-12 py-8 portrait:flex-col">
         <main className="flex min-w-0 flex-1 flex-col">
           <div className="mb-7 flex shrink-0 items-center gap-4">
             <span className="animate-breathe h-4 w-4 rounded-full bg-emerald-400 shadow-[0_0_12px_2px_rgba(52,211,153,0.7)]" />
-            <h1 className="text-4xl font-bold uppercase tracking-[0.2em] text-slate-200">
+            <h1 className="text-4xl font-bold uppercase tracking-[0.2em] text-ink-dim">
               Hozir qabulda
             </h1>
           </div>
           {count === 0 ? (
-            <div className="flex flex-1 items-center justify-center rounded-[2rem] border border-white/5 bg-white/[0.02]">
-              <p className="text-display-sm font-black text-slate-700">Navbat kutilmoqda…</p>
+            <div className="flex flex-1 items-center justify-center rounded-[2rem] border border-edge/5 bg-raise/[0.02]">
+              <p className="text-display-sm font-black text-ink-faint">Navbat kutilmoqda…</p>
             </div>
           ) : (
             <div
@@ -199,23 +201,23 @@ export default function BoardPage() {
             </div>
           )}
           {overflowCount > 0 ? (
-            <p className="mt-4 shrink-0 text-center text-2xl font-semibold text-slate-500">
+            <p className="mt-4 shrink-0 text-center text-2xl font-semibold text-ink-faint">
               +{overflowCount} ta yana chaqirilmoqda
             </p>
           ) : null}
         </main>
 
-        <aside className="min-h-0 w-[27rem] shrink-0 rounded-[2rem] border border-white/5 bg-white/[0.015] px-8 py-7 portrait:h-[38%] portrait:w-full">
+        <aside className="min-h-0 w-[27rem] shrink-0 rounded-[2rem] border border-edge/5 bg-raise/[0.015] px-8 py-7 portrait:h-[38%] portrait:w-full">
           <WaitingList tickets={waiting} total={waitingTotal} />
         </aside>
       </div>
 
-      <footer className="flex min-h-[5.5rem] shrink-0 items-center gap-8 border-t border-white/5 px-12 py-4">
+      <footer className="flex min-h-[5.5rem] shrink-0 items-center gap-8 border-t border-edge/5 px-12 py-4">
         <HistoryStrip tickets={history} />
         <div className="flex min-w-0 flex-1 items-center">
           <NewsTicker />
         </div>
-        <span className="shrink-0 text-lg font-semibold uppercase tracking-[0.25em] text-slate-700">
+        <span className="shrink-0 text-lg font-semibold uppercase tracking-[0.25em] text-ink-faint">
           AviShifo · Jonli navbat
         </span>
       </footer>
@@ -224,6 +226,9 @@ export default function BoardPage() {
         open={settingsOpen}
         connection={connection}
         tokenHint={tokenHint}
+        themeMode={themeMode}
+        resolvedTheme={resolvedTheme}
+        onThemeModeChange={setThemeMode}
         onClose={() => setSettingsOpen(false)}
         onChangeToken={changeToken}
       />

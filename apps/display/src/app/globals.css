@@ -26,15 +26,84 @@ html {
   font-size: clamp(9px, calc(0.52vw + 0.52vh), 34px);
 }
 
+/*
+ * Day / night palette. Night is the default so a screen that has never been
+ * configured looks exactly as it always did; `.theme-day` is added to <html>
+ * by lib/display-theme.ts.
+ *
+ * `--raise` and `--edge` flip from white to near-black: on the dark board a
+ * lifted surface is a wash of white at 5%, and on the light one it has to be
+ * a wash of ink instead, or every panel border disappears.
+ */
+:root {
+  --screen: 7 11 24;
+  --panel: 15 23 42;
+  --scrim: 2 6 23;
+  /* An input well, recessed BELOW the panel: darker than it at night, lighter
+     by day. It cannot borrow --scrim — that one stays dark in both themes
+     because it is the modal backdrop. */
+  --sunken: 2 6 23;
+  --raise: 255 255 255;
+  --edge: 255 255 255;
+  --ink: 255 255 255;
+  --ink-dim: 203 213 225;
+  --ink-faint: 100 116 139;
+
+  /* Brand teal as TEXT. The bright tint is 1.9:1 on white — unreadable — so
+     day mode drops to the deep teal. Brand as a BUTTON FILL stays bright in
+     both, since it carries dark text either way. */
+  --brand-ink: 94 234 212;
+
+  /* Status text. The pale 200/300 tints only work over the dark board; on a
+     white panel they wash out, so day mode uses the 700s instead. Solid dots
+     and 10% tint fills read on both and are left as plain Tailwind. */
+  --ok: 110 231 183;
+  --warn: 252 211 77;
+  --bad: 252 165 165;
+  --info: 125 211 252;
+
+  --glow-a: rgba(45, 212, 191, 0.12);
+  --glow-b: rgba(56, 108, 189, 0.14);
+  --glow-c: rgba(45, 212, 191, 0.06);
+}
+
+.theme-day {
+  --screen: 237 242 248;
+  --panel: 255 255 255;
+  --scrim: 15 23 42;
+  --sunken: 226 232 240;
+  --raise: 15 23 42;
+  --edge: 15 23 42;
+  --ink: 15 23 42;
+  --ink-dim: 51 65 85;
+  --ink-faint: 100 116 139;
+
+  --brand-ink: 13 148 136;
+
+  --ok: 4 120 87;
+  --warn: 180 83 9;
+  --bad: 185 28 28;
+  --info: 3 105 161;
+
+  /* Same glow shapes, a fraction of the strength — on white they would
+     otherwise read as stains rather than depth. */
+  --glow-a: rgba(13, 148, 136, 0.1);
+  --glow-b: rgba(56, 108, 189, 0.1);
+  --glow-c: rgba(13, 148, 136, 0.05);
+}
+
 body {
   -webkit-user-select: none;
   user-select: none;
-  /* Deep navy base with soft ambient glows for depth. */
-  background-color: #070b18;
+  /* Tinted base with soft ambient glows for depth. */
+  background-color: rgb(var(--screen));
   background-image:
-    radial-gradient(60rem 40rem at 12% -10%, rgba(45, 212, 191, 0.12), transparent 60%),
-    radial-gradient(70rem 45rem at 100% 0%, rgba(56, 108, 189, 0.14), transparent 55%),
-    radial-gradient(50rem 40rem at 50% 120%, rgba(45, 212, 191, 0.06), transparent 60%);
+    radial-gradient(60rem 40rem at 12% -10%, var(--glow-a), transparent 60%),
+    radial-gradient(70rem 45rem at 100% 0%, var(--glow-b), transparent 55%),
+    radial-gradient(50rem 40rem at 50% 120%, var(--glow-c), transparent 60%);
+  color: rgb(var(--ink));
+  /* The board never reloads; without this the day/night crossing is a hard cut. */
+  transition: background-color 600ms linear, color 600ms linear;
 }
 
 /* Glowing pulse ring on the most recently called ticket. */

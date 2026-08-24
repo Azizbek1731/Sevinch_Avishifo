@@ -35,7 +35,7 @@ export function TicketTile({
     ? 'animate-called-pulse border-emerald-400/70 bg-gradient-to-b from-emerald-500/15 to-emerald-500/[0.04]'
     : inRoom
       ? 'border-sky-400/25 bg-gradient-to-b from-sky-500/[0.06] to-white/[0.02]'
-      : 'border-white/10 bg-white/[0.03]';
+      : 'border-edge/10 bg-raise/[0.03]';
 
   return (
     <div
@@ -46,10 +46,10 @@ export function TicketTile({
         <div
           className={`tile-pill flex shrink-0 items-center gap-[0.5em] rounded-full px-[1em] py-[0.35em] font-bold uppercase tracking-[0.2em] ${
             highlighted
-              ? 'bg-emerald-400/15 text-emerald-300'
+              ? 'bg-emerald-400/15 text-ok'
               : inRoom
-                ? 'bg-sky-400/10 text-sky-300'
-                : 'bg-white/5 text-slate-400'
+                ? 'bg-sky-400/10 text-info'
+                : 'bg-raise/5 text-ink-dim'
           }`}
         >
           {highlighted ? (
@@ -61,21 +61,21 @@ export function TicketTile({
 
       <div
         className={`tile-number font-black tabular-nums ${
-          highlighted ? 'text-white drop-shadow-[0_0_25px_rgba(52,211,153,0.45)]' : 'text-white'
+          highlighted ? 'text-ink drop-shadow-[0_0_25px_rgba(52,211,153,0.45)]' : 'text-ink'
         }`}
       >
         {ticket.ticketNumber}
       </div>
 
       {room !== null ? (
-        <div className="tile-room flex shrink-0 items-center gap-[0.35em] font-black text-amber-300">
-          <span className="animate-nudge text-amber-400">→</span>
+        <div className="tile-room flex shrink-0 items-center gap-[0.35em] font-black text-warn">
+          <span className="animate-nudge text-warn">→</span>
           {room}
         </div>
       ) : null}
 
       {ticket.doctorName !== null ? (
-        <div className="tile-doctor w-full truncate font-medium text-slate-300">{ticket.doctorName}</div>
+        <div className="tile-doctor w-full truncate font-medium text-ink-dim">{ticket.doctorName}</div>
       ) : null}
     </div>
   );

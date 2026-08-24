@@ -69,7 +69,7 @@ export default function AppointmentsPage() {
             type="button"
             onClick={() => setScope(tab.value)}
             className={`h-11 rounded-lg text-sm font-medium transition ${
-              scope === tab.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+              scope === tab.value ? 'bg-surface text-slate-900 shadow-sm' : 'text-slate-500'
             }`}
           >
             {tab.label}
@@ -105,7 +105,7 @@ export default function AppointmentsPage() {
               return (
                 <li
                   key={a.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                  className="rounded-2xl border border-slate-200 bg-surface p-4 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

@@ -75,7 +75,7 @@ export default function LandingPage() {
               <button
                 type="button"
                 onClick={handleStart}
-                className="h-12 shrink-0 rounded-xl bg-white px-6 font-semibold text-brand-dark transition hover:bg-brand-light"
+                className="h-12 shrink-0 rounded-xl bg-surface px-6 font-semibold text-brand-dark transition hover:bg-brand-light"
               >
                 Boshlash
               </button>
@@ -88,7 +88,7 @@ export default function LandingPage() {
         {status === 'authed' && (
           <Link
             href="/me"
-            className="mt-5 inline-flex h-12 items-center gap-2 rounded-xl bg-white px-6 font-semibold text-brand-dark transition hover:bg-brand-light"
+            className="mt-5 inline-flex h-12 items-center gap-2 rounded-xl bg-surface px-6 font-semibold text-brand-dark transition hover:bg-brand-light"
           >
             Kabinetga o&apos;tish
             <ChevronRight className="h-4 w-4" />

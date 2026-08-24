@@ -46,5 +46,11 @@
   "notFound": "Topilmadi",
   "select": "Tanlang...",
   "showPassword": "Parolni ko'rsatish",
-  "hidePassword": "Parolni yashirish"
+  "hidePassword": "Parolni yashirish",
+  "theme": {
+    "label": "Ko'rinish",
+    "light": "Kunduzgi",
+    "dark": "Tungi",
+    "system": "Tizim bo‘yicha"
+  }
 }

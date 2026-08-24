@@ -46,5 +46,11 @@
   "notFound": "Топилмади",
   "select": "Танланг...",
   "showPassword": "Паролни кўрсатиш",
-  "hidePassword": "Паролни яшириш"
+  "hidePassword": "Паролни яшириш",
+  "theme": {
+    "label": "Кўриниш",
+    "light": "Кундузги",
+    "dark": "Тунги",
+    "system": "Тизим бўйича"
+  }
 }

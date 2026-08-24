@@ -13,6 +13,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { LogoMark } from '@/components/logo-mark';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { toast } from 'sonner';
 import { useSession } from '@/stores/session';
 
@@ -66,7 +67,7 @@ export function Nav() {
     <>
       {/* viewport-fit=cover runs the page under the status bar in landscape and
           when installed to the home screen; the inset keeps the logo clear of it. */}
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-surface/90 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto w-full max-w-3xl px-4">
           <div className="flex h-14 items-center justify-between gap-2">
             <Link href="/" className="flex min-h-11 items-center gap-2">
@@ -76,6 +77,7 @@ export function Nav() {
               </span>
             </Link>
             <div className="flex items-center gap-1">
+              <ThemeToggle />
               {status === 'authed' && (
                 <>
                   <Link
@@ -129,7 +131,7 @@ export function Nav() {
       {showTabBar && (
         <nav
           aria-label="Tezkor menyu"
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur print:hidden md:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-surface/95 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur print:hidden md:hidden"
         >
           <div className="mx-auto flex max-w-3xl">
             {TABS.map((tab) => {

@@ -28,8 +28,8 @@ export function NewsTicker() {
   return (
     <div className="min-w-0 flex-1 overflow-hidden">
       <div className="animate-ticker inline-flex whitespace-nowrap will-change-transform">
-        <span className="text-3xl text-slate-300">{content}</span>
-        <span className="text-3xl text-slate-300">{content}</span>
+        <span className="text-3xl text-ink-dim">{content}</span>
+        <span className="text-3xl text-ink-dim">{content}</span>
       </div>
     </div>
   );

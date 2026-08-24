@@ -22,7 +22,7 @@ function safeNext(raw: string | null): string {
 }
 
 const inputBase =
-  'h-12 w-full rounded-xl border bg-white px-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 disabled:bg-slate-100';
+  'h-12 w-full rounded-xl border bg-surface px-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 disabled:bg-slate-100';
 
 function inputClass(invalid: boolean): string {
   return `${inputBase} ${
@@ -162,7 +162,7 @@ function CompleteProfileForm({ next }: { next: string }) {
                 className={`h-12 flex-1 rounded-xl border text-sm font-medium transition disabled:opacity-60 ${
                   selected
                     ? 'border-brand bg-brand-light text-brand-dark'
-                    : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'
+                    : 'border-slate-300 bg-surface text-slate-600 hover:border-slate-400'
                 }`}
               >
                 {option.label}

@@ -80,7 +80,7 @@ export default function ResultsPage() {
               return (
                 <li
                   key={order.id}
-                  className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                  className="overflow-hidden rounded-2xl border border-slate-200 bg-surface shadow-sm"
                 >
                   <button
                     type="button"

@@ -21,10 +21,10 @@ export function BrandMark({ subtitle }: { subtitle?: string }) {
       </div>
       <div className="leading-none">
         <div className="text-4xl font-black tracking-tight">
-          Avi<span className="text-brand-bright">Shifo</span>
+          Avi<span className="text-brand-ink">Shifo</span>
         </div>
         {subtitle ? (
-          <div className="mt-1 text-lg font-medium uppercase tracking-[0.25em] text-slate-500">
+          <div className="mt-1 text-lg font-medium uppercase tracking-[0.25em] text-ink-faint">
             {subtitle}
           </div>
         ) : null}

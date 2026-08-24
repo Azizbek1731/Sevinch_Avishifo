@@ -112,7 +112,7 @@ function FeedbackContent() {
             onChange={(e) => setComment(e.target.value)}
             rows={4}
             placeholder="Izoh (ixtiyoriy)"
-            className="w-full rounded-xl border border-slate-300 bg-white p-3 text-base outline-none transition placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-brand/20"
+            className="w-full rounded-xl border border-slate-300 bg-surface p-3 text-base outline-none transition placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-brand/20"
           />
           <button
             type="submit"

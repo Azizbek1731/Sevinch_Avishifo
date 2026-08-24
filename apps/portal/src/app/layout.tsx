@@ -23,7 +23,9 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="uz">
+    // next-themes writes the class onto <html> before paint; without
+    // suppressHydrationWarning React logs a mismatch on every load.
+    <html lang="uz" suppressHydrationWarning>
       <body className="min-h-screen">
         <Providers>
           <Nav />

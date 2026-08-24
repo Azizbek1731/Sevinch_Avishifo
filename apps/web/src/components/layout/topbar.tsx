@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PatientSearchCommand } from '@/components/patient-search-command';
+import { ThemeMenuItems } from '@/components/theme-menu-items';
 import { MobileNav } from '@/components/layout/sidebar';
 import { useState } from 'react';
 
@@ -211,6 +212,8 @@ export function Topbar() {
                 {name}
               </DropdownMenuItem>
             ))}
+            <DropdownMenuSeparator />
+            <ThemeMenuItems />
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href="/security">

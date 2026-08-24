@@ -42,7 +42,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(function
       autoFocus={autoFocus}
       disabled={disabled}
       onChange={(e) => onChange(formatPhoneDisplay(e.target.value))}
-      className={`h-12 w-full rounded-xl border bg-white px-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 disabled:bg-slate-100 ${
+      className={`h-12 w-full rounded-xl border bg-surface px-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 disabled:bg-slate-100 ${
         invalid === true
           ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
           : 'border-slate-300 focus:border-brand focus:ring-brand/20'

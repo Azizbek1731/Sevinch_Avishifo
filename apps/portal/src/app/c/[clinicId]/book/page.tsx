@@ -252,7 +252,7 @@ export default function BookingPage() {
                 setSlot(null);
                 setStep(2);
               }}
-              className={`w-full rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:border-brand ${
+              className={`w-full rounded-2xl border bg-surface p-4 text-left shadow-sm transition hover:border-brand ${
                 branchId === b.id ? 'border-brand ring-2 ring-brand/20' : 'border-slate-200'
               }`}
             >
@@ -284,7 +284,7 @@ export default function BookingPage() {
                 setSlot(null);
                 setStep(3);
               }}
-              className={`flex flex-col items-center rounded-2xl border bg-white p-4 text-center shadow-sm transition hover:border-brand ${
+              className={`flex flex-col items-center rounded-2xl border bg-surface p-4 text-center shadow-sm transition hover:border-brand ${
                 doctorUserId === d.userId ? 'border-brand ring-2 ring-brand/20' : 'border-slate-200'
               }`}
             >
@@ -321,7 +321,7 @@ export default function BookingPage() {
                 className={`flex w-16 shrink-0 flex-col items-center rounded-xl border py-2 transition ${
                   date === day.date
                     ? 'border-brand bg-brand text-white'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-brand'
+                    : 'border-slate-200 bg-surface text-slate-700 hover:border-brand'
                 }`}
               >
                 <span className={`text-[11px] ${date === day.date ? 'text-white/80' : 'text-slate-400'}`}>
@@ -363,7 +363,7 @@ export default function BookingPage() {
                   className={`min-h-11 rounded-xl border text-sm font-semibold transition ${
                     slot?.startAt === s.startAt
                       ? 'border-brand bg-brand text-white'
-                      : 'border-slate-200 bg-white text-slate-800 hover:border-brand'
+                      : 'border-slate-200 bg-surface text-slate-800 hover:border-brand'
                   }`}
                 >
                   {formatTime(s.startAt)}
@@ -403,7 +403,7 @@ export default function BookingPage() {
               <select
                 value={serviceId}
                 onChange={(e) => setServiceId(e.target.value)}
-                className="h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-base outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                className="h-12 w-full rounded-xl border border-slate-300 bg-surface px-3 text-base outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
               >
                 <option value="">Tanlanmagan</option>
                 {services.map((s) => (
@@ -438,7 +438,7 @@ export default function BookingPage() {
                         }}
                         placeholder="Ismingiz"
                         autoComplete="given-name"
-                        className={`h-12 w-full rounded-xl border bg-white px-4 text-base outline-none transition focus:ring-2 ${
+                        className={`h-12 w-full rounded-xl border bg-surface px-4 text-base outline-none transition focus:ring-2 ${
                           nameError && firstName.trim() === ''
                             ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
                             : 'border-slate-300 focus:border-brand focus:ring-brand/20'
@@ -454,7 +454,7 @@ export default function BookingPage() {
                         }}
                         placeholder="Familiyangiz"
                         autoComplete="family-name"
-                        className={`h-12 w-full rounded-xl border bg-white px-4 text-base outline-none transition focus:ring-2 ${
+                        className={`h-12 w-full rounded-xl border bg-surface px-4 text-base outline-none transition focus:ring-2 ${
                           nameError && lastName.trim() === ''
                             ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
                             : 'border-slate-300 focus:border-brand focus:ring-brand/20'

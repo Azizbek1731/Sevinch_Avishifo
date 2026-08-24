@@ -58,7 +58,7 @@ export function RecordAccessGate({ children }: { children: React.ReactNode }) {
         .map((c) => (
           <div
             key={c.clinicId}
-            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+            className="rounded-2xl border border-slate-200 bg-surface p-4 shadow-sm"
           >
             <div className="flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">

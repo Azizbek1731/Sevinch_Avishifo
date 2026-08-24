@@ -78,7 +78,7 @@ export default function CabinetPage() {
           <Link
             key={link.href}
             href={link.href}
-            className="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm transition hover:border-brand"
+            className="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200 bg-surface p-3 text-center shadow-sm transition hover:border-brand"
           >
             <link.icon className="h-6 w-6 text-brand" />
             <span className="text-xs font-medium text-slate-700">{link.label}</span>

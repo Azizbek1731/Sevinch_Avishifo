@@ -51,7 +51,7 @@ export default function ClinicPage() {
           <img
             src={resolveAssetUrl(clinic.logoUrl)}
             alt={clinic.name}
-            className="h-16 w-16 rounded-2xl border border-slate-200 bg-white object-contain p-1"
+            className="h-16 w-16 rounded-2xl border border-slate-200 bg-surface object-contain p-1"
           />
         ) : (
           <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-light text-2xl font-bold text-brand-dark">
@@ -161,7 +161,7 @@ export default function ClinicPage() {
 
       {/* Sticky booking CTA. The layout's bottom padding — sized for the phone
           tab bar — already clears it, so the page adds none of its own. */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-surface/95 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] backdrop-blur">
         <div className="mx-auto max-w-3xl">
           <Link
             href={`/c/${clinicId}/book`}
