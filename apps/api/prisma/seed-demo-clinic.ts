@@ -576,7 +576,21 @@ async function main(): Promise<void> {
     for (let off = -DEMO.historyDays; off <= 10; off++) {
       if (isoWeekday(off) > 5) continue;
       const perDay = off < 0 ? randInt(4, 9) : randInt(3, 7);
-      const chosen = shuffle(slots).slice(0, perDay).sort((a, b) => a - b);
+      let chosen: number[];
+      if (off === 0) {
+        // Today is what the dashboard opens on, and it opens on ONE branch —
+        // so every doctor gets a guaranteed morning (already seen) and a
+        // guaranteed afternoon (still to come). Leaving it to the shuffle once
+        // gave a whole branch an afternoon-only day and two zeros on screen.
+        const morning = slots.filter((m) => m < 13 * 60);
+        const afternoon = slots.filter((m) => m >= 13 * 60);
+        chosen = [
+          ...shuffle(morning).slice(0, randInt(3, 5)),
+          ...shuffle(afternoon).slice(0, randInt(2, 4)),
+        ].sort((a, b) => a - b);
+      } else {
+        chosen = shuffle(slots).slice(0, perDay).sort((a, b) => a - b);
+      }
       const dayPatients = shuffle(patients).slice(0, chosen.length);
       for (let k = 0; k < chosen.length; k++) {
         const startAt = day(off, Math.floor(chosen[k] / 60), chosen[k] % 60);
@@ -637,7 +651,10 @@ async function main(): Promise<void> {
   const diagRows: Prisma.DiagnosisCreateManyInput[] = [];
   const rxRows: Prisma.PrescriptionCreateManyInput[] = [];
   for (const a of appts) {
-    if (a.off > 0 || a.status !== 'COMPLETED' || !chance(0.8)) continue;
+    // Every one of today's finished appointments becomes a visit; on past days
+    // a fifth are left without one, the way a real clinic's records look.
+    if (a.off > 0 || a.status !== 'COMPLETED') continue;
+    if (a.off < 0 && !chance(0.8)) continue;
     const id = uuid();
     const startedAt = addMin(a.startAt, randInt(1, 6));
     const completedAt = addMin(startedAt, randInt(Math.max(5, a.slot - 6), a.slot + 4));
