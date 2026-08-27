@@ -28,6 +28,14 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'VisitVital',
   'Diagnosis',
   'Prescription',
+  // The ward. These shipped after this list was written and were never added,
+  // so every admission query ran unscoped and one clinic's owner could read
+  // another clinic's inpatients, rounds and charges.
+  'Admission',
+  'AdmissionDailyNote',
+  'TreatmentOrder',
+  'TreatmentAdministration',
+  'ChargeItem',
   'Referral',
   'VisitTemplate',
   'VisitAmendment',

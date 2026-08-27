@@ -4,6 +4,7 @@ import { ArrowRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { useAuthStore } from '@/stores/auth-store';
+import { homePath } from '@/lib/home-path';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { usePanelUrl, type PanelPath } from './panel-link';
 
@@ -36,7 +37,10 @@ export function AuthCta({
   onClick,
 }: AuthCtaProps) {
   const t = useTranslations('landing');
-  const authenticated = useAuthStore((s) => s.status === 'authenticated');
+  // The user, not just the flag: "go to the panel" has to point at the screen
+  // this role may open — /dashboard is an owner's home, not a receptionist's.
+  const user = useAuthStore((s) => (s.status === 'authenticated' ? s.user : null));
+  const authenticated = user !== null;
   const panelUrl = usePanelUrl(target);
 
   const label = authenticated ? t('cta.dashboard') : anonymousLabel;
@@ -55,7 +59,7 @@ export function AuthCta({
 
   return (
     <Button asChild size={size} variant={variant} className={className}>
-      <Link href={authenticated ? '/dashboard' : `/${target}`} onClick={onClick}>
+      <Link href={user ? homePath(user) : `/${target}`} onClick={onClick}>
         {label}
         {arrow}
       </Link>

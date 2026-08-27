@@ -16,6 +16,7 @@ import {
 import { ArrowLeft, Send } from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
 import { useAuthStore, type MeResponse } from '@/stores/auth-store';
+import { homePath } from '@/lib/home-path';
 import { Link, useRouter } from '@/i18n/routing';
 import { LogoMark } from '@/components/logo';
 import { Button } from '@/components/ui/button';
@@ -146,26 +147,9 @@ export function LoginForm() {
     useAuthStore.getState().setAccessToken(data.accessToken);
     const me = await api.get<MeResponse>('/auth/me');
     setSession({ ...me.data, accessToken: data.accessToken });
-    // Everyone used to land on /dashboard, which needs reports.read — a
-    // receptionist's first screen was a spinner over 403s. Land each role where
-    // its day actually starts.
-    const home =
-      data.user.role === 'SUPER_ADMIN'
-        ? '/platform/clinics'
-        : data.user.permissions.includes('reports.read')
-          ? '/dashboard'
-          : data.user.permissions.includes('queue.manage')
-            ? '/reception'
-            : data.user.permissions.includes('queue.call')
-              ? '/doctor'
-              : data.user.permissions.includes('payments.create')
-                ? '/cashier'
-                : data.user.permissions.includes('lab.orders.write')
-                  ? '/lab'
-                  : data.user.permissions.includes('queue.read')
-                    ? '/queue'
-                    : '/patients';
-    router.replace(home);
+    // The login page bounces an authenticated visitor to homePath too, and it
+    // fires on this same setSession — both must agree or the later one wins.
+    router.replace(homePath(data.user));
   }
 
   async function onVerify(e: React.FormEvent): Promise<void> {
