@@ -581,9 +581,14 @@ async function main(): Promise<void> {
       for (let k = 0; k < chosen.length; k++) {
         const startAt = day(off, Math.floor(chosen[k] / 60), chosen[k] % 60);
         const endAt = addMin(startAt, doc.slotMinutes);
+        const isMorning = chosen[k] < 13 * 60;
         let status: AppointmentStatus;
         if (off < 0) status = chance(0.07) ? 'NO_SHOW' : chance(0.04) ? 'CANCELLED' : 'COMPLETED';
-        else if (off === 0) status = startAt < nowUtc ? (chance(0.5) ? 'CHECKED_IN' : 'CONFIRMED') : chance(0.5) ? 'SCHEDULED' : 'CONFIRMED';
+        // Today is split by the clinic's own morning, not by the wall clock:
+        // the dashboard opens on "today", and a demo seeded at 4am would show
+        // two zeros all day. Morning slots are seen-and-done, the afternoon is
+        // still ahead — which is what a clinic looks like when it is shown.
+        else if (off === 0) status = isMorning ? (chance(0.75) ? 'COMPLETED' : 'IN_PROGRESS') : chance(0.5) ? 'SCHEDULED' : 'CONFIRMED';
         else status = chance(0.5) ? 'SCHEDULED' : 'CONFIRMED';
         const codes = [pick(doc.primary)];
         if (chance(0.35)) codes.push(pick(doc.extra));
@@ -632,7 +637,7 @@ async function main(): Promise<void> {
   const diagRows: Prisma.DiagnosisCreateManyInput[] = [];
   const rxRows: Prisma.PrescriptionCreateManyInput[] = [];
   for (const a of appts) {
-    if (a.off >= 0 || a.status !== 'COMPLETED' || !chance(0.8)) continue;
+    if (a.off > 0 || a.status !== 'COMPLETED' || !chance(0.8)) continue;
     const id = uuid();
     const startedAt = addMin(a.startAt, randInt(1, 6));
     const completedAt = addMin(startedAt, randInt(Math.max(5, a.slot - 6), a.slot + 4));
@@ -692,8 +697,10 @@ async function main(): Promise<void> {
     const rows: Prisma.QueueTicketCreateManyInput[] = [];
     for (const a of mine) {
       n++;
-      const past = a.startAt < nowUtc;
-      const status: TicketStatus = past ? (chance(0.65) ? 'DONE' : chance(0.5) ? 'IN_ROOM' : 'SKIPPED') : 'WAITING';
+      // Same morning/afternoon split the appointments use, so the board is not
+      // a wall of "waiting" when the demo is opened before the clinic opens.
+      const past = a.status === 'COMPLETED' || a.status === 'IN_PROGRESS';
+      const status: TicketStatus = past ? (chance(0.7) ? 'DONE' : chance(0.6) ? 'IN_ROOM' : 'SKIPPED') : 'WAITING';
       rows.push({
         clinicId, branchId, queueId: q.id, number: n, patientId: a.patientId, doctorUserId: a.doctorId,
         appointmentId: a.id, status, priority: chance(0.06) ? 'EMERGENCY' : chance(0.12) ? 'PRIORITY' : 'NORMAL', position: n,
