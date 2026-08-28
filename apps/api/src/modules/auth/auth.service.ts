@@ -26,6 +26,7 @@ import { PrincipalService } from '../../core/principal/principal.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { ClinicProvisioningService } from '../../core/provisioning/clinic-provisioning.service';
+import { PlatformAlertsService } from '../notifications/platform-alerts.service';
 import {
   SubscriptionService,
   type SubscriptionState,
@@ -113,6 +114,7 @@ export class AuthService {
     private readonly provisioning: ClinicProvisioningService,
     private readonly subscriptions: SubscriptionService,
     private readonly twoFactor: TwoFactorService,
+    private readonly platformAlerts: PlatformAlertsService,
   ) {}
 
   // --------------------------------------------------------------- sign-up
@@ -186,6 +188,17 @@ export class AuthService {
       entityId: provisioned.owner.id,
       userId: provisioned.owner.id,
       clinicId: provisioned.clinic.id,
+    });
+
+    // Tell the platform admins on Telegram. Not awaited and never throws: the
+    // director is mid-signup and must not wait on — or be failed by — Telegram.
+    void this.platformAlerts.newClinicRegistered({
+      clinicName: provisioned.clinic.name,
+      ownerName: provisioned.owner.fullName,
+      ownerPhone: phone,
+      ownerEmail: input.email ?? null,
+      planName: provisioned.plan.name,
+      trialEndsAt: provisioned.subscription.endsAt,
     });
 
     return {
