@@ -60,7 +60,10 @@ if [ "${1:-}" = "--migrate" ]; then
   # pipe after the command — a masked migrate failure ships code against the
   # old schema, which is worse than a loud abort.
   echo "==> [3b] prisma migrate deploy"
-  run_ssh "cd ${REMOTE_DIR}/apps/api && npx prisma migrate deploy"
+  # The build step sources the root .env for NEXT_PUBLIC_*; this one needs it
+  # for DATABASE_URL. pm2 gets it from its own environment, so nothing else on
+  # the box ever noticed that this line ran without it.
+  run_ssh "cd ${REMOTE_DIR} && set -a && . ./.env && set +a && cd apps/api && npx prisma migrate deploy"
 fi
 
 echo "==> [4/4] restart pm2 + health check"
