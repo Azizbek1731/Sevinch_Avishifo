@@ -25,6 +25,8 @@ describe('admissions and charges (e2e)', () => {
   let patientId: string;
   let serviceId: string;
   let admissionId: string;
+  let historyNumber: string;
+  let stayInvoiceId: string;
 
   const auth = (t: LoginResult) => ({ Authorization: `Bearer ${t.accessToken}`, 'x-branch-id': clinic.branchId });
   const day = (offset = 0) => {
@@ -88,6 +90,7 @@ describe('admissions and charges (e2e)', () => {
       .expect(201);
     admissionId = res.body.data.id as string;
     expect(res.body.data.historyNumber).toMatch(/^KT-\d{4}-\d{4}$/);
+    historyNumber = res.body.data.historyNumber as string;
     expect(res.body.data.status).toBe('ACTIVE');
 
     const p = await prisma.patient.findUniqueOrThrow({ where: { id: patientId } });
@@ -360,17 +363,70 @@ describe('admissions and charges (e2e)', () => {
     expect(res.status).toBe(409);
   });
 
-  it('discharges once everything is billed, and returns the patient to ambulatory', async () => {
+  it('names the blocker instead of failing blankly', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`${API}/admissions/${admissionId}/discharge-check`)
+      .set(auth(doctor))
+      .expect(200);
+    expect(res.body.data.canDischarge).toBe(false);
+    expect(res.body.data.blockers).toContain('UNBILLED');
+    expect(res.body.data.unbilled.count).toBe(1);
+    expect(res.body.data.unbilled.total).toBe('50000.00');
+  });
+
+  it('still refuses once billed but unpaid, and says how much is owed', async () => {
     const rest = await request(app.getHttpServer())
       .get(`${API}/charges`)
       .set(auth(cashier))
       .query({ patientId, status: 'PENDING' })
       .expect(200);
+    stayInvoiceId = (
+      await request(app.getHttpServer())
+        .post(`${API}/charges/invoice`)
+        .set(auth(cashier))
+        .send({ chargeIds: (rest.body.data.items as Array<{ id: string }>).map((i) => i.id) })
+        .expect(201)
+    ).body.data.id as string;
+
+    // The stay is now reachable from its invoice — the link that makes a debt
+    // gate possible at all.
+    const check = await request(app.getHttpServer())
+      .get(`${API}/admissions/${admissionId}/discharge-check`)
+      .set(auth(doctor))
+      .expect(200);
+    expect(check.body.data.blockers).toEqual(['DEBT']);
+    expect(check.body.data.stayDebt).toBe('50000.00');
+    expect(check.body.data.stayInvoices).toHaveLength(1);
+
+    const res = await request(app.getHttpServer())
+      .post(`${API}/admissions/${admissionId}/discharge`)
+      .set(auth(doctor))
+      .send({ outcome: 'RECOVERED', finalDiagnosisMain: 'J18.9 Pnevmoniya' });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('ADMISSION_DEBT_UNPAID');
+    // The amount reaches the person who has to collect it.
+    expect(res.body.error.message).toContain('50000.00');
+  });
+
+  it('discharges once the stay is paid, and returns the patient to ambulatory', async () => {
+    // Cash lands in a drawer, so there has to be one open.
     await request(app.getHttpServer())
-      .post(`${API}/charges/invoice`)
+      .post(`${API}/shifts/open`)
       .set(auth(cashier))
-      .send({ chargeIds: (rest.body.data.items as Array<{ id: string }>).map((i) => i.id) })
+      .send({ openingCash: '0.00' })
       .expect(201);
+    await request(app.getHttpServer())
+      .post(`${API}/invoices/${stayInvoiceId}/payments`)
+      .set(auth(cashier))
+      .send({ amount: '50000.00', method: 'CASH', idempotencyKey: randomUUID() })
+      .expect(201);
+
+    const check = await request(app.getHttpServer())
+      .get(`${API}/admissions/${admissionId}/discharge-check`)
+      .set(auth(doctor))
+      .expect(200);
+    expect(check.body.data.canDischarge).toBe(true);
+    expect(check.body.data.stayDebt).toBe('0.00');
 
     await request(app.getHttpServer())
       .post(`${API}/admissions/${admissionId}/discharge`)
@@ -384,6 +440,9 @@ describe('admissions and charges (e2e)', () => {
 
     const p = await prisma.patient.findUniqueOrThrow({ where: { id: patientId } });
     expect(p.careType).toBe('AMBULATORY');
+    // "Settled at closure" is recorded as a fact, not left absent.
+    const adm = await prisma.admission.findUniqueOrThrow({ where: { id: admissionId } });
+    expect(adm.debtAtDischarge?.toFixed(2)).toBe('0.00');
 
     // A discharged history is closed to edits.
     const res = await request(app.getHttpServer())
@@ -391,6 +450,22 @@ describe('admissions and charges (e2e)', () => {
       .set(auth(doctor))
       .send({ complaints: 'kech qoldi' });
     expect(res.status).toBe(409);
+  });
+
+  it('lets the same patient be admitted again after discharge', async () => {
+    const again = await request(app.getHttpServer())
+      .post(`${API}/admissions`)
+      .set(auth(doctor))
+      .send({ patientId, ward: '2', bed: '3' })
+      .expect(201);
+    expect(again.body.data.historyNumber).not.toBe(historyNumber);
+
+    const p = await prisma.patient.findUniqueOrThrow({ where: { id: patientId } });
+    expect(p.careType).toBe('INPATIENT');
+
+    // And the first stay stays closed — a re-admission is a NEW history.
+    const old = await prisma.admission.findUniqueOrThrow({ where: { id: admissionId } });
+    expect(old.status).toBe('DISCHARGED');
   });
 
   it('will not let a billed treatment day be un-marked', async () => {

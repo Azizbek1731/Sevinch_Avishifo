@@ -54,5 +54,7 @@
   "RECORD_ACCESS_REQUIRED": "Ask the clinic to release your medical history",
   "APPOINTMENT_NOT_FOUND": "Appointment not found",
   "QUEUE_CLOSED": "The queue is closed",
-  "TRANSFER_COUNT_REQUIRED": "Enter the closing figure for the transfer book, or say why it could not be checked"
+  "TRANSFER_COUNT_REQUIRED": "Enter the closing figure for the transfer book, or say why it could not be checked",
+  "ADMISSION_CHARGES_UNBILLED": "Some services are not on an invoice yet",
+  "ADMISSION_DEBT_UNPAID": "This stay still has an unpaid balance"
 }

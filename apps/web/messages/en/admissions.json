@@ -22,7 +22,7 @@
   "admitted": "History opened: {number}",
   "discharge": "Discharge",
   "discharged": "Patient discharged",
-  "dischargeHint": "Every unpaid service must be invoiced before discharge.",
+  "dischargeHint": "Services are invoiced first, then paid — only then is the history closed.",
   "addOrder": "Add order",
   "orderAdded": "Order added",
   "addNote": "Add note",
@@ -95,5 +95,16 @@
   "pickPatientDescription": "Find and select the patient — then enter the department, ward and diagnosis.",
   "pickPatientPlaceholder": "Search by name, phone or card number...",
   "pickPatientEmpty": "Patient not found. Register them first.",
-  "pickPatientHint": "Type at least 2 characters to search."
+  "pickPatientHint": "Type at least 2 characters to search.",
+  "invoiceRaised": "Invoice raised: {number}",
+  "dischargeCheck": {
+    "unbilled": "{count} service(s) not yet invoiced — {total}",
+    "issueInvoice": "Raise invoice",
+    "debtTitle": "Owed for this stay",
+    "pay": "Pay",
+    "deposit": "Patient deposit",
+    "otherDebt": "Other debt (does not block discharge)",
+    "acknowledge": "Discharge with the debt unpaid (death or transfer). The amount is kept on the record.",
+    "needsCashier": "A cashier or manager must take the payment to clear this debt."
+  }
 }

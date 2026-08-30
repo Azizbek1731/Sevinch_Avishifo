@@ -180,6 +180,9 @@ export class ChargesService {
             quantity: c.quantity,
             unitPrice: c.unitPrice.toFixed(2),
             discount: '0',
+            // Carries the stay through to the invoice: without it a discharged
+            // history cannot say which bills belonged to it.
+            chargeItemId: c.id,
           })),
         },
         user,

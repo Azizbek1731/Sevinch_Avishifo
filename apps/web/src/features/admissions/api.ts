@@ -105,6 +105,32 @@ export interface AdmissionDetail extends AdmissionRow {
   }>;
 }
 
+/** What the API says stands between this stay and its discharge. */
+export interface DischargeCheck {
+  admissionId: string;
+  historyNumber: string;
+  status: 'ACTIVE' | 'DISCHARGED';
+  patientId: string;
+  canDischarge: boolean;
+  blockers: Array<'UNBILLED' | 'DEBT'>;
+  unbilled: {
+    count: number;
+    total: MoneyString;
+    items: Array<{ id: string; title: ChargeRow['title']; unitPrice: MoneyString; quantity: number }>;
+  };
+  stayDebt: MoneyString;
+  stayInvoices: Array<{
+    id: string;
+    number: string;
+    status: string;
+    total: MoneyString;
+    paidTotal: MoneyString;
+    due: MoneyString;
+  }>;
+  otherDebt: MoneyString;
+  deposit: MoneyString;
+}
+
 export const admissionsApi = {
   list: (q: { status?: string; patientId?: string; page?: number; limit?: number }) =>
     api.get<AdmissionRow[]>('/admissions', { ...q }),
@@ -112,6 +138,7 @@ export const admissionsApi = {
   admit: (body: AdmitPatientInput) => api.post<AdmissionRow>('/admissions', body),
   update: (id: string, body: UpdateAdmissionInput) => api.patch<AdmissionRow>(`/admissions/${id}`, body),
   discharge: (id: string, body: DischargeInput) => api.post<AdmissionRow>(`/admissions/${id}/discharge`, body),
+  dischargeCheck: (id: string) => api.get<DischargeCheck>(`/admissions/${id}/discharge-check`),
 
   createOrder: (id: string, body: CreateOrderInput) =>
     api.post<{ id: string; days: string[] }>(`/admissions/${id}/orders`, body),

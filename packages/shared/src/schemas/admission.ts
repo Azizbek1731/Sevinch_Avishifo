@@ -66,6 +66,13 @@ export const dischargeSchema = z.object({
   finalDiagnosisComorbid: z.string().trim().max(500).optional(),
   epicrisis: z.string().max(8000).optional(),
   dischargedAt: z.string().datetime().optional(),
+  /**
+   * Close the stay even though it still owes money. A death or a transfer
+   * cannot wait for the family to settle the bill, and a discharge date
+   * recorded days late is a falsified record. What was owed at that instant is
+   * stored on the admission, so the debt is carried, not forgiven.
+   */
+  debtAcknowledged: z.coerce.boolean().optional(),
 });
 export type DischargeInput = z.infer<typeof dischargeSchema>;
 

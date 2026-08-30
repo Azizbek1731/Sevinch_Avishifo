@@ -18,6 +18,12 @@ export const invoiceLineSchema = z
     discount: moneySchema.default('0'),
     /** Doctor who performed the service (KPI/commission). */
     performerUserId: idSchema.optional(),
+    /**
+     * The ward charge this line bills, when the line comes from a stay. Links
+     * ChargeItem to InvoiceLine so an admission's outstanding money can be
+     * found; optional, so every existing caller is unaffected.
+     */
+    chargeItemId: idSchema.optional(),
   })
   .refine((l) => l.serviceId !== undefined || l.title !== undefined, {
     message: 'Line requires serviceId or title',

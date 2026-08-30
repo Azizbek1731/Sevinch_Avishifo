@@ -56,6 +56,12 @@ export const ErrorCode = {
   PAYMENT_FAILED: 'PAYMENT_FAILED',
   PAYMENT_EXCEEDS_DUE: 'PAYMENT_EXCEEDS_DUE',
   SHIFT_NOT_OPEN: 'SHIFT_NOT_OPEN',
+
+  // Statsionar — the two reasons a stay cannot be closed yet. Distinct codes so
+  // the discharge dialog can offer the right next step instead of a dead end:
+  // one needs an invoice raised, the other needs money taken.
+  ADMISSION_CHARGES_UNBILLED: 'ADMISSION_CHARGES_UNBILLED',
+  ADMISSION_DEBT_UNPAID: 'ADMISSION_DEBT_UNPAID',
   /** Someone else already holds an open drawer in this branch. */
   BRANCH_DRAWER_ALREADY_OPEN: 'BRANCH_DRAWER_ALREADY_OPEN',
   /** The transfer register had activity, so closing needs a counted figure or a stated reason. */

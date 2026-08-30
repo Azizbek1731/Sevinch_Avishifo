@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { BedDouble, Plus } from 'lucide-react';
 import { formatTz } from '@/lib/dates';
-import { Link } from '@/i18n/routing';
+import { Link, useRouter } from '@/i18n/routing';
 import { PageHeader } from '@/components/page-header';
 import { EmptyState } from '@/components/empty-state';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +29,7 @@ import { AdmitPickerDialog } from './admit-picker-dialog';
 export function AdmissionsPage() {
   const t = useTranslations('admissions');
   const can = usePermissions();
+  const router = useRouter();
   const [status, setStatus] = useState<'ACTIVE' | 'DISCHARGED'>('ACTIVE');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [admitting, setAdmitting] = useState<{ id: string; fullName: string } | null>(null);
@@ -104,9 +105,21 @@ export function AdmissionsPage() {
                   // Bed-days as the ward counts them: the day of admission counts.
                   const days = Math.max(1, Math.ceil((to - from) / 86_400_000));
                   return (
-                    <TableRow key={a.id}>
+                    // The whole row opens the stay. Only the history number used
+                    // to be a link, so clicking the patient's name — the obvious
+                    // target — did nothing, and the discharge button on the
+                    // detail page was never found.
+                    <TableRow
+                      key={a.id}
+                      className="cursor-pointer"
+                      onClick={() => router.push(`/admissions/${a.id}`)}
+                    >
                       <TableCell>
-                        <Link href={`/admissions/${a.id}`} className="font-mono text-xs hover:underline">
+                        <Link
+                          href={`/admissions/${a.id}`}
+                          className="font-mono text-xs hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {a.historyNumber}
                         </Link>
                       </TableCell>

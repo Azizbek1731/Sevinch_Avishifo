@@ -43,6 +43,13 @@ interface LinePlan {
   discount: Prisma.Decimal;
   lineTotal: Prisma.Decimal;
   performerUserId: string | null;
+  /**
+   * The ward charge this line was raised from, when there is one. Written back
+   * onto ChargeItem.invoiceLineId so a stay can be traced to the invoices that
+   * billed it — the column existed from the first migration but nothing ever
+   * filled it, so "what does this admission still owe" had no answer at all.
+   */
+  chargeItemId: string | null;
 }
 
 /** Payment view returned to provider webhook handlers (Payme state codes). */
@@ -291,6 +298,7 @@ export class InvoicesService {
           discount,
           lineTotal,
           performerUserId: l.performerUserId ?? visit?.doctorUserId ?? null,
+          chargeItemId: l.chargeItemId ?? null,
         });
       }
     } else if (visit) {
@@ -312,6 +320,7 @@ export class InvoicesService {
           discount: new Prisma.Decimal(0),
           lineTotal: unitPrice,
           performerUserId: visit.doctorUserId,
+          chargeItemId: null,
         });
       }
     }
@@ -354,6 +363,21 @@ export class InvoicesService {
       },
       include: { lines: true },
     });
+
+    // Point each ward charge at the line that billed it. Prisma's nested create
+    // gives no way to carry the charge id through, so the lines are matched back
+    // by position — `create` preserves the order of the array it was given.
+    const chargeLinks = plans
+      .map((p, i) => ({ chargeItemId: p.chargeItemId, lineId: invoice.lines[i]?.id }))
+      .filter((l): l is { chargeItemId: string; lineId: string } =>
+        Boolean(l.chargeItemId) && Boolean(l.lineId),
+      );
+    for (const link of chargeLinks) {
+      await this.prisma.db.chargeItem.update({
+        where: { id: link.chargeItemId },
+        data: { invoiceLineId: link.lineId },
+      });
+    }
 
     await this.audit.log({
       action: AuditAction.CREATE,

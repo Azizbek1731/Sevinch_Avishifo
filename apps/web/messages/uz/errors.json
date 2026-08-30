@@ -54,5 +54,7 @@
   "RECORD_ACCESS_REQUIRED": "Kasallik tarixini ko‘rish uchun klinikadan ruxsat oling",
   "APPOINTMENT_NOT_FOUND": "Qabul topilmadi",
   "QUEUE_CLOSED": "Navbat yopilgan",
-  "TRANSFER_COUNT_REQUIRED": "O‘tkazma kassasi uchun yakuniy summani kiriting yoki sababini yozing"
+  "TRANSFER_COUNT_REQUIRED": "O‘tkazma kassasi uchun yakuniy summani kiriting yoki sababini yozing",
+  "ADMISSION_CHARGES_UNBILLED": "Hisob-fakturaga kiritilmagan xizmatlar bor",
+  "ADMISSION_DEBT_UNPAID": "Bu yotqizish bo‘yicha to‘lanmagan qarz bor"
 }

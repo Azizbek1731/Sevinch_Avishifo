@@ -688,6 +688,11 @@ model Admission {
 
   admittedAt   DateTime  @db.Timestamptz(6)
   dischargedAt DateTime? @db.Timestamptz(6)
+  /// What this stay still owed at the instant it was closed. 0.00 means it was
+  /// settled; a value means it was closed over an acknowledged debt. Stored
+  /// rather than derived, because the invoices behind it can later be
+  /// cancelled or refunded and would no longer answer the same question.
+  debtAtDischarge Decimal? @db.Decimal(14, 2)
 
   // ------- 003 title page -------
   referredBy                 String? // kim yuborgan

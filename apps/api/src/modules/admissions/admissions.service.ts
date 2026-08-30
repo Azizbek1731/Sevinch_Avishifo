@@ -162,38 +162,219 @@ export class AdmissionsService {
     return this.map(updated);
   }
 
-  async discharge(id: string, dto: DischargeInput): Promise<Record<string, unknown>> {
+  /**
+   * The money picture for one stay.
+   *
+   * "This stay's debt" is reachable only through the charges it raised:
+   * ChargeItem.invoiceLineId -> InvoiceLine -> Invoice. Debt itself is the same
+   * figure the patient card and the debtors report use — the unpaid remainder
+   * of ISSUED/PARTIALLY_PAID invoices — so the three can never disagree.
+   *
+   * An invoice that mixes ward lines with walk-in lines blocks for its WHOLE
+   * remaining balance. paidTotal is an invoice-level number with no per-line
+   * allocation, so any "the ward's share of this" figure would be invented, and
+   * a cashier cannot collect an invented number.
+   */
+  private async stayMoney(admissionId: string, patientId: string): Promise<{
+    pending: Array<{ id: string; title: Prisma.JsonValue; unitPrice: string; quantity: number }>;
+    pendingTotal: Prisma.Decimal;
+    stayInvoices: Array<{
+      id: string;
+      number: string;
+      status: string;
+      total: string;
+      paidTotal: string;
+      due: string;
+    }>;
+    stayDebt: Prisma.Decimal;
+    otherDebt: Prisma.Decimal;
+    deposit: Prisma.Decimal;
+  }> {
+    const zero = new Prisma.Decimal(0);
+
+    const pendingRows = await this.prisma.db.chargeItem.findMany({
+      where: { admissionId, status: 'PENDING' },
+      select: { id: true, title: true, unitPrice: true, quantity: true },
+      orderBy: { date: 'asc' },
+    });
+    const pendingTotal = pendingRows.reduce(
+      (acc, c) => acc.add(c.unitPrice.mul(c.quantity)),
+      zero,
+    );
+
+    const linked = await this.prisma.db.chargeItem.findMany({
+      where: { admissionId, invoiceLineId: { not: null } },
+      select: { invoiceLineId: true },
+    });
+    const lineIds = linked
+      .map((l) => l.invoiceLineId)
+      .filter((x): x is string => x !== null);
+    const stayInvoiceIds =
+      lineIds.length > 0
+        ? [
+            ...new Set(
+              (
+                await this.prisma.db.invoiceLine.findMany({
+                  where: { id: { in: lineIds } },
+                  select: { invoiceId: true },
+                })
+              ).map((l) => l.invoiceId),
+            ),
+          ]
+        : [];
+
+    const openStay =
+      stayInvoiceIds.length > 0
+        ? await this.prisma.db.invoice.findMany({
+            where: { id: { in: stayInvoiceIds }, status: { in: ['ISSUED', 'PARTIALLY_PAID'] } },
+            select: { id: true, number: true, status: true, total: true, paidTotal: true },
+            orderBy: { createdAt: 'asc' },
+          })
+        : [];
+    const stayDebt = openStay.reduce((acc, i) => acc.add(i.total.sub(i.paidTotal)), zero);
+
+    // Everything else the patient owes. Shown so the desk knows, never enforced
+    // — see discharge() for why it must not hold a bed.
+    const allOpen = await this.prisma.db.invoice.aggregate({
+      where: { patientId, status: { in: ['ISSUED', 'PARTIALLY_PAID'] } },
+      _sum: { total: true, paidTotal: true },
+    });
+    const totalDebt = (allOpen._sum.total ?? zero).sub(allOpen._sum.paidTotal ?? zero);
+    const otherDebt = totalDebt.sub(stayDebt);
+
+    const patient = await this.prisma.db.patient.findFirst({
+      where: { id: patientId },
+      select: { balance: true },
+    });
+
+    return {
+      pending: pendingRows.map((c) => ({
+        id: c.id,
+        title: c.title,
+        unitPrice: c.unitPrice.toFixed(2),
+        quantity: c.quantity,
+      })),
+      pendingTotal,
+      stayInvoices: openStay.map((i) => ({
+        id: i.id,
+        number: i.number,
+        status: i.status,
+        total: i.total.toFixed(2),
+        paidTotal: i.paidTotal.toFixed(2),
+        due: i.total.sub(i.paidTotal).toFixed(2),
+      })),
+      stayDebt,
+      otherDebt: otherDebt.gt(0) ? otherDebt : zero,
+      deposit: patient?.balance ?? zero,
+    };
+  }
+
+  /**
+   * What stands between this stay and its discharge, answered before the user
+   * fills in a form they may not be allowed to submit.
+   */
+  async dischargeCheck(id: string): Promise<Record<string, unknown>> {
+    const a = await this.require(id);
+    const money = await this.stayMoney(id, a.patientId);
+    const blockers: string[] = [];
+    if (money.pending.length > 0) blockers.push('UNBILLED');
+    if (money.stayDebt.gt(0)) blockers.push('DEBT');
+
+    return {
+      admissionId: a.id,
+      historyNumber: a.historyNumber,
+      status: a.status,
+      patientId: a.patientId,
+      canDischarge: a.status === 'ACTIVE' && blockers.length === 0,
+      blockers,
+      unbilled: {
+        count: money.pending.length,
+        total: money.pendingTotal.toFixed(2),
+        items: money.pending,
+      },
+      stayDebt: money.stayDebt.toFixed(2),
+      stayInvoices: money.stayInvoices,
+      otherDebt: money.otherDebt.toFixed(2),
+      deposit: money.deposit.toFixed(2),
+    };
+  }
+
+  async discharge(
+    id: string,
+    dto: DischargeInput,
+    user: AuthUser,
+  ): Promise<Record<string, unknown>> {
     const a = await this.require(id);
     this.requireActive(a);
 
-    // Discharging with money still unbilled is how a stay ends up written off,
-    // so it is refused rather than warned about.
-    const pending = await this.prisma.db.chargeItem.count({
-      where: { admissionId: id, status: 'PENDING' },
-    });
-    if (pending > 0) {
+    const money = await this.stayMoney(id, a.patientId);
+
+    // Services not yet on a bill. Discharging over them is how a stay gets
+    // silently written off, so it is refused — but with the count, so the
+    // dialog can offer to raise the invoice instead of dead-ending.
+    if (money.pending.length > 0) {
       throw new AppException(
-        ErrorCode.VALIDATION_ERROR,
-        `To‘lanmagan ${pending} ta xizmat bor — avval hisob-faktura chiqaring`,
+        ErrorCode.ADMISSION_CHARGES_UNBILLED,
+        `Hisob-fakturaga kiritilmagan ${money.pending.length} ta xizmat bor — avval hisob-faktura chiqaring`,
         409,
+        [{ count: money.pending.length, total: money.pendingTotal.toFixed(2) }],
       );
     }
 
-    const updated = await this.prisma.db.admission.update({
-      where: { id },
-      data: {
-        status: 'DISCHARGED',
-        dischargedAt: dto.dischargedAt ? new Date(dto.dischargedAt) : new Date(),
-        outcome: dto.outcome,
-        finalDiagnosisMain: dto.finalDiagnosisMain,
-        finalDiagnosisComplication: dto.finalDiagnosisComplication ?? null,
-        finalDiagnosisComorbid: dto.finalDiagnosisComorbid ?? null,
-        epicrisis: dto.epicrisis ?? a.epicrisis,
-      },
-    });
-    await this.prisma.db.patient.update({
-      where: { id: a.patientId },
-      data: { careType: 'AMBULATORY' },
+    // Money owed for THIS stay. Deliberately not the patient's whole debt: the
+    // same patient may run up outpatient bills while lying in the bed, and an
+    // unrelated old invoice must never be what keeps a bed occupied. Old debt
+    // is collections (the debtors report), not bed management.
+    if (money.stayDebt.gt(0) && dto.debtAcknowledged !== true) {
+      throw new AppException(
+        ErrorCode.ADMISSION_DEBT_UNPAID,
+        `Bu yotqizish bo‘yicha ${money.stayDebt.toFixed(2)} so‘m qarz bor — avval to‘lovni qabul qiling`,
+        409,
+        [{ debt: money.stayDebt.toFixed(2), invoices: money.stayInvoices }],
+      );
+    }
+
+    // Closing over a debt is a money decision, not a clinical one.
+    if (money.stayDebt.gt(0) && !user.permissions.includes('payments.create')) {
+      throw new AppException(
+        ErrorCode.FORBIDDEN,
+        'Qarzni tan olib chiqarish uchun to‘lov huquqi kerak',
+        403,
+      );
+    }
+
+    // One transaction: a discharge that updated the admission but not the
+    // patient left an AMBULATORY-less patient with no ACTIVE stay — the ward
+    // showed them gone while the patient card refused a new admission.
+    const updated = await this.prisma.db.$transaction(async (tx) => {
+      const adm = await tx.admission.update({
+        where: { id },
+        data: {
+          status: 'DISCHARGED',
+          dischargedAt: dto.dischargedAt ? new Date(dto.dischargedAt) : new Date(),
+          outcome: dto.outcome,
+          finalDiagnosisMain: dto.finalDiagnosisMain,
+          finalDiagnosisComplication: dto.finalDiagnosisComplication ?? null,
+          finalDiagnosisComorbid: dto.finalDiagnosisComorbid ?? null,
+          epicrisis: dto.epicrisis ?? a.epicrisis,
+          // Written on every discharge, 0.00 included: "settled at closure" is
+          // a fact worth recording, and the invoices behind it may later be
+          // cancelled or refunded and stop answering the question.
+          debtAtDischarge: money.stayDebt,
+        },
+      });
+      // Only when this was their last open stay — a patient cannot be sent home
+      // from one ward while still lying in another.
+      const stillIn = await tx.admission.count({
+        where: { patientId: a.patientId, status: 'ACTIVE', id: { not: id } },
+      });
+      if (stillIn === 0) {
+        await tx.patient.update({
+          where: { id: a.patientId },
+          data: { careType: 'AMBULATORY' },
+        });
+      }
+      return adm;
     });
     return this.map(updated);
   }

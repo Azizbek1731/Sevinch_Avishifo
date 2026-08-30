@@ -56,10 +56,21 @@ export class AdmissionsController {
     return this.admissions.update(id, dto);
   }
 
+  /** What stands between this stay and discharge — unbilled services, debt. */
+  @Get(':id/discharge-check')
+  @RequirePermissions('admissions.read')
+  dischargeCheck(@Param('id') id: string): Promise<Record<string, unknown>> {
+    return this.admissions.dischargeCheck(id);
+  }
+
   @Post(':id/discharge')
   @RequirePermissions('admissions.write')
-  discharge(@Param('id') id: string, @Body() dto: DischargeDto): Promise<Record<string, unknown>> {
-    return this.admissions.discharge(id, dto);
+  discharge(
+    @Param('id') id: string,
+    @Body() dto: DischargeDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Record<string, unknown>> {
+    return this.admissions.discharge(id, dto, user);
   }
 
   // ------------------------------------------------------- treatment sheet

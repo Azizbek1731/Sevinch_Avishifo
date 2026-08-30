@@ -22,7 +22,7 @@
   "admitted": "Kasallik tarixi ochildi: {number}",
   "discharge": "Chiqarish",
   "discharged": "Bemor chiqarildi",
-  "dischargeHint": "Chiqarishdan oldin barcha to‘lanmagan xizmatlar hisob-fakturaga kiritilishi kerak.",
+  "dischargeHint": "Avval xizmatlar hisob-fakturaga kiritiladi, keyin to‘lov olinadi — shundan so‘ng kasallik tarixi yopiladi.",
   "addOrder": "Tayinlov qo‘shish",
   "orderAdded": "Tayinlov qo‘shildi",
   "addNote": "Kundalik yozish",
@@ -95,5 +95,16 @@
   "pickPatientDescription": "Bemorni qidirib tanlang — keyin bo'lim, palata va tashxis kiritiladi.",
   "pickPatientPlaceholder": "Ism, telefon yoki karta raqami bo'yicha qidiring...",
   "pickPatientEmpty": "Bemor topilmadi. Avval uni ro'yxatga oling.",
-  "pickPatientHint": "Qidirish uchun kamida 2 ta harf yozing."
+  "pickPatientHint": "Qidirish uchun kamida 2 ta harf yozing.",
+  "invoiceRaised": "Hisob-faktura chiqarildi: {number}",
+  "dischargeCheck": {
+    "unbilled": "Hisob-fakturaga kiritilmagan {count} ta xizmat — {total}",
+    "issueInvoice": "Hisob-faktura chiqarish",
+    "debtTitle": "Shu yotqizish bo‘yicha qarz",
+    "pay": "To‘lash",
+    "deposit": "Bemor depoziti",
+    "otherDebt": "Boshqa qarzlar (chiqarishga to‘sqinlik qilmaydi)",
+    "acknowledge": "Qarz to‘lanmagan holda chiqarish (vafot etgan yoki boshqa muassasaga o‘tkazilgan). Qarz summasi tarixda saqlanadi.",
+    "needsCashier": "Qarzni yopish uchun kassir yoki rahbar to‘lovni qabul qilishi kerak."
+  }
 }
