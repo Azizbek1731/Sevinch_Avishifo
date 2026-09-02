@@ -139,6 +139,7 @@ export const admissionsApi = {
   update: (id: string, body: UpdateAdmissionInput) => api.patch<AdmissionRow>(`/admissions/${id}`, body),
   discharge: (id: string, body: DischargeInput) => api.post<AdmissionRow>(`/admissions/${id}/discharge`, body),
   dischargeCheck: (id: string) => api.get<DischargeCheck>(`/admissions/${id}/discharge-check`),
+  remove: (id: string) => api.delete<{ id: string; invoicedKept: number }>(`/admissions/${id}`),
 
   createOrder: (id: string, body: CreateOrderInput) =>
     api.post<{ id: string; days: string[] }>(`/admissions/${id}/orders`, body),

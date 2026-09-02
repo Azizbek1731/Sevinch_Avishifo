@@ -126,11 +126,23 @@ export class ChargesService {
     const c = await this.prisma.db.chargeItem.findFirst({ where: { id } });
     if (!c) throw new AppException(ErrorCode.NOT_FOUND, 'Yozuv topilmadi', 404);
     if (c.status === 'INVOICED') {
-      throw new AppException(
-        ErrorCode.VALIDATION_ERROR,
-        'Hisob-fakturaga kiritilgan xizmatni bekor qilib bo‘lmaydi',
-        409,
-      );
+      // …unless the bill it was on is gone. Cancelling an invoice used to leave
+      // its services INVOICED forever: unbillable because already claimed, and
+      // unremovable because of this check. Nothing could then close the stay.
+      const line = c.invoiceLineId
+        ? await this.prisma.db.invoiceLine.findFirst({
+            where: { id: c.invoiceLineId },
+            select: { invoice: { select: { status: true } } },
+          })
+        : null;
+      const billIsGone = line === null || line.invoice.status === 'CANCELLED';
+      if (!billIsGone) {
+        throw new AppException(
+          ErrorCode.VALIDATION_ERROR,
+          'Xizmat hisob-fakturada — avval hisob-fakturani bekor qiling',
+          409,
+        );
+      }
     }
     await this.prisma.db.chargeItem.update({ where: { id }, data: { status: 'CANCELLED' } });
     return { id };

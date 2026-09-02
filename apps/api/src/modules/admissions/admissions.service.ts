@@ -148,6 +148,60 @@ export class AdmissionsService {
     }
   }
 
+  /**
+   * Removes a stay outright — the one opened on the wrong patient, or the
+   * duplicate opened because the first attempt looked like it failed.
+   *
+   * Money already billed is left alone: an invoice is a document the patient
+   * may hold a copy of, and deleting a stay must not quietly rewrite it. Only
+   * the charges this stay raised and never billed are cancelled with it, along
+   * with the treatment sheet and rounds, which mean nothing without the stay.
+   */
+  async remove(id: string): Promise<{ id: string; invoicedKept: number }> {
+    const a = await this.require(id);
+
+    const invoicedKept = await this.prisma.db.chargeItem.count({
+      where: { admissionId: id, status: 'INVOICED' },
+    });
+
+    await this.prisma.db.$transaction(async (tx) => {
+      const orders = await tx.treatmentOrder.findMany({
+        where: { admissionId: id },
+        select: { id: true },
+      });
+      const orderIds = orders.map((o) => o.id);
+      // Charges point at administrations, so they go first.
+      await tx.chargeItem.deleteMany({ where: { admissionId: id, status: { not: 'INVOICED' } } });
+      // A billed charge outlives the stay, but must stop pointing at a row
+      // that no longer exists.
+      await tx.chargeItem.updateMany({
+        where: { admissionId: id },
+        data: { admissionId: null, administrationId: null },
+      });
+      if (orderIds.length > 0) {
+        await tx.treatmentAdministration.deleteMany({ where: { orderId: { in: orderIds } } });
+      }
+      await tx.treatmentOrder.deleteMany({ where: { admissionId: id } });
+      await tx.admissionDailyNote.deleteMany({ where: { admissionId: id } });
+      await tx.admission.delete({ where: { id } });
+
+      // Only when this was their last open stay — the same guard discharge uses.
+      if (a.status === 'ACTIVE') {
+        const stillIn = await tx.admission.count({
+          where: { patientId: a.patientId, status: 'ACTIVE' },
+        });
+        if (stillIn === 0) {
+          await tx.patient.update({
+            where: { id: a.patientId },
+            data: { careType: 'AMBULATORY' },
+          });
+        }
+      }
+    });
+
+    return { id, invoicedKept };
+  }
+
   async update(id: string, dto: UpdateAdmissionInput): Promise<Record<string, unknown>> {
     const a = await this.require(id);
     this.requireActive(a);
@@ -309,38 +363,44 @@ export class AdmissionsService {
 
     const money = await this.stayMoney(id, a.patientId);
 
-    // Services not yet on a bill. Discharging over them is how a stay gets
-    // silently written off, so it is refused — but with the count, so the
-    // dialog can offer to raise the invoice instead of dead-ending.
-    if (money.pending.length > 0) {
-      throw new AppException(
-        ErrorCode.ADMISSION_CHARGES_UNBILLED,
-        `Hisob-fakturaga kiritilmagan ${money.pending.length} ta xizmat bor — avval hisob-faktura chiqaring`,
-        409,
-        [{ count: money.pending.length, total: money.pendingTotal.toFixed(2) }],
-      );
-    }
-
-    // Money owed for THIS stay. Deliberately not the patient's whole debt: the
-    // same patient may run up outpatient bills while lying in the bed, and an
-    // unrelated old invoice must never be what keeps a bed occupied. Old debt
-    // is collections (the debtors report), not bed management.
-    if (money.stayDebt.gt(0) && dto.debtAcknowledged !== true) {
-      throw new AppException(
-        ErrorCode.ADMISSION_DEBT_UNPAID,
-        `Bu yotqizish bo‘yicha ${money.stayDebt.toFixed(2)} so‘m qarz bor — avval to‘lovni qabul qiling`,
-        409,
-        [{ debt: money.stayDebt.toFixed(2), invoices: money.stayInvoices }],
-      );
-    }
-
-    // Closing over a debt is a money decision, not a clinical one.
-    if (money.stayDebt.gt(0) && !user.permissions.includes('payments.create')) {
+    // `force` closes the stay over anything still outstanding. It is a
+    // deliberate act by someone holding admissions.force (the desk and the
+    // administrator), never the default path — the blockers below still guide
+    // everyone else through billing and payment first.
+    const forced = dto.force === true || dto.debtAcknowledged === true;
+    if (forced && !user.permissions.includes('admissions.force')) {
       throw new AppException(
         ErrorCode.FORBIDDEN,
-        'Qarzni tan olib chiqarish uchun to‘lov huquqi kerak',
+        'Majburiy chiqarish uchun administrator yoki qabulxona huquqi kerak',
         403,
       );
+    }
+
+    if (!forced) {
+      // Services not yet on a bill. Discharging over them is how a stay gets
+      // silently written off, so it is refused — but with the count, so the
+      // dialog can offer to raise the invoice instead of dead-ending.
+      if (money.pending.length > 0) {
+        throw new AppException(
+          ErrorCode.ADMISSION_CHARGES_UNBILLED,
+          `Hisob-fakturaga kiritilmagan ${money.pending.length} ta xizmat bor — avval hisob-faktura chiqaring`,
+          409,
+          [{ count: money.pending.length, total: money.pendingTotal.toFixed(2) }],
+        );
+      }
+
+      // Money owed for THIS stay. Deliberately not the patient's whole debt:
+      // the same patient may run up outpatient bills while lying in the bed,
+      // and an unrelated old invoice must never be what keeps a bed occupied.
+      // Old debt is collections (the debtors report), not bed management.
+      if (money.stayDebt.gt(0)) {
+        throw new AppException(
+          ErrorCode.ADMISSION_DEBT_UNPAID,
+          `Bu yotqizish bo‘yicha ${money.stayDebt.toFixed(2)} so‘m qarz bor — avval to‘lovni qabul qiling`,
+          409,
+          [{ debt: money.stayDebt.toFixed(2), invoices: money.stayInvoices }],
+        );
+      }
     }
 
     // One transaction: a discharge that updated the admission but not the
@@ -357,10 +417,12 @@ export class AdmissionsService {
           finalDiagnosisComplication: dto.finalDiagnosisComplication ?? null,
           finalDiagnosisComorbid: dto.finalDiagnosisComorbid ?? null,
           epicrisis: dto.epicrisis ?? a.epicrisis,
-          // Written on every discharge, 0.00 included: "settled at closure" is
-          // a fact worth recording, and the invoices behind it may later be
-          // cancelled or refunded and stop answering the question.
-          debtAtDischarge: money.stayDebt,
+          // Everything still outstanding, billed or not. Written on every
+          // discharge, 0.00 included: "settled at closure" is a fact worth
+          // recording, and the invoices behind it may later be cancelled or
+          // refunded and stop answering the question. When a stay is forced
+          // out, this is the only place the amount survives.
+          debtAtDischarge: money.stayDebt.add(money.pendingTotal),
         },
       });
       // Only when this was their last open stay — a patient cannot be sent home

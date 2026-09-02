@@ -50,6 +50,13 @@ export const PERMISSIONS = [
   'admissions.write',
   /// Marking the treatment sheet — the ward nurse and the desk, not only doctors.
   'admissions.administer',
+  /**
+   * Close or remove a stay that still has loose ends — services not yet on a
+   * bill, or a bill not yet paid. The ward must never be a room a patient
+   * cannot be let out of: the bed is physical, the paperwork can be finished
+   * afterwards, and what was outstanding is recorded rather than forgotten.
+   */
+  'admissions.force',
   'charges.read',
   'charges.write',
   'shifts.manage',
@@ -127,6 +134,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'admissions.read',
     'admissions.write',
     'admissions.administer',
+    'admissions.force',
     'charges.read',
     'charges.write',
     'patients.write',
@@ -209,6 +217,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'admissions.read',
     'admissions.write',
     'admissions.administer',
+    'admissions.force',
     'charges.read',
     'charges.write',
     'patients.write',

@@ -4,10 +4,20 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { ArrowLeft, LogOut, Plus, Printer } from 'lucide-react';
+import { ArrowLeft, LogOut, Plus, Printer, Trash2 } from 'lucide-react';
 import { formatTz } from '@/lib/dates';
 import { Link, useRouter } from '@/i18n/routing';
 import { usePermissions } from '@/hooks/use-permissions';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,6 +67,7 @@ function NarrativeField({
 
 export function AdmissionDetail({ admissionId }: { admissionId: string }) {
   const t = useTranslations('admissions');
+  const tc = useTranslations('common');
   const can = usePermissions();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -64,7 +75,22 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
 
   const [orderOpen, setOrderOpen] = useState(false);
   const [dischargeOpen, setDischargeOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
   const [note, setNote] = useState({ condition: '', temperatureC: '', pulseBpm: '' });
+
+  const remove = useMutation({
+    mutationFn: () => admissionsApi.remove(admissionId),
+    onSuccess: (res) => {
+      void queryClient.invalidateQueries({ queryKey: ['admissions'] });
+      toast.success(
+        res.data.invoicedKept > 0
+          ? t('removedKeptInvoiced', { count: res.data.invoicedKept })
+          : t('removed'),
+      );
+      router.push('/admissions');
+    },
+    onError: errorToast,
+  });
 
   const query = useQuery({
     queryKey: ['admission', admissionId],
@@ -138,8 +164,34 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
               {t('discharge')}
             </Button>
           ) : null}
+          {/* For the stay opened on the wrong patient, or the duplicate opened
+              because the first attempt looked like it had failed. */}
+          {can('admissions.force') ? (
+            <Button variant="ghost" size="icon" onClick={() => setRemoveOpen(true)} aria-label={t('remove')}>
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          ) : null}
         </div>
       </div>
+
+      <AlertDialog open={removeOpen} onOpenChange={setRemoveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('removeTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('removeHint')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{tc('cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={remove.isPending}
+              onClick={() => remove.mutate()}
+            >
+              {t('remove')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Tabs defaultValue="sheet">
         <TabsList className="flex h-auto w-full flex-wrap justify-start">

@@ -63,6 +63,13 @@ export class AdmissionsController {
     return this.admissions.dischargeCheck(id);
   }
 
+  /** Remove a stay opened by mistake. Billed money is kept — see remove(). */
+  @Delete(':id')
+  @RequirePermissions('admissions.force')
+  remove(@Param('id') id: string): Promise<{ id: string; invoicedKept: number }> {
+    return this.admissions.remove(id);
+  }
+
   @Post(':id/discharge')
   @RequirePermissions('admissions.write')
   discharge(

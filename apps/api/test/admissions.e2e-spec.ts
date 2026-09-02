@@ -468,6 +468,145 @@ describe('admissions and charges (e2e)', () => {
     expect(old.status).toBe('DISCHARGED');
   });
 
+  // ------------------------------------------------- never a room with no door
+
+  it('lets the desk close a stay that still owes, and remembers what it owed', async () => {
+    // The stay from the re-admission above, with a service given and unbilled.
+    const stay = await prisma.admission.findFirstOrThrow({
+      where: { patientId, status: 'ACTIVE' },
+    });
+    await request(app.getHttpServer())
+      .post(`${API}/charges`)
+      .set(auth(recep))
+      .send({ patientId, serviceId, date: day(0), quantity: 1, admissionId: stay.id })
+      .expect(201);
+
+    // Refused without saying so explicitly...
+    const blocked = await request(app.getHttpServer())
+      .post(`${API}/admissions/${stay.id}/discharge`)
+      .set(auth(doctor))
+      .send({ outcome: 'IMPROVED', finalDiagnosisMain: 'J18.9' });
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error.code).toBe('ADMISSION_CHARGES_UNBILLED');
+
+    // ...and the doctor cannot force it either — that is a desk decision.
+    const forbidden = await request(app.getHttpServer())
+      .post(`${API}/admissions/${stay.id}/discharge`)
+      .set(auth(doctor))
+      .send({ outcome: 'IMPROVED', finalDiagnosisMain: 'J18.9', force: true });
+    expect(forbidden.status).toBe(403);
+
+    // Reception can, and the amount left behind is written onto the history.
+    await request(app.getHttpServer())
+      .post(`${API}/admissions/${stay.id}/discharge`)
+      .set(auth(recep))
+      .send({ outcome: 'IMPROVED', finalDiagnosisMain: 'J18.9', force: true })
+      .expect(201);
+
+    const closed = await prisma.admission.findUniqueOrThrow({ where: { id: stay.id } });
+    expect(closed.status).toBe('DISCHARGED');
+    expect(closed.debtAtDischarge?.toFixed(2)).toBe('50000.00');
+    // Nothing was forgiven: the service is still there to be billed.
+    const still = await prisma.chargeItem.count({
+      where: { admissionId: stay.id, status: 'PENDING' },
+    });
+    expect(still).toBe(1);
+  });
+
+  it('frees a stay whose invoice was cancelled, instead of stranding it', async () => {
+    const p3 = await prisma.patient.create({
+      data: {
+        clinicId: clinic.clinicId,
+        mrn: `AD3-${randomUUID().slice(0, 6)}`,
+        firstName: 'Bekor',
+        lastName: 'Qilingan',
+        fullName: 'Bekor Qilingan',
+        gender: 'MALE',
+      },
+    });
+    const stay = (
+      await request(app.getHttpServer())
+        .post(`${API}/admissions`)
+        .set(auth(recep))
+        .send({ patientId: p3.id })
+        .expect(201)
+    ).body.data.id as string;
+    const charge = (
+      await request(app.getHttpServer())
+        .post(`${API}/charges`)
+        .set(auth(recep))
+        .send({ patientId: p3.id, serviceId, date: day(0), quantity: 1, admissionId: stay })
+        .expect(201)
+    ).body.data.id as string;
+
+    const inv = (
+      await request(app.getHttpServer())
+        .post(`${API}/charges/invoice`)
+        .set(auth(cashier))
+        .send({ chargeIds: [charge] })
+        .expect(201)
+    ).body.data.id as string;
+
+    await request(app.getHttpServer())
+      .post(`${API}/invoices/${inv}/cancel`)
+      .set(auth(owner))
+      .expect(201);
+
+    // Cancelling the bill hands the service back rather than leaving it claimed
+    // by an invoice that no longer exists — the state nothing could get out of.
+    const back = await prisma.chargeItem.findUniqueOrThrow({ where: { id: charge } });
+    expect(back.status).toBe('PENDING');
+    expect(back.invoiceLineId).toBeNull();
+
+    // And it can now be removed, which the old code refused forever.
+    await request(app.getHttpServer())
+      .delete(`${API}/charges/${charge}`)
+      .set(auth(recep))
+      .expect(200);
+  });
+
+  it('deletes a stay opened by mistake, keeping anything already billed', async () => {
+    const p4 = await prisma.patient.create({
+      data: {
+        clinicId: clinic.clinicId,
+        mrn: `AD4-${randomUUID().slice(0, 6)}`,
+        firstName: 'Xato',
+        lastName: 'Yotqizilgan',
+        fullName: 'Xato Yotqizilgan',
+        gender: 'FEMALE',
+      },
+    });
+    const stay = (
+      await request(app.getHttpServer())
+        .post(`${API}/admissions`)
+        .set(auth(recep))
+        .send({ patientId: p4.id })
+        .expect(201)
+    ).body.data.id as string;
+    await request(app.getHttpServer())
+      .post(`${API}/charges`)
+      .set(auth(recep))
+      .send({ patientId: p4.id, serviceId, date: day(0), quantity: 1, admissionId: stay })
+      .expect(201);
+
+    // A doctor may not: removing a history is not a clinical act.
+    const forbidden = await request(app.getHttpServer())
+      .delete(`${API}/admissions/${stay}`)
+      .set(auth(doctor));
+    expect(forbidden.status).toBe(403);
+
+    const res = await request(app.getHttpServer())
+      .delete(`${API}/admissions/${stay}`)
+      .set(auth(recep))
+      .expect(200);
+    expect(res.body.data.invoicedKept).toBe(0);
+
+    expect(await prisma.admission.findUnique({ where: { id: stay } })).toBeNull();
+    // The patient is out of the ward and can be admitted again.
+    const p = await prisma.patient.findUniqueOrThrow({ where: { id: p4.id } });
+    expect(p.careType).toBe('AMBULATORY');
+  });
+
   it('will not let a billed treatment day be un-marked', async () => {
     // Runs after discharge billed the ward treatment: money already on an
     // invoice is not the sheet's to take back.

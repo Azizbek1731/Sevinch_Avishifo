@@ -104,7 +104,12 @@
     "pay": "Pay",
     "deposit": "Patient deposit",
     "otherDebt": "Other debt (does not block discharge)",
-    "acknowledge": "Discharge with the debt unpaid (death or transfer). The amount is kept on the record.",
-    "needsCashier": "A cashier or manager must take the payment to clear this debt."
-  }
+    "acknowledge": "Discharge anyway (settle the money later). The outstanding amount is kept on the history and the services stay billable.",
+    "needsForce": "Discharging over an unsettled stay needs administrator or reception rights."
+  },
+  "remove": "Delete",
+  "removeTitle": "Delete this history?",
+  "removeHint": "The history, its orders and daily notes are removed for good. Services already on an invoice are kept — they are the patient's payment record. This cannot be undone.",
+  "removed": "History deleted",
+  "removedKeptInvoiced": "History deleted. {count} invoiced service(s) were kept."
 }

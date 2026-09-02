@@ -104,7 +104,12 @@
     "pay": "To‘lash",
     "deposit": "Bemor depoziti",
     "otherDebt": "Boshqa qarzlar (chiqarishga to‘sqinlik qilmaydi)",
-    "acknowledge": "Qarz to‘lanmagan holda chiqarish (vafot etgan yoki boshqa muassasaga o‘tkazilgan). Qarz summasi tarixda saqlanadi.",
-    "needsCashier": "Qarzni yopish uchun kassir yoki rahbar to‘lovni qabul qilishi kerak."
-  }
+    "acknowledge": "Baribir chiqarish (to‘lov keyinroq hal qilinadi). Qolgan summa kasallik tarixida saqlanadi va xizmatlar hisob-fakturaga kiritilishi mumkin bo‘lib qoladi.",
+    "needsForce": "Baribir chiqarish uchun administrator yoki qabulxona huquqi kerak."
+  },
+  "remove": "O‘chirish",
+  "removeTitle": "Kasallik tarixini o‘chirasizmi?",
+  "removeHint": "Tarix, tayinlovlar va kundalik yozuvlar butunlay o‘chadi. Hisob-fakturaga kiritilgan xizmatlar saqlanib qoladi — ular bemorning to‘lov tarixi. Bu amalni ortga qaytarib bo‘lmaydi.",
+  "removed": "Kasallik tarixi o‘chirildi",
+  "removedKeptInvoiced": "Tarix o‘chirildi. Hisob-fakturaga kiritilgan {count} ta xizmat saqlab qolindi."
 }

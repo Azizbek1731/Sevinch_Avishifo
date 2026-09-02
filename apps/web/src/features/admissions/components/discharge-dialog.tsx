@@ -91,7 +91,7 @@ export function DischargeDialog({
         outcome,
         finalDiagnosisMain: main.trim(),
         epicrisis: epicrisis.trim() || undefined,
-        ...(acknowledged ? { debtAcknowledged: true } : {}),
+        ...(acknowledged ? { force: true } : {}),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admissions'] });
@@ -112,9 +112,10 @@ export function DischargeDialog({
   const hasUnbilled = (c?.unbilled.count ?? 0) > 0;
   const debt = Number(c?.stayDebt ?? '0');
   const hasDebt = debt > 0;
-  const canPay = can('payments.create');
-  // Money is settled, or it is being closed over on purpose by someone allowed to.
-  const moneyCleared = !hasUnbilled && (!hasDebt || (acknowledged && canPay));
+  const canForce = can('admissions.force');
+  const blocked = hasUnbilled || hasDebt;
+  // Settled, or being closed over on purpose by someone allowed to do that.
+  const moneyCleared = !blocked || (acknowledged && canForce);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -188,25 +189,29 @@ export function DischargeDialog({
                     {t('dischargeCheck.deposit')}: {formatUZS(c?.deposit ?? '0')}
                   </p>
                 ) : null}
-
-                {/* A death or a transfer cannot wait for the family to pay, and a
-                    discharge date recorded days late is a falsified record. */}
-                {canPay ? (
-                  <label className="mt-3 flex cursor-pointer items-start gap-2 text-xs">
-                    <Checkbox
-                      checked={acknowledged}
-                      onCheckedChange={(v) => setAcknowledged(v === true)}
-                      className="mt-0.5"
-                    />
-                    <span>{t('dischargeCheck.acknowledge')}</span>
-                  </label>
-                ) : (
-                  <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    {t('dischargeCheck.needsCashier')}
-                  </p>
-                )}
               </div>
+            ) : null}
+
+            {/* The way out of any blocker. A bed is physical and the paperwork
+                is not — a death, a transfer or a patient who simply left cannot
+                wait for the desk to catch up. Nothing is forgiven: the services
+                stay billable and the amount is written onto the history. */}
+            {blocked ? (
+              canForce ? (
+                <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-dashed p-3 text-xs">
+                  <Checkbox
+                    checked={acknowledged}
+                    onCheckedChange={(v) => setAcknowledged(v === true)}
+                    className="mt-0.5"
+                  />
+                  <span>{t('dischargeCheck.acknowledge')}</span>
+                </label>
+              ) : (
+                <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  {t('dischargeCheck.needsForce')}
+                </p>
+              )
             ) : null}
 
             {/* Other debt is shown, never enforced — an unrelated old invoice

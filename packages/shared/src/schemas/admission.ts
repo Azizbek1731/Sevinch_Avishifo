@@ -67,11 +67,17 @@ export const dischargeSchema = z.object({
   epicrisis: z.string().max(8000).optional(),
   dischargedAt: z.string().datetime().optional(),
   /**
-   * Close the stay even though it still owes money. A death or a transfer
-   * cannot wait for the family to settle the bill, and a discharge date
-   * recorded days late is a falsified record. What was owed at that instant is
-   * stored on the admission, so the debt is carried, not forgiven.
+   * Close the stay over whatever is still outstanding — services not yet
+   * invoiced, money not yet paid, or both. Needs `admissions.force`.
+   *
+   * A bed is physical and the paperwork is not: a death, a transfer, or a
+   * patient who simply walked out cannot wait for the desk to catch up, and a
+   * discharge date recorded days late is a falsified record. Nothing is
+   * forgiven — the charges stay billable and the amount owed at that instant is
+   * written onto the admission.
    */
+  force: z.coerce.boolean().optional(),
+  /** @deprecated Older clients sent this; `force` covers it. */
   debtAcknowledged: z.coerce.boolean().optional(),
 });
 export type DischargeInput = z.infer<typeof dischargeSchema>;

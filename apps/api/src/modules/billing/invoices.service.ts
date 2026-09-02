@@ -767,6 +767,23 @@ export class InvoicesService {
       throw new AppException(ErrorCode.INVOICE_INVALID_STATE, 'Invoice cannot be cancelled in this state', 409);
     }
     const updated = await this.prisma.db.invoice.update({ where: { id }, data: { status: 'CANCELLED' } });
+
+    // Hand the ward charges back. Cancelling only flipped the invoice, so the
+    // services it had claimed stayed INVOICED against a bill that no longer
+    // exists: they could not be billed again (already claimed) and could not be
+    // removed (cancelling an invoiced charge is refused). That dead end is what
+    // made a stay impossible to close or clean up.
+    const lines = await this.prisma.db.invoiceLine.findMany({
+      where: { invoiceId: id },
+      select: { id: true },
+    });
+    if (lines.length > 0) {
+      await this.prisma.db.chargeItem.updateMany({
+        where: { invoiceLineId: { in: lines.map((l) => l.id) } },
+        data: { status: 'PENDING', invoiceLineId: null },
+      });
+    }
+
     await this.audit.log({
       action: AuditAction.UPDATE,
       entity: 'Invoice',
