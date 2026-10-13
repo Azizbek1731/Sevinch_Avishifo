@@ -128,6 +128,9 @@ export class AuthService {
   async registerClinic(
     input: RegisterClinicInput,
   ): Promise<LoginResult & { trialEndsAt: string | null }> {
+    if (this.config.env.SINGLE_CLINIC_MODE) {
+      throw new AppException(ErrorCode.FORBIDDEN, 'Clinic registration is disabled', 403);
+    }
     const phone = normalizePhone(input.phone);
     if (!phone) {
       throw new AppException(ErrorCode.VALIDATION_ERROR, 'Invalid phone number', 400);
@@ -277,7 +280,7 @@ export class AuthService {
       });
     }
 
-    // Second factor, if the user turned it on and can actually receive a code.
+    // An enabled second factor stays required if its bot is unavailable.
     // No session is created until the code checks out.
     if (this.twoFactor.isRequiredFor(user)) {
       const { challengeId, expiresInSeconds } = await this.twoFactor.issue(
@@ -285,7 +288,6 @@ export class AuthService {
         user.telegramChatId,
         user.fullName,
         'second-factor',
-        user.phone,
       );
       return {
         twoFactorRequired: true,
@@ -307,6 +309,9 @@ export class AuthService {
     clinicId: string | null,
     role: UserRole,
   ): Promise<LoginResult> {
+    if (this.config.env.SINGLE_CLINIC_MODE && (role === UserRole.SUPER_ADMIN || !clinicId)) {
+      throw new AppException(ErrorCode.FORBIDDEN, 'Platform accounts are disabled', 403);
+    }
     const user = { id: userId, clinicId, role };
     const { session, refreshToken } = await this.createSession(user.id);
     const authUser = await this.principal.buildAuthUser({
@@ -334,7 +339,7 @@ export class AuthService {
   }
 
   /**
-   * Second step of a two-factor login: exchange the emailed-to-Telegram code for
+   * Second step of a two-factor login: exchange the clinic-bot code for
    * a real session. The account state is re-checked here — a user suspended
    * between the two steps must not slip through.
    */
@@ -408,9 +413,13 @@ export class AuthService {
       return this.decoyChallenge();
     }
 
-    // Somewhere to send it: the user's own bot chat, or Telegram Gateway, which
-    // reaches any number registered on Telegram without prior linking.
-    if (!user.telegramChatId && !this.twoFactor.gatewayEnabled) {
+    // Only a verified link to the clinic bot can receive authentication codes.
+    if (!user.telegramChatId) {
+      return this.decoyChallenge();
+    }
+
+    // Apply the cooldown to codes and password-required notices alike.
+    if (!(await this.twoFactor.claimSendSlot(input.phone))) {
       return this.decoyChallenge();
     }
 
@@ -420,14 +429,8 @@ export class AuthService {
     if (user.twoFactorEnabled) {
       // Not awaited, for the same timing reason as the code itself below.
       if (user.telegramChatId) {
-        void this.twoFactor.notifyPasswordRequired(user.telegramChatId, user.fullName);
+        void this.twoFactor.notifyPasswordRequired(user.id, user.telegramChatId, user.fullName);
       }
-      return this.decoyChallenge();
-    }
-
-    // One code per number per minute, so this endpoint cannot be used to bombard
-    // someone's Telegram. A caller inside the cooldown gets the usual decoy.
-    if (!(await this.twoFactor.claimSendSlot(input.phone))) {
       return this.decoyChallenge();
     }
 
@@ -439,7 +442,6 @@ export class AuthService {
       user.telegramChatId,
       user.fullName,
       'passwordless',
-      user.phone,
     );
   }
 
@@ -478,12 +480,9 @@ export class AuthService {
     // Unscoped: User is not tenant-scoped.
     const user = await this.prisma.unscoped.user.findUnique({
       where: { id: userId },
-      select: { telegramChatId: true, phone: true },
+      select: { telegramChatId: true },
     });
-    // Gateway delivers to the account's own phone number, so a linked bot chat
-    // is only required when it is the sole route available.
-    const reachable = !!user?.telegramChatId || (this.twoFactor.gatewayEnabled && !!user?.phone);
-    if (enabled && !reachable) {
+    if (enabled && !user?.telegramChatId) {
       throw new AppException(
         ErrorCode.TELEGRAM_NOT_LINKED,
         'Avval Telegram botni ulang — aks holda tasdiqlash kodi keladigan joy bo‘lmaydi',
@@ -787,10 +786,11 @@ export class AuthService {
         status: UserStatus.ACTIVE,
       },
       select: { id: true, fullName: true, telegramChatId: true },
+      orderBy: { createdAt: 'asc' },
     });
 
     // Always answer success — never reveal whether the phone exists.
-    if (!user) return { requested: true };
+    if (!user?.telegramChatId) return { requested: true };
 
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     // Unscoped: OtpCode is a platform model (no clinicId column).
@@ -798,7 +798,7 @@ export class AuthService {
       where: { phone: input.phone, purpose: OTP_PURPOSE_PASSWORD_RESET, usedAt: null },
       data: { usedAt: new Date() }, // invalidate any previous outstanding codes
     });
-    await this.prisma.unscoped.otpCode.create({
+    const otp = await this.prisma.unscoped.otpCode.create({
       data: {
         phone: input.phone,
         codeHash: await argon2.hash(code, ARGON2_OPTS),
@@ -806,15 +806,15 @@ export class AuthService {
         expiresAt: new Date(Date.now() + OTP_TTL_MINUTES * 60_000),
       },
     });
+    await this.twoFactor.bindResetRecipient(otp.id, user.id, user.telegramChatId, OTP_TTL_MINUTES * 60);
 
     // Delivery is not awaited: this endpoint is unauthenticated and answers the
     // same way for every phone, so waiting on Telegram would let the response
     // time say whether the account exists.
     void this.twoFactor
       .deliverCode({
+        userId: user.id,
         chatId: user.telegramChatId,
-        phone: input.phone,
-        code,
         botText:
           `🔑 AviShifo — parolni tiklash kodi\n\n` +
           `Kod: ${code}\n\n` +
@@ -823,7 +823,16 @@ export class AuthService {
           `parolingiz o‘zgarmaydi.`,
         label: 'password-reset',
       })
-      .catch((e: unknown) => this.logger.warn(`Password-reset code delivery failed: ${String(e)}`));
+      .then(async ({ delivered }) => {
+        if (!delivered) {
+          await this.prisma.unscoped.otpCode.updateMany({
+            where: { id: otp.id, usedAt: null },
+            data: { usedAt: new Date() },
+          });
+          await this.twoFactor.forgetResetRecipient(otp.id);
+        }
+      })
+      .catch(() => this.logger.warn('Password-reset code delivery failed'));
 
     return { requested: true };
   }
@@ -860,28 +869,34 @@ export class AuthService {
         role: { not: UserRole.PATIENT },
         status: UserStatus.ACTIVE,
       },
-      select: { id: true, clinicId: true },
+      select: { id: true, clinicId: true, telegramChatId: true },
+      orderBy: { createdAt: 'asc' },
     });
-    if (!user) {
+    if (!user || !(await this.twoFactor.isResetRecipientCurrent(otp.id, user.id))) {
       throw new AppException(ErrorCode.OTP_INVALID, 'Invalid code', 400);
     }
 
-    await this.prisma.unscoped.otpCode.update({
-      where: { id: otp.id },
-      data: { usedAt: new Date() },
+    const passwordHash = await argon2.hash(input.newPassword, ARGON2_OPTS);
+    // Only one verifier can claim a reset. The new password and session
+    // revocation commit together with that claim.
+    await this.prisma.unscoped.$transaction(async (tx) => {
+      const claimed = await tx.otpCode.updateMany({
+        where: { id: otp.id, usedAt: null, expiresAt: { gt: new Date() }, attempts: { lt: OTP_MAX_ATTEMPTS } },
+        data: { usedAt: new Date() },
+      });
+      if (claimed.count !== 1) throw new AppException(ErrorCode.OTP_INVALID, 'Invalid code', 400);
+      const updated = await tx.user.updateMany({
+        where: { id: user.id, status: UserStatus.ACTIVE, deletedAt: null, telegramChatId: user.telegramChatId },
+        data: { passwordHash, failedLoginCount: 0, lockedUntil: null },
+      });
+      if (updated.count !== 1) throw new AppException(ErrorCode.OTP_INVALID, 'Invalid code', 400);
+      await tx.authSession.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
     });
-    await this.prisma.unscoped.user.update({
-      where: { id: user.id },
-      data: {
-        passwordHash: await argon2.hash(input.newPassword, ARGON2_OPTS),
-        failedLoginCount: 0,
-        lockedUntil: null,
-      },
-    });
-    // Password reset invalidates every existing session.
-    await this.prisma.unscoped.authSession.updateMany({
-      where: { userId: user.id, revokedAt: null },
-      data: { revokedAt: new Date() },
+    await this.twoFactor.forgetResetRecipient(otp.id).catch(() => {
+      this.logger.warn('Password-reset recipient cleanup failed');
     });
 
     await this.audit.log({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,6 +14,7 @@ import {
   toTiyin,
   type CreateInvoiceInput,
   type MoneyString,
+  type QuickInvoiceInput,
 } from '@avishifo/shared';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRouter } from '@/i18n/routing';
@@ -29,8 +30,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { billingApi, sanitizeMoney, type PatientBrief, type ServiceOption } from '../api';
-import { useApiErrorToast } from '../hooks';
+import { useApiErrorToast, usePermission } from '../hooks';
 import { PatientCombobox } from './patient-combobox';
+import { identifyInvoiceRequest, type InvoiceRequestIdentity } from '../invoice-request';
 import { ServiceCombobox } from './service-combobox';
 
 const EMPTY_LINE = { quantity: 1, unitPrice: '0' as MoneyString, discount: '0' as MoneyString };
@@ -57,10 +59,13 @@ export interface NewInvoiceDialogProps {
 export function NewInvoiceDialog({ open, onOpenChange, lockedPatient }: NewInvoiceDialogProps) {
   const t = useTranslations('billing');
   const errorToast = useApiErrorToast();
+  const can = usePermission();
+  const receptionOnly = !can('payments.create');
   const router = useRouter();
   const queryClient = useQueryClient();
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
 
+  const requestIdentity = useRef<InvoiceRequestIdentity | null>(null);
   const [patient, setPatient] = useState<PatientBrief | null>(lockedPatient ?? null);
   /** Selected service per field-array row, keyed by RHF field id. */
   const [rowServices, setRowServices] = useState<Record<string, ServiceOption | null>>({});
@@ -77,6 +82,7 @@ export function NewInvoiceDialog({ open, onOpenChange, lockedPatient }: NewInvoi
 
   useEffect(() => {
     if (open) {
+      requestIdentity.current = null;
       setPatient(lockedPatient ?? null);
       setRowServices({});
       form.reset({
@@ -88,12 +94,30 @@ export function NewInvoiceDialog({ open, onOpenChange, lockedPatient }: NewInvoi
   }, [open, activeBranchId, lockedPatient]);
 
   const mutation = useMutation({
-    mutationFn: (values: CreateInvoiceInput) => billingApi.createInvoice(values),
+    mutationFn: async (values: CreateInvoiceInput) => {
+      if (receptionOnly) {
+        const payload: Omit<QuickInvoiceInput, 'idempotencyKey'> = {
+          ...values,
+          lines: values.lines ?? [],
+          settle: 'DEBT',
+        };
+        requestIdentity.current = identifyInvoiceRequest(payload, requestIdentity.current);
+        const response = await billingApi.quickInvoice({
+          ...payload,
+          idempotencyKey: requestIdentity.current.key,
+        });
+        return response.data.invoice;
+      }
+      return (await billingApi.createInvoice(values)).data;
+    },
     onSuccess: (res) => {
+      requestIdentity.current = null;
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      toast.success(t('form.created', { number: res.data.number }));
+      toast.success(
+        t(receptionOnly ? 'quick.sentToCashier' : 'form.created', { number: res.number }),
+      );
       onOpenChange(false);
-      router.push(`/invoices/${res.data.id}`);
+      router.push(`/invoices/${res.id}`);
     },
     onError: errorToast,
   });
@@ -122,6 +146,7 @@ export function NewInvoiceDialog({ open, onOpenChange, lockedPatient }: NewInvoi
               </div>
             ) : (
               <PatientCombobox
+                allowCreate
                 value={patient}
                 onChange={(p) => {
                   setPatient(p);
@@ -139,7 +164,9 @@ export function NewInvoiceDialog({ open, onOpenChange, lockedPatient }: NewInvoi
             <div className="space-y-3">
               {fields.map((field, idx) => {
                 const line = watchedLines[idx];
-                const lt = line ? lineTotalTiyin(line.quantity, line.unitPrice, line.discount ?? '0') : null;
+                const lt = line
+                  ? lineTotalTiyin(line.quantity, line.unitPrice, line.discount ?? '0')
+                  : null;
                 return (
                   <div
                     key={field.id}
@@ -148,6 +175,7 @@ export function NewInvoiceDialog({ open, onOpenChange, lockedPatient }: NewInvoi
                     <div className="col-span-2 min-w-0 space-y-1 md:col-span-1">
                       <span className="text-xs text-muted-foreground">{t('form.service')}</span>
                       <ServiceCombobox
+                        excludeSurgery
                         value={rowServices[field.id] ?? null}
                         onChange={(s) => {
                           setRowServices((prev) => ({ ...prev, [field.id]: s }));
@@ -213,7 +241,12 @@ export function NewInvoiceDialog({ open, onOpenChange, lockedPatient }: NewInvoi
             {form.formState.errors.lines ? (
               <p className="text-sm text-destructive">{t('form.linesInvalid')}</p>
             ) : null}
-            <Button type="button" variant="outline" size="sm" onClick={() => append({ ...EMPTY_LINE })}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => append({ ...EMPTY_LINE })}
+            >
               <Plus className="mr-1 h-4 w-4" />
               {t('form.addLine')}
             </Button>
@@ -227,7 +260,9 @@ export function NewInvoiceDialog({ open, onOpenChange, lockedPatient }: NewInvoi
 
           <DialogFooter>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? t('form.creating') : t('form.create')}
+              {mutation.isPending
+                ? t('form.creating')
+                : t(receptionOnly ? 'quick.sendToCashier' : 'form.create')}
             </Button>
           </DialogFooter>
         </form>

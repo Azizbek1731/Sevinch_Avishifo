@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { formatUZS, toTiyin } from '@avishifo/shared';
 import { formatTz } from '@/lib/dates';
@@ -46,15 +47,7 @@ function Rule() {
  * 58mm paper — the value drops to its own line and stays right-aligned there,
  * rather than either side being cut.
  */
-function Row({
-  label,
-  value,
-  strong = false,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-}) {
+function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
     <div
       className={cn(
@@ -70,12 +63,12 @@ function Row({
 
 /**
  * Thermal receipt body, styled from the clinic's receipt settings (Sozlamalar →
- * Chek). Rendered on the receipt page and — off-screen — by <ReceiptPrinter />
- * right after a front-desk sale, so both paths print the same customized slip.
+ * Chek). Rendered on the receipt page and in <ReceiptPrinter /> immediately
+ * after payment, so both paths print the same customized slip.
  * The `print-area` class is what the global print stylesheet keeps visible;
  * `receipt-print` is what forces it to pure black and drops the on-screen card.
  */
-export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
+export function ReceiptDocument({ data, onReady }: { data: ReceiptPayload; onReady?: () => void }) {
   const t = useTranslations('billing');
   const locale = useLocale();
   const user = useAuthStore((s) => s.user);
@@ -99,6 +92,10 @@ export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
   const hasDiscount = toTiyin(data.totals.discountTotal) > 0n;
   const hasDue = toTiyin(data.totals.due) > 0n;
 
+  useEffect(() => {
+    if (!showLogo) onReady?.();
+  }, [showLogo, onReady]);
+
   return (
     <>
       {/*
@@ -116,7 +113,7 @@ export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
 
       <div
         className={cn(
-          'print-area receipt-print mx-auto w-full bg-card p-3 font-mono leading-snug text-foreground',
+          'print-area print-flow receipt-print mx-auto w-full bg-card p-3 font-mono leading-snug text-foreground',
           // The card framing is a screen affordance so the preview reads as a
           // slip; print strips it back to bare paper.
           'rounded-md border print:rounded-none print:border-0 print:p-0',
@@ -129,6 +126,7 @@ export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
             <ThermalLogo
               src={data.clinic.logoUrl}
               alt={data.clinic?.name ?? ''}
+              onReady={onReady}
               /*
                * Constrained by WIDTH, not height. Clinic logos are usually wide
                * — a mark beside a name — and capping the height squeezed one to
@@ -186,7 +184,7 @@ export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
 
         <div className="space-y-1">
           {data.lines.map((l) => (
-            <div key={l.id}>
+            <div key={l.id} className="receipt-line">
               {/* The name gets its own line so it can wrap without ever pushing
                   the figures around. */}
               <p className="leading-tight">{localizedText(l.title, locale)}</p>
@@ -202,18 +200,16 @@ export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
 
         <Rule />
 
-        <div>
+        <div className="receipt-totals">
           {/* With no discount the subtotal is the total said twice, and it owns
               the longest label on the slip — so it only appears when it differs. */}
-          {hasDiscount ? <Row label={t('receipt.subtotal')} value={money(data.totals.subtotal)} /> : null}
+          {hasDiscount ? (
+            <Row label={t('receipt.subtotal')} value={money(data.totals.subtotal)} />
+          ) : null}
           {hasDiscount ? (
             <Row label={t('receipt.discount')} value={`− ${money(data.totals.discountTotal)}`} />
           ) : null}
-          <Row
-            label={t('receipt.total')}
-            value={formatUZS(data.totals.total)}
-            strong
-          />
+          <Row label={t('receipt.total')} value={formatUZS(data.totals.total)} strong />
           <Row label={t('receipt.paid')} value={money(data.totals.paidTotal)} />
           {hasDue ? <Row label={t('receipt.due')} value={money(data.totals.due)} strong /> : null}
         </div>
@@ -226,7 +222,14 @@ export function ReceiptDocument({ data }: { data: ReceiptPayload }) {
                   split across cash and a card. The timestamp is dropped: the
                   receipt is already dated at the top. */}
               {data.payments.map((p) => (
-                <Row key={p.id} label={t(`methods.${p.method}`)} value={money(p.amount)} />
+                <div key={p.id} className="break-inside-avoid">
+                  <Row label={t(`methods.${p.method}`)} value={money(p.amount)} />
+                  {p.note ? (
+                    <p className="mb-1 whitespace-pre-wrap break-words text-[0.9em]">
+                      {t('pay.note')}: {p.note}
+                    </p>
+                  ) : null}
+                </div>
               ))}
             </div>
           </>

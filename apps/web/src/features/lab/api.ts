@@ -31,6 +31,7 @@ export interface LabCatalogQuery {
 }
 
 export interface LabOrdersQuery {
+  includeUnpaid?: boolean;
   status?: LabOrderStatus;
   branchId?: string;
   patientId?: string;
@@ -45,6 +46,7 @@ export const labApi = {
       status: q.status,
       branchId: q.branchId,
       patientId: q.patientId,
+      includeUnpaid: q.includeUnpaid,
       search: q.search || undefined,
       page: q.page,
       limit: q.limit,

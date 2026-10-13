@@ -1,5 +1,1 @@
-import { AppointmentsCalendar } from '@/features/appointments/components/appointments-calendar';
-
-export default function AppointmentsPage() {
-  return <AppointmentsCalendar />;
-}
+export { HomeRedirect as default } from '@/components/layout/home-redirect';

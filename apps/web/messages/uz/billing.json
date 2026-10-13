@@ -63,7 +63,11 @@
     "submit": "To'lovni qabul qilish",
     "paying": "Yuborilmoqda...",
     "success": "To'lov qabul qilindi",
-    "viewReceipt": "Chekni ochish"
+    "viewReceipt": "Chekni ochish",
+    "exceedsDue": "To‘lov summasi hisobning qolgan qarzidan oshmasligi kerak",
+    "note": "To‘lov izohi",
+    "noteOptional": "Izoh (ixtiyoriy)",
+    "notePlaceholder": "Masalan: terminal cheki yoki to‘lovga oid ma’lumot"
   },
   "quick": {
     "title": "Xizmat qo'shish",
@@ -73,8 +77,18 @@
     "paidSuccess": "{number} — to'lov qabul qilindi, chek chop etilmoqda",
     "debtSuccess": "{number} — bemor qarziga yozildi",
     "viewInvoice": "Hisobni ochish",
-    "shiftRequired": "Naqd to'lovni qabul qilish uchun avval kassa smenasini oching",
-    "labOrdered": "Tahlillar laboratoriyaga yuborildi ({number})"
+    "shiftRequired": "To‘lovni qabul qilish uchun avval kassa smenasini oching",
+    "labOrdered": "Tahlillar laboratoriyaga yuborildi ({number})",
+    "sendToCashier": "Kassaga yuborish",
+    "sentToCashier": "{number} — hisob kassaga yuborildi",
+    "labTitle": "Laboratoriya tahlillarini kiritish",
+    "proceduresTitle": "Muolaja va tekshiruvlarni kiritish",
+    "proceduresSubtitle": "Muolaja, instrumental tekshiruv va boshqa xizmatlarni tanlang. Tayyor hisob kassaga yuboriladi.",
+    "proceduresHint": "Laboratoriya tahlillari, shifokor qabuli va UZI qabulxonadagi alohida tugmalar orqali rasmiylashtiriladi.",
+    "labSubtitle": "Laboratoriya tahlillarini tanlang. Hisob kassaga yuboriladi, to‘liq to‘lovdan so‘ng laboratoriya buyurtmani oladi.",
+    "tests": "Laboratoriya tahlillari",
+    "test": "Tahlil",
+    "addTest": "Tahlil qo‘shish"
   },
   "refundDlg": {
     "title": "Qaytarish — {number}",
@@ -117,7 +131,13 @@
     "total": "JAMI",
     "paid": "To'langan",
     "due": "Qarz",
-    "thanks": "Murojaatingiz uchun rahmat!"
+    "thanks": "Murojaatingiz uchun rahmat!",
+    "previewTitle": "To‘lov cheki",
+    "autoPrintHint": "Chop etish oynasi avtomatik ochiladi. Ochilmasa yoki qayta nusxa kerak bo‘lsa, «Chop etish» tugmasini bosing.",
+    "preparing": "Chek tayyorlanmoqda…",
+    "loadFailed": "To‘lov saqlandi, lekin chek yuklanmadi. To‘lovni takrorlamasdan chekni qayta yuklang.",
+    "printFailed": "Chop etish oynasi ochilmadi. «Chop etish» tugmasi orqali qayta urinib ko‘ring.",
+    "retry": "Chekni qayta yuklash"
   },
   "split": {
     "addMethod": "Usul qo‘shish",
@@ -137,5 +157,46 @@
     "cancel": "Yopish",
     "working": "Bajarilmoqda…",
     "done": "To‘lov bekor qilindi"
+  },
+  "accounts": {
+    "CASH": "Naqd kassa",
+    "CARD": "Karta kassasi",
+    "CLICK": "Click kassasi",
+    "opening": "Boshlang‘ich qoldiq",
+    "receipts": "Qabul qilingan to‘lovlar",
+    "deposits": "Depozitlar",
+    "refunds": "Qaytarishlar",
+    "expenses": "Chiqimlar",
+    "expected": "Hisob bo‘yicha qoldiq",
+    "actual": "Haqiqiy yakuniy qoldiq",
+    "difference": "Farq",
+    "metric": "Ko‘rsatkich",
+    "closedHint": "Naqd, karta va Click orqali to‘lov yoki chiqim kiritish uchun smenani oching.",
+    "openHint": "Har bir kassa uchun boshlang‘ich qoldiqni alohida kiriting.",
+    "closeHint": "Naqd pulni sanang, karta va Click hisoblarini tekshiring. Har bir kassaning haqiqiy yakuniy qoldig‘ini kiriting.",
+    "reportHint": "Boshlang‘ich qoldiq + to‘lovlar + depozitlar − qaytarishlar − chiqimlar. Summalar so‘mda.",
+    "legacyTitle": "Taqsimlanmagan eski o‘tkazma qoldig‘i: {amount}",
+    "legacyHint": "Bu summa karta va Click kartochkalaridagi qoldiqqa hali qo‘shilmagan. Smenani yopishda boshlang‘ich qoldiqni ikki hisobga taqsimlang.",
+    "allocateTitle": "Eski boshlang‘ich o‘tkazma qoldig‘ini taqsimlang: {amount}",
+    "allocateHint": "Eski smena bitta umumiy o‘tkazma qoldig‘i bilan ochilgan. Uni karta va Click hisoblari o‘rtasida hujjatlar bo‘yicha taqsimlang.",
+    "allocationMismatch": "Karta va Click boshlang‘ich summalari yig‘indisi eski umumiy qoldiqqa teng bo‘lishi kerak."
+  },
+  "workspace": {
+    "description": "Qabulxonadan kelgan hisoblar, naqd, karta va Click to‘lovlari hamda kassa nazorati.",
+    "expenses": "Chiqimlar",
+    "reports": "Hisobotlar"
+  },
+  "pending": {
+    "title": "Qabulxonadan kelgan hisoblar",
+    "description": "Bemor va xizmatlarni tekshiring, so‘ng to‘lovni kerakli kassaga qabul qiling.",
+    "refresh": "Yangilash",
+    "search": "Bemor ismi, telefon, ID yoki hisob raqami",
+    "loadFailed": "Hisoblar yuklanmadi. Qayta urinib ko‘ring.",
+    "noMatch": "Qidiruvga mos hisob topilmadi",
+    "searchHint": "Bemor ismi, telefon yoki hisob raqamini tekshiring.",
+    "openDetails": "Xizmatlarni ko‘rish uchun hisobni oching",
+    "pagination": "{page} / {pages} sahifa · {total} ta hisob",
+    "previous": "Oldingi sahifa",
+    "next": "Keyingi sahifa"
   }
 }

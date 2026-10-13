@@ -40,8 +40,8 @@ export const PERMISSIONS = [
   /**
    * Reversing a payment entered by mistake. Separate from refunds.create: a
    * refund gives money back, a void says it was never taken. The people who
-   * mistype an amount are the ones who must be able to correct it, so this sits
-   * with the front desk rather than with the owner.
+   * mistype an amount are the ones who must be able to correct it, so cashiers
+   * and clinic management receive this permission.
    */
   'payments.void',
   'refunds.create',
@@ -59,6 +59,10 @@ export const PERMISSIONS = [
   'admissions.force',
   'charges.read',
   'charges.write',
+  'surgery.read',
+  'surgery.schedule',
+  'surgery.record',
+  'surgery.payout',
   'shifts.manage',
   /**
    * See every register in the clinic, live, without holding one.
@@ -80,6 +84,8 @@ export const PERMISSIONS = [
   // Reports (M12)
   'reports.read',
   'reports.export',
+  'reports.cash.read',
+  'reports.cash.export',
   // Staff & schedules (M11)
   'staff.read',
   'staff.write',
@@ -130,6 +136,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   [UserRole.SUPER_ADMIN]: PERMISSIONS,
   [UserRole.CLINIC_OWNER]: ALL_CLINIC_PERMISSIONS,
   [UserRole.CLINIC_ADMIN]: [
+    'surgery.read', 'surgery.schedule', 'surgery.record',
     'patients.read',
     'admissions.read',
     'admissions.write',
@@ -163,6 +170,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'lab.orders.read',
     'reports.read',
     'reports.export',
+    'reports.cash.read',
+    'reports.cash.export',
     'shifts.oversee',
     'staff.read',
     'staff.write',
@@ -176,6 +185,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'feedback.read',
   ],
   [UserRole.DOCTOR]: [
+    'surgery.read',
     'patients.read',
     'admissions.read',
     'admissions.write',
@@ -206,22 +216,20 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'services.read',
     'schedules.read',
   ],
-  // Small clinics run the cash desk from the front desk: the receptionist books
-  // the visit, sells the services and takes the money. Refunds stay with the
-  // cashier/owner (they need a second pair of eyes).
+  // Reception prepares patient care and invoices; the cashier handles money.
   [UserRole.RECEPTIONIST]: [
+    'surgery.read', 'surgery.schedule',
     'patients.read',
     // The desk answers "tahlil tayyormi?" from the patient card's lab tab and
     // downloads the ready PDF for the patient standing in front of them.
     'lab.orders.read',
+    'lab.orders.write',
     'admissions.read',
     'admissions.write',
     'admissions.administer',
-    'admissions.force',
     'charges.read',
     'charges.write',
     'patients.write',
-    'patients.delete',
     'patients.documents.write',
     'appointments.read',
     'appointments.write',
@@ -231,27 +239,15 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'services.read',
     'invoices.read',
     'invoices.write',
-    'payments.create',
-    'payments.void',
-    'shifts.manage',
-    // Reception holds a drawer too — it has shifts.manage and takes payments —
-    // so money leaving that drawer has to be recordable by the person holding
-    // it. Cash expenses still come out of their OWN open shift, so nothing
-    // here lets one desk spend from another's till.
-    'expenses.read',
-    'expenses.write',
     'debts.read',
     'schedules.read',
   ],
   [UserRole.CASHIER]: [
+    'surgery.read', 'surgery.payout',
     'patients.read',
     'admissions.read',
     'charges.read',
-    'charges.write',
-    'patients.delete',
     'invoices.read',
-    'invoices.write',
-    'invoices.cancel',
     'payments.create',
     'payments.void',
     'refunds.create',
@@ -263,6 +259,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     // shift is short with nothing to point at.
     'expenses.read',
     'expenses.write',
+    'reports.cash.read',
+    'reports.cash.export',
   ],
   [UserRole.LAB_TECH]: [
     'patients.read',
@@ -273,7 +271,13 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'lab.results.approve',
     'services.read',
   ],
+  [UserRole.OPERATING_ROOM]: [
+    'surgery.read',
+    'surgery.record',
+    'services.read',
+  ],
   [UserRole.ACCOUNTANT]: [
+    'surgery.read',
     'invoices.read',
     'admissions.read',
     'charges.read',
@@ -282,6 +286,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'expenses.write',
     'reports.read',
     'reports.export',
+    'reports.cash.read',
+    'reports.cash.export',
     'payroll.read',
     'payroll.write',
     'services.read',

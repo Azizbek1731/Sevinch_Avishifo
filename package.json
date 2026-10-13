@@ -15,6 +15,9 @@
   },
   "scripts": {
     "dev": "turbo run dev",
+    "dev:clinic": "node --env-file=.env scripts/dev-clinic.mjs",
+    "build:clinic": "node --env-file=.env scripts/start-clinic.mjs --build-only",
+    "start:clinic": "node --env-file=.env scripts/start-clinic.mjs",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
@@ -24,6 +27,8 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,md,json,yml,yaml}\"",
     "db:migrate": "pnpm --filter @avishifo/api db:migrate",
     "db:seed": "pnpm --filter @avishifo/api db:seed",
+    "db:seed-surgery-demo": "pnpm --filter @avishifo/api exec tsx prisma/seed-surgery-demo.ts",
+    "db:seed-prescription-directory": "pnpm --filter @avishifo/api exec tsx prisma/seed-prescription-directory.ts",
     "db:studio": "pnpm --filter @avishifo/api db:studio",
     "keys:generate": "node scripts/generate-keys.mjs",
     "logo:export": "node scripts/export-logo.mjs .",

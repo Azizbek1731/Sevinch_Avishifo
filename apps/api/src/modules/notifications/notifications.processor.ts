@@ -9,6 +9,7 @@ import { TelegramChannel } from './channels/telegram.channel';
 import { type TelegramInlineKeyboard } from './channels/telegram.channel';
 import { DEFAULT_TEMPLATES, renderTemplate, templateLang } from './default-templates';
 import { NOTIFICATIONS_QUEUE, type NotificationJobData } from './notifications.service';
+import { TelegramPatientAccessService } from './telegram-patient-access.service';
 
 /**
  * Delivery worker for the 'notifications' queue: renders the clinic template
@@ -24,6 +25,7 @@ export class NotificationsProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly sms: SmsChannel,
     private readonly telegram: TelegramChannel,
+    private readonly patientAccess: TelegramPatientAccessService,
   ) {
     super();
   }
@@ -32,6 +34,25 @@ export class NotificationsProcessor extends WorkerHost {
     const d = job.data;
     // Workers have no HTTP tenant context — establish it from the job payload.
     await TenantContext.run({ clinicId: d.clinicId }, async () => {
+      if (d.channel === 'TELEGRAM') {
+        // A job may sit in the queue (or retry) after the patient changes their
+        // phone or revokes/rebinds Telegram. Never trust its saved destination.
+        const recipient = d.patientId
+          ? await this.patientAccess.recipientFor(d.patientId, d.clinicId)
+          : null;
+        if (!recipient || recipient !== d.recipient) {
+          await this.prisma.db.notificationLog.update({
+            where: { id: d.logId },
+            data: {
+              status: 'FAILED',
+              error: 'Telegram patient access was revoked or changed; delivery cancelled.',
+              attempts: job.attemptsMade + 1,
+              sentAt: null,
+            },
+          });
+          return; // Permanent authorization failure: retries cannot restore it.
+        }
+      }
       // Clinic is not a tenant-scoped model; unscoped read by id to resolve the
       // clinic's default locale for template selection — justified system read.
       const clinic = await this.prisma.unscoped.clinic.findUnique({
@@ -64,7 +85,9 @@ export class NotificationsProcessor extends WorkerHost {
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`notification ${d.logId} attempt ${job.attemptsMade + 1} failed: ${message}`);
+        this.logger.warn(
+          `notification ${d.logId} attempt ${job.attemptsMade + 1} failed: ${message}`,
+        );
         await this.prisma.db.notificationLog
           .update({
             where: { id: d.logId },

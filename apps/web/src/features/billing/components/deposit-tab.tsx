@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/select';
 import { billingApi, sanitizeMoney, type PatientBrief } from '../api';
 import { useApiErrorToast, usePermission } from '../hooks';
+import { useAuthStore } from '@/stores/auth-store';
+import { EXTERNAL_PAYMENT_METHODS, inputTiyin } from '../payment-methods';
 import { PatientCombobox } from './patient-combobox';
 
 export function DepositTab() {
@@ -29,6 +31,11 @@ export function DepositTab() {
   const errorToast = useApiErrorToast();
   const can = usePermission();
   const queryClient = useQueryClient();
+  const activeBranchId = useAuthStore((state) => state.activeBranchId);
+  const shiftQuery = useQuery({
+    queryKey: ['shifts', 'current', activeBranchId],
+    queryFn: async () => (await billingApi.currentShift()).data,
+  });
 
   const [patient, setPatient] = useState<PatientBrief | null>(null);
 
@@ -54,7 +61,11 @@ export function DepositTab() {
     onError: errorToast,
   });
 
-  const onSubmit = form.handleSubmit((values) => mutation.mutate(values));
+  const amountTiyin = inputTiyin(form.watch('amount'));
+  const amountInvalid = amountTiyin === null || amountTiyin <= 0n;
+  const onSubmit = form.handleSubmit((values) => {
+    if (!amountInvalid && shiftQuery.data?.open && !mutation.isPending) mutation.mutate(values);
+  });
 
   return (
     <Card className="max-w-lg">
@@ -114,7 +125,7 @@ export function DepositTab() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(['CASH', 'CARD', 'PAYME', 'CLICK', 'UZUM'] as const).map((m) => (
+                {EXTERNAL_PAYMENT_METHODS.map((m) => (
                   <SelectItem key={m} value={m}>
                     {tb(`methods.${m}`)}
                   </SelectItem>
@@ -128,10 +139,18 @@ export function DepositTab() {
             <Input id="deposit-note" autoComplete="off" {...form.register('note')} />
           </div>
 
+          {!shiftQuery.data?.open ? (
+            <p className="text-sm text-warning-foreground">{tb('accounts.closedHint')}</p>
+          ) : null}
           <Button
             type="submit"
             className="w-full"
-            disabled={mutation.isPending || !can('payments.create')}
+            disabled={
+              mutation.isPending ||
+              !can('payments.create') ||
+              !shiftQuery.data?.open ||
+              amountInvalid
+            }
           >
             {t('deposit.submit')}
           </Button>

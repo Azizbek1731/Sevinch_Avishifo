@@ -61,7 +61,10 @@
     "invalidPhone": "Invalid phone number (+998...)",
     "duplicatesFound": "Similar patients found — make sure this is not a duplicate:",
     "forceCreate": "Create anyway",
-    "created": "Patient registered"
+    "created": "Patient registered",
+    "add": "Add new patient",
+    "searchHint": "Enter at least 2 characters to search",
+    "selectExisting": "Select"
   },
   "walkIn": {
     "button": "Enqueue (walk-in)",
@@ -88,5 +91,19 @@
   "cashDesk": {
     "title": "Cash desk",
     "addServices": "Add services"
-  }
+  },
+  "workflow": {
+    "services": "Procedures & examinations",
+    "servicesHint": "Select procedures, diagnostic examinations and other services, then send the invoice to the cashier.",
+    "lab": "Laboratory tests",
+    "labHint": "Order tests: the lab receives the order, the cashier receives the invoice.",
+    "admit": "Admit a patient",
+    "admitHint": "Choose a patient, department, ward and bed.",
+    "ward": "Inpatient charges",
+    "wardHint": "Manage stays, treatments and additional services.",
+    "handoff": "Reception prepares services. Issued invoices appear at the cash desk for the cashier to collect payment.",
+    "invoices": "Issued invoices",
+    "labPaidHint": "Select tests and send the invoice to the cashier. The order enters the laboratory queue after full payment."
+  },
+  "singleClinicSubtitle": "Patient registration, care orders and payment tracking"
 }

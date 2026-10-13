@@ -22,7 +22,8 @@
     "duration": "Davomiylik",
     "price": "Narx",
     "active": "Faol",
-    "minutes": "{min} daq."
+    "minutes": "{min} daq.",
+    "unit": "O‘lchov birligi"
   },
   "rowActions": {
     "edit": "Tahrirlash",
@@ -43,7 +44,10 @@
     "ULTRASOUND": "UTT",
     "PROCEDURE": "Muolaja",
     "DIAGNOSTICS": "Diagnostika",
-    "OTHER": "Boshqa"
+    "OTHER": "Boshqa",
+    "SURGERY": "Operatsiya",
+    "MATERIAL": "Sarf materiallari",
+    "MEDICINE": "Dorilar"
   },
   "categories": {
     "title": "Kategoriyalar",
@@ -77,7 +81,10 @@
     "labCatalogHint": "Katalogdan tanlansa — nomi, kodi va normalari o'zi keladi. Topilmasa, pastda qo'lda yozing.",
     "labCatalogEmpty": "Katalogda topilmadi — pastdagi maydonlarga qo'lda yozing.",
     "labCatalogClear": "Tanlovni bekor qilish",
-    "labCatalogTaken": "Klinikada bor"
+    "labCatalogTaken": "Klinikada bor",
+    "unit": "O‘lchov birligi",
+    "unitPlaceholder": "dona, ml, mg, to‘plam…",
+    "unitHint": "Operatsiya sarflari va kasr miqdorlarni hisoblashda ishlatiladi."
   },
   "prices": {
     "title": "Narx tarixi — {name}",

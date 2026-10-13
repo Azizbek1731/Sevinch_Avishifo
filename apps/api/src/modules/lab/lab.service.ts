@@ -10,16 +10,26 @@ import {
   flagValue,
   matchReferenceRange,
   type PatientContext,
+  type AuthUser,
 } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
 import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
+import type { TenantTransactionClient } from '../../core/prisma/tenant-extension';
 import { EventsService } from '../../core/realtime/events.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { SequenceService } from '../../core/sequence/sequence.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { parseReferenceRanges } from './reference-ranges';
+import { PricingService } from '../services/pricing.service';
+import {
+  FINAL_LAB_STATUSES,
+  isLabInvoicePaid,
+  labInvoiceNetPaid,
+  isLabResultComplete,
+  lockLabOrder,
+} from './lab-workflow';
 import {
   CreateLabOrderDto,
   CreateLabTestDto,
@@ -44,10 +54,11 @@ type LabTestRow = Prisma.LabTestGetPayload<{ include: { parameters: true } }>;
 type LabOrderDetailRow = Prisma.LabOrderGetPayload<{
   include: {
     patient: true;
+    invoice: { include: { refunds: { select: { amount: true } } } };
     items: {
       include: {
         labTest: { include: { parameters: true } };
-        result: { include: { values: true } };
+        result: { include: { values: true; reportDocument: true } };
       };
     };
     attachments: {
@@ -64,7 +75,11 @@ type LabOrderDetailRow = Prisma.LabOrderGetPayload<{
 }>;
 
 type LabOrderListRow = Prisma.LabOrderGetPayload<{
-  include: { patient: true; _count: { select: { items: true } } };
+  include: {
+    patient: true;
+    invoice: { include: { refunds: { select: { amount: true } } } };
+    _count: { select: { items: true } };
+  };
 }>;
 
 /** Guarded manual transitions (RESULTED/APPROVED/DELIVERED go through dedicated endpoints). */
@@ -81,6 +96,7 @@ export class LabService {
     private readonly audit: AuditService,
     private readonly sequence: SequenceService,
     private readonly notifications: NotificationsService,
+    private readonly pricing: PricingService,
   ) {}
 
   // ------------------------------------------------------------ mapping
@@ -142,6 +158,19 @@ export class LabService {
       patientId: o.patientId,
       visitId: o.visitId,
       status: o.status,
+      canWork: isLabInvoicePaid(o.invoice),
+      billing: o.invoice
+        ? {
+            invoiceId: o.invoice.id,
+            number: o.invoice.number,
+            status: o.invoice.status,
+            total: o.invoice.total.toFixed(2),
+            paidTotal: o.invoice.paidTotal.toFixed(2),
+            due: Prisma.Decimal.max(o.invoice.total.sub(labInvoiceNetPaid(o.invoice)), 0).toFixed(
+              2,
+            ),
+          }
+        : null,
       itemCount: o._count.items,
       collectedAt: iso(o.collectedAt),
       deliveredAt: iso(o.deliveredAt),
@@ -163,6 +192,19 @@ export class LabService {
       patientId: o.patientId,
       visitId: o.visitId,
       status: o.status,
+      canWork: isLabInvoicePaid(o.invoice),
+      billing: o.invoice
+        ? {
+            invoiceId: o.invoice.id,
+            number: o.invoice.number,
+            status: o.invoice.status,
+            total: o.invoice.total.toFixed(2),
+            paidTotal: o.invoice.paidTotal.toFixed(2),
+            due: Prisma.Decimal.max(o.invoice.total.sub(labInvoiceNetPaid(o.invoice)), 0).toFixed(
+              2,
+            ),
+          }
+        : null,
       physiologicalState: o.physiologicalState,
       orderedById: o.orderedById,
       collectedAt: iso(o.collectedAt),
@@ -180,6 +222,7 @@ export class LabService {
       items: o.items.map((it) => ({
         id: it.id,
         labTestId: it.labTestId,
+        complete: isLabResultComplete(it),
         labTest: {
           id: it.labTest.id,
           code: it.labTest.code,
@@ -198,6 +241,15 @@ export class LabService {
               approvedById: it.result.approvedById,
               approvedAt: iso(it.result.approvedAt),
               note: it.result.note,
+              reportDocumentId: it.result.reportDocumentId,
+              reportDocument: it.result.reportDocument
+                ? {
+                    id: it.result.reportDocument.id,
+                    title: it.result.reportDocument.title,
+                    fileName: it.result.reportDocument.fileName,
+                  }
+                : null,
+              updatedAt: iso(it.result.updatedAt),
               values: it.result.values.map((v) => ({
                 id: v.id,
                 parameterId: v.parameterId,
@@ -400,102 +452,249 @@ export class LabService {
 
   // ------------------------------------------------------------ orders
 
-  /**
-   * Shared internal create used by both POST /lab-orders and cross-module referrals.
-   */
-  private async createOrderInternal(input: {
-    patientId: string;
-    branchId: string;
-    visitId?: string;
-    testIds: string[];
-    physiologicalState?: PhysiologicalStateValue;
-    orderedById?: string | null;
-  }): Promise<{ id: string; orderNumber: string }> {
-    const patient = await this.prisma.db.patient.findUnique({
-      where: { id: input.patientId },
-      select: { id: true },
+  /** Idempotent invoice-to-laboratory handoff, inside the cashier invoice transaction. */
+  async prepareOrderForInvoice(
+    tx: TenantTransactionClient,
+    invoice: {
+      id: string;
+      patientId: string;
+      branchId: string;
+      visitId: string | null;
+      createdById: string | null;
+    },
+    lines: { serviceId: string | null }[],
+  ): Promise<{ id: string; orderNumber: string } | null> {
+    const existing = await tx.labOrder.findUnique({
+      where: { invoiceId: invoice.id },
+      select: { id: true, orderNumber: true },
     });
-    if (!patient) throw new AppException(ErrorCode.PATIENT_NOT_FOUND, 'Patient not found', 404);
-
-    // The branch column has no FK — without this, any UUID (another clinic's
-    // included) would be stamped onto the order and its worklist room.
-    const branch = await this.prisma.db.branch.findFirst({
-      where: { id: input.branchId },
-      select: { id: true },
+    if (existing) return existing;
+    const serviceIds = [
+      ...new Set(lines.flatMap((line) => (line.serviceId ? [line.serviceId] : []))),
+    ];
+    const labServices = await tx.service.findMany({
+      where: { id: { in: serviceIds }, category: { kind: 'LAB' } },
+      select: { id: true, isActive: true },
     });
-    if (!branch) throw new AppException(ErrorCode.NOT_FOUND, 'Branch not found', 404);
+    if (labServices.length === 0) return null;
+    const tests = await tx.labTest.findMany({
+      where: { serviceId: { in: labServices.map((service) => service.id) }, isActive: true },
+      select: { id: true, serviceId: true },
+    });
+    if (tests.length !== labServices.length || labServices.some((service) => !service.isActive)) {
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'Every active laboratory service must have an active test before it can be billed',
+        400,
+      );
+    }
+    const clinicId = TenantContext.requireClinicId();
+    const orderNumber = await this.sequence.nextFormatted('lab', 'L');
+    return tx.labOrder.create({
+      data: {
+        clinicId,
+        invoiceId: invoice.id,
+        patientId: invoice.patientId,
+        branchId: invoice.branchId,
+        visitId: invoice.visitId,
+        orderedById: invoice.createdById,
+        orderNumber,
+        items: { create: tests.map((test) => ({ clinicId, labTestId: test.id })) },
+      },
+      select: { id: true, orderNumber: true },
+    });
+  }
 
-    if (input.visitId) {
-      const visit = await this.prisma.db.visit.findUnique({
-        where: { id: input.visitId },
+  /** Reception and doctor referrals create their cashier bill together with the order. */
+  private async createOrderInternal(
+    input: {
+      patientId: string;
+      branchId: string;
+      visitId?: string;
+      testIds: string[];
+      physiologicalState?: PhysiologicalStateValue;
+      orderedById?: string | null;
+    },
+    outerTx?: TenantTransactionClient,
+  ): Promise<{ id: string; orderNumber: string }> {
+    const clinicId = TenantContext.requireClinicId();
+    const [patient, branch, tests] = await Promise.all([
+      this.prisma.db.patient.findFirst({
+        where: { id: input.patientId, deletedAt: null },
         select: { id: true },
+      }),
+      this.prisma.db.branch.findFirst({ where: { id: input.branchId }, select: { id: true } }),
+      this.prisma.db.labTest.findMany({
+        where: { id: { in: [...new Set(input.testIds)] }, isActive: true },
+        include: { service: { include: { category: true } } },
+      }),
+    ]);
+    if (!patient) throw new AppException(ErrorCode.PATIENT_NOT_FOUND, 'Patient not found', 404);
+    if (!branch) throw new AppException(ErrorCode.NOT_FOUND, 'Branch not found', 404);
+    if (tests.length !== new Set(input.testIds).size || tests.length === 0)
+      throw new AppException(ErrorCode.NOT_FOUND, 'Lab test not found', 404);
+    if (
+      tests.some(
+        (test) => !test.service || !test.service.isActive || test.service.category.kind !== 'LAB',
+      )
+    ) {
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'Each test needs an active priced laboratory service',
+        400,
+      );
+    }
+    if (input.visitId) {
+      const visit = await this.prisma.db.visit.findFirst({
+        where: { id: input.visitId, patientId: input.patientId, branchId: input.branchId },
       });
       if (!visit) throw new AppException(ErrorCode.VISIT_NOT_FOUND, 'Visit not found', 404);
     }
-
-    const testIds = [...new Set(input.testIds)];
-    const tests = await this.prisma.db.labTest.findMany({
-      where: { id: { in: testIds }, isActive: true },
-      select: { id: true },
+    const serviceIds = tests.map((test) => test.serviceId!);
+    const prices = await this.pricing.getCurrentPrices(serviceIds, input.branchId);
+    if (serviceIds.some((serviceId) => !prices.has(serviceId)))
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'Laboratory service has no current price',
+        400,
+      );
+    // This is the same clinic-controlled invoice number format as cashier invoices.
+    const clinic = await this.prisma.unscoped.clinic.findUnique({
+      where: { id: clinicId },
+      select: { settings: true },
     });
-    if (tests.length !== testIds.length) {
-      throw new AppException(ErrorCode.NOT_FOUND, 'One or more lab tests were not found', 404);
-    }
-
-    const clinicId = TenantContext.requireClinicId();
-    const orderNumber = await this.sequence.nextFormatted('lab', 'L');
-    const order = await this.prisma.db.labOrder.create({
-      data: {
-        clinicId,
-        branchId: input.branchId,
-        orderNumber,
-        patientId: input.patientId,
-        visitId: input.visitId,
-        physiologicalState: input.physiologicalState,
-        orderedById: input.orderedById ?? undefined,
-        items: {
-          // Nested creates are not auto-stamped by the tenant extension.
-          create: testIds.map((labTestId) => ({ clinicId, labTestId })),
+    const settings = (clinic?.settings ?? {}) as Record<string, unknown>;
+    const format =
+      typeof settings.invoiceNumberFormat === 'string' && settings.invoiceNumberFormat
+        ? settings.invoiceNumberFormat
+        : 'INV-{YYYY}-{NNNNNN}';
+    const sequence = await this.sequence.next('invoice');
+    const number = format
+      .replace('{YYYY}', String(new Date().getUTCFullYear()))
+      .replace(/\{(N+)\}/, (_match, digits: string) =>
+        String(sequence).padStart(digits.length, '0'),
+      );
+    const lines = tests.map((test) => ({
+      clinicId,
+      serviceId: test.serviceId!,
+      title: test.service!.name as Prisma.InputJsonValue,
+      quantity: 1,
+      unitPrice: new Prisma.Decimal(prices.get(test.serviceId!)!),
+      discount: new Prisma.Decimal(0),
+      lineTotal: new Prisma.Decimal(prices.get(test.serviceId!)!),
+    }));
+    const total = lines.reduce((sum, line) => sum.add(line.lineTotal), new Prisma.Decimal(0));
+    const create = async (tx: TenantTransactionClient) => {
+      const invoice = await tx.invoice.create({
+        data: {
+          clinicId,
+          branchId: input.branchId,
+          patientId: input.patientId,
+          visitId: input.visitId,
+          createdById: input.orderedById,
+          number,
+          status: total.isZero() ? 'PAID' : 'ISSUED',
+          issuedAt: new Date(),
+          subtotal: total,
+          total,
+          lines: { create: lines },
         },
-      },
+      });
+      const order = await this.prepareOrderForInvoice(tx, invoice, lines);
+      if (!order)
+        throw new AppException(
+          ErrorCode.VALIDATION_ERROR,
+          'No laboratory test could be ordered',
+          400,
+        );
+      if (input.physiologicalState)
+        await tx.labOrder.update({
+          where: { id: order.id },
+          data: { physiologicalState: input.physiologicalState },
+        });
+      return { order, invoiceId: invoice.id };
+    };
+    const created = outerTx ? await create(outerTx) : await this.prisma.db.$transaction(create);
+    if (outerTx) return created.order;
+    await this.audit.log({
+      action: AuditAction.CREATE,
+      entity: 'Invoice',
+      entityId: created.invoiceId,
+      after: { number, patientId: input.patientId, total: total.toFixed(2), source: 'LAB_ORDER' },
     });
-
     await this.audit.log({
       action: AuditAction.CREATE,
       entity: 'LabOrder',
-      entityId: order.id,
-      after: {
-        orderNumber,
-        patientId: input.patientId,
-        branchId: input.branchId,
-        visitId: input.visitId ?? null,
-        testIds,
-        physiologicalState: input.physiologicalState ?? null,
-      },
+      entityId: created.order.id,
+      after: { invoiceId: created.invoiceId, patientId: input.patientId, testIds: input.testIds },
     });
-    await this.emitOrderUpdated(order.id);
-
-    return { id: order.id, orderNumber };
+    await this.emitOrderUpdated(created.order.id);
+    return created.order;
   }
 
-  async createOrder(dto: CreateLabOrderDto, orderedById: string): Promise<Record<string, unknown>> {
-    const { id } = await this.createOrderInternal({ ...dto, orderedById });
+  async createOrder(dto: CreateLabOrderDto, user: AuthUser): Promise<Record<string, unknown>> {
+    if (user.branchIds.length > 0 && !user.branchIds.includes(dto.branchId)) {
+      throw new AppException(ErrorCode.FORBIDDEN, 'No access to this branch', 403);
+    }
+    const { id } = await this.createOrderInternal({ ...dto, orderedById: user.id });
     return this.getOrder(id);
   }
 
-  /** Cross-module contract (visit referrals, billing). Caller must have TenantContext set. */
-  async createOrderFromReferral(i: {
-    patientId: string;
-    branchId: string;
-    visitId?: string;
-    testIds: string[];
-    orderedById?: string;
-  }): Promise<{ id: string; orderNumber: string }> {
-    return this.createOrderInternal(i);
+  async createOrderFromReferral(
+    input: {
+      patientId: string;
+      branchId: string;
+      visitId?: string;
+      testIds: string[];
+      orderedById?: string;
+    },
+    tx?: TenantTransactionClient,
+  ): Promise<{ id: string; orderNumber: string }> {
+    return this.createOrderInternal(input, tx);
+  }
+
+  /** Call after an external referral transaction commits, never while its rows are uncommitted. */
+  async announceReferralOrder(id: string): Promise<void> {
+    const order = await this.requireOrder(id);
+    if (order.invoice) {
+      await this.audit.log({
+        action: AuditAction.CREATE,
+        entity: 'Invoice',
+        entityId: order.invoice.id,
+        after: {
+          number: order.invoice.number,
+          patientId: order.patientId,
+          total: order.invoice.total.toFixed(2),
+          source: 'LAB_REFERRAL',
+        },
+      });
+    }
+    await this.audit.log({
+      action: AuditAction.CREATE,
+      entity: 'LabOrder',
+      entityId: id,
+      after: {
+        invoiceId: order.invoiceId,
+        patientId: order.patientId,
+        testIds: order.items.map((item) => item.labTestId),
+      },
+    });
+    await this.emitOrderUpdated(id);
   }
 
   async listOrders(query: LabOrderQueryDto): Promise<PaginatedResult<unknown>> {
     const where: Prisma.LabOrderWhereInput = {};
+    if (!query.includeUnpaid && !query.patientId) {
+      // Cashier payments cannot exceed the total: any refund reopens the clinical gate.
+      where.AND = [
+        {
+          OR: [
+            { invoiceId: null },
+            { invoice: { status: 'PAID', refunds: { none: { amount: { gt: 0 } } } } },
+          ],
+        },
+      ];
+    }
     if (query.status) where.status = query.status;
     if (query.branchId) where.branchId = query.branchId;
     if (query.patientId) where.patientId = query.patientId;
@@ -515,7 +714,11 @@ export class LabService {
     const [rows, total] = await Promise.all([
       this.prisma.db.labOrder.findMany({
         where,
-        include: { patient: true, _count: { select: { items: true } } },
+        include: {
+          patient: true,
+          invoice: { include: { refunds: { select: { amount: true } } } },
+          _count: { select: { items: true } },
+        },
         orderBy: { createdAt: 'desc' },
         ...skipTake(query),
       }),
@@ -527,19 +730,30 @@ export class LabService {
     );
   }
 
-  private async requireOrder(id: string): Promise<LabOrderDetailRow> {
-    const order = await this.prisma.db.labOrder.findUnique({
+  private async requireOrder(
+    id: string,
+    db: TenantTransactionClient = this.prisma.db,
+  ): Promise<LabOrderDetailRow> {
+    const order = await db.labOrder.findUnique({
       where: { id },
       include: {
         patient: true,
+        invoice: { include: { refunds: { select: { amount: true } } } },
         items: {
           include: {
             labTest: { include: { parameters: true } },
-            result: { include: { values: true } },
+            result: { include: { values: true, reportDocument: true } },
           },
         },
         attachments: {
-          select: { id: true, title: true, fileName: true, mimeType: true, sizeBytes: true, createdAt: true },
+          select: {
+            id: true,
+            title: true,
+            fileName: true,
+            mimeType: true,
+            sizeBytes: true,
+            createdAt: true,
+          },
           orderBy: { createdAt: 'desc' },
         },
       },
@@ -553,75 +767,65 @@ export class LabService {
   }
 
   async updateStatus(id: string, dto: UpdateLabOrderStatusDto): Promise<Record<string, unknown>> {
-    const order = await this.requireOrder(id);
-    const allowed = MANUAL_TRANSITIONS[order.status] ?? [];
-    if (!allowed.includes(dto.status)) {
-      throw new AppException(
-        ErrorCode.LAB_INVALID_TRANSITION,
-        `Cannot transition lab order from ${order.status} to ${dto.status}`,
-        409,
-      );
-    }
-
-    await this.prisma.db.labOrder.update({
-      where: { id },
-      data: {
-        status: dto.status,
-        ...(dto.status === LabOrderStatus.SPECIMEN_COLLECTED ? { collectedAt: new Date() } : {}),
-      },
+    const before = await this.prisma.db.$transaction(async (tx) => {
+      const order = await lockLabOrder(tx, id, dto.status !== LabOrderStatus.CANCELLED);
+      if (dto.status === LabOrderStatus.CANCELLED && order.invoiceId) {
+        throw new AppException(
+          ErrorCode.LAB_INVALID_TRANSITION,
+          'Cancel or refund the linked invoice through the cashier before closing the order',
+          409,
+        );
+      }
+      const allowed = MANUAL_TRANSITIONS[order.status] ?? [];
+      if (!allowed.includes(dto.status))
+        throw new AppException(
+          ErrorCode.LAB_INVALID_TRANSITION,
+          'Invalid laboratory status transition',
+          409,
+        );
+      await tx.labOrder.update({
+        where: { id },
+        data: {
+          status: dto.status,
+          ...(dto.status === LabOrderStatus.SPECIMEN_COLLECTED ? { collectedAt: new Date() } : {}),
+        },
+      });
+      return order.status;
     });
-
     await this.audit.log({
       action: AuditAction.UPDATE,
       entity: 'LabOrder',
       entityId: id,
-      before: { status: order.status },
+      before: { status: before },
       after: { status: dto.status },
     });
     await this.emitOrderUpdated(id);
-
     return this.getOrder(id);
   }
 
   async approve(id: string, actorUserId: string): Promise<Record<string, unknown>> {
-    const order = await this.requireOrder(id);
-    if (order.status !== LabOrderStatus.RESULTED) {
-      throw new AppException(
-        ErrorCode.LAB_INVALID_TRANSITION,
-        `Only a RESULTED order can be approved (current: ${order.status})`,
-        409,
-      );
-    }
-    if (order.items.some((it) => !it.result)) {
-      throw new AppException(
-        ErrorCode.LAB_INVALID_TRANSITION,
-        'All items must have results before approval',
-        409,
-      );
-    }
-
     const approvedAt = new Date();
-    await this.prisma.db.$transaction(async (tx) => {
+    const order = await this.prisma.db.$transaction(async (tx) => {
+      await lockLabOrder(tx, id);
+      const current = await this.requireOrder(id, tx);
+      if (
+        current.status !== LabOrderStatus.RESULTED ||
+        current.items.length === 0 ||
+        !current.items.every(isLabResultComplete)
+      ) {
+        throw new AppException(
+          ErrorCode.LAB_INVALID_TRANSITION,
+          'Complete every test or select its uploaded report before signing',
+          409,
+        );
+      }
       await tx.labResult.updateMany({
         where: { orderItem: { orderId: id } },
         data: { approvedById: actorUserId, approvedAt },
       });
-      await tx.labOrder.update({
-        where: { id },
-        data: { status: LabOrderStatus.APPROVED },
-      });
+      await tx.labOrder.update({ where: { id }, data: { status: LabOrderStatus.APPROVED } });
+      return current;
     });
-
-    await this.notifications.enqueueEvent({
-      event: NotificationEvent.LAB_RESULT_READY,
-      clinicId: TenantContext.requireClinicId(),
-      patientId: order.patientId,
-      vars: {
-        patient_name: order.patient.fullName,
-        order_number: order.orderNumber,
-      },
-    });
-
     await this.audit.log({
       action: AuditAction.UPDATE,
       entity: 'LabOrder',
@@ -634,35 +838,49 @@ export class LabService {
       },
     });
     await this.emitOrderUpdated(id);
-
+    await this.notifications.enqueueEvent({
+      event: NotificationEvent.LAB_RESULT_READY,
+      clinicId: TenantContext.requireClinicId(),
+      patientId: order.patientId,
+      vars: { patient_name: order.patient.fullName, order_number: order.orderNumber },
+    });
     return this.getOrder(id);
   }
 
   async deliver(id: string): Promise<Record<string, unknown>> {
-    const order = await this.requireOrder(id);
-    if (order.status !== LabOrderStatus.APPROVED) {
-      throw new AppException(
-        ErrorCode.LAB_INVALID_TRANSITION,
-        `Only an APPROVED order can be delivered (current: ${order.status})`,
-        409,
-      );
-    }
-
-    await this.prisma.db.labOrder.update({
-      where: { id },
-      data: { status: LabOrderStatus.DELIVERED, deliveredAt: new Date() },
+    await this.prisma.db.$transaction(async (tx) => {
+      const order = await lockLabOrder(tx, id, false);
+      if (order.status !== LabOrderStatus.APPROVED)
+        throw new AppException(
+          ErrorCode.LAB_INVALID_TRANSITION,
+          'Only signed results can be delivered',
+          409,
+        );
+      await tx.labOrder.update({
+        where: { id },
+        data: { status: LabOrderStatus.DELIVERED, deliveredAt: new Date() },
+      });
     });
-
     await this.audit.log({
       action: AuditAction.UPDATE,
       entity: 'LabOrder',
       entityId: id,
-      before: { status: order.status },
+      before: { status: LabOrderStatus.APPROVED },
       after: { status: LabOrderStatus.DELIVERED },
     });
     await this.emitOrderUpdated(id);
-
     return this.getOrder(id);
+  }
+
+  /** Proves attachment ownership before the controller delegates streaming to storage. */
+  async requireAttachment(orderId: string, documentId: string): Promise<void> {
+    await this.requireOrder(orderId);
+    const document = await this.prisma.db.patientDocument.findFirst({
+      where: { id: documentId, labOrderId: orderId },
+      select: { id: true },
+    });
+    if (!document)
+      throw new AppException(ErrorCode.NOT_FOUND, 'Laboratory attachment not found', 404);
   }
 
   /**
@@ -676,10 +894,7 @@ export class LabService {
    * Refused once the order is approved or delivered: that report has been signed and
    * handed to the patient, and quietly restating it is not a correction anyone can see.
    */
-  async updateContext(
-    id: string,
-    dto: UpdateLabOrderContextDto,
-  ): Promise<Record<string, unknown>> {
+  async updateContext(id: string, dto: UpdateLabOrderContextDto): Promise<Record<string, unknown>> {
     const order = await this.requireOrder(id);
     if (
       order.status === LabOrderStatus.APPROVED ||
@@ -696,16 +911,23 @@ export class LabService {
     const state = dto.physiologicalState;
     if (before === state) return this.toOrderDetail(order);
 
-    const ctx: PatientContext = {
-      gender: order.patient.gender,
-      ageDays: ageInDays(order.patient.dob, order.collectedAt ?? order.createdAt),
-      state,
-    };
-
     let reflagged = 0;
     await this.prisma.db.$transaction(async (tx) => {
+      const locked = await lockLabOrder(tx, id, false);
+      if (FINAL_LAB_STATUSES.includes(locked.status))
+        throw new AppException(
+          ErrorCode.LAB_INVALID_TRANSITION,
+          'Signed laboratory context is locked',
+          409,
+        );
+      const current = await this.requireOrder(id, tx);
+      const ctx: PatientContext = {
+        gender: current.patient.gender,
+        ageDays: ageInDays(current.patient.dob, current.collectedAt ?? current.createdAt),
+        state,
+      };
       await tx.labOrder.update({ where: { id }, data: { physiologicalState: state } });
-      for (const item of order.items) {
+      for (const item of current.items) {
         if (!item.result) continue;
         const paramById = new Map(item.labTest.parameters.map((p) => [p.id, p]));
         for (const v of item.result.values) {

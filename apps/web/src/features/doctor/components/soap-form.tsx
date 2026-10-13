@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
@@ -37,7 +37,15 @@ type SoapFormValues = z.infer<typeof soapFormSchema>;
 const SOAP_FIELDS = ['subjective', 'objective', 'assessmentNote', 'plan'] as const;
 type SoapField = (typeof SOAP_FIELDS)[number];
 
-export function SoapForm({ visit, locked }: { visit: VisitDetail; locked: boolean }) {
+export function SoapForm({
+  visit,
+  locked,
+  onUnsavedChange,
+}: {
+  visit: VisitDetail;
+  locked: boolean;
+  onUnsavedChange?: (value: boolean) => void;
+}) {
   const t = useTranslations('visits');
   const tCommon = useTranslations('common');
   const updateVisit = useUpdateVisit(visit.id);
@@ -61,6 +69,12 @@ export function SoapForm({ visit, locked }: { visit: VisitDetail; locked: boolea
       reason: '',
     },
   });
+
+  const [savedNextVisitDate, setSavedNextVisitDate] = useState(nextVisitDate);
+  const dirty = form.formState.isDirty || nextVisitDate !== savedNextVisitDate;
+  useEffect(() => {
+    onUnsavedChange?.(dirty || updateVisit.isPending || amendVisit.isPending);
+  }, [dirty, updateVisit.isPending, amendVisit.isPending, onUnsavedChange]);
 
   const applyTemplate = (templateId: string) => {
     const template = templates?.find((tpl) => tpl.id === templateId);
@@ -88,9 +102,22 @@ export function SoapForm({ visit, locked }: { visit: VisitDetail; locked: boolea
         form.setError('reason', { type: 'manual', message: t('amendReasonRequired') });
         return;
       }
-      amendVisit.mutate({ ...soap, reason });
+      amendVisit.mutate(
+        { ...soap, reason },
+        {
+          onSuccess: () => {
+            form.reset({ ...values, reason: '' });
+            setSavedNextVisitDate(nextVisitDate);
+          },
+        },
+      );
     } else {
-      updateVisit.mutate(soap);
+      updateVisit.mutate(soap, {
+        onSuccess: () => {
+          form.reset(values);
+          setSavedNextVisitDate(nextVisitDate);
+        },
+      });
     }
   });
 
@@ -152,6 +179,7 @@ export function SoapForm({ visit, locked }: { visit: VisitDetail; locked: boolea
               <Textarea
                 id={`soap-${field}`}
                 rows={3}
+                disabled={pending}
                 {...form.register(field)}
               />
             </div>
@@ -173,9 +201,7 @@ export function SoapForm({ visit, locked }: { visit: VisitDetail; locked: boolea
                 <Label htmlFor="amend-reason">{t('amendReason')}</Label>
                 <Input id="amend-reason" {...form.register('reason')} />
                 {form.formState.errors.reason ? (
-                  <p className="text-xs text-destructive">
-                    {form.formState.errors.reason.message}
-                  </p>
+                  <p className="text-xs text-destructive">{form.formState.errors.reason.message}</p>
                 ) : null}
               </div>
             ) : null}

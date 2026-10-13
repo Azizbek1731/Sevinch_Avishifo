@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import type { CashierShift, Expense, ExpenseCategory } from '@prisma/client';
 import {
   ErrorCode,
+  AuditAction,
   type AuthUser,
   type CreateExpenseInput,
   type ExpenseCategoryUpsertInput,
@@ -13,15 +14,23 @@ import { canSeeDeleted } from '../../common/visibility';
 import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
+import { AuditService } from '../../core/audit/audit.service';
+import { AppConfigService } from '../../core/config/app-config.service';
+import { assertManualMethod, lockOpenShift } from './cash-accounts';
 
 type ExpenseWithJoins = Expense & {
   category?: { id: string; name: string } | null;
   shift?: Pick<CashierShift, 'id' | 'status'> | null;
+  surgeryPayout?: { id: string; surgeryId: string } | null;
 };
 
 @Injectable()
 export class ExpensesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly config: AppConfigService,
+  ) {}
 
   private mapCategory(c: ExpenseCategory): Record<string, unknown> {
     return { id: c.id, name: c.name, isActive: c.isActive };
@@ -40,6 +49,7 @@ export class ExpensesService {
       createdById: e.createdById,
       createdAt: e.createdAt.toISOString(),
       deletedAt: e.deletedAt ? e.deletedAt.toISOString() : null,
+      surgeryId: e.surgeryPayout?.surgeryId ?? null,
       ...(e.category ? { category: e.category } : {}),
     };
   }
@@ -97,7 +107,7 @@ export class ExpensesService {
     if (!shift) {
       throw new AppException(
         ErrorCode.SHIFT_NOT_OPEN,
-        'Naqd chiqim uchun ochiq kassa smenasi kerak',
+        'Chiqim uchun ochiq kassa smenasi kerak',
         409,
       );
     }
@@ -109,6 +119,7 @@ export class ExpensesService {
     user: AuthUser,
     branchId: string,
   ): Promise<Record<string, unknown>> {
+    assertManualMethod(dto.method, this.config.env.SINGLE_CLINIC_MODE);
     const category = await this.prisma.db.expenseCategory.findFirst({
       where: { id: dto.categoryId, isActive: true },
     });
@@ -121,7 +132,7 @@ export class ExpensesService {
 
     // Resolved before the write, so a cash expense with no open drawer is
     // refused outright rather than recorded as money out of nowhere.
-    const shiftId = dto.method === 'CASH' ? await this.requireOpenShift(branchId) : null;
+    const shiftId = (this.config.env.SINGLE_CLINIC_MODE || dto.method === 'CASH') ? await this.requireOpenShift(branchId) : null;
 
     const expense = await this.prisma.db.$transaction(async (tx) => {
       // Re-checked inside the transaction with a share lock, so a close() that
@@ -151,6 +162,7 @@ export class ExpensesService {
         include: { category: { select: { id: true, name: true } } },
       });
     });
+    await this.audit.log({ action: AuditAction.CREATE, entity: 'Expense', entityId: expense.id, after: this.mapExpense(expense) });
     return this.mapExpense(expense);
   }
 
@@ -178,7 +190,7 @@ export class ExpensesService {
         where,
         orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
         ...skipTake(q),
-        include: { category: { select: { id: true, name: true } } },
+        include: { category: { select: { id: true, name: true } }, surgeryPayout: { select: { id: true, surgeryId: true } } },
       }),
       this.prisma.db.expense.count({ where }),
       // The headline total counts only live rows: a withdrawn expense is one
@@ -204,6 +216,10 @@ export class ExpensesService {
       include: { shift: { select: { id: true, status: true } } },
     });
     if (!existing) throw new AppException(ErrorCode.NOT_FOUND, 'Expense not found', 404);
+    const surgeryPayout = await this.prisma.db.surgeryPayout.findFirst({ where: { expenseId: id }, select: { id: true } });
+    if (surgeryPayout) {
+      throw new AppException(ErrorCode.VALIDATION_ERROR, 'Jarroh ulushini operatsiya kartasidan bekor qiling — bog‘langan chiqimni alohida o‘zgartirib bo‘lmaydi', 409);
+    }
     if (existing.shift && existing.shift.status !== 'OPEN') {
       throw new AppException(
         ErrorCode.VALIDATION_ERROR,
@@ -235,16 +251,20 @@ export class ExpensesService {
         409,
       );
     }
-    const updated = await this.prisma.db.expense.update({
-      where: { id },
-      data: {
+    const updated = await this.prisma.db.$transaction(async (tx) => {
+      await lockOpenShift(tx, existing.shiftId, existing.shiftId !== null);
+      return tx.expense.update({
+        where: { id, deletedAt: null },
+        data: {
         ...(dto.categoryId !== undefined ? { categoryId: dto.categoryId } : {}),
         ...(dto.amount !== undefined ? { amount: new Prisma.Decimal(dto.amount) } : {}),
         ...(dto.date !== undefined ? { date: new Date(dto.date) } : {}),
         ...(dto.note !== undefined ? { note: dto.note } : {}),
       },
       include: { category: { select: { id: true, name: true } } },
+      });
     });
+    await this.audit.log({ action: AuditAction.UPDATE, entity: 'Expense', entityId: id, before: this.mapExpense(existing), after: this.mapExpense(updated) });
     return this.mapExpense(updated);
   }
 
@@ -256,10 +276,14 @@ export class ExpensesService {
   async removeExpense(id: string, user: AuthUser): Promise<{ id: string }> {
     const existing = await this.loadEditable(id);
     if (existing.deletedAt) return { id };
-    await this.prisma.db.expense.update({
-      where: { id },
-      data: { deletedAt: new Date(), deletedById: user.id },
+    await this.prisma.db.$transaction(async (tx) => {
+      await lockOpenShift(tx, existing.shiftId, existing.shiftId !== null);
+      await tx.expense.updateMany({
+        where: { id, deletedAt: null },
+        data: { deletedAt: new Date(), deletedById: user.id },
+      });
     });
+    await this.audit.log({ action: AuditAction.DELETE, entity: 'Expense', entityId: id, before: this.mapExpense(existing), after: { deleted: true } });
     return { id };
   }
 }

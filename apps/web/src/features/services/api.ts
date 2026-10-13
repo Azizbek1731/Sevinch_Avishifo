@@ -45,6 +45,7 @@ export interface ServiceRow {
   code: string;
   name: LocalizedName;
   durationMin: number;
+  unit: string;
   vatIncluded: boolean;
   isActive: boolean;
   currentPrice: MoneyString | null;
@@ -85,6 +86,7 @@ export interface ServiceListQuery {
   page?: number;
   limit?: number;
   categoryId?: string;
+  kind?: ServiceKind;
   search?: string;
   isActive?: boolean;
 }
@@ -125,7 +127,10 @@ export const servicesApi = {
   deletePackage: (id: string) => api.delete<PackageRow>(`/service-packages/${id}`),
 
   // discount rules
-  listDiscountRules: (q: { page?: number; limit?: number }): Promise<ApiResult<DiscountRuleRow[]>> =>
+  listDiscountRules: (q: {
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResult<DiscountRuleRow[]>> =>
     api.get<DiscountRuleRow[]>('/discount-rules', { ...q }),
   createDiscountRule: (body: DiscountRuleUpsertInput) =>
     api.post<DiscountRuleRow>('/discount-rules', body),

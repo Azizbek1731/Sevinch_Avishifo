@@ -18,6 +18,8 @@ async function bootstrap(): Promise<void> {
   const config = app.get(AppConfigService);
 
   app.set('trust proxy', 1);
+  // A consultation saves its full prescription draft atomically, including legacy notes.
+  app.useBodyParser('json', { limit: '1mb' });
   app.use(helmet());
   app.use(cookieParser());
   app.enableCors({

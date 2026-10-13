@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { INestApplication } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import Redis from 'ioredis';
@@ -95,6 +95,11 @@ describe('telegram passwordless sign-in (e2e)', () => {
   }
 
   beforeAll(async () => {
+    if (
+      new URL(process.env.DATABASE_URL ?? '').pathname !== '/avishifo_finance_migration' ||
+      process.env.TELEGRAM_ENABLED !== 'false'
+    )
+      throw new Error('Use isolated avishifo_finance_migration with Telegram disabled');
     prisma = new PrismaClient();
     redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
     app = await createApp(sent);
@@ -121,7 +126,7 @@ describe('telegram passwordless sign-in (e2e)', () => {
   it('signs a linked staff user in with the code from Telegram', async () => {
     const challengeId = await requestCode(ownerPhone);
 
-    expect(sent).toHaveLength(1);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
     const message = sent[0]!;
     expect(message.chatId).toBe(ownerChatId);
     expect(message.text).toMatch(CODE_LINE);
@@ -148,6 +153,7 @@ describe('telegram passwordless sign-in (e2e)', () => {
 
   it('will not spend the same code twice', async () => {
     const challengeId = await requestCode(ownerPhone);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
     const code = codeOf(sent[0]!);
 
     await request(app.getHttpServer())
@@ -215,7 +221,7 @@ describe('telegram passwordless sign-in (e2e)', () => {
 
     // They are told why, in the chat — but no code is sent, so there is nothing
     // to type even for someone reading over their shoulder.
-    expect(sent).toHaveLength(1);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]!.chatId).toBe(chatId);
     expect(sent[0]!.text).not.toMatch(CODE_LINE);
     expect(sent[0]!.text).toMatch(/parol/i);
@@ -237,7 +243,7 @@ describe('telegram passwordless sign-in (e2e)', () => {
       .expect(200);
 
     expect(res.body.data.twoFactorRequired).toBe(true);
-    expect(sent).toHaveLength(1);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]!.text).toMatch(CODE_LINE);
 
     await prisma.user.update({
@@ -281,6 +287,7 @@ describe('telegram passwordless sign-in (e2e)', () => {
     });
 
     const challengeId = await requestCode(cashierPhone);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
     const code = codeOf(sent[0]!);
 
     await prisma.user.update({
@@ -292,8 +299,8 @@ describe('telegram passwordless sign-in (e2e)', () => {
       .post(`${API}/auth/telegram/verify`)
       .set('X-Forwarded-For', uniqueIp())
       .send({ challengeId, code })
-      .expect(403);
-    expect(res.body.error.code).toBe('ACCOUNT_SUSPENDED');
+      .expect(401);
+    expect(res.body.error.code).toBe('TWO_FACTOR_CHALLENGE_INVALID');
 
     await prisma.user.update({
       where: { id: clinic.cashier.id },
@@ -309,6 +316,7 @@ describe('telegram passwordless sign-in (e2e)', () => {
     });
 
     const challengeId = await requestCode(cashierPhone);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
     const code = codeOf(sent[0]!);
 
     await prisma.user.update({
@@ -337,7 +345,7 @@ describe('telegram passwordless sign-in (e2e)', () => {
     });
 
     await requestCode(cashierPhone);
-    expect(sent).toHaveLength(1);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
 
     // Same neutral 200 + challengeId, but the victim's chat stays quiet.
     await requestCode(cashierPhone, { respectCooldown: true });
@@ -348,6 +356,7 @@ describe('telegram passwordless sign-in (e2e)', () => {
 
   it('rejects a wrong code and burns the challenge after too many tries', async () => {
     const challengeId = await requestCode(ownerPhone);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
     const real = codeOf(sent[0]!);
     const wrong = real === '000000' ? '111111' : '000000';
 
@@ -383,6 +392,7 @@ describe('telegram passwordless sign-in (e2e)', () => {
 
   it('cannot spend a passwordless code on the two-factor step', async () => {
     const challengeId = await requestCode(ownerPhone);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
     const code = codeOf(sent[0]!);
 
     // /auth/two-factor/verify is reached only after a correct password; a code

@@ -1,4 +1,5 @@
 import {
+  LabOrderStatus,
   ResultFlag,
   formatRangeBounds,
   type Gender,
@@ -8,6 +9,16 @@ import {
 } from '@avishifo/shared';
 
 export type UiLocale = 'uz' | 'ru' | 'en';
+
+/** Financial holds do not replace the clinical status of a signed or cancelled report. */
+export function hasUnpaidLabWork(order: { status: LabOrderStatus; canWork: boolean }): boolean {
+  return (
+    !order.canWork &&
+    order.status !== LabOrderStatus.APPROVED &&
+    order.status !== LabOrderStatus.DELIVERED &&
+    order.status !== LabOrderStatus.CANCELLED
+  );
+}
 
 /** Pick the localized variant of a {uz, ru?, en?} name (uz is first-class fallback). */
 export function localizedName(name: LocalizedNameInput, locale: UiLocale): string {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
@@ -32,6 +32,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useAuthStore } from '@/stores/auth-store';
+import { EXTERNAL_PAYMENT_METHODS, inputTiyin } from '../payment-methods';
 import { billingApi, sanitizeMoney } from '../api';
 import { useApiErrorToast, useInvalidateBilling } from '../hooks';
 
@@ -45,6 +47,12 @@ export function RefundDialog({ open, onOpenChange, invoice }: RefundDialogProps)
   const t = useTranslations('billing');
   const errorToast = useApiErrorToast();
   const invalidate = useInvalidateBilling();
+  const activeBranchId = useAuthStore((state) => state.activeBranchId);
+  const shiftQuery = useQuery({
+    queryKey: ['shifts', 'current', activeBranchId],
+    queryFn: async () => (await billingApi.currentShift()).data,
+    enabled: open,
+  });
 
   const form = useForm<CreateRefundInput>({
     resolver: zodResolver(createRefundSchema),
@@ -65,8 +73,15 @@ export function RefundDialog({ open, onOpenChange, invoice }: RefundDialogProps)
     onError: errorToast,
   });
 
-  const onSubmit = form.handleSubmit((values) => mutation.mutate(values));
+  const onSubmit = form.handleSubmit((values) => {
+    if (!amountInvalid && shiftQuery.data?.open && !mutation.isPending) mutation.mutate(values);
+  });
   const method = form.watch('method');
+  const amountTiyin = inputTiyin(form.watch('amount'));
+  const amountInvalid =
+    amountTiyin === null ||
+    amountTiyin <= 0n ||
+    amountTiyin > (inputTiyin(invoice.paidTotal) ?? 0n);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -101,7 +116,7 @@ export function RefundDialog({ open, onOpenChange, invoice }: RefundDialogProps)
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.values(PaymentMethod).map((m) => (
+                {EXTERNAL_PAYMENT_METHODS.map((m) => (
                   <SelectItem key={m} value={m}>
                     {t(`methods.${m}`)}
                   </SelectItem>
@@ -116,12 +131,15 @@ export function RefundDialog({ open, onOpenChange, invoice }: RefundDialogProps)
               <p className="text-sm text-destructive">{t('refundDlg.reasonRequired')}</p>
             ) : null}
           </div>
+          {!shiftQuery.data?.open ? (
+            <p className="text-sm text-warning-foreground">{t('accounts.closedHint')}</p>
+          ) : null}
           <DialogFooter>
             <Button
               type="submit"
               variant="destructive"
               className="w-full"
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || amountInvalid || !shiftQuery.data?.open}
             >
               {t('refundDlg.submit')}
             </Button>

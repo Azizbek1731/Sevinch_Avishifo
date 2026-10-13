@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Admission, TreatmentOrder } from '@prisma/client';
 import {
+  AuditAction,
   ErrorCode,
   type AdmitPatientInput,
   type AdmissionQueryInput,
@@ -16,10 +18,15 @@ import { AppException } from '../../common/app.exception';
 import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
+import type { TenantTransactionClient } from '../../core/prisma/tenant-extension';
+import { AuditService } from '../../core/audit/audit.service';
 import { PricingService } from '../services/pricing.service';
+import { InvoicesService } from '../billing/invoices.service';
 
 /** Every planned date of an order, from its schedule. */
-function plannedDates(order: Pick<TreatmentOrder, 'schedule' | 'startDate' | 'timesPlanned'>): string[] {
+function plannedDates(
+  order: Pick<TreatmentOrder, 'schedule' | 'startDate' | 'timesPlanned'>,
+): string[] {
   const step = order.schedule === 'EVERY_OTHER_DAY' ? 2 : 1;
   const times = order.schedule === 'ONCE' ? 1 : order.timesPlanned;
   const out: string[] = [];
@@ -37,6 +44,8 @@ export class AdmissionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pricing: PricingService,
+    private readonly audit: AuditService,
+    private readonly invoices: InvoicesService,
   ) {}
 
   private map(a: Admission): Record<string, unknown> {
@@ -56,7 +65,9 @@ export class AdmissionsService {
       referralDiagnosis: a.referralDiagnosis,
       admissionDiagnosis: a.admissionDiagnosis,
       clinicalDiagnosis: a.clinicalDiagnosis,
-      clinicalDiagnosisAt: a.clinicalDiagnosisAt ? a.clinicalDiagnosisAt.toISOString().slice(0, 10) : null,
+      clinicalDiagnosisAt: a.clinicalDiagnosisAt
+        ? a.clinicalDiagnosisAt.toISOString().slice(0, 10)
+        : null,
       finalDiagnosisMain: a.finalDiagnosisMain,
       finalDiagnosisComplication: a.finalDiagnosisComplication,
       finalDiagnosisComorbid: a.finalDiagnosisComorbid,
@@ -86,7 +97,11 @@ export class AdmissionsService {
     return `${prefix}${String(n).padStart(4, '0')}`;
   }
 
-  async admit(dto: AdmitPatientInput, user: AuthUser, branchId: string): Promise<Record<string, unknown>> {
+  async admit(
+    dto: AdmitPatientInput,
+    user: AuthUser,
+    branchId: string,
+  ): Promise<Record<string, unknown>> {
     const patient = await this.prisma.db.patient.findFirst({
       where: { id: dto.patientId, deletedAt: null },
       select: { id: true },
@@ -106,6 +121,10 @@ export class AdmissionsService {
       );
     }
 
+    const attendingDoctorUserId =
+      dto.attendingDoctorUserId ?? (user.role === 'DOCTOR' ? user.id : null);
+    if (attendingDoctorUserId) await this.validateDoctor(attendingDoctorUserId, branchId);
+
     const created = await this.prisma.db.admission.create({
       // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
       data: {
@@ -116,7 +135,7 @@ export class AdmissionsService {
         department: dto.department ?? null,
         ward: dto.ward ?? null,
         bed: dto.bed ?? null,
-        attendingDoctorUserId: dto.attendingDoctorUserId ?? user.id,
+        attendingDoctorUserId,
         admittedAt: dto.admittedAt ? new Date(dto.admittedAt) : new Date(),
         referredBy: dto.referredBy ?? null,
         referralDiagnosis: dto.referralDiagnosis ?? null,
@@ -129,6 +148,12 @@ export class AdmissionsService {
       where: { id: dto.patientId },
       data: { careType: 'INPATIENT' },
     });
+    await this.audit.log({
+      action: AuditAction.CREATE,
+      entity: 'Admission',
+      entityId: created.id,
+      after: { patientId: dto.patientId, branchId, attendingDoctorUserId },
+    });
     return this.map(created);
   }
 
@@ -136,6 +161,37 @@ export class AdmissionsService {
     const a = await this.prisma.db.admission.findFirst({ where: { id } });
     if (!a) throw new AppException(ErrorCode.NOT_FOUND, 'Kasallik tarixi topilmadi', 404);
     return a;
+  }
+
+  /** Surgery and ward mutations share this first lock, including discharge. */
+  private async lockAdmission(tx: TenantTransactionClient, id: string): Promise<Admission> {
+    const clinicId = TenantContext.requireClinicId();
+    await tx.$queryRaw`SELECT "id" FROM "Admission" WHERE "id" = ${id} AND "clinicId" = ${clinicId} FOR UPDATE`;
+    const admission = await tx.admission.findFirst({ where: { id } });
+    if (!admission) throw new AppException(ErrorCode.NOT_FOUND, 'Kasallik tarixi topilmadi', 404);
+    return admission;
+  }
+
+  private async validateDoctor(doctorId: string, branchId: string): Promise<void> {
+    // User is platform-scoped; explicitly require this clinic and branch.
+    const doctor = await this.prisma.unscoped.user.findFirst({
+      where: {
+        id: doctorId,
+        clinicId: TenantContext.requireClinicId(),
+        role: 'DOCTOR',
+        status: 'ACTIVE',
+        deletedAt: null,
+        branches: { some: { branchId } },
+      },
+      select: { id: true },
+    });
+    if (!doctor) throw new AppException(ErrorCode.VALIDATION_ERROR, 'Faol shifokorni tanlang', 400);
+  }
+
+  /** Financial rows cannot move between pending and invoiced during closure. */
+  private async lockStayCharges(tx: TenantTransactionClient, id: string): Promise<void> {
+    const clinicId = TenantContext.requireClinicId();
+    await tx.$queryRaw`SELECT "id" FROM "ChargeItem" WHERE "admissionId" = ${id} AND "clinicId" = ${clinicId} ORDER BY "id" FOR UPDATE`;
   }
 
   private requireActive(a: Admission): void {
@@ -158,18 +214,26 @@ export class AdmissionsService {
    * with the treatment sheet and rounds, which mean nothing without the stay.
    */
   async remove(id: string): Promise<{ id: string; invoicedKept: number }> {
-    const a = await this.require(id);
-
-    const invoicedKept = await this.prisma.db.chargeItem.count({
-      where: { admissionId: id, status: 'INVOICED' },
-    });
-
-    await this.prisma.db.$transaction(async (tx) => {
+    const invoicedKept = await this.prisma.db.$transaction(async (tx) => {
+      const a = await this.lockAdmission(tx, id);
+      if (await tx.surgeryCase.count({ where: { admissionId: id } })) {
+        throw new AppException(
+          ErrorCode.VALIDATION_ERROR,
+          'Operatsiya tarixi mavjud — yotqizishni o‘chirish mumkin emas',
+          409,
+        );
+      }
+      await this.lockStayCharges(tx, id);
+      const kept = await tx.chargeItem.count({ where: { admissionId: id, status: 'INVOICED' } });
       const orders = await tx.treatmentOrder.findMany({
         where: { admissionId: id },
         select: { id: true },
       });
       const orderIds = orders.map((o) => o.id);
+      await tx.treatmentOrder.updateMany({
+        where: { admissionId: id, billingChargeId: { not: null } },
+        data: { billingChargeId: null },
+      });
       // Charges point at administrations, so they go first.
       await tx.chargeItem.deleteMany({ where: { admissionId: id, status: { not: 'INVOICED' } } });
       // A billed charge outlives the stay, but must stop pointing at a row
@@ -197,21 +261,38 @@ export class AdmissionsService {
           });
         }
       }
+      return kept;
     });
-
+    await this.audit.log({
+      action: AuditAction.DELETE,
+      entity: 'Admission',
+      entityId: id,
+      after: { invoicedKept },
+    });
     return { id, invoicedKept };
   }
 
   async update(id: string, dto: UpdateAdmissionInput): Promise<Record<string, unknown>> {
-    const a = await this.require(id);
-    this.requireActive(a);
-    const updated = await this.prisma.db.admission.update({
-      where: { id },
-      data: {
-        ...dto,
-        clinicalDiagnosisAt: dto.clinicalDiagnosisAt ? new Date(dto.clinicalDiagnosisAt) : undefined,
-        attendingDoctorUserId: dto.attendingDoctorUserId ?? undefined,
-      },
+    const updated = await this.prisma.db.$transaction(async (tx) => {
+      const a = await this.lockAdmission(tx, id);
+      this.requireActive(a);
+      if (dto.attendingDoctorUserId)
+        await this.validateDoctor(dto.attendingDoctorUserId, a.branchId);
+      return tx.admission.update({
+        where: { id },
+        data: {
+          ...dto,
+          clinicalDiagnosisAt: dto.clinicalDiagnosisAt
+            ? new Date(dto.clinicalDiagnosisAt)
+            : undefined,
+        },
+      });
+    });
+    await this.audit.log({
+      action: AuditAction.UPDATE,
+      entity: 'Admission',
+      entityId: id,
+      after: dto,
     });
     return this.map(updated);
   }
@@ -229,7 +310,11 @@ export class AdmissionsService {
    * allocation, so any "the ward's share of this" figure would be invented, and
    * a cashier cannot collect an invented number.
    */
-  private async stayMoney(admissionId: string, patientId: string): Promise<{
+  private async stayMoney(
+    admissionId: string,
+    patientId: string,
+    db: TenantTransactionClient = this.prisma.db,
+  ): Promise<{
     pending: Array<{ id: string; title: Prisma.JsonValue; unitPrice: string; quantity: number }>;
     pendingTotal: Prisma.Decimal;
     stayInvoices: Array<{
@@ -246,29 +331,24 @@ export class AdmissionsService {
   }> {
     const zero = new Prisma.Decimal(0);
 
-    const pendingRows = await this.prisma.db.chargeItem.findMany({
+    const pendingRows = await db.chargeItem.findMany({
       where: { admissionId, status: 'PENDING' },
       select: { id: true, title: true, unitPrice: true, quantity: true },
       orderBy: { date: 'asc' },
     });
-    const pendingTotal = pendingRows.reduce(
-      (acc, c) => acc.add(c.unitPrice.mul(c.quantity)),
-      zero,
-    );
+    const pendingTotal = pendingRows.reduce((acc, c) => acc.add(c.unitPrice.mul(c.quantity)), zero);
 
-    const linked = await this.prisma.db.chargeItem.findMany({
+    const linked = await db.chargeItem.findMany({
       where: { admissionId, invoiceLineId: { not: null } },
       select: { invoiceLineId: true },
     });
-    const lineIds = linked
-      .map((l) => l.invoiceLineId)
-      .filter((x): x is string => x !== null);
+    const lineIds = linked.map((l) => l.invoiceLineId).filter((x): x is string => x !== null);
     const stayInvoiceIds =
       lineIds.length > 0
         ? [
             ...new Set(
               (
-                await this.prisma.db.invoiceLine.findMany({
+                await db.invoiceLine.findMany({
                   where: { id: { in: lineIds } },
                   select: { invoiceId: true },
                 })
@@ -279,7 +359,7 @@ export class AdmissionsService {
 
     const openStay =
       stayInvoiceIds.length > 0
-        ? await this.prisma.db.invoice.findMany({
+        ? await db.invoice.findMany({
             where: { id: { in: stayInvoiceIds }, status: { in: ['ISSUED', 'PARTIALLY_PAID'] } },
             select: { id: true, number: true, status: true, total: true, paidTotal: true },
             orderBy: { createdAt: 'asc' },
@@ -289,14 +369,14 @@ export class AdmissionsService {
 
     // Everything else the patient owes. Shown so the desk knows, never enforced
     // — see discharge() for why it must not hold a bed.
-    const allOpen = await this.prisma.db.invoice.aggregate({
+    const allOpen = await db.invoice.aggregate({
       where: { patientId, status: { in: ['ISSUED', 'PARTIALLY_PAID'] } },
       _sum: { total: true, paidTotal: true },
     });
     const totalDebt = (allOpen._sum.total ?? zero).sub(allOpen._sum.paidTotal ?? zero);
     const otherDebt = totalDebt.sub(stayDebt);
 
-    const patient = await this.prisma.db.patient.findFirst({
+    const patient = await db.patient.findFirst({
       where: { id: patientId },
       select: { balance: true },
     });
@@ -358,11 +438,6 @@ export class AdmissionsService {
     dto: DischargeInput,
     user: AuthUser,
   ): Promise<Record<string, unknown>> {
-    const a = await this.require(id);
-    this.requireActive(a);
-
-    const money = await this.stayMoney(id, a.patientId);
-
     // `force` closes the stay over anything still outstanding. It is a
     // deliberate act by someone holding admissions.force (the desk and the
     // administrator), never the default path — the blockers below still guide
@@ -376,37 +451,46 @@ export class AdmissionsService {
       );
     }
 
-    if (!forced) {
-      // Services not yet on a bill. Discharging over them is how a stay gets
-      // silently written off, so it is refused — but with the count, so the
-      // dialog can offer to raise the invoice instead of dead-ending.
-      if (money.pending.length > 0) {
-        throw new AppException(
-          ErrorCode.ADMISSION_CHARGES_UNBILLED,
-          `Hisob-fakturaga kiritilmagan ${money.pending.length} ta xizmat bor — avval hisob-faktura chiqaring`,
-          409,
-          [{ count: money.pending.length, total: money.pendingTotal.toFixed(2) }],
-        );
-      }
-
-      // Money owed for THIS stay. Deliberately not the patient's whole debt:
-      // the same patient may run up outpatient bills while lying in the bed,
-      // and an unrelated old invoice must never be what keeps a bed occupied.
-      // Old debt is collections (the debtors report), not bed management.
-      if (money.stayDebt.gt(0)) {
-        throw new AppException(
-          ErrorCode.ADMISSION_DEBT_UNPAID,
-          `Bu yotqizish bo‘yicha ${money.stayDebt.toFixed(2)} so‘m qarz bor — avval to‘lovni qabul qiling`,
-          409,
-          [{ debt: money.stayDebt.toFixed(2), invoices: money.stayInvoices }],
-        );
-      }
-    }
-
-    // One transaction: a discharge that updated the admission but not the
-    // patient left an AMBULATORY-less patient with no ACTIVE stay — the ward
-    // showed them gone while the patient card refused a new admission.
     const updated = await this.prisma.db.$transaction(async (tx) => {
+      const a = await this.lockAdmission(tx, id);
+      this.requireActive(a);
+      await this.lockStayCharges(tx, id);
+      const clinicId = TenantContext.requireClinicId();
+      await tx.$queryRaw`
+        SELECT i."id" FROM "Invoice" i
+        WHERE i."clinicId" = ${clinicId} AND EXISTS (
+          SELECT 1 FROM "ChargeItem" c JOIN "InvoiceLine" l ON l."id" = c."invoiceLineId"
+          WHERE c."admissionId" = ${id} AND c."clinicId" = ${clinicId} AND l."invoiceId" = i."id"
+        ) ORDER BY i."id" FOR UPDATE
+      `;
+      const money = await this.stayMoney(id, a.patientId, tx);
+      if (!forced) {
+        // Services not yet on a bill. Discharging over them is how a stay gets
+        // silently written off, so it is refused — but with the count, so the
+        // dialog can offer to raise the invoice instead of dead-ending.
+        if (money.pending.length > 0) {
+          throw new AppException(
+            ErrorCode.ADMISSION_CHARGES_UNBILLED,
+            `Hisob-fakturaga kiritilmagan ${money.pending.length} ta xizmat bor — avval hisob-faktura chiqaring`,
+            409,
+            [{ count: money.pending.length, total: money.pendingTotal.toFixed(2) }],
+          );
+        }
+
+        // Money owed for THIS stay. Deliberately not the patient's whole debt:
+        // the same patient may run up outpatient bills while lying in the bed,
+        // and an unrelated old invoice must never be what keeps a bed occupied.
+        // Old debt is collections (the debtors report), not bed management.
+        if (money.stayDebt.gt(0)) {
+          throw new AppException(
+            ErrorCode.ADMISSION_DEBT_UNPAID,
+            `Bu yotqizish bo‘yicha ${money.stayDebt.toFixed(2)} so‘m qarz bor — avval to‘lovni qabul qiling`,
+            409,
+            [{ debt: money.stayDebt.toFixed(2), invoices: money.stayInvoices }],
+          );
+        }
+      }
+
       const adm = await tx.admission.update({
         where: { id },
         data: {
@@ -438,6 +522,17 @@ export class AdmissionsService {
       }
       return adm;
     });
+    await this.audit.log({
+      action: AuditAction.UPDATE,
+      entity: 'Admission',
+      entityId: id,
+      after: {
+        status: updated.status,
+        dischargedAt: updated.dischargedAt,
+        debtAtDischarge: updated.debtAtDischarge?.toFixed(2),
+        forced,
+      },
+    });
     return this.map(updated);
   }
 
@@ -451,7 +546,9 @@ export class AdmissionsService {
         where,
         orderBy: { admittedAt: 'desc' },
         ...skipTake(q),
-        include: { patient: { select: { id: true, mrn: true, fullName: true, dob: true, gender: true } } },
+        include: {
+          patient: { select: { id: true, mrn: true, fullName: true, dob: true, gender: true } },
+        },
       }),
       this.prisma.db.admission.count({ where }),
     ]);
@@ -471,7 +568,8 @@ export class AdmissionsService {
           orderBy: { createdAt: 'asc' },
           include: {
             service: { select: { id: true, name: true, code: true } },
-            administrations: { orderBy: { date: 'asc' } },
+            administrations: { orderBy: { date: 'asc' }, include: { charge: true } },
+            billingCharge: true,
           },
         },
         dailyNotes: { orderBy: { date: 'asc' } },
@@ -479,10 +577,31 @@ export class AdmissionsService {
     });
     if (!a) throw new AppException(ErrorCode.NOT_FOUND, 'Kasallik tarixi topilmadi', 404);
 
+    // A legacy one-dose order can already have its exact bill attached to the
+    // delivered dose. Expose it without rewriting or re-billing old records.
+    const orders = a.orders.map((order) => ({
+      ...order,
+      billingCharge: order.billingCharge ?? (
+        !order.billedOnOrder && plannedDates(order).length * order.timesPerDay === 1
+          ? order.administrations.find((mark) => mark.status === 'GIVEN')?.charge ?? null
+          : null
+      ),
+    }));
+    const lineIds = orders.flatMap((order) =>
+      order.billingCharge?.invoiceLineId ? [order.billingCharge.invoiceLineId] : [],
+    );
+    const invoiceLines = lineIds.length
+      ? await this.prisma.db.invoiceLine.findMany({
+          where: { id: { in: lineIds } },
+          include: { invoice: true },
+        })
+      : [];
+    const invoicesByLine = new Map(invoiceLines.map((line) => [line.id, line.invoice]));
+
     return {
       ...this.map(a),
       patient: a.patient,
-      orders: a.orders.map((o) => ({
+      orders: orders.map((o) => ({
         id: o.id,
         serviceId: o.serviceId,
         service: o.service,
@@ -492,6 +611,29 @@ export class AdmissionsService {
         note: o.note,
         stoppedAt: o.stoppedAt ? o.stoppedAt.toISOString() : null,
         timesPerDay: o.timesPerDay,
+        billedOnOrder: o.billedOnOrder,
+        billing: o.billingCharge
+          ? {
+              chargeId: o.billingCharge.id,
+              status: o.billingCharge.status,
+              lineTotal: o.billingCharge.unitPrice.mul(o.billingCharge.quantity).toFixed(2),
+              invoice: (() => {
+                const invoice = o.billingCharge.invoiceLineId
+                  ? invoicesByLine.get(o.billingCharge.invoiceLineId)
+                  : null;
+                return invoice
+                  ? {
+                      id: invoice.id,
+                      number: invoice.number,
+                      status: invoice.status,
+                      total: invoice.total.toFixed(2),
+                      paidTotal: invoice.paidTotal.toFixed(2),
+                      due: Prisma.Decimal.max(invoice.total.sub(invoice.paidTotal), 0).toFixed(2),
+                    }
+                  : null;
+              })(),
+            }
+          : null,
         /** Every planned day with a mark per dose — the treatment sheet as a grid. */
         days: plannedDates(o).map((date) => ({
           date,
@@ -533,7 +675,10 @@ export class AdmissionsService {
         patient: true,
         orders: {
           orderBy: { createdAt: 'asc' },
-          include: { service: { select: { name: true } }, administrations: { orderBy: { date: 'asc' } } },
+          include: {
+            service: { select: { name: true } },
+            administrations: { orderBy: { date: 'asc' } },
+          },
         },
         dailyNotes: { orderBy: { date: 'asc' } },
       },
@@ -611,176 +756,287 @@ export class AdmissionsService {
 
   // ------------------------------------------------------- treatment sheet
 
-  async createOrder(admissionId: string, dto: CreateOrderInput, user: AuthUser): Promise<Record<string, unknown>> {
-    const a = await this.require(admissionId);
-    this.requireActive(a);
-    const service = await this.prisma.db.service.findFirst({ where: { id: dto.serviceId, isActive: true } });
-    if (!service) throw new AppException(ErrorCode.NOT_FOUND, 'Xizmat topilmadi', 404);
-
-    const order = await this.prisma.db.treatmentOrder.create({
-      // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
-      data: {
-        clinicId: TenantContext.requireClinicId(),
-        admissionId,
-        serviceId: dto.serviceId,
-        doctorUserId: user.id,
-        schedule: dto.schedule,
-        startDate: new Date(dto.startDate),
-        timesPlanned: dto.schedule === 'ONCE' ? 1 : dto.timesPlanned,
-        timesPerDay: dto.schedule === 'ONCE' ? 1 : dto.timesPerDay,
-        note: dto.note ?? null,
-      },
+  async createOrder(
+    admissionId: string,
+    dto: CreateOrderInput,
+    user: AuthUser,
+  ): Promise<Record<string, unknown>> {
+    const clinicId = TenantContext.requireClinicId();
+    const schedule = {
+      serviceId: dto.serviceId,
+      schedule: dto.schedule,
+      startDate: dto.startDate,
+      timesPlanned: dto.schedule === 'ONCE' ? 1 : dto.timesPlanned,
+      timesPerDay: dto.schedule === 'ONCE' ? 1 : dto.timesPerDay,
+      note: dto.note ?? null,
+    };
+    const requestFingerprint = createHash('sha256').update(JSON.stringify(schedule)).digest('hex');
+    const result = await this.prisma.db.$transaction(async (tx) => {
+      const a = await this.lockAdmission(tx, admissionId);
+      if (dto.idempotencyKey) {
+        const replay = await tx.treatmentOrder.findFirst({
+          where: { admissionId, requestKey: dto.idempotencyKey },
+        });
+        if (replay) {
+          if (replay.requestFingerprint !== requestFingerprint)
+            throw new AppException(ErrorCode.VALIDATION_ERROR, 'Bu so‘rov kaliti boshqa tayinlov uchun ishlatilgan', 409);
+          return { order: replay, created: false };
+        }
+      }
+      this.requireActive(a);
+      const service = await tx.service.findFirst({ where: { id: dto.serviceId, isActive: true, category: { isActive: true } }, include: { category: { select: { kind: true } } } });
+      if (!service) throw new AppException(ErrorCode.NOT_FOUND, 'Xizmat topilmadi', 404);
+      if (service.category.kind === 'SURGERY') throw new AppException(ErrorCode.VALIDATION_ERROR, 'Operatsiyani statsionar kartasining Operatsiyalar bo‘limidan kiriting', 400);
+      const unitPrice = await this.orderPrice(tx, service.id, a.branchId);
+      const charge = await tx.chargeItem.create({
+        data: {
+          clinicId,
+          branchId: a.branchId,
+          patientId: a.patientId,
+          admissionId,
+          serviceId: service.id,
+          title: service.name as Prisma.InputJsonValue,
+          date: new Date(dto.startDate),
+          quantity: schedule.timesPlanned * schedule.timesPerDay,
+          unitPrice,
+          createdById: user.id,
+        },
+      });
+      const order = await tx.treatmentOrder.create({
+        data: {
+          ...schedule,
+          clinicId,
+          admissionId,
+          doctorUserId: user.id,
+          startDate: new Date(dto.startDate),
+          billedOnOrder: true,
+          billingChargeId: charge.id,
+          requestKey: dto.idempotencyKey ?? null,
+          requestFingerprint: dto.idempotencyKey ? requestFingerprint : null,
+        },
+      });
+      await this.invoices.issueChargesInTransaction(tx, [charge.id], user, a.branchId);
+      await tx.auditLog.create({
+        data: {
+          clinicId,
+          userId: user.id,
+          action: AuditAction.CREATE,
+          entity: 'TreatmentOrder',
+          entityId: order.id,
+          diff: { after: { admissionId, ...schedule, billingChargeId: charge.id, quantity: charge.quantity } },
+        },
+      });
+      return { order, created: true };
     });
-    return { id: order.id, days: plannedDates(order) };
+    return { id: result.order.id, days: plannedDates(result.order), billingChargeId: result.order.billingChargeId };
+  }
+
+  /** Resolve and snapshot the effective price inside the same billing transaction. */
+  private async orderPrice(tx: TenantTransactionClient, serviceId: string, branchId: string) {
+    const now = new Date();
+    const prices = await tx.servicePrice.findMany({
+      where: {
+        serviceId,
+        effectiveFrom: { lte: now },
+        AND: [
+          { OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }] },
+          { OR: [{ branchId }, { branchId: null }] },
+        ],
+      },
+      orderBy: { effectiveFrom: 'desc' },
+    });
+    const price = prices.find((row) => row.branchId === branchId) ?? prices.find((row) => row.branchId === null);
+    if (!price) throw new AppException(ErrorCode.VALIDATION_ERROR, 'Xizmat narxi belgilanmagan', 400);
+    return price.price;
   }
 
   async stopOrder(orderId: string): Promise<{ id: string }> {
     const order = await this.prisma.db.treatmentOrder.findFirst({ where: { id: orderId } });
     if (!order) throw new AppException(ErrorCode.NOT_FOUND, 'Tayinlov topilmadi', 404);
-    await this.prisma.db.treatmentOrder.update({
-      where: { id: orderId },
-      data: { stoppedAt: new Date() },
+    const changed = await this.prisma.db.$transaction(async (tx) => {
+      const admission = await this.lockAdmission(tx, order.admissionId);
+      this.requireActive(admission);
+      return tx.treatmentOrder.updateMany({
+        where: { id: orderId, admissionId: order.admissionId, stoppedAt: null },
+        data: { stoppedAt: new Date() },
+      });
     });
+    if (changed.count)
+      await this.audit.log({
+        action: AuditAction.UPDATE,
+        entity: 'TreatmentOrder',
+        entityId: orderId,
+        after: { stopped: true },
+      });
     return { id: orderId };
   }
 
   /**
-   * Marks one planned day. GIVEN writes the charge; SKIPPED records that it
-   * was not taken and bills nothing. Re-marking the same day flips it, and
-   * flipping GIVEN→SKIPPED cancels the charge — provided it has not been
-   * invoiced yet, because money already on a bill is not ours to erase.
+   * Optional clinical history. Upfront-billed orders never change money here.
+   * Legacy orders still create a charge on GIVEN; a correction can cancel only
+   * their un-invoiced charge, preserving the historical billing workflow.
    */
   async markAdministration(
     admissionId: string,
     dto: MarkAdministrationInput,
     user: AuthUser,
   ): Promise<Record<string, unknown>> {
-    const a = await this.require(admissionId);
-    this.requireActive(a);
-
-    const order = await this.prisma.db.treatmentOrder.findFirst({
-      where: { id: dto.orderId, admissionId },
-      include: { service: true },
-    });
-    if (!order) throw new AppException(ErrorCode.NOT_FOUND, 'Tayinlov topilmadi', 404);
-    if (order.stoppedAt) {
-      throw new AppException(ErrorCode.VALIDATION_ERROR, 'Bu tayinlov to‘xtatilgan', 409);
-    }
-    if (!plannedDates(order).includes(dto.date)) {
-      throw new AppException(
-        ErrorCode.VALIDATION_ERROR,
-        'Bu sana tayinlov jadvalida yo‘q',
-        400,
-      );
-    }
-    if (dto.slot > order.timesPerDay) {
-      throw new AppException(
-        ErrorCode.VALIDATION_ERROR,
-        `Bu tayinlov kunida ${order.timesPerDay} mahal — ${dto.slot}-mahal jadvalda yo‘q`,
-        400,
-      );
-    }
-
     const clinicId = TenantContext.requireClinicId();
-    // The clinic's real pricing rules — branch override first, future-dated
-    // rows excluded. The old raw lookup ignored both, so a ward in a branch
-    // with its own price billed the clinic-wide one, and a price scheduled for
-    // next month was charged today.
-    const priceStr = await this.pricing.getCurrentPrice(order.serviceId, a.branchId);
-
-    return this.prisma.db.$transaction(async (tx) => {
+    const result = await this.prisma.db.$transaction(async (tx) => {
+      const a = await this.lockAdmission(tx, admissionId);
+      this.requireActive(a);
+      const order = await tx.treatmentOrder.findFirst({
+        where: { id: dto.orderId, admissionId },
+        include: { service: true },
+      });
+      if (!order) throw new AppException(ErrorCode.NOT_FOUND, 'Tayinlov topilmadi', 404);
+      if (!plannedDates(order).includes(dto.date) || dto.slot < 1 || dto.slot > order.timesPerDay) {
+        throw new AppException(
+          ErrorCode.VALIDATION_ERROR,
+          'Bu sana yoki mahal tayinlov jadvalida yo‘q',
+          400,
+        );
+      }
       const existing = await tx.treatmentAdministration.findFirst({
         where: { orderId: dto.orderId, date: new Date(dto.date), slot: dto.slot },
         include: { charge: true },
       });
-
-      if (existing) {
-        if (existing.charge && existing.charge.status === 'INVOICED') {
-          throw new AppException(
-            ErrorCode.VALIDATION_ERROR,
-            'Bu xizmat hisob-fakturaga kiritilgan — belgini o‘zgartirib bo‘lmaydi',
-            409,
-          );
-        }
-        await tx.treatmentAdministration.update({
-          where: { id: existing.id },
-          data: { status: dto.status, markedById: user.id },
-        });
-        if (existing.charge) {
-          await tx.chargeItem.update({
-            where: { id: existing.charge.id },
-            data: { status: dto.status === 'GIVEN' ? 'PENDING' : 'CANCELLED' },
-          });
-        } else if (dto.status === 'GIVEN') {
-          await tx.chargeItem.create({
+      // Reception has already billed every planned dose. A clinical mark is
+      // still a useful historical fact, but may neither bill a second time nor
+      // silently subtract money from an issued invoice.
+      if (order.billedOnOrder) {
+        if (existing?.status === dto.status)
+          return { id: existing.id, status: existing.status, changed: false };
+        if (dto.status === 'GIVEN' && (order.stoppedAt || !order.service.isActive))
+          throw new AppException(ErrorCode.VALIDATION_ERROR, 'Tayinlov yoki xizmat faol emas', 409);
+        const administration = existing
+          ? await tx.treatmentAdministration.update({
+              where: { id: existing.id },
+              data: { status: dto.status, markedById: user.id },
+            })
+          : await tx.treatmentAdministration.create({
+              data: {
+                clinicId,
+                orderId: order.id,
+                date: new Date(dto.date),
+                slot: dto.slot,
+                status: dto.status,
+                markedById: user.id,
+              },
+            });
+        return { id: administration.id, status: administration.status, changed: true };
+      }
+      let charge = existing?.charge ?? null;
+      if (charge) {
+        // Invoice creation claims this same row. Re-read after the lock so a
+        // just-billed administration cannot be cancelled from a stale snapshot.
+        await tx.$queryRaw`SELECT "id" FROM "ChargeItem" WHERE "id" = ${charge.id} AND "clinicId" = ${clinicId} FOR UPDATE`;
+        charge = await tx.chargeItem.findFirst({ where: { id: charge.id } });
+      }
+      const replay =
+        existing?.status === dto.status &&
+        (dto.status === 'GIVEN'
+          ? charge && charge.status !== 'CANCELLED'
+          : !charge || charge.status === 'CANCELLED');
+      if (replay && existing) return { id: existing.id, status: existing.status, changed: false };
+      if (charge?.status === 'INVOICED' || charge?.invoiceLineId) {
+        throw new AppException(
+          ErrorCode.VALIDATION_ERROR,
+          'Bu xizmat hisob-fakturaga kiritilgan — belgini o‘zgartirib bo‘lmaydi',
+          409,
+        );
+      }
+      if (dto.status === 'GIVEN' && (order.stoppedAt || !order.service.isActive)) {
+        throw new AppException(ErrorCode.VALIDATION_ERROR, 'Tayinlov yoki xizmat faol emas', 409);
+      }
+      // Resolve a price only for a new charge. A retry or a corrected mark
+      // retains its original charge snapshot, even after the catalogue changes.
+      let price: Prisma.Decimal | null = null;
+      if (dto.status === 'GIVEN' && !charge) {
+        const priceStr = await this.pricing.getCurrentPrice(order.serviceId, a.branchId);
+        if (priceStr === null)
+          throw new AppException(ErrorCode.VALIDATION_ERROR, 'Xizmat narxi belgilanmagan', 400);
+        price = new Prisma.Decimal(priceStr);
+      }
+      const administration = existing
+        ? await tx.treatmentAdministration.update({
+            where: { id: existing.id },
+            data: { status: dto.status, markedById: user.id },
+          })
+        : await tx.treatmentAdministration.create({
             data: {
               clinicId,
-              branchId: a.branchId,
-              patientId: a.patientId,
-              admissionId,
-              administrationId: existing.id,
-              serviceId: order.serviceId,
-              title: order.service.name as Prisma.InputJsonValue,
+              orderId: dto.orderId,
               date: new Date(dto.date),
-              quantity: 1,
-              unitPrice: new Prisma.Decimal(priceStr ?? 0),
-              createdById: user.id,
+              slot: dto.slot,
+              status: dto.status,
+              markedById: user.id,
             },
           });
-        }
-        return { id: existing.id, status: dto.status };
-      }
-
-      const created = await tx.treatmentAdministration.create({
-        data: {
-          clinicId,
-          orderId: dto.orderId,
-          date: new Date(dto.date),
-          slot: dto.slot,
-          status: dto.status,
-          markedById: user.id,
-        },
-      });
-      if (dto.status === 'GIVEN') {
+      if (charge) {
+        await tx.chargeItem.update({
+          where: { id: charge.id },
+          data: { status: dto.status === 'GIVEN' ? 'PENDING' : 'CANCELLED' },
+        });
+      } else if (price !== null) {
         await tx.chargeItem.create({
           data: {
             clinicId,
             branchId: a.branchId,
             patientId: a.patientId,
             admissionId,
-            administrationId: created.id,
+            administrationId: administration.id,
             serviceId: order.serviceId,
             title: order.service.name as Prisma.InputJsonValue,
             date: new Date(dto.date),
             quantity: 1,
-            unitPrice: new Prisma.Decimal(priceStr ?? 0),
+            unitPrice: price,
             createdById: user.id,
           },
         });
       }
-      return { id: created.id, status: dto.status };
+      return { id: administration.id, status: dto.status, changed: true };
     });
+    if (result.changed)
+      await this.audit.log({
+        action: AuditAction.UPDATE,
+        entity: 'TreatmentAdministration',
+        entityId: result.id,
+        after: { admissionId, ...dto },
+      });
+    return { id: result.id, status: result.status };
   }
 
   // ------------------------------------------------------------ daily notes
 
-  async addDailyNote(admissionId: string, dto: DailyNoteInput, user: AuthUser): Promise<Record<string, unknown>> {
-    const a = await this.require(admissionId);
-    this.requireActive(a);
-    const note = await this.prisma.db.admissionDailyNote.create({
-      // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
-      data: {
-        clinicId: TenantContext.requireClinicId(),
-        admissionId,
-        doctorUserId: user.id,
-        date: new Date(dto.date),
-        condition: dto.condition,
-        temperatureC: dto.temperatureC ?? null,
-        pulseBpm: dto.pulseBpm ?? null,
-        bpSystolic: dto.bpSystolic ?? null,
-        bpDiastolic: dto.bpDiastolic ?? null,
-        note: dto.note ?? null,
-      },
+  async addDailyNote(
+    admissionId: string,
+    dto: DailyNoteInput,
+    user: AuthUser,
+  ): Promise<Record<string, unknown>> {
+    const note = await this.prisma.db.$transaction(async (tx) => {
+      const a = await this.lockAdmission(tx, admissionId);
+      this.requireActive(a);
+      return tx.admissionDailyNote.create({
+        data: {
+          clinicId: TenantContext.requireClinicId(),
+          admissionId,
+          doctorUserId: user.id,
+          date: new Date(dto.date),
+          condition: dto.condition,
+          temperatureC: dto.temperatureC ?? null,
+          pulseBpm: dto.pulseBpm ?? null,
+          bpSystolic: dto.bpSystolic ?? null,
+          bpDiastolic: dto.bpDiastolic ?? null,
+          note: dto.note ?? null,
+        },
+      });
+    });
+    await this.audit.log({
+      action: AuditAction.CREATE,
+      entity: 'AdmissionDailyNote',
+      entityId: note.id,
+      after: { admissionId, date: dto.date },
     });
     return { id: note.id, date: dto.date };
   }

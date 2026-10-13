@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { ArrowRight, FileDown, FlaskConical } from 'lucide-react';
 import { LabOrderStatus } from '@avishifo/shared';
@@ -10,11 +10,13 @@ import { Link } from '@/i18n/routing';
 import { formatTz } from '@/lib/dates';
 import { api } from '@/lib/api-client';
 import { usePermissions } from '@/hooks/use-permissions';
+import { useSocketEvent } from '@/hooks/use-socket';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/empty-state';
+import { hasUnpaidLabWork } from '@/features/lab/lib';
 import { StatusBadge } from '@/components/status-badge';
 import {
   Table,
@@ -31,6 +33,7 @@ interface PatientLabOrder {
   status: LabOrderStatus;
   itemCount: number;
   createdAt: string | null;
+  canWork: boolean;
 }
 
 /** A ready result exists once the order has passed approval. */
@@ -48,18 +51,32 @@ export function PatientLabTab({ patientId }: { patientId: string }) {
   const t = useTranslations('patients');
   const tLab = useTranslations('lab');
   const can = usePermissions();
+  const locale = useLocale();
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
   const [downloading, setDownloading] = useState<string | null>(null);
 
   const orders = useQuery({
-    queryKey: ['patients', 'lab-orders', patientId],
+    queryKey: ['patients', 'lab-orders', patientId, page],
     queryFn: async () =>
-      (await api.get<PatientLabOrder[]>('/lab-orders', { patientId, limit: 50 })).data,
+      api.get<PatientLabOrder[]>('/lab-orders', {
+        patientId,
+        page,
+        limit: 20,
+        includeUnpaid: true,
+      }),
+    enabled: can('lab.orders.read'),
+    refetchInterval: 30_000,
+  });
+  useSocketEvent('lab.order.updated', (event) => {
+    if (event.order.patientId === patientId)
+      void queryClient.invalidateQueries({ queryKey: ['patients', 'lab-orders', patientId] });
   });
 
   const download = async (order: PatientLabOrder): Promise<void> => {
     setDownloading(order.id);
     try {
-      const blob = await api.get<Blob>(`/lab-orders/${order.id}/pdf`);
+      const blob = await api.get<Blob>(`/lab-orders/${order.id}/pdf`, { locale });
       const url = URL.createObjectURL(blob.data);
       const a = document.createElement('a');
       a.href = url;
@@ -75,7 +92,7 @@ export function PatientLabTab({ patientId }: { patientId: string }) {
 
   if (orders.isLoading) return <Skeleton className="h-48 w-full" />;
 
-  const rows = orders.data ?? [];
+  const rows = orders.data?.data ?? [];
   if (rows.length === 0) {
     return (
       <Card>
@@ -114,7 +131,14 @@ export function PatientLabTab({ patientId }: { patientId: string }) {
                   <Badge variant="outline">{o.itemCount}</Badge>
                 </TableCell>
                 <TableCell>
-                  <StatusBadge status={o.status} label={tLab(`status.${o.status}` as never)} />
+                  <StatusBadge
+                    status={o.status}
+                    label={
+                      hasUnpaidLabWork(o)
+                        ? tLab('paymentWaiting')
+                        : tLab(`status.${o.status}` as never)
+                    }
+                  />
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
@@ -143,6 +167,29 @@ export function PatientLabTab({ patientId }: { patientId: string }) {
             ))}
           </TableBody>
         </Table>
+        {(orders.data?.meta?.total ?? 0) > 20 ? (
+          <div className="flex items-center justify-end gap-3 border-t p-3">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === 1}
+              onClick={() => setPage((current) => current - 1)}
+            >
+              {tLab('previousPage')}
+            </Button>
+            <span className="text-sm">
+              {page} / {Math.ceil((orders.data?.meta?.total ?? 0) / 20)}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page * 20 >= (orders.data?.meta?.total ?? 0)}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              {tLab('nextPage')}
+            </Button>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

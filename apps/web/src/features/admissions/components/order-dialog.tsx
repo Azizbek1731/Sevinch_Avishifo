@@ -1,13 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
+import {
+  createOrderSchema,
+  formatUZS,
+  fromTiyin,
+  toTiyin,
+  type CreateOrderInput,
+} from '@avishifo/shared';
+import { todayTashkent } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -28,7 +37,7 @@ import { admissionsApi } from '../api';
 
 const SCHEDULES = ['DAILY', 'EVERY_OTHER_DAY', 'ONCE'] as const;
 
-/** Ordering a service onto the treatment sheet. */
+/** One order and its cashier invoice are saved together. */
 export function OrderDialog({
   open,
   onOpenChange,
@@ -46,7 +55,8 @@ export function OrderDialog({
   const [schedule, setSchedule] = useState<(typeof SCHEDULES)[number]>('DAILY');
   const [days, setDays] = useState('5');
   const [perDay, setPerDay] = useState('1');
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(todayTashkent);
+  const requestIdentity = useRef<{ fingerprint: string; key: string } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -54,20 +64,22 @@ export function OrderDialog({
     setSchedule('DAILY');
     setDays('5');
     setPerDay('1');
-    setStartDate(new Date().toISOString().slice(0, 10));
+    setStartDate(todayTashkent());
+    requestIdentity.current = null;
   }, [open]);
 
   const create = useMutation({
-    mutationFn: () =>
-      admissionsApi.createOrder(admissionId, {
-        serviceId: service?.id as string,
-        schedule,
-        startDate,
-        timesPlanned: Number(days),
-        timesPerDay: Number(perDay),
-      } as never),
+    mutationFn: (payload: CreateOrderInput) => admissionsApi.createOrder(admissionId, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admission', admissionId] });
+      for (const key of [
+        'charges',
+        'invoices',
+        'patients',
+        'admissions',
+        'admission-discharge-check',
+      ])
+        void queryClient.invalidateQueries({ queryKey: [key] });
       onOpenChange(false);
       toast.success(t('orderAdded'));
     },
@@ -75,23 +87,57 @@ export function OrderDialog({
   });
 
   const once = schedule === 'ONCE';
-  const totalDoses = once ? 1 : (Number(days) || 0) * (Number(perDay) || 1);
+  const parsed = createOrderSchema.safeParse({
+    serviceId: service?.id,
+    schedule,
+    startDate,
+    timesPlanned: once ? 1 : Number(days),
+    timesPerDay: once ? 1 : Number(perDay),
+  });
+  const totalDoses = parsed.success ? parsed.data.timesPlanned * parsed.data.timesPerDay : 0;
+  const totalPrice =
+    service?.currentPrice != null && totalDoses > 0
+      ? fromTiyin(toTiyin(service.currentPrice) * BigInt(totalDoses))
+      : null;
+
+  const submit = () => {
+    if (!parsed.success || create.isPending) return;
+    const fingerprint = JSON.stringify(parsed.data);
+    if (requestIdentity.current?.fingerprint !== fingerprint)
+      requestIdentity.current = { fingerprint, key: crypto.randomUUID() };
+    create.mutate({ ...parsed.data, idempotencyKey: requestIdentity.current.key });
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        if (!create.isPending) onOpenChange(value);
+      }}
+    >
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t('addOrder')}</DialogTitle>
+          <DialogDescription>{t('directBilling.hint')}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label>{t('fields.service')}</Label>
-            <ServiceCombobox value={service} onChange={setService} />
+            <ServiceCombobox
+              excludeSurgery
+              disabled={create.isPending}
+              value={service}
+              onChange={setService}
+            />
           </div>
 
           <div className="space-y-1.5">
             <Label>{t('fields.schedule')}</Label>
-            <Select value={schedule} onValueChange={(v) => setSchedule(v as typeof schedule)}>
+            <Select
+              disabled={create.isPending}
+              value={schedule}
+              onValueChange={(v) => setSchedule(v as typeof schedule)}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -105,10 +151,16 @@ export function OrderDialog({
             </Select>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 items-end gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="o-start">{t('fields.startDate')}</Label>
-              <Input id="o-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <Input
+                id="o-start"
+                type="date"
+                value={startDate}
+                disabled={create.isPending}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
             </div>
             {/* Treatment DAYS — the ward says "5 kun davomida", so the field
                 counts days; kunora spreads those days over a longer stay. */}
@@ -118,13 +170,17 @@ export function OrderDialog({
                 id="o-days"
                 inputMode="numeric"
                 value={once ? '1' : days}
-                disabled={once}
+                disabled={once || create.isPending}
                 onChange={(e) => setDays(e.target.value)}
               />
             </div>
             <div className="space-y-1.5">
               <Label>{t('fields.timesPerDay')}</Label>
-              <Select value={once ? '1' : perDay} onValueChange={setPerDay} disabled={once}>
+              <Select
+                value={once ? '1' : perDay}
+                onValueChange={setPerDay}
+                disabled={once || create.isPending}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -148,14 +204,24 @@ export function OrderDialog({
               })}
             </p>
           ) : null}
+          {totalPrice !== null ? (
+            <div className="flex items-center justify-between rounded-md bg-primary/5 p-3 text-sm">
+              <span>{t('directBilling.total')}</span>
+              <strong className="tabular-nums">{formatUZS(totalPrice)}</strong>
+            </div>
+          ) : service ? (
+            <p role="alert" className="text-sm text-destructive">
+              {t('directBilling.checkFields')}
+            </p>
+          ) : null}
         </div>
         <DialogFooter>
           <Button
             className="w-full"
-            disabled={!service || create.isPending}
-            onClick={() => create.mutate()}
+            disabled={!parsed.success || totalPrice === null || create.isPending}
+            onClick={submit}
           >
-            {t('addOrder')}
+            {t('directBilling.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

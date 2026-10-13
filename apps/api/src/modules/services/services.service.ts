@@ -16,7 +16,18 @@ import { TenantContext } from '../../core/prisma/tenant-context';
 import { AuditService } from '../../core/audit/audit.service';
 import { PricingService } from './pricing.service';
 import { LabCatalogService } from '../lab/catalog.service';
-import { CreatePackageDto, CreateServiceCategoryDto, CreateServiceDto, DiscountRuleUpsertDto, ListQueryDto, ServiceQueryDto, SetServicePriceDto, UpdatePackageDto, UpdateServiceCategoryDto, UpdateServiceDto } from './dto';
+import {
+  CreatePackageDto,
+  CreateServiceCategoryDto,
+  CreateServiceDto,
+  DiscountRuleUpsertDto,
+  ListQueryDto,
+  ServiceQueryDto,
+  SetServicePriceDto,
+  UpdatePackageDto,
+  UpdateServiceCategoryDto,
+  UpdateServiceDto,
+} from './dto';
 
 // ---------------------------------------------------------------- responses
 
@@ -44,6 +55,7 @@ export interface ServiceResponse {
   code: string;
   name: Prisma.JsonValue;
   durationMin: number;
+  unit: string;
   vatIncluded: boolean;
   isActive: boolean;
   currentPrice: string | null;
@@ -106,6 +118,7 @@ function mapService(
     code: s.code,
     name: s.name,
     durationMin: s.durationMin,
+    unit: s.unit,
     vatIncluded: s.vatIncluded,
     isActive: s.isActive,
     currentPrice,
@@ -198,6 +211,7 @@ export class ServicesService {
   ): Promise<PaginatedResult<ServiceResponse>> {
     const search = query.search;
     const where: Prisma.ServiceWhereInput = {
+      ...(query.kind ? { category: { kind: query.kind } } : {}),
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.isActive !== undefined ? { isActive: query.isActive } : {}),
       ...(search
@@ -255,6 +269,7 @@ export class ServicesService {
             code: dto.code,
             name: dto.name,
             durationMin: dto.durationMin,
+            unit: dto.unit,
             vatIncluded: dto.vatIncluded,
             prices: {
               create: {
@@ -286,7 +301,12 @@ export class ServicesService {
       action: AuditAction.CREATE,
       entity: 'Service',
       entityId: service.id,
-      after: { code: service.code, name: service.name, categoryId: service.categoryId, price: dto.price },
+      after: {
+        code: service.code,
+        name: service.name,
+        categoryId: service.categoryId,
+        price: dto.price,
+      },
     });
     return mapService(service, dto.price);
   }
@@ -301,7 +321,11 @@ export class ServicesService {
     return mapService(service, currentPrice);
   }
 
-  async updateService(id: string, dto: UpdateServiceDto, branchId?: string): Promise<ServiceResponse> {
+  async updateService(
+    id: string,
+    dto: UpdateServiceDto,
+    branchId?: string,
+  ): Promise<ServiceResponse> {
     const before = await this.prisma.db.service.findFirst({ where: { id } });
     if (!before) throw new AppException(ErrorCode.NOT_FOUND, 'Service not found', 404);
     if (dto.categoryId !== undefined) await this.requireCategory(dto.categoryId);
@@ -316,6 +340,7 @@ export class ServicesService {
           ...(dto.categoryId !== undefined ? { categoryId: dto.categoryId } : {}),
           ...(dto.code !== undefined ? { code: dto.code } : {}),
           ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.unit !== undefined ? { unit: dto.unit } : {}),
           ...(dto.durationMin !== undefined ? { durationMin: dto.durationMin } : {}),
           ...(dto.vatIncluded !== undefined ? { vatIncluded: dto.vatIncluded } : {}),
         },
@@ -328,8 +353,22 @@ export class ServicesService {
       action: AuditAction.UPDATE,
       entity: 'Service',
       entityId: id,
-      before: { code: before.code, name: before.name, categoryId: before.categoryId, durationMin: before.durationMin, vatIncluded: before.vatIncluded },
-      after: { code: service.code, name: service.name, categoryId: service.categoryId, durationMin: service.durationMin, vatIncluded: service.vatIncluded },
+      before: {
+        code: before.code,
+        name: before.name,
+        categoryId: before.categoryId,
+        durationMin: before.durationMin,
+        unit: before.unit,
+        vatIncluded: before.vatIncluded,
+      },
+      after: {
+        code: service.code,
+        name: service.name,
+        categoryId: service.categoryId,
+        durationMin: service.durationMin,
+        unit: service.unit,
+        vatIncluded: service.vatIncluded,
+      },
     });
     const currentPrice = await this.pricing.getCurrentPrice(id, branchId);
     return mapService(service, currentPrice);
@@ -492,7 +531,11 @@ export class ServicesService {
     return this.mapPackage(pkg, priceMap);
   }
 
-  async updatePackage(id: string, dto: UpdatePackageDto, branchId?: string): Promise<PackageResponse> {
+  async updatePackage(
+    id: string,
+    dto: UpdatePackageDto,
+    branchId?: string,
+  ): Promise<PackageResponse> {
     const existing = await this.prisma.db.servicePackage.findFirst({ where: { id } });
     if (!existing) throw new AppException(ErrorCode.NOT_FOUND, 'Package not found', 404);
     if (dto.items !== undefined) {

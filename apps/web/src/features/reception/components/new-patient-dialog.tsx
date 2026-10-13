@@ -5,7 +5,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslations } from 'next-intl';
-import { Gender, formatPhone, normalizePhone, type CreatePatientInput,
+import {
+  Gender,
+  formatPhone,
+  normalizePhone,
+  type CreatePatientInput,
   phoneWireValueOptional,
 } from '@avishifo/shared';
 import { ApiError } from '@/lib/api-client';
@@ -45,9 +49,15 @@ export interface NewPatientDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Called with the created patient (e.g. to select it in the walk-in flow). */
   onCreated?: (patient: PatientHit) => void;
+  onSelectExisting?: (patient: PatientHit) => void;
 }
 
-export function NewPatientDialog({ open, onOpenChange, onCreated }: NewPatientDialogProps) {
+export function NewPatientDialog({
+  open,
+  onOpenChange,
+  onCreated,
+  onSelectExisting,
+}: NewPatientDialogProps) {
   const t = useTranslations('reception');
   const tc = useTranslations('common');
   const enumLabel = useEnumLabel();
@@ -57,8 +67,8 @@ export function NewPatientDialog({ open, onOpenChange, onCreated }: NewPatientDi
   const schema = useMemo(
     () =>
       z.object({
-        firstName: z.string().min(1, tc('required')),
-        lastName: z.string().min(1, tc('required')),
+        firstName: z.string().trim().min(1, tc('required')),
+        lastName: z.string().trim().min(1, tc('required')),
         phone: z
           .string()
           .min(1, tc('required'))
@@ -90,8 +100,7 @@ export function NewPatientDialog({ open, onOpenChange, onCreated }: NewPatientDi
         phone: normalizePhone(values.phone) ?? undefined,
         dob: values.dob || undefined,
         gender: values.gender || undefined,
-        // The reception quick-add is the walk-in path; admitting happens on
-        // the patient card, where the ward and bed are chosen too.
+        // The care workflow continues after registration; admission assigns a bed later.
         careType: 'AMBULATORY',
         allergies: [],
         chronicConditions: [],
@@ -114,7 +123,12 @@ export function NewPatientDialog({ open, onOpenChange, onCreated }: NewPatientDi
     })();
 
   return (
-    <Dialog open={open} onOpenChange={close}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!createMutation.isPending) close(next);
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t('newPatient.title')}</DialogTitle>
@@ -124,6 +138,9 @@ export function NewPatientDialog({ open, onOpenChange, onCreated }: NewPatientDi
           className="space-y-3"
           onSubmit={(e) => {
             e.preventDefault();
+            // Portal events still bubble through the outer appointment/invoice form.
+            e.stopPropagation();
+            if (createMutation.isPending) return;
             void submit(false);
           }}
           noValidate
@@ -182,6 +199,20 @@ export function NewPatientDialog({ open, onOpenChange, onCreated }: NewPatientDi
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {c.phone ? formatPhone(c.phone) : c.mrn}
                     </span>
+                    {onSelectExisting ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={createMutation.isPending}
+                        onClick={() => {
+                          close(false);
+                          onSelectExisting(c);
+                        }}
+                      >
+                        {t('newPatient.selectExisting')}
+                      </Button>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -189,7 +220,12 @@ export function NewPatientDialog({ open, onOpenChange, onCreated }: NewPatientDi
           ) : null}
 
           <DialogFooter className="gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => close(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={createMutation.isPending}
+              onClick={() => close(false)}
+            >
               {tc('cancel')}
             </Button>
             {candidates.length > 0 ? (

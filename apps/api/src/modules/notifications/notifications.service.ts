@@ -23,6 +23,7 @@ import { EventsService } from '../../core/realtime/events.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { SmsChannel } from './channels/sms.channel';
 import { TelegramChannel } from './channels/telegram.channel';
+import { TelegramPatientAccessService } from './telegram-patient-access.service';
 
 export const NOTIFICATIONS_QUEUE = 'notifications';
 export const REMINDERS_QUEUE = 'reminders';
@@ -119,6 +120,7 @@ export class NotificationsService {
     private readonly audit: AuditService,
     private readonly sms: SmsChannel,
     private readonly telegram: TelegramChannel,
+    private readonly patientAccess: TelegramPatientAccessService,
   ) {}
 
   // ------------------------------------------------------------ contract API
@@ -144,17 +146,13 @@ export class NotificationsService {
         select: { id: true, phone: true },
       });
       if (!patient) return null;
-      const link = await this.prisma.db.telegramLink.findFirst({
-        where: { patientId: patient.id, isActive: true },
-        orderBy: { createdAt: 'desc' },
-        select: { chatId: true },
-      });
-      return { patient, link };
+      const chatId = await this.patientAccess.recipientFor(patient.id, i.clinicId);
+      return { patient, chatId };
     });
     if (!target) return;
 
     const jobs: Array<{ channel: 'SMS' | 'TELEGRAM'; recipient: string }> = [];
-    if (target.link) jobs.push({ channel: 'TELEGRAM', recipient: target.link.chatId });
+    if (target.chatId) jobs.push({ channel: 'TELEGRAM', recipient: target.chatId });
     else if (target.patient.phone) jobs.push({ channel: 'SMS', recipient: target.patient.phone });
     if (jobs.length === 0) return;
 
@@ -319,7 +317,9 @@ export class NotificationsService {
 
   // ------------------------------------------------------------ delivery log
 
-  async listLogs(query: NotificationLogQueryInput): Promise<PaginatedResult<NotificationLogResponse>> {
+  async listLogs(
+    query: NotificationLogQueryInput,
+  ): Promise<PaginatedResult<NotificationLogResponse>> {
     const where = {
       ...(query.status ? { status: query.status } : {}),
       ...(query.channel ? { channel: query.channel } : {}),

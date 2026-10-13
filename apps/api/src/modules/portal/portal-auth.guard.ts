@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ErrorCode } from '@avishifo/shared';
 import type { Request } from 'express';
 import { AppException } from '../../common/app.exception';
+import { AppConfigService } from '../../core/config/app-config.service';
 
 export interface PortalRequest extends Request {
   /** OTP-verified patient phone (+998XXXXXXXXX), set by PortalAuthGuard. */
@@ -28,9 +29,19 @@ interface PortalTokenPayload {
  */
 @Injectable()
 export class PortalAuthGuard implements CanActivate {
-  constructor(private readonly jwt: JwtService) {}
+  constructor(
+    private readonly jwt: JwtService,
+    private readonly config: AppConfigService,
+  ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    if (this.config.env.SINGLE_CLINIC_MODE) {
+      throw new AppException(
+        ErrorCode.FORBIDDEN,
+        'Bemor ma’lumotlari Telegram bot orqali olinadi.',
+        403,
+      );
+    }
     const req = ctx.switchToHttp().getRequest<PortalRequest>();
     const header = req.headers.authorization;
     const token = header?.startsWith('Bearer ') ? header.slice(7).trim() : undefined;

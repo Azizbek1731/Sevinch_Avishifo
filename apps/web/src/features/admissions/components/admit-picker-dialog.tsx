@@ -3,11 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { Search } from 'lucide-react';
+import { Search, UserPlus } from 'lucide-react';
 import { formatPhone } from '@avishifo/shared';
 import { api } from '@/lib/api-client';
+import { usePermissions } from '@/hooks/use-permissions';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { NewPatientDialog } from '@/features/reception/components/new-patient-dialog';
 import {
   Dialog,
   DialogContent,
@@ -48,11 +51,16 @@ export function AdmitPickerDialog({
   onPick: (patient: { id: string; fullName: string }) => void;
 }) {
   const t = useTranslations('admissions');
+  const tReception = useTranslations('reception');
+  const can = usePermissions();
+  const canCreatePatient = can('patients.write');
   const [query, setQuery] = useState('');
+  const [newPatientOpen, setNewPatientOpen] = useState(false);
   const debounced = useDebouncedValue(query, 300);
 
   useEffect(() => {
     if (open) setQuery('');
+    else setNewPatientOpen(false);
   }, [open]);
 
   const patients = useQuery({
@@ -63,56 +71,74 @@ export function AdmitPickerDialog({
   });
 
   const rows = patients.data ?? [];
+  const selectPatient = (patient: { id: string; fullName: string }) => {
+    onOpenChange(false);
+    onPick({ id: patient.id, fullName: patient.fullName });
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t('pickPatientTitle')}</DialogTitle>
-          <DialogDescription>{t('pickPatientDescription')}</DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('pickPatientTitle')}</DialogTitle>
+            <DialogDescription>{t('pickPatientDescription')}</DialogDescription>
+          </DialogHeader>
 
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('pickPatientPlaceholder')}
-            className="pl-9"
-          />
-        </div>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('pickPatientPlaceholder')}
+              className="pl-9"
+            />
+          </div>
 
-        {patients.isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : rows.length > 0 ? (
-          <div className="max-h-64 overflow-y-auto rounded-md border">
-            {rows.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm hover:bg-muted"
-                onClick={() => {
-                  onOpenChange(false);
-                  onPick({ id: p.id, fullName: p.fullName });
-                }}
-              >
-                <span className="truncate font-medium">{p.fullName}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {p.phone ? formatPhone(p.phone) : p.mrn}
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : debounced.trim().length >= 2 && patients.isFetched ? (
-          <p className="text-sm text-muted-foreground">{t('pickPatientEmpty')}</p>
-        ) : (
-          <p className="text-sm text-muted-foreground">{t('pickPatientHint')}</p>
-        )}
-      </DialogContent>
-    </Dialog>
+          {patients.isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : rows.length > 0 ? (
+            <div className="max-h-64 overflow-y-auto rounded-md border">
+              {rows.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm hover:bg-muted"
+                  onClick={() => selectPatient(p)}
+                >
+                  <span className="truncate font-medium">{p.fullName}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {p.phone ? formatPhone(p.phone) : p.mrn}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : debounced.trim().length >= 2 && patients.isFetched ? (
+            <p className="text-sm text-muted-foreground">{t('pickPatientEmpty')}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t('pickPatientHint')}</p>
+          )}
+
+          {canCreatePatient ? (
+            <Button type="button" variant="outline" onClick={() => setNewPatientOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              {tReception('newPatient.add')}
+            </Button>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+      {canCreatePatient ? (
+        <NewPatientDialog
+          open={newPatientOpen}
+          onOpenChange={setNewPatientOpen}
+          onCreated={selectPatient}
+          onSelectExisting={selectPatient}
+        />
+      ) : null}
+    </>
   );
 }

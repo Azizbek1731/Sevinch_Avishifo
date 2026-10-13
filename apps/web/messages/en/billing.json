@@ -63,7 +63,11 @@
     "submit": "Accept payment",
     "paying": "Submitting...",
     "success": "Payment accepted",
-    "viewReceipt": "Open receipt"
+    "viewReceipt": "Open receipt",
+    "exceedsDue": "The payment cannot exceed the remaining invoice balance",
+    "note": "Payment note",
+    "noteOptional": "Note (optional)",
+    "notePlaceholder": "For example: terminal receipt reference or payment details"
   },
   "quick": {
     "title": "Add services",
@@ -73,8 +77,18 @@
     "paidSuccess": "{number} — payment accepted, printing the receipt",
     "debtSuccess": "{number} — added to the patient's debt",
     "viewInvoice": "Open invoice",
-    "shiftRequired": "Open a cashier shift before taking cash",
-    "labOrdered": "Tests sent to the laboratory ({number})"
+    "shiftRequired": "Open a cashier shift before accepting payments",
+    "labOrdered": "Tests sent to the laboratory ({number})",
+    "sendToCashier": "Send to cashier",
+    "sentToCashier": "{number} — invoice sent to cashier",
+    "labTitle": "Order laboratory tests",
+    "proceduresTitle": "Order procedures and examinations",
+    "proceduresSubtitle": "Select procedures, diagnostic examinations and other services. The invoice will be sent to the cashier.",
+    "proceduresHint": "Use the dedicated reception actions for laboratory tests, doctor consultations and ultrasound.",
+    "labSubtitle": "Select laboratory tests. The invoice goes to the cashier and the laboratory receives the order after full payment.",
+    "tests": "Laboratory tests",
+    "test": "Test",
+    "addTest": "Add test"
   },
   "refundDlg": {
     "title": "Refund — {number}",
@@ -117,7 +131,13 @@
     "total": "TOTAL",
     "paid": "Paid",
     "due": "Due",
-    "thanks": "Thank you for your visit!"
+    "thanks": "Thank you for your visit!",
+    "previewTitle": "Payment receipt",
+    "autoPrintHint": "The print dialog opens automatically. If it does not open or you need another copy, select Print.",
+    "preparing": "Preparing receipt…",
+    "loadFailed": "Payment was saved, but the receipt could not load. Reload the receipt without submitting payment again.",
+    "printFailed": "The print dialog could not open. Select Print to try again.",
+    "retry": "Reload receipt"
   },
   "split": {
     "addMethod": "Add method",
@@ -137,5 +157,46 @@
     "cancel": "Close",
     "working": "Working…",
     "done": "Payment voided"
+  },
+  "accounts": {
+    "CASH": "Cash account",
+    "CARD": "Card account",
+    "CLICK": "Click account",
+    "opening": "Opening balance",
+    "receipts": "Payments received",
+    "deposits": "Deposits",
+    "refunds": "Refunds",
+    "expenses": "Expenses",
+    "expected": "Expected balance",
+    "actual": "Actual closing balance",
+    "difference": "Difference",
+    "metric": "Metric",
+    "closedHint": "Open a shift to accept payments or record expenses by cash, card or Click.",
+    "openHint": "Enter a separate opening balance for each account.",
+    "closeHint": "Count the cash and check the card and Click statements. Enter each account’s actual closing balance.",
+    "reportHint": "Opening balance + payments + deposits − refunds − expenses. Amounts in UZS.",
+    "legacyTitle": "Unallocated legacy transfer balance: {amount}",
+    "legacyHint": "This amount is not yet included in the card and Click account balances. Allocate the opening balance between those accounts when closing the shift.",
+    "allocateTitle": "Allocate the original transfer opening balance: {amount}",
+    "allocateHint": "This older shift opened with a combined transfer balance. Use your records to split it between card and Click.",
+    "allocationMismatch": "Card and Click opening balances must add up to the original combined balance."
+  },
+  "workspace": {
+    "description": "Reception invoices, cash, card and Click payments, and account reconciliation.",
+    "expenses": "Expenses",
+    "reports": "Reports"
+  },
+  "pending": {
+    "title": "Invoices from reception",
+    "description": "Check the patient and services, then accept payment into the correct account.",
+    "refresh": "Refresh",
+    "search": "Patient name, phone, ID or invoice number",
+    "loadFailed": "Invoices could not be loaded. Please retry.",
+    "noMatch": "No matching invoices",
+    "searchHint": "Check the patient name, phone or invoice number.",
+    "openDetails": "Open the invoice to view services",
+    "pagination": "Page {page} / {pages} · {total} invoices",
+    "previous": "Previous page",
+    "next": "Next page"
   }
 }

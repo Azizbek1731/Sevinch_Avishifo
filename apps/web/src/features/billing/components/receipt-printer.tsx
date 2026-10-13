@@ -1,74 +1,123 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
+import { Printer, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { billingApi } from '../api';
+import { scheduleReceiptPrint } from '../receipt-print';
 import { ReceiptDocument } from './receipt-document';
 
 export interface ReceiptPrinterProps {
   invoiceId: string;
-  /** Called once the print dialog has been dismissed (or printing failed). */
+  /** Unique successful submission, including a subsequent partial payment. */
+  requestId?: string;
+  /** Close the preview after printing, cancelling, or using the manual fallback. */
   onPrinted?: () => void;
 }
 
-/**
- * Mount after a paid sale to push the receipt straight to the printer without
- * leaving the current screen: the receipt renders off-screen and the print
- * stylesheet promotes it to the page. Unmount on `onPrinted`.
- */
-export function ReceiptPrinter({ invoiceId, onPrinted }: ReceiptPrinterProps) {
-  const { data, isError } = useQuery({
-    // Outside the ['invoices'] prefix on purpose: a paid receipt never
-    // changes, and sitting under that prefix meant every sale invalidated and
-    // refetched it for no reason.
-    queryKey: ['receipt', invoiceId],
-    staleTime: Infinity,
+/** Keep this outside the payment dialog: a settled invoice leaves the queue. */
+export function ReceiptPrinter({ invoiceId, requestId, onPrinted }: ReceiptPrinterProps) {
+  const t = useTranslations('billing');
+  const tc = useTranslations('common');
+  const [mountId] = useState(() => crypto.randomUUID());
+  const printRequestId = requestId ?? `${mountId}:${invoiceId}`;
+  const [printFailed, setPrintFailed] = useState(false);
+  const [renderedRequest, setRenderedRequest] = useState<string | null>(null);
+  const onReceiptReady = useCallback(() => setRenderedRequest(printRequestId), [printRequestId]);
+  const { data, isError, isFetching, refetch } = useQuery({
+    // A receipt changes after partial payments, reversals and refunds. A unique
+    // submission key prevents the previous payment's cached slip being printed.
+    queryKey: ['receipt', invoiceId, printRequestId],
     queryFn: async () => (await billingApi.getReceipt(invoiceId)).data,
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
-
-  // Held in a ref so a new inline callback from the parent cannot retrigger the
-  // effect below. The parent re-renders several times right after a sale — the
-  // toast, the dialog closing, four query invalidations — and each one used to
-  // tear the pending print down.
-  const onPrintedRef = useRef(onPrinted);
-  onPrintedRef.current = onPrinted;
-
-  // Keyed by invoice, not by mount. When a print is lost the parent never
-  // clears printInvoiceId, so this component stays mounted and the next sale
-  // arrives as a prop change rather than a remount — a per-mount flag would
-  // then suppress every receipt for the rest of the session.
-  const printedFor = useRef<string | null>(null);
-
-  // A boolean, deliberately, rather than `data` itself: invalidateBilling()
-  // invalidates the `['invoices']` prefix, which matches this receipt query, so
-  // `data` gets a fresh identity on every refetch. Depending on the object
-  // re-ran the effect mid-flight, the cleanup cancelled the timer, and the
-  // guard then blocked it from ever being rescheduled — the receipt was simply
-  // never printed.
-  const ready = data !== undefined;
+  const attempted = useRef(new Set<string>());
+  const hasData = data !== undefined;
+  const ready = hasData && renderedRequest === printRequestId;
 
   useEffect(() => {
-    if (printedFor.current === invoiceId) return;
-    if (isError) {
-      printedFor.current = invoiceId;
-      onPrintedRef.current?.();
-      return;
-    }
-    if (!ready) return;
-    printedFor.current = invoiceId;
-    // One frame so the off-screen receipt is painted before the dialog opens.
-    const timer = window.setTimeout(() => {
-      window.print();
-      onPrintedRef.current?.();
-    }, 50);
+    if (!hasData || ready || isError) return;
+    // A remote logo must not hold a paid receipt hostage. Print the receipt
+    // without it after three seconds; a late image load keeps the same request
+    // identity and cannot start a second automatic print.
+    const timer = window.setTimeout(() => setRenderedRequest(printRequestId), 3_000);
     return () => window.clearTimeout(timer);
-  }, [ready, isError, invoiceId]);
+  }, [hasData, ready, isError, printRequestId]);
 
-  if (!data) return null;
+  useEffect(() => {
+    if (!ready || isError) return;
+    setPrintFailed(false);
+    return scheduleReceiptPrint({
+      requestId: printRequestId,
+      attempted: attempted.current,
+      print: () => window.print(),
+      onError: () => setPrintFailed(true),
+    });
+  }, [ready, isError, printRequestId]);
+
+  const printManually = () => {
+    // A quick manual click can beat the scheduled auto-print frame.
+    attempted.current.add(printRequestId);
+    try {
+      window.print();
+      setPrintFailed(false);
+    } catch {
+      setPrintFailed(true);
+    }
+  };
 
   return (
-    <div aria-hidden className="print-offscreen">
-      <ReceiptDocument data={data} />
-    </div>
+    <Dialog open onOpenChange={(open) => !open && onPrinted?.()}>
+      <DialogContent className="receipt-preview-dialog sm:max-w-lg">
+        <DialogHeader className="print:hidden">
+          <DialogTitle>{t('receipt.previewTitle')}</DialogTitle>
+          <DialogDescription>{t('receipt.autoPrintHint')}</DialogDescription>
+        </DialogHeader>
+        {isError ? (
+          <div className="space-y-3 py-6 text-center">
+            <p role="alert" className="text-sm text-destructive">
+              {t('receipt.loadFailed')}
+            </p>
+            <Button variant="outline" onClick={() => void refetch()} disabled={isFetching}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              {t('receipt.retry')}
+            </Button>
+          </div>
+        ) : data ? (
+          <ReceiptDocument data={data} onReady={onReceiptReady} />
+        ) : (
+          <div className="space-y-3" aria-busy>
+            <p className="text-sm text-muted-foreground">{t('receipt.preparing')}</p>
+            <Skeleton className="mx-auto h-80 w-72 max-w-full" />
+          </div>
+        )}
+        {printFailed ? (
+          <p role="alert" className="text-sm text-destructive print:hidden">
+            {t('receipt.printFailed')}
+          </p>
+        ) : null}
+        <DialogFooter className="print:hidden">
+          <Button variant="outline" onClick={onPrinted}>
+            {tc('close')}
+          </Button>
+          <Button onClick={printManually} disabled={!data || isError}>
+            <Printer className="mr-2 h-4 w-4" />
+            {t('receipt.print')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

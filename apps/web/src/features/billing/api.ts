@@ -15,7 +15,9 @@ import type {
   PaymentMethod,
   PaymentStatus,
   QuickInvoiceInput,
+  ServiceKind,
 } from '@avishifo/shared';
+import type { Localizable } from '@/lib/localized';
 import { api, type ApiResult } from '@/lib/api-client';
 
 // ============================================================ types
@@ -48,13 +50,14 @@ export interface InvoiceSummary {
 
 export interface InvoiceListItem extends InvoiceSummary {
   patient: PatientBrief;
+  lines: Pick<InvoiceLine, 'id' | 'title' | 'quantity' | 'lineTotal'>[];
 }
 
 export interface InvoiceLine {
   id: string;
   serviceId: string | null;
   /** Snapshot of the service name at billing time: string or { uz, ru, en }. */
-  title: import('@/lib/localized').Localizable;
+  title: Localizable;
   quantity: number;
   unitPrice: MoneyString;
   discount: MoneyString;
@@ -68,6 +71,7 @@ export interface InvoicePayment {
   branchId: string;
   amount: MoneyString;
   method: PaymentMethod;
+  note: string | null;
   status: PaymentStatus;
   shiftId: string | null;
   providerTxId: string | null;
@@ -102,6 +106,20 @@ export interface QuickInvoiceResult {
   paid: boolean;
 }
 
+export type CashAccountMethod = 'CASH' | 'CARD' | 'CLICK';
+
+export interface CashAccount {
+  method: CashAccountMethod;
+  opening: MoneyString;
+  receipts: MoneyString;
+  deposits: MoneyString;
+  refunds: MoneyString;
+  expenses: MoneyString;
+  expected: MoneyString;
+  actual: MoneyString | null;
+  difference: MoneyString | null;
+}
+
 export interface CashierShift {
   id: string;
   branchId: string;
@@ -110,6 +128,10 @@ export interface CashierShift {
   openedAt: string;
   closedAt: string | null;
   openingCash: MoneyString;
+  openingCard: MoneyString;
+  openingClick: MoneyString;
+  unallocatedOpeningTransfer: MoneyString;
+  requiresOpeningAllocation: boolean;
   /** What the transfer account held at opening, entered by whoever opened. */
   openingTransfer: MoneyString;
   expectedCash: MoneyString | null;
@@ -124,6 +146,7 @@ export interface CashierShift {
 }
 
 export interface CurrentShift extends CashierShift {
+  accounts: CashAccount[];
   open: true;
   /** Who opened the branch register — shown so the handover is traceable. */
   cashier: { id: string; fullName: string };
@@ -140,11 +163,11 @@ export interface CurrentShift extends CashierShift {
   transferByMethod: Array<{ method: PaymentMethod; amount: MoneyString; count: number }>;
 }
 
-
 export interface ShiftPaymentRow {
   id: string;
   amount: MoneyString;
   method: PaymentMethod;
+  note: string | null;
   status: 'COMPLETED' | 'VOIDED';
   paidAt: string;
   invoiceId: string;
@@ -156,6 +179,7 @@ export interface ShiftPaymentRow {
 export interface RegistersOverview {
   registers: Array<{
     shiftId: string;
+    accounts: CashAccount[];
     cashier: { id: string; fullName: string };
     openedAt: string;
     openingCash: MoneyString;
@@ -163,7 +187,13 @@ export interface RegistersOverview {
     expectedCash: MoneyString;
     transferTotal: MoneyString;
   }>;
-  totals: { expectedCash: MoneyString; transferTotal: MoneyString; openDrawers: number };
+  totals: {
+    accounts: CashAccount[];
+    unallocatedOpeningTransfer?: MoneyString;
+    expectedCash: MoneyString;
+    transferTotal: MoneyString;
+    openDrawers: number;
+  };
   /** Online money that arrived with nobody at the desk — no register owns it. */
   unattachedOnlineToday: MoneyString;
 }
@@ -173,6 +203,7 @@ export interface ShiftHistoryItem extends CashierShift {
 }
 
 export interface ShiftReport {
+  accounts: CashAccount[];
   openingCash: MoneyString;
   openingTransfer: MoneyString;
   cashIn: MoneyString;
@@ -282,6 +313,8 @@ export interface ReceiptPayload {
 }
 
 export interface InvoiceListQuery {
+  pending?: boolean;
+  search?: string;
   page?: number;
   limit?: number;
   status?: InvoiceStatus;
@@ -312,7 +345,10 @@ export const billingApi = {
   issueInvoice: (id: string) => api.post<InvoiceSummary>(`/invoices/${id}/issue`),
   cancelInvoice: (id: string) => api.post<InvoiceSummary>(`/invoices/${id}/cancel`),
   addPayment: (id: string, body: AddPaymentInput) =>
-    api.post<{ payment: InvoicePayment; invoice: InvoiceSummary }>(`/invoices/${id}/payments`, body),
+    api.post<{ payment: InvoicePayment; invoice: InvoiceSummary }>(
+      `/invoices/${id}/payments`,
+      body,
+    ),
   /** Settle an invoice across several methods in one request. */
   addPayments: (id: string, body: AddPaymentsInput) =>
     api.post<{ payment: InvoicePayment; invoice: InvoiceSummary }>(
@@ -333,10 +369,14 @@ export const billingApi = {
   listDebtors: (q: { page?: number }) => api.get<DebtorsResult>('/debtors', q),
 
   // lookups
-  searchServices: (search: string) =>
-    api.get<ServiceOption[]>('/services', { isActive: true, search: search || undefined, limit: 20 }),
-  searchPatients: (search: string) =>
-    api.get<PatientBrief[]>('/patients', { search, limit: 10 }),
+  searchServices: (search: string, kind?: ServiceKind) =>
+    api.get<ServiceOption[]>('/services', {
+      isActive: true,
+      kind,
+      search: search || undefined,
+      limit: 20,
+    }),
+  searchPatients: (search: string) => api.get<PatientBrief[]>('/patients', { search, limit: 10 }),
 };
 
 /** "1 500 000,5" → "1500000.5" (UI convenience before zod money validation). */

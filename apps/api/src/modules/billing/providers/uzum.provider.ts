@@ -25,13 +25,11 @@ export class UzumProvider implements PaymentProvider {
 
   constructor(private readonly config: AppConfigService) {}
 
-  verifyWebhook(req: WebhookRequest): boolean {
-    if (!this.config.env.UZUM_SECRET_KEY) {
-      this.logger.warn('UZUM_SECRET_KEY not configured — structural webhook verification only (stub)');
-    }
-    // Structural check only until the real signature scheme is implemented.
-    const b = asRecord(req.body);
-    return str(b.transId ?? b.transaction_id) !== '' || str(b.invoiceNumber ?? b.account) !== '';
+  verifyWebhook(_req: WebhookRequest): boolean {
+    // No financial callback is trusted until the actual signature protocol is
+    // implemented. Structural shape is not proof that money was received.
+    if (!this.config.env.SINGLE_CLINIC_MODE) this.logger.warn('Uzum webhook verification is unavailable — rejected');
+    return false;
   }
 
   parseWebhook(body: unknown): ParsedWebhook {

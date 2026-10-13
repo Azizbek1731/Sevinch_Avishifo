@@ -12,9 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton';
  * refresh cookie is sent to their home instead of being asked to sign in again.
  * The form waits for the bootstrap to settle so it never flashes for them.
  *
- * This also fires the moment a sign-in succeeds, after the form has already
- * navigated — so it must send the user to the same place the form does, or it
- * silently wins and overrides it.
+ * This also handles a successful sign-in: the form stores the session and this
+ * page performs the role-aware redirect once.
  */
 export default function LoginPage() {
   const status = useAuthStore((s) => s.status);

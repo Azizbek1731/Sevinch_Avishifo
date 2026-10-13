@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Banknote, Pencil, Plus, Tags, Trash2, Wallet } from 'lucide-react';
 import { formatUZS, type ExpenseMethod } from '@avishifo/shared';
 import { formatTz } from '@/lib/dates';
+import { Link } from '@/i18n/routing';
 import { usePermissions } from '@/hooks/use-permissions';
 import { PageHeader } from '@/components/page-header';
 import { DataTable } from '@/components/data-table';
@@ -33,6 +34,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { EXTERNAL_PAYMENT_METHODS } from '@/features/billing/payment-methods';
+import { useAuthStore } from '@/stores/auth-store';
 import { useApiErrorToast } from '@/features/services/hooks';
 import { expensesApi, todayInTashkent, type ExpenseRow } from '../api';
 import { ExpenseDialog } from './expense-dialog';
@@ -40,25 +43,20 @@ import { CategoriesDialog } from './categories-dialog';
 
 const ALL = '__all__';
 const PAGE_LIMIT = 20;
-const METHODS: ExpenseMethod[] = ['CASH', 'CARD', 'PAYME', 'CLICK', 'UZUM'];
+const METHODS = EXTERNAL_PAYMENT_METHODS;
 
 /** First day of the current month, in Tashkent. */
 function monthStart(): string {
   return `${todayInTashkent().slice(0, 7)}-01`;
 }
 
-/**
- * Where a clinic records what it spends.
- *
- * Cash rows are the ones that matter operationally: they come out of the
- * cashier's drawer and are subtracted from what that shift is expected to hold,
- * so the count at closing time matches the money actually in the till.
- */
+/** Record spending against cash, card or Click and review a selected period. */
 export function ExpensesPage() {
   const t = useTranslations('expenses');
   const can = usePermissions();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
+  const activeBranchId = useAuthStore((state) => state.activeBranchId);
 
   const canWrite = can('expenses.write');
   const canSeeDeleted = can('records.viewDeleted');
@@ -90,7 +88,7 @@ export function ExpensesPage() {
   };
 
   const query = useQuery({
-    queryKey: ['expenses', 'list', filters],
+    queryKey: ['expenses', 'list', activeBranchId, filters],
     queryFn: async () => (await expensesApi.list(filters)).data,
   });
 
@@ -102,7 +100,8 @@ export function ExpensesPage() {
       void queryClient.invalidateQueries({ queryKey: ['expenses'] });
       // Withdrawing a cash expense puts the money back into what the drawer
       // is expected to hold.
-      void queryClient.invalidateQueries({ queryKey: ['shift'] });
+      void queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      void queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
     onError: errorToast,
   });
@@ -148,7 +147,7 @@ export function ExpensesPage() {
         accessorKey: 'note',
         header: t('table.note'),
         cell: ({ row }) => (
-          <span className="block max-w-[22ch] truncate text-muted-foreground">
+          <span className="block max-w-[40ch] whitespace-normal break-words text-muted-foreground">
             {row.original.note || '—'}
           </span>
         ),
@@ -174,7 +173,11 @@ export function ExpensesPage() {
         id: 'actions',
         header: '',
         cell: ({ row }) =>
-          row.original.deletedAt ? null : (
+          row.original.surgeryId ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/surgeries/${row.original.surgeryId}`}>{t('surgeryDetails')}</Link>
+            </Button>
+          ) : row.original.deletedAt ? null : (
             <span className="flex justify-end gap-1">
               <Button
                 size="icon"
@@ -227,6 +230,29 @@ export function ExpensesPage() {
 
       <Card>
         <CardContent className="flex flex-wrap items-end gap-3 p-4">
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                const today = todayInTashkent();
+                setFrom(today);
+                setTo(today);
+                setPage(1);
+              }}
+            >
+              {t('today')}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setFrom(monthStart());
+                setTo(todayInTashkent());
+                setPage(1);
+              }}
+            >
+              {t('thisMonth')}
+            </Button>
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="expense-from">{t('from')}</Label>
             <Input
@@ -320,19 +346,30 @@ export function ExpensesPage() {
           </span>
           <div>
             <p className="text-sm text-muted-foreground">{t('totalForPeriod')}</p>
-            <p className="text-2xl font-bold">{formatUZS(query.data?.sum ?? '0')}</p>
+            <p className="text-2xl font-bold">{query.data ? formatUZS(query.data.sum) : '—'}</p>
           </div>
         </CardContent>
       </Card>
 
-      <DataTable
-        columns={columns}
-        data={items}
-        isLoading={query.isLoading}
-        emptyText={t('empty')}
-        meta={meta ? { page: meta.page, limit: meta.limit, total: meta.total } : undefined}
-        onPageChange={setPage}
-      />
+      {query.isError ? (
+        <Card>
+          <CardContent className="flex items-center justify-between gap-3 p-4">
+            <p className="text-sm text-destructive">{t('loadFailed')}</p>
+            <Button variant="outline" onClick={() => void query.refetch()}>
+              {t('retry')}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={items}
+          isLoading={query.isLoading}
+          emptyText={t('empty')}
+          meta={meta ? { page: meta.page, limit: meta.limit, total: meta.total } : undefined}
+          onPageChange={setPage}
+        />
+      )}
 
       <ExpenseDialog
         open={formOpen}

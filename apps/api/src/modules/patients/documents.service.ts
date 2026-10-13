@@ -4,12 +4,7 @@ import type { Readable } from 'node:stream';
 import { fromBuffer } from 'file-type';
 import sharp from 'sharp';
 import type { PatientDocument, Prisma } from '@prisma/client';
-import {
-  AuditAction,
-  ErrorCode,
-  UPLOAD_LIMITS,
-  type DocumentMetaInput,
-} from '@avishifo/shared';
+import { AuditAction, ErrorCode, UPLOAD_LIMITS, type DocumentMetaInput } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
 import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
 import { AuditService } from '../../core/audit/audit.service';
@@ -17,6 +12,7 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { StorageService } from '../../core/storage/storage.service';
 import { PatientsService } from './patients.service';
+import { FINAL_LAB_STATUSES, lockLabOrder } from '../lab/lab-workflow';
 
 /** Raster images are re-encoded (EXIF-rotated, stripped) to JPEG for safety. */
 const REENCODE_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic']);
@@ -93,21 +89,39 @@ export class DocumentsService {
     const key = `${clinicId}/patients/${randomUUID()}${ext}`;
     await this.storage.put(key, buffer);
 
-    const doc = await this.prisma.db.patientDocument.create({
-      data: {
-        // Required by Prisma's checked input type; the tenant extension re-stamps the same value.
-        clinicId,
-        patientId,
-        category: meta.category,
-        title: meta.title,
-        fileKey: key,
-        fileName: file.originalname,
-        mimeType,
-        sizeBytes: buffer.length,
-        uploadedById,
-        labOrderId: labOrderId ?? null,
-      },
-    });
+    let doc: PatientDocument;
+    try {
+      doc = await this.prisma.db.$transaction(async (tx) => {
+        if (labOrderId) {
+          const order = await lockLabOrder(tx, labOrderId);
+          if (order.patientId !== patientId || FINAL_LAB_STATUSES.includes(order.status)) {
+            throw new AppException(
+              ErrorCode.LAB_INVALID_TRANSITION,
+              'Signed or cancelled laboratory attachments are locked',
+              409,
+            );
+          }
+        }
+        return tx.patientDocument.create({
+          data: {
+            // Required by Prisma's checked input type; the tenant extension re-stamps the same value.
+            clinicId,
+            patientId,
+            category: meta.category,
+            title: meta.title,
+            fileKey: key,
+            fileName: file.originalname,
+            mimeType,
+            sizeBytes: buffer.length,
+            uploadedById,
+            labOrderId: labOrderId ?? null,
+          },
+        });
+      });
+    } catch (error) {
+      await this.storage.delete(key).catch(() => undefined);
+      throw error;
+    }
 
     await this.audit.log({
       action: AuditAction.CREATE,
@@ -159,7 +173,26 @@ export class DocumentsService {
     const doc = await this.prisma.db.patientDocument.findFirst({ where: { id: docId } });
     if (!doc) throw new AppException(ErrorCode.NOT_FOUND, 'Document not found', 404);
 
-    await this.prisma.db.patientDocument.delete({ where: { id: docId } });
+    await this.prisma.db.$transaction(async (tx) => {
+      if (doc.labOrderId) {
+        const order = await lockLabOrder(tx, doc.labOrderId, false);
+        if (FINAL_LAB_STATUSES.includes(order.status)) {
+          throw new AppException(
+            ErrorCode.LAB_INVALID_TRANSITION,
+            'Signed laboratory files cannot be deleted',
+            409,
+          );
+        }
+        const used = await tx.labResult.count({ where: { reportDocumentId: docId } });
+        if (used > 0)
+          throw new AppException(
+            ErrorCode.CONFLICT,
+            'This file is used by a laboratory result',
+            409,
+          );
+      }
+      await tx.patientDocument.delete({ where: { id: docId } });
+    });
     await this.storage.delete(doc.fileKey);
 
     await this.audit.log({

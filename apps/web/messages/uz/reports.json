@@ -25,7 +25,9 @@
     "services": "Xizmatlar",
     "queue": "Navbat",
     "lab": "Laboratoriya",
-    "shifts": "Smenalar"
+    "shifts": "Smenalar",
+    "cashflow": "Kassa hisoboti",
+    "consumables": "Dori va materiallar"
   },
   "empty": {
     "title": "Ma'lumot yo'q",
@@ -140,5 +142,76 @@
       "OPEN": "Ochiq",
       "CLOSED": "Yopiq"
     }
+  },
+  "cashflow": {
+    "allMethods": "Barcha kassalar",
+    "refresh": "Yangilash",
+    "scope": "Filialdagi barcha kassirlar · Toshkent vaqti",
+    "explanation": "To‘lovlar va avanslar kirim sifatida olinadi. Avans hisobidan xizmat to‘lash ikkinchi marta kirimga qo‘shilmaydi.",
+    "error": "Hisobotni yuklab bo‘lmadi. Sanalar to‘g‘riligini va davr 366 kundan oshmaganini tekshiring.",
+    "inflow": "Jami kirim",
+    "outflow": "Jami chiqish",
+    "net": "Sof pul harakati",
+    "inflowDetail": "To‘lovlar: {receipts} · Avanslar: {deposits}",
+    "outflowDetail": "Qaytarishlar: {refunds} · Chiqimlar: {expenses}",
+    "netDetail": "{count} ta amaliyot · kirim − chiqish",
+    "accounts": "Kassalar bo‘yicha",
+    "currency": "so‘m",
+    "method": "Kassa",
+    "receipts": "To‘lovlar",
+    "deposits": "Avanslar",
+    "refunds": "Qaytarishlar",
+    "expenses": "Chiqimlar",
+    "total": "Jami",
+    "periods": "Davr bo‘yicha harakat",
+    "period": "Davr boshlanishi",
+    "categories": "Chiqim toifalari",
+    "category": "Toifa",
+    "datePolicy": "To‘lov, avans va qaytarishlar Toshkent vaqtidagi amaliyot sanasi bo‘yicha, chiqimlar kiritilgan chiqim sanasi bo‘yicha hisoblanadi. Bekor qilingan to‘lovlar va o‘chirilgan chiqimlar chiqariladi. Sof harakat boshlang‘ich qoldiqni o‘z ichiga olmaydi; kunni yopish va qoldiqni solishtirish Kassa → Smena bo‘limida.",
+    "legacyMethod": "{method} (oldingi yozuvlar)"
+  },
+  "consumables": {
+    "kindFilter": "Sarf turi",
+    "sourceFilter": "Sarf manbasi",
+    "allKinds": "Barcha turlar",
+    "allSources": "Barcha bo‘limlar",
+    "kinds": {
+      "MEDICINE": "Dori",
+      "MATERIAL": "Sarf materiali"
+    },
+    "sources": {
+      "SURGERY": "Operatsiya",
+      "INPATIENT": "Statsionar",
+      "OUTPATIENT": "Ambulator"
+    },
+    "scope": "Tanlangan filial · Toshkent vaqti",
+    "explanation": "Dorilar, bint, shprits va boshqa materiallarning kiritilgan sarfi. Summalar bemorga qo‘llangan tarif bo‘yicha hisoblanadi; xarid tannarxi yoki kassadan chiqim emas.",
+    "error": "Sarf hisobotini yuklab bo‘lmadi. Sanalar to‘g‘riligini va davr 366 kundan oshmaganini tekshirib, qayta yangilang.",
+    "actualAmount": "Sarf summasi",
+    "tariffHint": "Kiritilgan tariflar bo‘yicha",
+    "itemCount": "Nomenklatura soni",
+    "itemCountHint": "Dori va material turlari",
+    "entries": "Sarf yozuvlari",
+    "entriesHint": "Kiritilgan sarf qaydlari soni",
+    "orderedAmount": "Tayinlangan — alohida",
+    "orderedCount": "{count} ta tayinlov yozuvi",
+    "emptyTitle": "Sarf qayd etilmagan",
+    "items": "Dori va materiallar kesimida · so‘m",
+    "manual": "Qo‘lda kiritilgan",
+    "columns": {
+      "name": "Nomi / kodi",
+      "kind": "Turi",
+      "unit": "Birligi",
+      "quantity": "Sarflangan",
+      "amount": "Sarf summasi",
+      "orderedQuantity": "Tayinlangan miqdor",
+      "orderedAmount": "Tayinlov summasi"
+    },
+    "periods": "Davr bo‘yicha sarf · so‘m",
+    "units": "Birliklar bo‘yicha miqdor",
+    "unitsHint": "Turli o‘lchov birliklari bir-biriga qo‘shilmaydi.",
+    "orderedPolicy": "Oldindan hisobga olingan statsionar tayinlovlar alohida ko‘rsatiladi. Ular sarf summasiga qo‘shilmaydi va bemor olganini anglatmaydi. Keyin sarf qayd etilsa ham dastlabki tayinlov miqdori saqlanadi.",
+    "datePolicy": "Operatsiya sarfi kiritilgan sana, boshqa sarflar xarajat sanasi, berilgan dorilar berilgan sana bo‘yicha olinadi. Bekor qilingan xarajatlar chiqariladi.",
+    "catalogHint": "Operatsiyada qo‘lda kiritilgan material va dorilar ham hisoblanadi. Boshqa bo‘limlarda dori yoki materialni tegishli katalogdan tanlang; turi belgilanmagan erkin matnli xarajatlar bu hisobotga kirmaydi."
   }
 }

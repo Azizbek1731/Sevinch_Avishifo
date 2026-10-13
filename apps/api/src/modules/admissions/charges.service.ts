@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import {
+  AuditAction,
   ErrorCode,
+  type ChargeQueryInput,
   type AddChargeInput,
   type AuthUser,
   type InvoiceChargesInput,
@@ -9,22 +12,22 @@ import {
 import { AppException } from '../../common/app.exception';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
+import { AuditService } from '../../core/audit/audit.service';
+import { PricingService } from '../services/pricing.service';
 import { InvoicesService } from '../billing/invoices.service';
 
 /**
- * What a patient owes but has not been billed for yet.
- *
- * This is the ledger that makes "pay some now, the rest later" work the way
- * clinics actually operate: services are written as they are delivered — a
- * consultation, or a marked-off treatment day on the ward — and the desk later
- * bills whichever of them the patient is paying for. Some pay on arrival, some
- * at discharge, most somewhere in between.
+ * Patient charge ledger. Newly recorded costs are issued to the cashier in the
+ * same transaction; pending legacy/cancelled invoice charges can still be
+ * selected and reissued explicitly.
  */
 @Injectable()
 export class ChargesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly invoices: InvoicesService,
+    private readonly pricing: PricingService,
+    private readonly audit: AuditService,
   ) {}
 
   private map(c: {
@@ -32,6 +35,7 @@ export class ChargesService {
     admissionId: string | null;
     visitId: string | null;
     serviceId: string | null;
+    surgeryId?: string | null;
     title: Prisma.JsonValue;
     date: Date;
     quantity: number;
@@ -44,6 +48,7 @@ export class ChargesService {
       admissionId: c.admissionId,
       visitId: c.visitId,
       serviceId: c.serviceId,
+      surgeryId: c.surgeryId ?? null,
       title: c.title,
       date: c.date.toISOString().slice(0, 10),
       quantity: c.quantity,
@@ -54,77 +59,144 @@ export class ChargesService {
     };
   }
 
-  /** Everything written to this patient, newest first, with the pending total. */
-  async listForPatient(patientId: string, status?: string): Promise<Record<string, unknown>> {
-    const where: Prisma.ChargeItemWhereInput = {
-      patientId,
-      ...(status ? { status: status as Prisma.EnumChargeStatusFilter['equals'] } : {}),
+  /** Pending total covers the complete filtered ledger, independent of display limit. */
+  async listForPatient(
+    query: ChargeQueryInput,
+    branchId: string,
+  ): Promise<Record<string, unknown>> {
+    const scope = {
+      patientId: query.patientId,
+      branchId,
+      ...(query.admissionId ? { admissionId: query.admissionId } : {}),
     };
     const [rows, pending] = await Promise.all([
-      this.prisma.db.chargeItem.findMany({ where, orderBy: [{ date: 'desc' }, { createdAt: 'desc' }], take: 500 }),
-      this.prisma.db.chargeItem.aggregate({
-        where: { patientId, status: 'PENDING' },
-        _sum: { unitPrice: true },
+      this.prisma.db.chargeItem.findMany({
+        where: { ...scope, ...(query.status ? { status: query.status } : {}) },
+        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+        take: 500,
+      }),
+      this.prisma.db.chargeItem.findMany({
+        where: { ...scope, status: 'PENDING' },
+        select: { unitPrice: true, quantity: true },
       }),
     ]);
-    // Sum by line, not by unitPrice — quantity matters.
-    const pendingTotal = rows
-      .filter((r) => r.status === 'PENDING')
-      .reduce((acc, r) => acc.add(r.unitPrice.mul(r.quantity)), new Prisma.Decimal(0));
-    void pending;
-    return {
-      items: rows.map((r) => this.map(r)),
-      pendingTotal: pendingTotal.toFixed(2),
-    };
+    const pendingTotal = pending.reduce(
+      (acc, r) => acc.add(r.unitPrice.mul(r.quantity)),
+      new Prisma.Decimal(0),
+    );
+    return { items: rows.map((r) => this.map(r)), pendingTotal: pendingTotal.toFixed(2) };
   }
 
-  async add(dto: AddChargeInput, user: AuthUser, branchId: string): Promise<Record<string, unknown>> {
-    const patient = await this.prisma.db.patient.findFirst({
-      where: { id: dto.patientId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!patient) throw new AppException(ErrorCode.PATIENT_NOT_FOUND, 'Bemor topilmadi', 404);
-
-    let title: Prisma.InputJsonValue = { uz: dto.title ?? '' };
-    let unitPrice = dto.unitPrice ? new Prisma.Decimal(dto.unitPrice) : new Prisma.Decimal(0);
-
-    if (dto.serviceId) {
-      const service = await this.prisma.db.service.findFirst({ where: { id: dto.serviceId, isActive: true } });
-      if (!service) throw new AppException(ErrorCode.NOT_FOUND, 'Xizmat topilmadi', 404);
-      title = service.name as Prisma.InputJsonValue;
-      if (!dto.unitPrice) {
-        const price = await this.prisma.db.servicePrice.findFirst({
-          where: { serviceId: dto.serviceId, effectiveTo: null },
-          orderBy: { effectiveFrom: 'desc' },
-        });
-        unitPrice = price?.price ?? new Prisma.Decimal(0);
-      }
-    } else if (!dto.title) {
-      throw new AppException(ErrorCode.VALIDATION_ERROR, 'Xizmat yoki nom kiriting', 400);
+  async add(
+    dto: AddChargeInput,
+    user: AuthUser,
+    branchId: string,
+  ): Promise<Record<string, unknown>> {
+    if (user.branchIds.length > 0 && !user.branchIds.includes(branchId)) {
+      throw new AppException(ErrorCode.FORBIDDEN, 'No access to this branch', 403);
     }
+    const clinicId = TenantContext.requireClinicId();
+    const requestFingerprint = createHash('sha256').update(JSON.stringify({
+      branchId, patientId: dto.patientId, admissionId: dto.admissionId ?? null,
+      visitId: dto.visitId ?? null, serviceId: dto.serviceId ?? null,
+      title: dto.title ?? null, date: dto.date, quantity: dto.quantity,
+      unitPrice: dto.unitPrice === undefined ? null : new Prisma.Decimal(dto.unitPrice).toFixed(2),
+    })).digest('hex');
+    const result = await this.prisma.db.$transaction(async (tx) => {
+      if (dto.idempotencyKey) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${clinicId + ':charge:' + dto.idempotencyKey}, 0))`;
+        const replay = await tx.chargeItem.findFirst({ where: { requestKey: dto.idempotencyKey } });
+        if (replay) {
+          if (replay.requestFingerprint !== requestFingerprint) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR, 'Bu so‘rov kaliti boshqa xarajat uchun ishlatilgan', 409);
+          }
+          return { charge: replay, created: false };
+        }
+      }
+      const patient = await tx.patient.findFirst({
+        where: { id: dto.patientId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!patient) throw new AppException(ErrorCode.PATIENT_NOT_FOUND, 'Bemor topilmadi', 404);
 
-    const created = await this.prisma.db.chargeItem.create({
-      // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
-      data: {
-        clinicId: TenantContext.requireClinicId(),
-        branchId,
+      if (dto.admissionId) {
+        await tx.$queryRaw`SELECT "id" FROM "Admission" WHERE "id" = ${dto.admissionId} AND "clinicId" = ${clinicId} AND "branchId" = ${branchId} FOR UPDATE`;
+        const admission = await tx.admission.findFirst({
+          where: { id: dto.admissionId, patientId: dto.patientId, branchId, status: 'ACTIVE' },
+          select: { id: true },
+        });
+        if (!admission)
+          throw new AppException(ErrorCode.VALIDATION_ERROR, 'Faol statsionar yozuvi topilmadi', 400);
+      }
+      if (dto.visitId) {
+        const visit = await tx.visit.findFirst({
+          where: { id: dto.visitId, patientId: dto.patientId, branchId },
+          select: { id: true },
+        });
+        if (!visit) throw new AppException(ErrorCode.VALIDATION_ERROR, 'Bemor qabuli topilmadi', 400);
+      }
+
+      let title: Prisma.InputJsonValue = { uz: dto.title ?? '' };
+      let unitPrice = dto.unitPrice ? new Prisma.Decimal(dto.unitPrice) : new Prisma.Decimal(0);
+
+      if (dto.serviceId) {
+        const service = await tx.service.findFirst({
+          where: { id: dto.serviceId, isActive: true },
+          include: { category: { select: { kind: true } } },
+        });
+        if (!service) throw new AppException(ErrorCode.NOT_FOUND, 'Xizmat topilmadi', 404);
+        if (service.category.kind === 'SURGERY') throw new AppException(ErrorCode.VALIDATION_ERROR, 'Operatsiyani statsionar kartasining Operatsiyalar bo‘limidan kiriting', 400);
+        title = service.name as Prisma.InputJsonValue;
+        if (!dto.unitPrice) {
+          const price = await this.pricing.getCurrentPrice(dto.serviceId, branchId);
+          if (price === null)
+            throw new AppException(ErrorCode.VALIDATION_ERROR, 'Xizmat narxi belgilanmagan', 400);
+          unitPrice = new Prisma.Decimal(price);
+        }
+      } else if (!dto.title || dto.unitPrice === undefined) {
+        throw new AppException(ErrorCode.VALIDATION_ERROR, 'Xizmat yoki nom va narx kiriting', 400);
+      }
+
+      const charge = await tx.chargeItem.create({
+        // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
+        data: {
+          clinicId,
+          branchId,
+          patientId: dto.patientId,
+          admissionId: dto.admissionId ?? null,
+          visitId: dto.visitId ?? null,
+          serviceId: dto.serviceId ?? null,
+          title,
+          date: new Date(dto.date),
+          quantity: dto.quantity,
+          unitPrice,
+          createdById: user.id,
+          requestKey: dto.idempotencyKey ?? null,
+          requestFingerprint: dto.idempotencyKey ? requestFingerprint : null,
+        },
+      });
+      await this.invoices.issueChargesInTransaction(tx, [charge.id], user, branchId);
+      return { charge: await tx.chargeItem.findFirstOrThrow({ where: { id: charge.id } }), created: true };
+    });
+    if (result.created) await this.audit.log({
+      action: AuditAction.CREATE,
+      entity: 'ChargeItem',
+      entityId: result.charge.id,
+      after: {
         patientId: dto.patientId,
         admissionId: dto.admissionId ?? null,
-        visitId: dto.visitId ?? null,
-        serviceId: dto.serviceId ?? null,
-        title,
-        date: new Date(dto.date),
-        quantity: dto.quantity,
-        unitPrice,
-        createdById: user.id,
+        branchId,
+        quantity: result.charge.quantity,
+        unitPrice: result.charge.unitPrice.toFixed(2),
       },
     });
-    return this.map(created);
+    return this.map(result.charge);
   }
 
-  async cancel(id: string): Promise<{ id: string }> {
-    const c = await this.prisma.db.chargeItem.findFirst({ where: { id } });
+  async cancel(id: string, branchId: string): Promise<{ id: string }> {
+    const c = await this.prisma.db.chargeItem.findFirst({ where: { id, branchId } });
     if (!c) throw new AppException(ErrorCode.NOT_FOUND, 'Yozuv topilmadi', 404);
+    if (c.surgeryId) throw new AppException(ErrorCode.VALIDATION_ERROR, 'Operatsiya xarajatini operatsiya kartasidan bekor qiling', 409);
     if (c.status === 'INVOICED') {
       // …unless the bill it was on is gone. Cancelling an invoice used to leave
       // its services INVOICED forever: unbillable because already claimed, and
@@ -144,75 +216,76 @@ export class ChargesService {
         );
       }
     }
-    await this.prisma.db.chargeItem.update({ where: { id }, data: { status: 'CANCELLED' } });
+    const changed = await this.prisma.db.chargeItem.updateMany({
+      where: { id, branchId, status: c.status, invoiceLineId: c.invoiceLineId },
+      data: { status: 'CANCELLED' },
+    });
+    if (changed.count !== 1)
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'Xizmat holati o‘zgardi, sahifani yangilang',
+        409,
+      );
+    await this.audit.log({
+      action: AuditAction.UPDATE,
+      entity: 'ChargeItem',
+      entityId: id,
+      before: { status: c.status },
+      after: { status: 'CANCELLED' },
+    });
     return { id };
   }
 
-  /**
-   * Turns the ticked charges into one invoice.
-   *
-   * The selection is claimed with a status-guarded update BEFORE the invoice is
-   * created, so two people billing overlapping selections cannot put the same
-   * service on two bills — the second one finds nothing left to claim and is
-   * told, rather than silently double-charging the patient.
-   */
-  async invoiceSelected(dto: InvoiceChargesInput, user: AuthUser, branchId: string): Promise<Record<string, unknown>> {
+  /** Claims, invoice lines and issuance commit together in InvoicesService. */
+  async invoiceSelected(
+    dto: InvoiceChargesInput,
+    user: AuthUser,
+    branchId: string,
+  ): Promise<Record<string, unknown>> {
+    const ids = [...new Set(dto.chargeIds)];
     const charges = await this.prisma.db.chargeItem.findMany({
-      where: { id: { in: dto.chargeIds }, status: 'PENDING' },
+      where: { id: { in: ids }, branchId, status: 'PENDING', invoiceLineId: null },
       orderBy: { date: 'asc' },
     });
-    if (charges.length === 0) {
-      throw new AppException(ErrorCode.VALIDATION_ERROR, 'To‘lanmagan xizmat tanlanmadi', 400);
-    }
-    const patientIds = new Set(charges.map((c) => c.patientId));
-    if (patientIds.size > 1) {
-      throw new AppException(ErrorCode.VALIDATION_ERROR, 'Xizmatlar turli bemorlarga tegishli', 400);
-    }
-    const patientId = charges[0]!.patientId;
-
-    const claimed = await this.prisma.db.chargeItem.updateMany({
-      where: { id: { in: charges.map((c) => c.id) }, status: 'PENDING' },
-      data: { status: 'INVOICED' },
-    });
-    if (claimed.count !== charges.length) {
+    if (charges.length !== ids.length || ids.length === 0) {
       throw new AppException(
         ErrorCode.VALIDATION_ERROR,
-        'Tanlangan xizmatlardan bazilari allaqachon hisob-fakturaga kiritilgan',
+        'Xizmatlar holati o‘zgargan yoki boshqa filialga tegishli',
         409,
       );
     }
-
-    try {
-      const created = await this.invoices.create(
-        {
-          patientId,
-          branchId,
-          lines: charges.map((c) => ({
-            serviceId: c.serviceId ?? undefined,
-            quantity: c.quantity,
-            unitPrice: c.unitPrice.toFixed(2),
-            discount: '0',
-            // Carries the stay through to the invoice: without it a discharged
-            // history cannot say which bills belonged to it.
-            chargeItemId: c.id,
-          })),
-        },
-        user,
+    if (new Set(charges.map((c) => c.patientId)).size !== 1) {
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'Xizmatlar turli bemorlarga tegishli',
+        400,
       );
-      // Issued immediately: the desk ticks services to COLLECT money, and the
-      // cashier's pending list only shows issued invoices. The old `issue:
-      // true` flag was swallowed by an `as never` cast — create() never read
-      // it, the invoice stayed DRAFT, and the cashier could not see or take
-      // payment for it until someone found it and pressed Issue by hand.
-      return await this.invoices.issue(created.id as string);
-    } catch (e) {
-      // The invoice failed, so the claim must not stand — otherwise the
-      // services are marked billed with no bill behind them.
-      await this.prisma.db.chargeItem.updateMany({
-        where: { id: { in: charges.map((c) => c.id) } },
-        data: { status: 'PENDING' },
-      });
-      throw e;
     }
+    return this.invoices.create(
+      {
+        patientId: charges[0]!.patientId,
+        branchId,
+        lines: charges.map((c) => ({
+          serviceId: c.serviceId ?? undefined,
+          title: this.chargeTitle(c.title),
+          quantity: c.quantity,
+          unitPrice: c.unitPrice.toFixed(2),
+          discount: '0',
+          chargeItemId: c.id,
+        })),
+      },
+      user,
+      { issueImmediately: true },
+    );
+  }
+
+  private chargeTitle(title: Prisma.JsonValue): string {
+    if (typeof title === 'string') return title;
+    if (title && typeof title === 'object' && !Array.isArray(title)) {
+      for (const locale of ['uz', 'ru', 'en']) {
+        if (typeof title[locale] === 'string') return title[locale];
+      }
+    }
+    throw new AppException(ErrorCode.VALIDATION_ERROR, 'Xizmat nomi topilmadi', 400);
   }
 }

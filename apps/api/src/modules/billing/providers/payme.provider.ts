@@ -60,13 +60,13 @@ export class PaymeProvider implements PaymentProvider {
   }
 
   verifyWebhook(req: WebhookRequest): boolean {
+    if (this.config.env.SINGLE_CLINIC_MODE) return false;
     const key = this.config.env.PAYME_KEY;
     const rawAuth = req.headers['authorization'];
     const auth = Array.isArray(rawAuth) ? rawAuth[0] : rawAuth;
     if (!key) {
-      // Sandbox-safe: no credentials configured — verify structurally and log.
-      this.logger.warn('PAYME_KEY not configured — structural webhook verification only (sandbox)');
-      return this.rpcOf(req.body).method !== '';
+      this.logger.warn('PAYME_KEY not configured — webhook rejected');
+      return false;
     }
     const expected = `Basic ${Buffer.from(`Paycom:${key}`).toString('base64')}`;
     return auth === expected;

@@ -5,16 +5,11 @@ import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { format, subDays } from 'date-fns';
-import type { Permission } from '@avishifo/shared';
+import type { ConsumablesKind, ConsumablesSource, Permission } from '@avishifo/shared';
 import { ApiError } from '@/lib/api-client';
 import { todayTashkent } from '@/lib/dates';
 import { useAuthStore } from '@/stores/auth-store';
-import {
-  reportsApi,
-  type ReportFilters,
-  type ReportGroupBy,
-  type RevenueDimension,
-} from './api';
+import { reportsApi, type ReportFilters, type ReportGroupBy, type RevenueDimension } from './api';
 
 // ------------------------------------------------------------- shared helpers
 
@@ -73,9 +68,9 @@ export function useReportFilters(): {
 } {
   const branchId = useAuthStore((s) => s.activeBranchId);
   const [state, setState] = useState<ReportFilterState>(() => ({
-    preset: 'month',
+    preset: 'today',
     groupBy: 'day',
-    ...presetRange('month'),
+    ...presetRange('today'),
   }));
 
   const filters = useMemo<ReportFilters>(
@@ -87,6 +82,24 @@ export function useReportFilters(): {
 }
 
 // ------------------------------------------------------------- report queries
+
+export function useConsumablesReport(
+  filters: ReportFilters,
+  kind?: ConsumablesKind,
+  source?: ConsumablesSource,
+) {
+  return useQuery({
+    queryKey: ['reports', 'consumables', { ...filters, kind, source }],
+    queryFn: () => reportsApi.consumables(filters, kind, source),
+  });
+}
+
+export function useCashflowReport(filters: ReportFilters, method?: 'CASH' | 'CARD' | 'CLICK') {
+  return useQuery({
+    queryKey: ['reports', 'cashflow', { ...filters, method }],
+    queryFn: () => reportsApi.cashflow(filters, method),
+  });
+}
 
 export function useRevenueReport(filters: ReportFilters, dimension: RevenueDimension) {
   return useQuery({

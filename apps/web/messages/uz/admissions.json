@@ -24,7 +24,7 @@
   "discharged": "Bemor chiqarildi",
   "dischargeHint": "Avval xizmatlar hisob-fakturaga kiritiladi, keyin to‘lov olinadi — shundan so‘ng kasallik tarixi yopiladi.",
   "addOrder": "Tayinlov qo‘shish",
-  "orderAdded": "Tayinlov qo‘shildi",
+  "orderAdded": "Tayinlov qo‘shildi va kassaga yuborildi",
   "addNote": "Kundalik yozish",
   "noteAdded": "Kundalik yozildi",
   "noNotes": "Kundalik yozuvlari yo‘q",
@@ -48,7 +48,8 @@
   "tabs": {
     "sheet": "Muolajalar varag‘i",
     "history": "Kasallik tarixi",
-    "notes": "Kundalik"
+    "notes": "Kundalik",
+    "charges": "Xarajatlar va hisob"
   },
   "sections": {
     "diagnoses": "Tashxislar",
@@ -111,5 +112,20 @@
   "removeTitle": "Kasallik tarixini o‘chirasizmi?",
   "removeHint": "Tarix, tayinlovlar va kundalik yozuvlar butunlay o‘chadi. Hisob-fakturaga kiritilgan xizmatlar saqlanib qoladi — ular bemorning to‘lov tarixi. Bu amalni ortga qaytarib bo‘lmaydi.",
   "removed": "Kasallik tarixi o‘chirildi",
-  "removedKeptInvoiced": "Tarix o‘chirildi. Hisob-fakturaga kiritilgan {count} ta xizmat saqlab qolindi."
+  "removedKeptInvoiced": "Tarix o‘chirildi. Hisob-fakturaga kiritilgan {count} ta xizmat saqlab qolindi.",
+  "directBilling": {
+    "hint": "Tayinlov va xarajatlar saqlanishi bilan kassaga avtomatik yuboriladi. Alohida olganini tasdiqlash shart emas.",
+    "total": "Kassaga yuboriladigan jami",
+    "checkFields": "Xizmat narxi, sana va muolajalar sonini tekshiring.",
+    "submit": "Qo‘shish va kassaga yuborish",
+    "quantity": "Jami miqdor",
+    "billing": "Hisob va to‘lov",
+    "awaitingPayment": "To‘lov kutilmoqda",
+    "paid": "To‘langan",
+    "noPending": "Statsionar bo‘yicha to‘lov kutilayotgan hisob yo‘q.",
+    "recorded": "Avval qayd etilgan: {given} berilgan, {skipped} olinmagan.",
+    "cancelled": "Xarajat bekor qilingan",
+    "legacy": "Avvalgi tayinlov — hisoblar Xarajatlar va hisob bo‘limida.",
+    "stopHint": "Tayinlov jadvali to‘xtatiladi. Kassaga yuborilgan hisob o‘zgarmaydi; summani tuzatish kerak bo‘lsa, hisob orqali bekor qilish yoki qaytarish rasmiylashtiriladi."
+  }
 }

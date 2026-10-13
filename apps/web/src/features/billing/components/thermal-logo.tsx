@@ -19,10 +19,12 @@ export function ThermalLogo({
   src,
   alt,
   className,
+  onReady,
 }: {
   src: string;
   alt: string;
   className?: string;
+  onReady?: () => void;
 }) {
   const [processed, setProcessed] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -92,6 +94,8 @@ export function ThermalLogo({
       src={processed ?? src}
       alt={alt}
       className={className}
+      onLoad={onReady}
+      onError={onReady}
       // Nearest-neighbour: any residual scaling must not blur the black edges
       // back into grey.
       style={{ imageRendering: 'pixelated' }}

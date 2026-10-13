@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { ChevronsUpDown, Stethoscope, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,10 @@ import { EmptyState } from '@/components/empty-state';
 import type { Icd10Item, VisitDiagnosis } from '../api';
 import { useAddDiagnosis, useIcd10Search, useRemoveDiagnosis } from '../hooks';
 
-function icd10Name(item: { nameUz: string; nameRu: string | null; nameEn: string | null }, locale: string): string {
+function icd10Name(
+  item: { nameUz: string; nameRu: string | null; nameEn: string | null },
+  locale: string,
+): string {
   if (locale === 'ru' && item.nameRu) return item.nameRu;
   if (locale === 'en' && item.nameEn) return item.nameEn;
   return item.nameUz;
@@ -33,10 +36,12 @@ export function DiagnosesSection({
   visitId,
   diagnoses,
   disabled,
+  onUnsavedChange,
 }: {
   visitId: string;
   diagnoses: VisitDiagnosis[];
   disabled: boolean;
+  onUnsavedChange?: (value: boolean) => void;
 }) {
   const t = useTranslations('visits');
   const tCommon = useTranslations('common');
@@ -52,6 +57,10 @@ export function DiagnosesSection({
   const { data: results, isFetching } = useIcd10Search(open ? search : '');
   const addDiagnosis = useAddDiagnosis(visitId);
   const removeDiagnosis = useRemoveDiagnosis(visitId);
+
+  useEffect(() => {
+    onUnsavedChange?.(Boolean(selected) || Boolean(note.trim()) || addDiagnosis.isPending);
+  }, [selected, note, addDiagnosis.isPending, onUnsavedChange]);
 
   const submit = () => {
     if (!selected) return;

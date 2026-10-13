@@ -22,7 +22,7 @@ async function login(page: Page, locale: string): Promise<void> {
 }
 
 for (const { code, loginTitle, dashboardMarker } of LOCALES) {
-  test(`${code}: login page localized, dashboard + queue render without crashes`, async ({
+  test(`${code}: login page localized, dashboard + reception render without crashes`, async ({
     page,
   }) => {
     const pageErrors: string[] = [];
@@ -34,12 +34,12 @@ for (const { code, loginTitle, dashboardMarker } of LOCALES) {
     await login(page, code);
     await expect(page.getByText(dashboardMarker).first()).toBeVisible({ timeout: 15_000 });
 
-    for (const route of ['queue', 'reception', 'patients', 'invoices']) {
+    for (const route of ['reception', 'doctor', 'patients', 'invoices']) {
       await page.goto(`/${code}/${route}`, { waitUntil: 'networkidle' });
       await expect(page.getByText('Application error', { exact: false })).toHaveCount(0);
     }
-    // Queue board must not leak raw enum ticket statuses.
-    await page.goto(`/${code}/queue`, { waitUntil: 'networkidle' });
+    // The reception queue must not leak raw enum ticket statuses.
+    await page.goto(`/${code}/reception`, { waitUntil: 'networkidle' });
     await expect(page.getByText(/\bWAITING\b/)).toHaveCount(0);
     await expect(page.getByText(/\bIN_ROOM\b/)).toHaveCount(0);
 

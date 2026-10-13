@@ -34,8 +34,11 @@ export function useInvalidateBilling(): () => void {
   const queryClient = useQueryClient();
   return useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    void queryClient.invalidateQueries({ queryKey: ['admission'] });
+    void queryClient.invalidateQueries({ queryKey: ['admission-discharge-check'] });
     void queryClient.invalidateQueries({ queryKey: ['shifts'] });
     void queryClient.invalidateQueries({ queryKey: ['debtors'] });
     void queryClient.invalidateQueries({ queryKey: ['balance'] });
+    void queryClient.invalidateQueries({ queryKey: ['reports'] });
   }, [queryClient]);
 }

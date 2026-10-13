@@ -34,6 +34,7 @@ const STAFF_ROLES: UserRole[] = [
   UserRole.CLINIC_ADMIN,
   UserRole.DOCTOR,
   UserRole.NURSE,
+  UserRole.OPERATING_ROOM,
   UserRole.RECEPTIONIST,
   UserRole.CASHIER,
   UserRole.LAB_TECH,
@@ -98,9 +99,7 @@ function StaffDirectory() {
         header: t('table.branches'),
         cell: ({ row }) =>
           row.original.branches.length > 0 ? (
-            <span className="text-sm">
-              {row.original.branches.map((b) => b.name).join(', ')}
-            </span>
+            <span className="text-sm">{row.original.branches.map((b) => b.name).join(', ')}</span>
           ) : (
             <span className="text-muted-foreground">—</span>
           ),

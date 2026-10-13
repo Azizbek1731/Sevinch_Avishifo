@@ -25,7 +25,9 @@
     "services": "Services",
     "queue": "Queue",
     "lab": "Laboratory",
-    "shifts": "Shifts"
+    "shifts": "Shifts",
+    "cashflow": "Cashflow",
+    "consumables": "Medicines & materials"
   },
   "empty": {
     "title": "No data",
@@ -140,5 +142,76 @@
       "OPEN": "Open",
       "CLOSED": "Closed"
     }
+  },
+  "cashflow": {
+    "allMethods": "All accounts",
+    "refresh": "Refresh",
+    "scope": "All cashiers in this branch · Tashkent time",
+    "explanation": "Payments and advance deposits count as inflows. Spending a patient’s advance on services is not counted again.",
+    "error": "Could not load the report. Check the dates and choose a period of up to 366 days.",
+    "inflow": "Total inflow",
+    "outflow": "Total outflow",
+    "net": "Net movement",
+    "inflowDetail": "Payments: {receipts} · Deposits: {deposits}",
+    "outflowDetail": "Refunds: {refunds} · Expenses: {expenses}",
+    "netDetail": "{count} transactions · inflow − outflow",
+    "accounts": "By account",
+    "currency": "UZS",
+    "method": "Account",
+    "receipts": "Payments",
+    "deposits": "Deposits",
+    "refunds": "Refunds",
+    "expenses": "Expenses",
+    "total": "Total",
+    "periods": "Movement by period",
+    "period": "Period start",
+    "categories": "Expense categories",
+    "category": "Category",
+    "datePolicy": "Payments, deposits and refunds use the transaction date in Tashkent; expenses use their entered accounting date. Voided payments and deleted expenses are excluded. Net movement excludes opening balances; close the day and reconcile balances in Cash desk → Shift.",
+    "legacyMethod": "{method} (legacy records)"
+  },
+  "consumables": {
+    "kindFilter": "Consumption type",
+    "sourceFilter": "Consumption source",
+    "allKinds": "All types",
+    "allSources": "All departments",
+    "kinds": {
+      "MEDICINE": "Medicine",
+      "MATERIAL": "Material"
+    },
+    "sources": {
+      "SURGERY": "Surgery",
+      "INPATIENT": "Inpatient",
+      "OUTPATIENT": "Outpatient"
+    },
+    "scope": "Selected branch · Tashkent time",
+    "explanation": "Recorded use of medicines, bandages, syringes and other materials. Amounts use patient tariffs, not purchase costs or cash disbursements.",
+    "error": "Unable to load consumption. Check the dates and a range of no more than 366 days, then refresh.",
+    "actualAmount": "Consumption amount",
+    "tariffHint": "At recorded patient tariffs",
+    "itemCount": "Distinct items",
+    "itemCountHint": "Medicine and material types",
+    "entries": "Consumption records",
+    "entriesHint": "Number of recorded entries",
+    "orderedAmount": "Ordered — separate",
+    "orderedCount": "{count} order records",
+    "emptyTitle": "No consumption recorded",
+    "items": "By medicine and material · UZS",
+    "manual": "Manually entered",
+    "columns": {
+      "name": "Name / code",
+      "kind": "Type",
+      "unit": "Unit",
+      "quantity": "Consumed",
+      "amount": "Consumption amount",
+      "orderedQuantity": "Ordered quantity",
+      "orderedAmount": "Order amount"
+    },
+    "periods": "Consumption by period · UZS",
+    "units": "Quantity by unit",
+    "unitsHint": "Different measurement units are not added together.",
+    "orderedPolicy": "Inpatient orders billed in advance appear separately. They are excluded from consumption amounts and do not confirm administration. The original ordered quantity remains unchanged after consumption is recorded.",
+    "datePolicy": "Surgery consumption uses its entry date, other charges use their accounting date, and administrations use the date given. Cancelled charges are excluded.",
+    "catalogHint": "Manually entered surgery medicines and materials are included. In other departments, select the appropriate catalog item; unclassified free-text charges are excluded."
   }
 }

@@ -80,7 +80,8 @@
     "CASHIER": "Kassir",
     "LAB_TECH": "Laborant",
     "ACCOUNTANT": "Buxgalter",
-    "PATIENT": "Bemor"
+    "PATIENT": "Bemor",
+    "OPERATING_ROOM": "Operatsion xodim"
   },
   "method": {
     "CASH": "Naqd",
@@ -120,7 +121,10 @@
     "ULTRASOUND": "UTT",
     "PROCEDURE": "Muolaja",
     "DIAGNOSTICS": "Diagnostika",
-    "OTHER": "Boshqa"
+    "OTHER": "Boshqa",
+    "SURGERY": "Operatsiya",
+    "MATERIAL": "Sarf materiallari",
+    "MEDICINE": "Dorilar"
   },
   "discount": {
     "PERCENT": "Foiz",

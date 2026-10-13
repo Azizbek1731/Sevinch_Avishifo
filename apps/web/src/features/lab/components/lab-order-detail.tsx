@@ -2,9 +2,24 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
-import { ArrowLeft, CheckCheck, CheckCircle2, FileDown, FlaskConical, Play, Printer, Syringe } from 'lucide-react';
-import { Gender, LabOrderStatus, PhysiologicalState, formatPhone } from '@avishifo/shared';
+import { useLocale, useTranslations } from 'next-intl';
+import {
+  ArrowLeft,
+  CheckCheck,
+  CheckCircle2,
+  FileDown,
+  FlaskConical,
+  Play,
+  Printer,
+  Syringe,
+} from 'lucide-react';
+import {
+  Gender,
+  LabOrderStatus,
+  PhysiologicalState,
+  formatPhone,
+  formatUZS,
+} from '@avishifo/shared';
 import { Link } from '@/i18n/routing';
 import { formatDate, formatTz } from '@/lib/dates';
 import { useSocketEvent } from '@/hooks/use-socket';
@@ -30,6 +45,7 @@ import {
   useSetOrderContext,
   useUpdateOrderStatus,
 } from '../hooks';
+import { hasUnpaidLabWork } from '../lib';
 import { OrderItemCard } from './order-item-card';
 import { OrderAttachments } from './order-attachments';
 import { toast } from 'sonner';
@@ -44,11 +60,13 @@ const LOCKED_STATUSES: readonly LabOrderStatus[] = [
 export function LabOrderDetail({ id }: { id: string }) {
   const t = useTranslations('lab');
   const tc = useTranslations('common');
+  const locale = useLocale();
   const queryClient = useQueryClient();
 
   const canWrite = useHasPermission('lab.orders.write');
   const canEnterResults = useHasPermission('lab.results.write');
   const canApprove = useHasPermission('lab.results.approve');
+  const canReadInvoice = useHasPermission('invoices.read');
 
   const orderQuery = useLabOrder(id);
   const updateStatus = useUpdateOrderStatus();
@@ -63,6 +81,9 @@ export function LabOrderDetail({ id }: { id: string }) {
     if (p.order.id === id) {
       void queryClient.invalidateQueries({ queryKey: ['lab', 'order', id] });
     }
+  });
+  useSocketEvent('invoice.paid', () => {
+    void queryClient.invalidateQueries({ queryKey: ['lab', 'order', id] });
   });
 
   if (orderQuery.isLoading) {
@@ -93,8 +114,12 @@ export function LabOrderDetail({ id }: { id: string }) {
     );
   }
 
-  const allResulted = order.items.length > 0 && order.items.every((it) => it.result !== null);
-  const locked = LOCKED_STATUSES.includes(order.status);
+  const allResulted = order.items.length > 0 && order.items.every((it) => it.complete);
+  const signed =
+    order.status === LabOrderStatus.APPROVED || order.status === LabOrderStatus.DELIVERED;
+  const locked = LOCKED_STATUSES.includes(order.status) || !order.canWork;
+  const resultEntryLocked = locked || order.status === LabOrderStatus.ORDERED;
+  const signedAt = order.items.find((item) => item.result?.approvedAt)?.result?.approvedAt;
 
   return (
     <div className="space-y-4">
@@ -108,19 +133,17 @@ export function LabOrderDetail({ id }: { id: string }) {
             {tc('back')}
           </Link>
         </Button>
-        {canWrite && order.status === LabOrderStatus.ORDERED ? (
+        {canEnterResults && order.canWork && order.status === LabOrderStatus.ORDERED ? (
           <Button
             variant="outline"
             disabled={updateStatus.isPending}
-            onClick={() =>
-              updateStatus.mutate({ id, status: LabOrderStatus.SPECIMEN_COLLECTED })
-            }
+            onClick={() => updateStatus.mutate({ id, status: LabOrderStatus.SPECIMEN_COLLECTED })}
           >
             <Syringe className="h-4 w-4" />
             {t('actionCollect')}
           </Button>
         ) : null}
-        {canWrite && order.status === LabOrderStatus.SPECIMEN_COLLECTED ? (
+        {canEnterResults && order.canWork && order.status === LabOrderStatus.SPECIMEN_COLLECTED ? (
           <Button
             variant="outline"
             disabled={updateStatus.isPending}
@@ -130,7 +153,7 @@ export function LabOrderDetail({ id }: { id: string }) {
             {t('actionStart')}
           </Button>
         ) : null}
-        {canApprove && order.status === LabOrderStatus.RESULTED && allResulted ? (
+        {canApprove && order.canWork && order.status === LabOrderStatus.RESULTED && allResulted ? (
           <Button disabled={approve.isPending} onClick={() => setApproveOpen(true)}>
             <CheckCircle2 className="h-4 w-4" />
             {t('approve')}
@@ -151,33 +174,66 @@ export function LabOrderDetail({ id }: { id: string }) {
         {/* Before any result exists the PDF is an empty table with an
             "unapproved" stamp — nothing anyone would hand to a patient. */}
         {(
-          [LabOrderStatus.RESULTED, LabOrderStatus.APPROVED, LabOrderStatus.DELIVERED] as LabOrderStatus[]
+          [
+            LabOrderStatus.RESULTED,
+            LabOrderStatus.APPROVED,
+            LabOrderStatus.DELIVERED,
+          ] as LabOrderStatus[]
         ).includes(order.status) ? (
-        <Button
-          variant="outline"
-          disabled={pdfBusy}
-          onClick={async () => {
-            setPdfBusy(true);
-            try {
-              const blob = await api.get<Blob>(`/lab-orders/${id}/pdf`);
-              const url = URL.createObjectURL(blob.data);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `natija-${order.orderNumber}.pdf`;
-              a.click();
-              URL.revokeObjectURL(url);
-            } catch {
-              toast.error(t('pdfFailed'));
-            } finally {
-              setPdfBusy(false);
-            }
-          }}
-        >
-          <FileDown className="h-4 w-4" />
-          PDF
-        </Button>
+          <Button
+            variant="outline"
+            disabled={pdfBusy}
+            onClick={async () => {
+              setPdfBusy(true);
+              try {
+                const blob = await api.get<Blob>(`/lab-orders/${id}/pdf`, { locale });
+                const url = URL.createObjectURL(blob.data);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `natija-${order.orderNumber}.pdf`;
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch {
+                toast.error(t('pdfFailed'));
+              } finally {
+                setPdfBusy(false);
+              }
+            }}
+          >
+            <FileDown className="h-4 w-4" />
+            PDF
+          </Button>
         ) : null}
       </PageHeader>
+
+      {order.billing && hasUnpaidLabWork(order) ? (
+        <Card className="border-warning/50 bg-warning/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div>
+              <p className="font-semibold">{t('paymentWaiting')}</p>
+              <p className="text-sm text-muted-foreground">
+                {t('paymentRequiredHint', {
+                  number: order.billing.number,
+                  amount: formatUZS(order.billing.due),
+                })}
+              </p>
+            </div>
+            {canReadInvoice ? (
+              <Button asChild variant="outline">
+                <Link href={`/invoices/${order.billing.invoiceId}`}>{t('openInvoice')}</Link>
+              </Button>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+      {signed && signedAt ? (
+        <p className="rounded-md border border-success/30 bg-success/5 p-3 text-sm">
+          {t('signedResultHint', { date: formatTz(signedAt) })}
+        </p>
+      ) : null}
+      {!locked && order.status === LabOrderStatus.ORDERED ? (
+        <p className="text-sm text-muted-foreground">{t('collectBeforeResults')}</p>
+      ) : null}
 
       <Card>
         <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 py-4">
@@ -240,17 +296,23 @@ export function LabOrderDetail({ id }: { id: string }) {
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
-        {order.items.map((item) => (
-          <OrderItemCard key={item.id} item={item} locked={locked} canEnter={canEnterResults} />
-        ))}
-      </div>
-
       <OrderAttachments
         orderId={id}
         attachments={order.attachments ?? []}
-        canUpload={canEnterResults && !locked}
+        canUpload={canEnterResults && !resultEntryLocked}
       />
+
+      <div className="space-y-4">
+        {order.items.map((item) => (
+          <OrderItemCard
+            key={`${item.id}:${item.result?.updatedAt ?? 'new'}`}
+            item={item}
+            locked={resultEntryLocked}
+            canEnter={canEnterResults}
+            attachments={order.attachments ?? []}
+          />
+        ))}
+      </div>
 
       <ConfirmDialog
         open={approveOpen}

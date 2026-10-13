@@ -42,10 +42,9 @@ export const referenceRangeSchema = z
     ageMinY: z.number().min(0).optional(),
     ageMaxY: z.number().min(0).optional(),
   })
-  .refine(
-    (r) => r.low === undefined || r.high === undefined || r.low <= r.high,
-    { message: 'low must not exceed high' },
-  )
+  .refine((r) => r.low === undefined || r.high === undefined || r.low <= r.high, {
+    message: 'low must not exceed high',
+  })
   .refine(
     (r) => r.ageMinDays === undefined || r.ageMaxDays === undefined || r.ageMinDays < r.ageMaxDays,
     { message: 'ageMinDays must be below ageMaxDays' },
@@ -122,17 +121,44 @@ export const updateLabOrderStatusSchema = z.object({
 });
 export type UpdateLabOrderStatusInput = z.infer<typeof updateLabOrderStatusSchema>;
 
-export const enterLabResultsSchema = z.object({
-  values: z
-    .array(
-      z.object({
-        parameterId: idSchema,
-        value: z.string().min(1),
-      }),
-    )
-    .min(1),
-  note: z.string().optional(),
-});
+export const enterLabResultsSchema = z
+  .object({
+    values: z
+      .array(
+        z.object({
+          parameterId: idSchema,
+          value: z.string().trim().min(1).max(2000),
+        }),
+      )
+      .default([]),
+    /** An uploaded report can replace manual parameter entry for this test. */
+    reportDocumentId: idSchema.nullable().optional(),
+    note: z.string().trim().max(4000).optional(),
+  })
+  .superRefine((input, ctx) => {
+    if (input.values.length === 0 && !input.reportDocumentId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['values'],
+        message: 'Enter values or select a report file',
+      });
+    }
+    if (input.reportDocumentId && input.values.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['reportDocumentId'],
+        message: 'Use parameter values or a report file, not both',
+      });
+    }
+    const ids = input.values.map((value) => value.parameterId);
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['values'],
+        message: 'Duplicate parameter',
+      });
+    }
+  });
 export type EnterLabResultsInput = z.infer<typeof enterLabResultsSchema>;
 
 export const labOrderQuerySchema = paginationQuerySchema.extend({
@@ -140,6 +166,12 @@ export const labOrderQuerySchema = paginationQuerySchema.extend({
   branchId: idSchema.optional(),
   /** One patient's orders — the patient card's lab tab. */
   patientId: idSchema.optional(),
+  /** Reception/history can inspect orders still waiting for cashier payment. */
+  includeUnpaid: z
+    .enum(['true', 'false'])
+    .transform((v) => v === 'true')
+    .or(z.boolean())
+    .optional(),
   from: isoDateTimeSchema.optional(),
   to: isoDateTimeSchema.optional(),
   search: z.string().min(1).optional(),

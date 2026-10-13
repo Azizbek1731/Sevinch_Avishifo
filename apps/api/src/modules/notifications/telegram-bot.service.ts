@@ -16,6 +16,13 @@ import { StorageService } from '../../core/storage/storage.service';
 import { RESULT_PDF_INCLUDE, buildResultPdfData } from '../lab/result-pdf.data';
 import { ResultPdfService } from '../lab/result-pdf.service';
 import { NotificationsService } from './notifications.service';
+import {
+  TelegramPatientAccessService,
+  type TelegramPatientAccessResult,
+} from './telegram-patient-access.service';
+import { VisitReportPdfService } from '../visits/visit-report-pdf.service';
+import { VISIT_REPORT_INCLUDE, buildVisitReportPdfData } from '../visits/visit-report.data';
+import { patientDocumentVisibility } from '../patients/patient-document-access';
 
 /** Buttons a linked patient sees. */
 const PATIENT_BUTTONS = [
@@ -58,13 +65,29 @@ function keyboardFor(identity: ChatIdentity): Keyboard {
 }
 
 /** Keyboard shown before the chat is bound to anything. */
-const CONTACT_KEYBOARD = new Keyboard()
-  .requestContact('📱 Raqamni yuborish')
-  .resized()
-  .oneTime();
+const CONTACT_KEYBOARD = new Keyboard().requestContact('📱 Raqamni yuborish').resized().oneTime();
 
 /** Patient-only keyboard, re-sent alongside patient answers. */
 const PATIENT_KEYBOARD = keyboardFor({ patientIds: ['x'], staff: null });
+const CLINIC_PATIENT_KEYBOARD = new Keyboard()
+  .text('🧪 Tahlillarim')
+  .text('🩻 UZI natijalarim')
+  .row()
+  .text('🩺 Shifokor xulosalari')
+  .text('📄 Hujjatlarim')
+  .row()
+  .text('👤 Mening ma’lumotlarim')
+  .text('🔄 Yangilash')
+  .row()
+  .text('ℹ️ Yordam')
+  .resized()
+  .persistent();
+const WAITING_PATIENT_KEYBOARD = new Keyboard()
+  .requestContact('📱 Raqamni yuborish')
+  .row()
+  .text('🔄 Yangilash')
+  .text('ℹ️ Yordam')
+  .resized();
 
 /** Pick a display name from a multilingual Json name ({ uz, ru, en }). */
 function pickName(name: unknown): string {
@@ -75,14 +98,6 @@ function pickName(name: unknown): string {
     }
   }
   return typeof name === 'string' ? name : '';
-}
-
-/** Short Uzbek label for an abnormal lab flag. */
-function flagLabel(flag: string): string {
-  if (flag === 'HIGH') return 'yuqori';
-  if (flag === 'LOW') return 'past';
-  if (flag === 'ABNORMAL') return 'chetlangan';
-  return '';
 }
 
 /**
@@ -110,19 +125,50 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     private readonly notifications: NotificationsService,
     private readonly storage: StorageService,
     private readonly resultPdf: ResultPdfService,
+    private readonly patientAccess: TelegramPatientAccessService,
+    private readonly visitReportPdf: VisitReportPdfService,
   ) {}
+
+  private get patientOnly(): boolean {
+    return this.config.env?.SINGLE_CLINIC_MODE === true;
+  }
+
+  private get patientKeyboard(): Keyboard {
+    return this.patientOnly ? CLINIC_PATIENT_KEYBOARD : PATIENT_KEYBOARD;
+  }
 
   onModuleInit(): void {
     const { TELEGRAM_ENABLED, TELEGRAM_BOT_TOKEN } = this.config.env;
     if (!TELEGRAM_ENABLED || !TELEGRAM_BOT_TOKEN) return;
     this.bot = new Bot(TELEGRAM_BOT_TOKEN);
     this.registerHandlers(this.bot);
-    this.bot.catch((err) => this.logger.error(`telegram bot error: ${err.message}`));
+    this.bot.catch(async (error) => {
+      this.logger.error('Telegram update could not be processed');
+      if (error.ctx.chat?.type === 'private' && error.ctx.chat.id === error.ctx.from?.id) {
+        await error.ctx
+          .reply('So‘rovni bajarib bo‘lmadi. Birozdan keyin /menu orqali qayta urinib ko‘ring.')
+          .catch(() => undefined);
+      }
+    });
     // Long polling must not block Nest bootstrap — fire and forget.
     void this.bot
-      .start({ drop_pending_updates: true })
-      .catch((err: unknown) => this.logger.error(`telegram bot stopped: ${String(err)}`));
-    this.logger.log('Telegram bot long polling started');
+      .start({
+        drop_pending_updates: false,
+        onStart: async (info) => {
+          this.logger.log(`Telegram patient bot @${info.username} is listening`);
+          await this.bot?.api
+            .setMyCommands([
+              { command: 'start', description: 'Telefon orqali bemor kartasiga ulanish' },
+              { command: 'menu', description: 'Natijalar va hujjatlar' },
+              { command: 'help', description: 'Foydalanish bo‘yicha yordam' },
+              { command: 'unlink', description: 'Bemor kartasidan uzilish' },
+            ])
+            .catch(() => this.logger.warn('Telegram command menu could not be updated'));
+        },
+      })
+      .catch(() =>
+        this.logger.error('Telegram bot stopped; check its token and polling connection'),
+      );
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -130,29 +176,76 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   private registerHandlers(bot: Bot): void {
+    // Contact sharing and medical documents belong only in a person's private
+    // conversation. Never resolve or send PHI in a group/channel or inline chat.
+    bot.use(async (ctx, next) => {
+      if (ctx.chat?.type !== 'private' || ctx.chat.id !== ctx.from?.id) return;
+      await next();
+    });
     bot.command('start', (ctx) => this.handleStart(ctx));
     bot.command('menu', (ctx) => this.handleMenu(ctx));
     bot.command('unlink', (ctx) => this.handleUnlink(ctx));
+    bot.command('help', (ctx) => this.handleHelp(ctx));
     bot.on('message:contact', (ctx) => this.handleContact(ctx));
     // Patient
-    bot.hears('📅 Qabullarim', (ctx) => this.handleMyAppointments(ctx));
-    bot.hears('🕐 Navbatim', (ctx) => this.handleMyQueue(ctx));
     bot.hears('🧪 Tahlillarim', (ctx) => this.handleMyResults(ctx));
     bot.hears('📄 Hujjatlarim', (ctx) => this.handleMyDocuments(ctx));
-    bot.hears('📋 Kasallik tarixim', (ctx) => this.handleMyHistory(ctx));
-    // Clinic owner / admin
-    bot.hears('📊 Bugungi holat', (ctx) => this.handleClinicToday(ctx));
-    bot.hears('👥 Navbat holati', (ctx) => this.handleClinicQueue(ctx));
-    // Platform super-admin
-    bot.hears('🏥 Klinikalar', (ctx) => this.handlePlatformClinics(ctx));
-    bot.hears('🆕 Yangi ro‘yxatdan o‘tganlar', (ctx) => this.handlePlatformSignups(ctx));
-    bot.callbackQuery(/^(confirm|cancel):(.+)$/, (ctx) => this.handleAppointmentAction(ctx));
+    bot.hears('🩻 UZI natijalarim', (ctx) => this.handleDocumentList(ctx, 'ultrasound', 0));
+    bot.hears('🩺 Shifokor xulosalari', (ctx) => this.handleDocumentList(ctx, 'consultation', 0));
+    bot.hears('👤 Mening ma’lumotlarim', (ctx) => this.handlePatientProfile(ctx));
+    bot.hears('🔄 Yangilash', (ctx) => this.handleMenu(ctx));
+    bot.hears('ℹ️ Yordam', (ctx) => this.handleHelp(ctx));
+    if (!this.patientOnly) {
+      bot.hears('📅 Qabullarim', (ctx) => this.handleMyAppointments(ctx));
+      bot.hears('🕐 Navbatim', (ctx) => this.handleMyQueue(ctx));
+      bot.hears('📋 Kasallik tarixim', (ctx) => this.handleMyHistory(ctx));
+      // Clinic owner / admin
+      bot.hears('📊 Bugungi holat', (ctx) => this.handleClinicToday(ctx));
+      bot.hears('👥 Navbat holati', (ctx) => this.handleClinicQueue(ctx));
+      // Platform super-admin
+      bot.hears('🏥 Klinikalar', (ctx) => this.handlePlatformClinics(ctx));
+      bot.hears('🆕 Yangi ro‘yxatdan o‘tganlar', (ctx) => this.handlePlatformSignups(ctx));
+      bot.callbackQuery(/^(confirm|cancel):(.+)$/, (ctx) => this.handleAppointmentAction(ctx));
+    }
     // A ready lab result as a PDF document.
-    bot.callbackQuery(/^labpdf:(.+)$/, (ctx) => this.handleResultPdf(ctx, ctx.match[1] ?? ''));
+    bot.callbackQuery(/^labpdf:([0-9a-f-]{36})$/, (ctx) =>
+      this.handleResultPdf(ctx, ctx.match[1] ?? ''),
+    );
+    bot.callbackQuery(/^docs:(lab|ultrasound|consultation|files):(\d+)$/, (ctx) =>
+      this.handleDocumentList(
+        ctx,
+        ctx.match[1] as 'lab' | 'ultrasound' | 'consultation' | 'files',
+        Number(ctx.match[2]),
+      ),
+    );
+    bot.callbackQuery(/^docfile:([0-9a-f-]{36})$/, (ctx) =>
+      this.handleDocumentFile(ctx, ctx.match[1] ?? ''),
+    );
+    bot.callbackQuery(/^visitpdf:([0-9a-f-]{36})$/, (ctx) =>
+      this.handleVisitReportPdf(ctx, ctx.match[1] ?? ''),
+    );
     // Patient asks a clinic to release their history.
-    bot.callbackQuery(/^ra_req:(.+)$/, (ctx) => this.handleHistoryRequest(ctx));
+    if (!this.patientOnly)
+      bot.callbackQuery(/^ra_req:(.+)$/, (ctx) => this.handleHistoryRequest(ctx));
     // Doctor / clinic admin decides, straight from the notification.
-    bot.callbackQuery(/^ra_(ok|no):(.+)$/, (ctx) => this.handleHistoryDecision(ctx));
+    if (!this.patientOnly)
+      bot.callbackQuery(/^ra_(ok|no):(.+)$/, (ctx) => this.handleHistoryDecision(ctx));
+    if (this.patientOnly) {
+      bot.on('callback_query:data', async (ctx) => {
+        await ctx.answerCallbackQuery({ text: 'Menyuni yangilash uchun /menu bosing.' });
+      });
+      bot.on('message:text', async (ctx) => {
+        const linked = (await this.patientAccess.resolve(ctx.chat.id)).status === 'LINKED';
+        await ctx.reply(
+          linked
+            ? 'Kerakli bo‘limni pastdagi menyudan tanlang. Yordam uchun /help bosing.'
+            : 'Telefon raqamini qo‘lda yozish o‘rniga «📱 Raqamni yuborish» tugmasini bosing. Natijalar uchun /menu, yordam uchun /help.',
+          {
+            reply_markup: linked ? CLINIC_PATIENT_KEYBOARD : WAITING_PATIENT_KEYBOARD,
+          },
+        );
+      });
+    }
   }
 
   // ------------------------------------------------------------ identity
@@ -166,18 +259,17 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
    * lookup is keyed by the chat's own id, never by user-supplied input.
    */
   private async identify(chatId: number): Promise<ChatIdentity> {
+    if (this.patientOnly)
+      return { patientIds: await this.patientAccess.patientIds(chatId), staff: null };
     const chat = String(chatId);
     const [links, staff] = await Promise.all([
-      this.prisma.unscoped.telegramLink.findMany({
-        where: { chatId: chat, isActive: true },
-        select: { patientId: true },
-      }),
+      this.patientAccess.patientIds(chatId),
       this.prisma.unscoped.user.findFirst({
         where: { telegramChatId: chat, deletedAt: null, status: 'ACTIVE' },
         select: { id: true, clinicId: true, role: true, fullName: true },
       }),
     ]);
-    return { patientIds: links.map((l) => l.patientId), staff };
+    return { patientIds: links, staff };
   }
 
   private roleLabel(role: string): string {
@@ -203,6 +295,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
   /** Re-send the menu for whoever this chat is. */
   private async handleMenu(ctx: Context): Promise<void> {
+    if (this.patientOnly) return this.replyPatientHome(ctx);
     const chatId = ctx.chat?.id;
     if (chatId === undefined) return;
     const identity = await this.identify(chatId);
@@ -219,6 +312,16 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   private async handleUnlink(ctx: Context): Promise<void> {
     const chatId = ctx.chat?.id;
     if (chatId === undefined) return;
+    if (this.patientOnly) {
+      await this.patientAccess.unlink(chatId);
+      await ctx.reply(
+        'Bemor kartangiz bilan bog‘lanish uzildi. Qayta ulanish uchun /start bosing.',
+        {
+          reply_markup: { remove_keyboard: true },
+        },
+      );
+      return;
+    }
     const chat = String(chatId);
     await Promise.all([
       this.prisma.unscoped.telegramLink.updateMany({
@@ -252,8 +355,63 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
   // ------------------------------------------------------------ linking
 
+  private async replyPatientHome(
+    ctx: Context,
+    resolved?: TelegramPatientAccessResult,
+  ): Promise<void> {
+    if (ctx.chat?.id === undefined) return;
+    const access = resolved ?? (await this.patientAccess.resolve(ctx.chat.id));
+    if (access.status === 'LINKED') {
+      await ctx.reply(
+        `Bemor kartangiz ulandi ✅\n\n${access.patients.map((p) => `${p.fullName}\nKarta: ${p.mrn}`).join('\n\n')}\n\nKerakli bo‘limni tanlang. Tasdiqlangan natija va xulosalarni PDF ko‘rinishida olishingiz mumkin.`,
+        {
+          reply_markup: CLINIC_PATIENT_KEYBOARD,
+        },
+      );
+      return;
+    }
+    const messages = {
+      UNLINKED:
+        'Assalomu alaykum! Klinikaning bemorlar botiga xush kelibsiz.\n\nUlanish uchun pastdagi «📱 Raqamni yuborish» tugmasini bosing. Telegram raqamingiz qabulxonada bemor kartasiga kiritilgan asosiy telefon bilan bir xil bo‘lishi kerak.',
+      NOT_FOUND:
+        'Telefon raqamingiz tasdiqlandi ✅\n\nHozircha klinikada shu raqamga bemor kartasi topilmadi. Qabulxonadan kartangizdagi asosiy telefonni tekshirishni so‘rang, keyin «🔄 Yangilash»ni bosing. Raqamni qayta yuborishingiz shart emas.',
+      AMBIGUOUS:
+        'Bu telefon raqami bir nechta bemor kartasida ko‘rsatilgan. Ma’lumotlarni to‘g‘ri ulash uchun qabulxonaga murojaat qiling. Tuzatilgach «🔄 Yangilash»ni bosing.',
+      UNAVAILABLE:
+        'Hozir bemor kartasiga ulanib bo‘lmadi. Birozdan keyin «🔄 Yangilash»ni bosing yoki qabulxonaga murojaat qiling.',
+    };
+    await ctx.reply(messages[access.status], { reply_markup: WAITING_PATIENT_KEYBOARD });
+  }
+
+  private async handlePatientProfile(ctx: Context): Promise<void> {
+    if (ctx.chat?.id === undefined) return;
+    const access = await this.patientAccess.resolve(ctx.chat.id);
+    if (access.status !== 'LINKED') return this.replyPatientHome(ctx, access);
+    await ctx.reply(
+      access.patients
+        .map((p) =>
+          [
+            '👤 Mening ma’lumotlarim',
+            p.fullName,
+            `Bemor kartasi: ${p.mrn}`,
+            `Telefon: ${p.phone ?? '—'}`,
+            `Tug‘ilgan sana: ${p.dob ? formatInTimeZone(p.dob, TIMEZONE, 'dd.MM.yyyy') : '—'}`,
+          ].join('\n'),
+        )
+        .join('\n\n') + '\n\nMa’lumotda xato bo‘lsa, qabulxonaga murojaat qiling.',
+      { reply_markup: this.patientKeyboard },
+    );
+  }
+
+  private async handleHelp(ctx: Context): Promise<void> {
+    await ctx.reply(
+      'ℹ️ Botdan foydalanish\n\n1. /start ni bosing va «📱 Raqamni yuborish» orqali o‘z raqamingizni yuboring.\n2. Raqam qabulxonada kiritilgan asosiy telefon bilan mos bo‘lsa, kartangiz avtomatik ulanadi.\n3. Laboratoriya, UZI yoki shifokor xulosasini tanlab, kerakli PDFni oling. Natija tasdiqlangandan keyin ko‘rinadi.\n\n/menu — bo‘limlarni ochish\n/unlink — kartadan uzilish\n\nRaqam mos kelmasa yoki bir nechta kartada ishlatilsa, qabulxonaga murojaat qiling.',
+    );
+  }
+
   /** /start — with a deep-link payload, consume a web link token; else ask for a contact. */
   private async handleStart(ctx: Context): Promise<void> {
+    if (this.patientOnly) return this.replyPatientHome(ctx);
     const payload = typeof ctx.match === 'string' ? ctx.match.trim() : '';
     if (payload) {
       await this.handleLinkToken(ctx, payload);
@@ -289,17 +447,21 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       );
       return;
     }
-    await this.prisma.unscoped.portalLinkToken.update({
-      where: { id: link.id },
+    const claimed = await this.prisma.unscoped.portalLinkToken.updateMany({
+      where: { id: link.id, usedAt: null, expiresAt: { gt: new Date() } },
       data: { usedAt: new Date() },
     });
+    if (claimed.count !== 1) {
+      await ctx.reply('Ulash havolasi eskirgan yoki ishlatilgan. Portaldan yangi havola oling.');
+      return;
+    }
     const cards = await this.bindChat(chatId, link.phone, ctx.from?.username ?? null);
     const tail =
       cards === 0
         ? ' Hozircha biriktirilgan bemor kartangiz yo‘q — klinikaga tashrifingizdan so‘ng ma’lumotlar ko‘rinadi.'
         : '';
     await ctx.reply(`Akkauntingiz Telegram bilan bog‘landi ✅${tail}`, {
-      reply_markup: PATIENT_KEYBOARD,
+      reply_markup: this.patientKeyboard,
     });
   }
 
@@ -329,6 +491,15 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         reply_markup: CONTACT_KEYBOARD,
       });
       return;
+    }
+
+    if (this.patientOnly) {
+      const access = await this.patientAccess.linkContact(
+        chatId,
+        phone,
+        ctx.from?.username ?? null,
+      );
+      return this.replyPatientHome(ctx, access);
     }
 
     await this.bindChat(chatId, phone, ctx.from?.username ?? null);
@@ -386,46 +557,13 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    // A Telegram chat maps to at most one account: release the chatId from any
-    // other phone first (re-linking to a different number), then bind it here.
-    await this.prisma.unscoped.portalAccount.updateMany({
-      where: { telegramChatId: chat, phone: { not: phone } },
-      data: { telegramChatId: null, telegramUsername: null, telegramLinkedAt: null },
-    });
-    await this.prisma.unscoped.portalAccount.upsert({
-      where: { phone },
-      update: { telegramChatId: chat, telegramUsername: username, telegramLinkedAt: new Date() },
-      create: {
-        phone,
-        phoneVerifiedAt: new Date(),
-        telegramChatId: chat,
-        telegramUsername: username,
-        telegramLinkedAt: new Date(),
-      },
-    });
-
-    // Per-clinic routing links for outbound notifications.
-    const patients = await this.prisma.unscoped.patient.findMany({
-      where: { OR: [{ phone }, { phoneAlt: phone }], deletedAt: null },
-      select: { id: true, clinicId: true },
-    });
-    for (const patient of patients) {
-      await this.prisma.unscoped.telegramLink.upsert({
-        where: { clinicId_chatId: { clinicId: patient.clinicId, chatId: chat } },
-        update: { patientId: patient.id, phone, isActive: true },
-        create: { clinicId: patient.clinicId, patientId: patient.id, chatId: chat, phone },
-      });
-    }
-    return patients.length;
+    const access = await this.patientAccess.linkContact(chatId, phone, username);
+    return access.patients.length;
   }
 
   /** Active links for this chat across clinics (unscoped — cross-clinic bot). */
   private async linkedPatientIds(chatId: number): Promise<string[]> {
-    const links = await this.prisma.unscoped.telegramLink.findMany({
-      where: { chatId: String(chatId), isActive: true },
-      select: { patientId: true },
-    });
-    return links.map((l) => l.patientId);
+    return this.patientAccess.patientIds(chatId);
   }
 
   // ------------------------------------------------------------ commands
@@ -451,14 +589,16 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       include: { doctor: { select: { fullName: true } } },
     });
     if (appointments.length === 0) {
-      await ctx.reply('Yaqin kunlarda qabullaringiz yo‘q.', { reply_markup: PATIENT_KEYBOARD });
+      await ctx.reply('Yaqin kunlarda qabullaringiz yo‘q.', { reply_markup: this.patientKeyboard });
       return;
     }
     const lines = appointments.map(
       (a) =>
         `📅 ${formatInTimeZone(a.startAt, TIMEZONE, 'dd.MM.yyyy HH:mm')} — ${a.doctor.fullName}`,
     );
-    await ctx.reply(`Yaqin qabullaringiz:\n${lines.join('\n')}`, { reply_markup: PATIENT_KEYBOARD });
+    await ctx.reply(`Yaqin qabullaringiz:\n${lines.join('\n')}`, {
+      reply_markup: this.patientKeyboard,
+    });
   }
 
   private async handleMyQueue(ctx: Context): Promise<void> {
@@ -481,7 +621,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       orderBy: { createdAt: 'asc' },
     });
     if (tickets.length === 0) {
-      await ctx.reply('Bugun faol navbatingiz yo‘q.', { reply_markup: PATIENT_KEYBOARD });
+      await ctx.reply('Bugun faol navbatingiz yo‘q.', { reply_markup: this.patientKeyboard });
       return;
     }
     const lines: string[] = [];
@@ -496,62 +636,11 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       });
       lines.push(`🎫 ${number} — oldingizda ${ahead} kishi bor.`);
     }
-    await ctx.reply(lines.join('\n'), { reply_markup: PATIENT_KEYBOARD });
+    await ctx.reply(lines.join('\n'), { reply_markup: this.patientKeyboard });
   }
 
   private async handleMyResults(ctx: Context): Promise<void> {
-    const chatId = ctx.chat?.id;
-    if (chatId === undefined) return;
-    const patientIds = await this.linkedPatientIds(chatId);
-    if (patientIds.length === 0) {
-      await ctx.reply('Avval /start orqali telefon raqamingizni bog‘lang.');
-      return;
-    }
-    // Ready (approved/delivered) lab orders for the chat's linked patients.
-    const orders = await this.prisma.unscoped.labOrder.findMany({
-      where: { patientId: { in: patientIds }, status: { in: ['APPROVED', 'DELIVERED'] } },
-      orderBy: { createdAt: 'desc' },
-      take: 3,
-      select: {
-        id: true,
-        orderNumber: true,
-        createdAt: true,
-        items: {
-          select: {
-            labTest: { select: { name: true } },
-            result: {
-              select: {
-                values: {
-                  select: { value: true, flag: true, parameter: { select: { name: true, unit: true } } },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-    if (orders.length === 0) {
-      await ctx.reply('Hozircha tayyor tahlil natijalari yo‘q.', { reply_markup: PATIENT_KEYBOARD });
-      return;
-    }
-    const blocks = orders.map((o) => {
-      const header = `🧪 ${o.orderNumber} — ${formatInTimeZone(o.createdAt, TIMEZONE, 'dd.MM.yyyy')}`;
-      const lines = o.items.flatMap((it) => {
-        const values = it.result?.values ?? [];
-        if (values.length === 0) return [`• ${pickName(it.labTest.name)}`];
-        return values.map((v) => {
-          const unit = v.parameter.unit ? ` ${v.parameter.unit}` : '';
-          const flag = v.flag && v.flag !== 'NORMAL' ? ` ⚠️ ${flagLabel(v.flag)}` : '';
-          return `• ${v.parameter.name}: ${v.value}${unit}${flag}`;
-        });
-      });
-      return [header, ...lines].join('\n');
-    });
-    // The keyboard swap is deliberate: the persistent reply keyboard survives on
-    // the chat, while the inline buttons ride on this one message.
-    const pdfButtons = new InlineKeyboard();
-    for (const o of orders) pdfButtons.text(`📄 ${o.orderNumber} — PDF`, `labpdf:${o.id}`).row();
-    await ctx.reply(blocks.join('\n\n'), { reply_markup: pdfButtons });
+    await this.handleDocumentList(ctx, 'lab', 0);
   }
 
   /**
@@ -608,8 +697,15 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       await ctx.replyWithDocument(new InputFile(buffer, `natija-${order.orderNumber}.pdf`), {
         caption: `🧪 ${order.orderNumber}`,
       });
-    } catch (err: unknown) {
-      this.logger.error(`lab result pdf failed for order ${orderId}: ${String(err)}`);
+      await this.audit.log({
+        action: AuditAction.EXPORT,
+        entity: 'LabResultReport',
+        entityId: order.id,
+        clinicId: order.clinicId,
+        after: { channel: 'telegram', requestedByPatient: true },
+      });
+    } catch {
+      this.logger.warn(`lab result pdf failed for order ${orderId}`);
       await ctx.reply('PDF tayyorlashda xatolik yuz berdi. Birozdan keyin urinib ko‘ring.');
     }
   }
@@ -617,33 +713,229 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   private async handleMyDocuments(ctx: Context): Promise<void> {
     const chatId = ctx.chat?.id;
     if (chatId === undefined) return;
+    if ((await this.linkedPatientIds(chatId)).length === 0) {
+      if (this.patientOnly) return this.replyPatientHome(ctx);
+      await ctx.reply('Avval /start orqali o‘zingizning telefon raqamingizni bog‘lang.');
+      return;
+    }
+    await ctx.reply(
+      'Kerakli hujjat turini tanlang. Xulosalar shifokor tasdiqlagandan keyin ko‘rinadi.',
+      {
+        reply_markup: new InlineKeyboard()
+          .text('🧪 Laboratoriya natijalari', 'docs:lab:0')
+          .row()
+          .text('🩻 UZI xulosalari', 'docs:ultrasound:0')
+          .row()
+          .text('🩺 Shifokor xulosalari', 'docs:consultation:0')
+          .row()
+          .text('📎 Yuklangan hujjatlar', 'docs:files:0'),
+      },
+    );
+  }
+
+  /** Explicit patient requests are the consent to deliver these files in this private chat. */
+  private async handleDocumentList(
+    ctx: Context,
+    type: 'lab' | 'ultrasound' | 'consultation' | 'files',
+    page: number,
+  ): Promise<void> {
+    if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => undefined);
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined || !Number.isInteger(page) || page < 0 || page > 1_000) return;
     const patientIds = await this.linkedPatientIds(chatId);
-    if (patientIds.length === 0) {
-      await ctx.reply('Avval /start orqali telefon raqamingizni bog‘lang.');
+    if (!patientIds.length) {
+      if (this.patientOnly) return this.replyPatientHome(ctx);
+      await ctx.reply('Avval /start orqali o‘zingizning telefon raqamingizni bog‘lang.');
       return;
     }
-    const docs = await this.prisma.unscoped.patientDocument.findMany({
-      where: { patientId: { in: patientIds } },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      select: { title: true, fileKey: true, fileName: true, createdAt: true },
-    });
-    if (docs.length === 0) {
-      await ctx.reply('Hozircha hujjatlaringiz yo‘q.', { reply_markup: PATIENT_KEYBOARD });
-      return;
-    }
-    await ctx.reply(`Sizda ${docs.length} ta hujjat topildi, yuborilmoqda…`);
-    for (const doc of docs) {
-      try {
-        const caption = `📄 ${doc.title} — ${formatInTimeZone(doc.createdAt, TIMEZONE, 'dd.MM.yyyy')}`;
-        await ctx.replyWithDocument(new InputFile(this.storage.getStream(doc.fileKey), doc.fileName), {
-          caption,
-        });
-      } catch (err) {
-        this.logger.error(`telegram document send failed: ${String(err)}`);
+    const limit = 6;
+    const keyboard = new InlineKeyboard();
+    const captions: string[] = [];
+    let hasMore = false;
+    // All unscoped reads below are restricted to the sender's freshly verified
+    // patient set. Status is checked again when the download button is pressed.
+    if (type === 'lab') {
+      const orders = await this.prisma.unscoped.labOrder.findMany({
+        where: { patientId: { in: patientIds }, status: { in: ['APPROVED', 'DELIVERED'] } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: page * limit,
+        take: limit + 1,
+        select: {
+          id: true,
+          orderNumber: true,
+          createdAt: true,
+          items: {
+            select: {
+              labTest: { select: { name: true } },
+              result: {
+                select: {
+                  approvedAt: true,
+                  approvedById: true,
+                  reportDocumentId: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      hasMore = orders.length > limit;
+      for (const order of orders.slice(0, limit)) {
+        const label = `${order.orderNumber} · ${formatInTimeZone(order.createdAt, TIMEZONE, 'dd.MM.yyyy')}`;
+        captions.push(`🧪 ${label}`);
+        keyboard.text(`📄 ${label}`, `labpdf:${order.id}`).row();
+        const attachments = order.items.filter(
+          (item) =>
+            item.result?.reportDocumentId && item.result.approvedAt && item.result.approvedById,
+        );
+        for (const item of attachments.slice(0, 4)) {
+          if (item.result?.reportDocumentId && item.result.approvedAt && item.result.approvedById) {
+            keyboard
+              .text(
+                `📎 ${pickName(item.labTest.name).slice(0, 45)}`,
+                `docfile:${item.result.reportDocumentId}`,
+              )
+              .row();
+          }
+        }
+        if (attachments.length > 4) keyboard.text('Barcha fayllar', 'docs:files:0').row();
+      }
+    } else if (type === 'files') {
+      const docs = await this.prisma.unscoped.patientDocument.findMany({
+        where: patientDocumentVisibility(patientIds),
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: page * limit,
+        take: limit + 1,
+        select: { id: true, title: true, createdAt: true },
+      });
+      hasMore = docs.length > limit;
+      for (const doc of docs.slice(0, limit)) {
+        const label = `${doc.title.slice(0, 50)} · ${formatInTimeZone(doc.createdAt, TIMEZONE, 'dd.MM.yyyy')}`;
+        captions.push(`📎 ${label}`);
+        keyboard.text(label, `docfile:${doc.id}`).row();
+      }
+    } else {
+      const visits = await this.prisma.unscoped.visit.findMany({
+        where: {
+          patientId: { in: patientIds },
+          status: 'COMPLETED',
+          completedAt: { not: null },
+          kind: type === 'ultrasound' ? 'ULTRASOUND' : 'CONSULTATION',
+        },
+        orderBy: [{ completedAt: 'desc' }, { id: 'desc' }],
+        skip: page * limit,
+        take: limit + 1,
+        select: {
+          id: true,
+          reportTitle: true,
+          completedAt: true,
+          doctor: { select: { fullName: true } },
+        },
+      });
+      hasMore = visits.length > limit;
+      for (const visit of visits.slice(0, limit)) {
+        const date = formatInTimeZone(visit.completedAt!, TIMEZONE, 'dd.MM.yyyy');
+        const title =
+          visit.reportTitle || (type === 'ultrasound' ? 'UZI xulosasi' : 'Shifokor xulosasi');
+        captions.push(`📋 ${title} · ${date} · ${visit.doctor.fullName}`);
+        keyboard.text(`${title.slice(0, 45)} · ${date}`, `visitpdf:${visit.id}`).row();
       }
     }
-    await ctx.reply('Barcha hujjatlar yuborildi ✅', { reply_markup: PATIENT_KEYBOARD });
+    if (page > 0) keyboard.text('← Oldingi', `docs:${type}:${page - 1}`);
+    if (hasMore) keyboard.text('Keyingi →', `docs:${type}:${page + 1}`);
+    await ctx.reply(
+      captions.length
+        ? `${captions.join('\n')}\n\nYuklab olish uchun hujjat tugmasini bosing.`
+        : 'Hozircha bu turdagi tayyor hujjatlar yo‘q.',
+      { reply_markup: keyboard },
+    );
+  }
+
+  private async handleDocumentFile(ctx: Context, documentId: string): Promise<void> {
+    await ctx.answerCallbackQuery().catch(() => undefined);
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    const patientIds = await this.linkedPatientIds(chatId);
+    const document = patientIds.length
+      ? await this.prisma.unscoped.patientDocument.findFirst({
+          where: { AND: [patientDocumentVisibility(patientIds), { id: documentId }] },
+          select: { id: true, clinicId: true, fileKey: true, fileName: true, title: true },
+        })
+      : null;
+    if (!document) {
+      await ctx.reply('Hujjat topilmadi yoki hali tasdiqlanmagan.');
+      return;
+    }
+    try {
+      await ctx.replyWithDocument(
+        new InputFile(this.storage.getStream(document.fileKey), document.fileName),
+        {
+          caption: document.title.slice(0, 200),
+        },
+      );
+      await this.audit.log({
+        action: AuditAction.EXPORT,
+        entity: 'PatientDocument',
+        entityId: document.id,
+        clinicId: document.clinicId,
+        after: { channel: 'telegram', requestedByPatient: true },
+      });
+    } catch {
+      this.logger.warn(`patient document delivery failed: ${document.id}`);
+      await ctx.reply('Hujjatni yuborib bo‘lmadi. Birozdan keyin qayta urinib ko‘ring.');
+    }
+  }
+
+  private async handleVisitReportPdf(ctx: Context, visitId: string): Promise<void> {
+    await ctx.answerCallbackQuery().catch(() => undefined);
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    const patientIds = await this.linkedPatientIds(chatId);
+    const visit = patientIds.length
+      ? await this.prisma.unscoped.visit.findFirst({
+          where: {
+            id: visitId,
+            patientId: { in: patientIds },
+            status: 'COMPLETED',
+            completedAt: { not: null },
+          },
+          include: VISIT_REPORT_INCLUDE,
+        })
+      : null;
+    if (!visit) {
+      await ctx.reply('Xulosa topilmadi yoki hali tasdiqlanmagan.');
+      return;
+    }
+    try {
+      const clinic = await this.prisma.unscoped.clinic.findUnique({
+        where: { id: visit.clinicId },
+        select: { name: true, legalName: true, address: true, phone: true },
+      });
+      if (!clinic) throw new Error('Clinic not found');
+      const latestAmendment = visit.amendments[0];
+      const amendmentAuthor = latestAmendment
+        ? await this.prisma.unscoped.user.findFirst({
+            where: { id: latestAmendment.authorId, clinicId: visit.clinicId },
+            select: { fullName: true },
+          })
+        : null;
+      const buffer = await this.visitReportPdf.render(
+        buildVisitReportPdfData(visit, clinic, amendmentAuthor),
+      );
+      await ctx.replyWithDocument(new InputFile(buffer, `xulosa-${visit.id}.pdf`), {
+        caption:
+          visit.reportTitle || (visit.kind === 'ULTRASOUND' ? 'UZI xulosasi' : 'Shifokor xulosasi'),
+      });
+      await this.audit.log({
+        action: AuditAction.EXPORT,
+        entity: 'VisitReport',
+        entityId: visit.id,
+        clinicId: visit.clinicId,
+        after: { channel: 'telegram', requestedByPatient: true },
+      });
+    } catch {
+      this.logger.warn(`clinical report delivery failed: ${visit.id}`);
+      await ctx.reply('Xulosani yuborib bo‘lmadi. Birozdan keyin qayta urinib ko‘ring.');
+    }
   }
 
   // -------------------------------------------------- medical-record access
@@ -677,7 +969,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         await ctx.reply(
           '⏳ So‘rovingiz klinikaga yuborilgan. Shifokor yoki administrator tasdiqlagach, ' +
             'kasallik tarixingiz shu yerda ko‘rinadi.',
-          { reply_markup: PATIENT_KEYBOARD },
+          { reply_markup: this.patientKeyboard },
         );
         return;
       }
@@ -686,7 +978,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         select: { id: true, name: true },
       });
       if (clinics.length === 0) {
-        await ctx.reply('Hozircha kasallik tarixingiz yo‘q.', { reply_markup: PATIENT_KEYBOARD });
+        await ctx.reply('Hozircha kasallik tarixingiz yo‘q.', {
+          reply_markup: this.patientKeyboard,
+        });
         return;
       }
       await ctx.reply(
@@ -725,7 +1019,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
     if (visits.length === 0) {
       await ctx.reply('Hozircha yakunlangan tashriflaringiz yo‘q.', {
-        reply_markup: PATIENT_KEYBOARD,
+        reply_markup: this.patientKeyboard,
       });
       return;
     }
@@ -747,7 +1041,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       return lines.join('\n');
     });
 
-    await ctx.reply(blocks.join('\n\n'), { reply_markup: PATIENT_KEYBOARD });
+    await ctx.reply(blocks.join('\n\n'), { reply_markup: this.patientKeyboard });
   }
 
   /** Patient tapped "so‘rov yuborish" under a clinic. */
@@ -797,10 +1091,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
 
     await this.notifyStaffOfHistoryRequest(clinicId, row.id, patient.fullName, patient.mrn);
     await ctx.answerCallbackQuery({ text: '✅ So‘rov yuborildi.' });
-    await ctx.reply(
-      '📨 So‘rovingiz klinikaga yuborildi. Tasdiqlangach, shu yerda xabar beramiz.',
-      { reply_markup: PATIENT_KEYBOARD },
-    );
+    await ctx.reply('📨 So‘rovingiz klinikaga yuborildi. Tasdiqlangach, shu yerda xabar beramiz.', {
+      reply_markup: this.patientKeyboard,
+    });
   }
 
   /** Doctor / clinic admin approves or rejects straight from the notification. */
@@ -997,7 +1290,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       await ctx.reply('Hozir navbat bo‘sh.');
       return;
     }
-    const doctorIds = [...new Set(tickets.map((t) => t.doctorUserId).filter((x): x is string => !!x))];
+    const doctorIds = [
+      ...new Set(tickets.map((t) => t.doctorUserId).filter((x): x is string => !!x)),
+    ];
     const doctors = await this.prisma.unscoped.user.findMany({
       where: { id: { in: doctorIds } },
       select: { id: true, fullName: true },
@@ -1173,6 +1468,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       await ctx.answerCallbackQuery({ text: '❌ Qabul bekor qilindi.' });
     }
     // Remove the inline buttons after the action (best effort).
-    await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => undefined);
+    await ctx
+      .editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } })
+      .catch(() => undefined);
   }
 }

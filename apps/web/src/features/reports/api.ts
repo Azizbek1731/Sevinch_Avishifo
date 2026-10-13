@@ -1,5 +1,11 @@
 import { api } from '@/lib/api-client';
-import type { MoneyString } from '@avishifo/shared';
+import type {
+  CashflowReport,
+  ConsumablesKind,
+  ConsumablesReport,
+  ConsumablesSource,
+  MoneyString,
+} from '@avishifo/shared';
 
 export type ReportGroupBy = 'day' | 'week' | 'month';
 export type RevenueDimension = 'time' | 'category' | 'doctor' | 'method';
@@ -117,6 +123,25 @@ function rangeQuery(f: ReportFilters): Record<string, string | undefined> {
 }
 
 export const reportsApi = {
+  consumables: async (
+    f: ReportFilters,
+    kind?: ConsumablesKind,
+    source?: ConsumablesSource,
+  ): Promise<ConsumablesReport> => {
+    const res = await api.get<ConsumablesReport>('/reports/consumables', {
+      ...rangeQuery(f),
+      kind,
+      source,
+    });
+    return res.data;
+  },
+  cashflow: async (
+    f: ReportFilters,
+    method?: 'CASH' | 'CARD' | 'CLICK',
+  ): Promise<CashflowReport> => {
+    const res = await api.get<CashflowReport>('/reports/cashflow', { ...rangeQuery(f), method });
+    return res.data;
+  },
   revenue: async (f: ReportFilters, dimension: RevenueDimension): Promise<RevenueReport> => {
     const res = await api.get<RevenueReport>('/reports/revenue', {
       ...rangeQuery(f),

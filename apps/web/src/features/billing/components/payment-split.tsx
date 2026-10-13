@@ -1,11 +1,13 @@
 'use client';
 
+import { useId } from 'react';
 import { useTranslations } from 'next-intl';
 import { Plus, X } from 'lucide-react';
-import { PaymentMethod, formatUZS, fromTiyin, toTiyin, type PaymentPart } from '@avishifo/shared';
+import { PaymentMethod, formatUZS, fromTiyin, type PaymentPart } from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -14,20 +16,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { sanitizeMoney } from '../api';
+import { inputTiyin, INVOICE_PAYMENT_METHODS, needsOpenShift } from '../payment-methods';
 
 export interface PaymentSplitProps {
   /** What the parts must add up to — the invoice total, or its outstanding due. */
   total: string;
   value: PaymentPart[];
   onChange: (parts: PaymentPart[]) => void;
-  /** Cash needs an open drawer; the warning belongs next to the method that needs it. */
+  /** Warn next to any external account that needs an open shift. */
   cashBlocked?: boolean;
   disabled?: boolean;
 }
 
 /** Sum of the parts, in tiyin, so rounding never drifts. */
 export function splitTotalTiyin(parts: PaymentPart[]): bigint {
-  return parts.reduce((acc, p) => acc + (toTiyin(sanitizeMoney(p.amount) || '0') || 0n), 0n);
+  return parts.reduce((acc, p) => acc + (inputTiyin(sanitizeMoney(p.amount)) ?? 0n), 0n);
 }
 
 /**
@@ -45,8 +48,9 @@ export function PaymentSplit({
   disabled = false,
 }: PaymentSplitProps) {
   const t = useTranslations('billing');
+  const noteId = useId();
 
-  const totalTiyin = toTiyin(total || '0');
+  const totalTiyin = inputTiyin(total) ?? 0n;
   const paidTiyin = splitTotalTiyin(value);
   const remainingTiyin = totalTiyin - paidTiyin;
 
@@ -59,9 +63,9 @@ export function PaymentSplit({
     // what the cashier is about to type anyway.
     const rest = remainingTiyin > 0n ? fromTiyin(remainingTiyin) : '0';
     const used = new Set(value.map((p) => p.method));
-    const nextMethod =
-      Object.values(PaymentMethod).find((m) => !used.has(m)) ?? PaymentMethod.CASH;
-    onChange([...value, { method: nextMethod, amount: rest }]);
+    const nextMethod = INVOICE_PAYMENT_METHODS.find((m) => !used.has(m)) ?? PaymentMethod.CASH;
+    const existing = value.length === 1 ? [{ ...value[0]!, amount: fromTiyin(totalTiyin) }] : value;
+    onChange([...existing, { method: nextMethod, amount: value.length === 1 ? '0' : rest }]);
   };
 
   const removePart = (index: number): void => {
@@ -79,7 +83,7 @@ export function PaymentSplit({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <Label>{t('pay.method')}</Label>
-        {value.length < 6 ? (
+        {value.length < INVOICE_PAYMENT_METHODS.length ? (
           <Button
             type="button"
             variant="ghost"
@@ -96,47 +100,70 @@ export function PaymentSplit({
 
       <div className="space-y-2">
         {value.map((part, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <Select
-              value={part.method}
-              onValueChange={(v) => setPart(index, { method: v as PaymentMethod })}
-              disabled={disabled}
-            >
-              <SelectTrigger className="flex-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.values(PaymentMethod).map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {t(`methods.${m}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div key={index} className="space-y-2 rounded-lg border p-3">
+            <div className="flex items-center gap-2">
+              <Select
+                value={part.method}
+                onValueChange={(v) => setPart(index, { method: v as PaymentMethod })}
+                disabled={disabled}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {INVOICE_PAYMENT_METHODS.map((m) => (
+                    <SelectItem
+                      key={m}
+                      value={m}
+                      disabled={value.some(
+                        (other, otherIndex) => otherIndex !== index && other.method === m,
+                      )}
+                    >
+                      {t(`methods.${m}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            {/* One row means one method for the whole bill — no amount to edit. */}
-            {value.length > 1 ? (
-              <>
-                <Input
-                  inputMode="decimal"
-                  className="w-36 text-right"
-                  value={part.amount}
-                  onChange={(e) => setPart(index, { amount: sanitizeMoney(e.target.value) })}
-                  disabled={disabled}
-                  aria-label={t('split.amountFor', { method: t(`methods.${part.method}`) })}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removePart(index)}
-                  disabled={disabled}
-                  aria-label={t('split.remove')}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </>
-            ) : null}
+              {/* One row means one method for the whole bill — no amount to edit. */}
+              {value.length > 1 ? (
+                <>
+                  <Input
+                    inputMode="decimal"
+                    className="w-36 text-right"
+                    value={part.amount}
+                    onChange={(e) => setPart(index, { amount: sanitizeMoney(e.target.value) })}
+                    disabled={disabled}
+                    aria-label={t('split.amountFor', { method: t(`methods.${part.method}`) })}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removePart(index)}
+                    disabled={disabled}
+                    aria-label={t('split.remove')}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : null}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`${noteId}-${index}`} className="text-xs text-muted-foreground">
+                {t('pay.noteOptional')}
+              </Label>
+              <Textarea
+                id={`${noteId}-${index}`}
+                rows={2}
+                maxLength={500}
+                value={part.note ?? ''}
+                onChange={(event) => setPart(index, { note: event.target.value })}
+                placeholder={t('pay.notePlaceholder')}
+                disabled={disabled}
+                className="min-h-16 resize-y"
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -144,20 +171,18 @@ export function PaymentSplit({
       {value.length > 1 ? (
         <p
           className={`text-sm ${
-            remainingTiyin === 0n
-              ? 'text-muted-foreground'
-              : 'font-medium text-destructive'
+            remainingTiyin === 0n ? 'text-muted-foreground' : 'font-medium text-destructive'
           }`}
         >
           {remainingTiyin === 0n
-            ? t('split.balanced', { total: formatUZS(total) })
+            ? t('split.balanced', { total: formatUZS(fromTiyin(totalTiyin)) })
             : remainingTiyin > 0n
               ? t('split.remaining', { amount: formatUZS(fromTiyin(remainingTiyin)) })
               : t('split.over', { amount: formatUZS(fromTiyin(-remainingTiyin)) })}
         </p>
       ) : null}
 
-      {cashBlocked && value.some((p) => p.method === PaymentMethod.CASH) ? (
+      {cashBlocked && value.some((p) => needsOpenShift(p.method)) ? (
         <p className="text-sm font-medium text-warning-foreground">{t('quick.shiftRequired')}</p>
       ) : null}
     </div>

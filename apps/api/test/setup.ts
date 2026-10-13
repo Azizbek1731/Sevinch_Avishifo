@@ -13,6 +13,7 @@ import { resolve } from 'node:path';
 import { config as loadDotenv } from 'dotenv';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Express } from 'express';
 import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
@@ -20,10 +21,11 @@ import cookieParser from 'cookie-parser';
 import request, { type Response } from 'supertest';
 import { AppModule } from '../src/app.module';
 import { TelegramChannel } from '../src/modules/notifications/channels/telegram.channel';
-import { TelegramGatewayChannel } from '../src/modules/notifications/channels/telegram-gateway.channel';
 
 // Repo-root .env (DATABASE_URL etc.) — same files AppConfigModule loads.
-loadDotenv({ path: [resolve(__dirname, '../../../.env.local'), resolve(__dirname, '../../../.env')] });
+loadDotenv({
+  path: [resolve(__dirname, '../../../.env.local'), resolve(__dirname, '../../../.env')],
+});
 
 export const PASSWORD = 'E2ePass123!';
 export const API = '/api/v1';
@@ -32,8 +34,7 @@ export const API = '/api/v1';
 
 /**
  * Captures what would have gone to Telegram, so tests can read codes back.
- * `chatId` is the bot chat id, or `gateway:<phone>` when the code went out
- * through Telegram Gateway instead.
+ * `chatId` is the linked clinic bot chat id.
  */
 export interface CapturedTelegram {
   chatId: string;
@@ -54,29 +55,13 @@ export async function createApp(captureTelegram?: CapturedTelegram[]): Promise<I
         return Promise.resolve();
       },
     });
-    // Gateway is off unless a test turns it on, so the default suite keeps
-    // exercising the bot-chat path exactly as before.
-    let gatewayEnabled = false;
-    builder.overrideProvider(TelegramGatewayChannel).useValue({
-      get enabled() {
-        return gatewayEnabled;
-      },
-      setEnabled: (v: boolean) => {
-        gatewayEnabled = v;
-      },
-      sendCode: (phone: string, code: string) => {
-        if (!gatewayEnabled) return Promise.resolve(null);
-        captureTelegram.push({ chatId: `gateway:${phone}`, text: `Kod: ${code}` });
-        return Promise.resolve(`req-${phone}`);
-      },
-      revoke: () => Promise.resolve(),
-    });
   }
   const moduleRef = await builder.compile();
-  const app = moduleRef.createNestApplication({ logger: false });
+  const app = moduleRef.createNestApplication<NestExpressApplication>({ logger: false });
 
   // Mirror main.ts: cookie parsing + API prefix. Global pipes/guards/filters/
   // interceptors are wired through APP_* providers inside AppModule already.
+  app.useBodyParser('json', { limit: '1mb' });
   app.use(cookieParser());
   app.setGlobalPrefix('api/v1');
   // trust proxy lets each test present a unique X-Forwarded-For source IP so
@@ -133,7 +118,9 @@ export async function createTestClinic(prisma: PrismaClient, suffix: string): Pr
     data: { clinicId: clinic.id, name: `E2E Branch ${tag}`, address: 'Test street 1' },
   });
 
-  async function mkUser(role: 'CLINIC_OWNER' | 'RECEPTIONIST' | 'DOCTOR' | 'CASHIER'): Promise<TestUser> {
+  async function mkUser(
+    role: 'CLINIC_OWNER' | 'RECEPTIONIST' | 'DOCTOR' | 'CASHIER',
+  ): Promise<TestUser> {
     const email = `${role.toLowerCase().replace('_', '-')}.${tag}@e2e.avishifo.test`;
     const phone = uniquePhone();
     const user = await prisma.user.create({

@@ -55,6 +55,7 @@ export function OrderAttachments({
     onSuccess: () => {
       toast.success(t('attachmentUploaded'));
       void queryClient.invalidateQueries({ queryKey: ['lab', 'order', orderId] });
+      void queryClient.invalidateQueries({ queryKey: ['patients'] });
     },
     onError: errorToast,
   });
@@ -62,7 +63,7 @@ export function OrderAttachments({
   const download = async (a: OrderAttachment): Promise<void> => {
     setDownloading(a.id);
     try {
-      const blob = await api.get<Blob>(`/patients/documents/${a.id}/download`);
+      const blob = await api.get<Blob>(`/lab-orders/${orderId}/attachments/${a.id}/download`);
       const url = URL.createObjectURL(blob.data);
       const link = document.createElement('a');
       link.href = url;

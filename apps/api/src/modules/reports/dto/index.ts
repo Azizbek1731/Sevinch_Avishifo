@@ -1,6 +1,10 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { idSchema, reportRangeQuerySchema } from '@avishifo/shared';
+import { cashflowQuerySchema, consumablesQuerySchema, idSchema, reportRangeQuerySchema } from '@avishifo/shared';
+
+export class ConsumablesQueryDto extends createZodDto(consumablesQuerySchema) {}
+
+export class CashflowQueryDto extends createZodDto(cashflowQuerySchema) {}
 
 /** `?export=xlsx` switches any report endpoint to an XLSX download. */
 const exportFlagSchema = z.enum(['xlsx']).optional();

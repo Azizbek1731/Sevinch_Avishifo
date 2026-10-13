@@ -15,6 +15,7 @@ import { AppException } from '../../common/app.exception';
 import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
 import { AuditService } from '../../core/audit/audit.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { AppConfigService } from '../../core/config/app-config.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { CreateUserDto, PermissionOverridesDto, UpdateUserDto, UpdateUserStatusDto, UserQueryDto } from './dto/user.dto';
 
@@ -88,6 +89,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly config: AppConfigService,
   ) {}
 
   // -------------------------------------------------------------- queries
@@ -413,6 +415,7 @@ export class UsersService {
 
   /** Enforce plan.maxUsers against active (non-archived-role) staff count. */
   private async assertPlanUserLimit(clinicId: string): Promise<void> {
+    if (this.config.env.SINGLE_CLINIC_MODE) return;
     // ClinicSubscription is tenant-scoped: prisma.db auto-filters by clinicId.
     const subscription = await this.prisma.db.clinicSubscription.findFirst({
       where: { status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL] } },

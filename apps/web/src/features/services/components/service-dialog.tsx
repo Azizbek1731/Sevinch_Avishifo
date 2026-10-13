@@ -28,7 +28,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { emptyToUndefined, sanitizeMoney, servicesApi, type ServiceCategoryRow, type ServiceRow } from '../api';
+import {
+  emptyToUndefined,
+  sanitizeMoney,
+  servicesApi,
+  type ServiceCategoryRow,
+  type ServiceRow,
+} from '../api';
 import { useApiErrorToast } from '../hooks';
 
 export interface ServiceDialogProps {
@@ -62,6 +68,7 @@ export function ServiceDialog({
       code: '',
       name: { uz: '' },
       durationMin: 15,
+      unit: 'dona',
       vatIncluded: true,
       price: '',
     },
@@ -77,6 +84,7 @@ export function ServiceDialog({
         code: service.code,
         name: { uz: service.name.uz, ru: service.name.ru },
         durationMin: service.durationMin,
+        unit: service.unit ?? 'dona',
         vatIncluded: service.vatIncluded,
         // Required by the create schema; PATCH ignores it (prices are effective-dated).
         price: service.currentPrice ?? '0',
@@ -87,6 +95,7 @@ export function ServiceDialog({
         code: '',
         name: { uz: '' },
         durationMin: 15,
+        unit: 'dona',
         vatIncluded: true,
         price: '',
       });
@@ -96,12 +105,13 @@ export function ServiceDialog({
   const mutation = useMutation({
     mutationFn: (values: CreateServiceInput) => {
       if (service) {
-        const { categoryId, code, name, durationMin, vatIncluded } = values;
+        const { categoryId, code, name, durationMin, vatIncluded, unit } = values;
         return servicesApi.updateService(service.id, {
           categoryId,
           code,
           name,
           durationMin,
+          unit,
           vatIncluded,
         });
       }
@@ -130,7 +140,12 @@ export function ServiceDialog({
     queryFn: async () =>
       (
         await api.get<
-          Array<{ code: string; name: { uz: string; ru?: string }; parameterCount: number; imported?: boolean }>
+          Array<{
+            code: string;
+            name: { uz: string; ru?: string };
+            parameterCount: number;
+            imported?: boolean;
+          }>
         >('/lab-catalog', { search: catalogQuery || undefined, limit: 8 })
       ).data,
     enabled: open && !isEdit && isLab && catalogQuery.trim().length >= 2,
@@ -226,7 +241,9 @@ export function ServiceDialog({
                                 {t('form.labCatalogTaken')}
                               </Badge>
                             ) : null}
-                            <span className="font-mono text-xs text-muted-foreground">{c.code}</span>
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {c.code}
+                            </span>
                           </span>
                         </button>
                       ))}
@@ -241,6 +258,19 @@ export function ServiceDialog({
             </div>
           ) : null}
 
+          <div className="space-y-2">
+            <Label htmlFor="service-unit">{t('form.unit')}</Label>
+            <Input
+              id="service-unit"
+              maxLength={30}
+              placeholder={t('form.unitPlaceholder')}
+              {...form.register('unit')}
+            />
+            <p className="text-xs text-muted-foreground">{t('form.unitHint')}</p>
+            {form.formState.errors.unit ? (
+              <p className="text-sm text-destructive">{t('form.required')}</p>
+            ) : null}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="service-code">{t('form.code')}</Label>

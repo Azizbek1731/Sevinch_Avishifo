@@ -24,7 +24,7 @@
   "discharged": "Patient discharged",
   "dischargeHint": "Services are invoiced first, then paid — only then is the history closed.",
   "addOrder": "Add order",
-  "orderAdded": "Order added",
+  "orderAdded": "Order added and sent to cashier",
   "addNote": "Add note",
   "noteAdded": "Note added",
   "noNotes": "No daily notes",
@@ -48,7 +48,8 @@
   "tabs": {
     "sheet": "Treatment sheet",
     "history": "Medical history",
-    "notes": "Daily notes"
+    "notes": "Daily notes",
+    "charges": "Charges & billing"
   },
   "sections": {
     "diagnoses": "Diagnoses",
@@ -111,5 +112,20 @@
   "removeTitle": "Delete this history?",
   "removeHint": "The history, its orders and daily notes are removed for good. Services already on an invoice are kept — they are the patient's payment record. This cannot be undone.",
   "removed": "History deleted",
-  "removedKeptInvoiced": "History deleted. {count} invoiced service(s) were kept."
+  "removedKeptInvoiced": "History deleted. {count} invoiced service(s) were kept.",
+  "directBilling": {
+    "hint": "Orders and charges are sent to the cashier automatically when saved. No separate delivery confirmation is required.",
+    "total": "Total sent to the cashier",
+    "checkFields": "Check the service price, date and number of treatments.",
+    "submit": "Add and send to cashier",
+    "quantity": "Total quantity",
+    "billing": "Invoice and payment",
+    "awaitingPayment": "Awaiting payment",
+    "paid": "Paid",
+    "noPending": "No unpaid invoices for this admission.",
+    "recorded": "Previously recorded: {given} given, {skipped} skipped.",
+    "cancelled": "Charge cancelled",
+    "legacy": "Legacy order — see invoices in Charges and billing.",
+    "stopHint": "The treatment schedule will stop. Its cashier invoice will remain unchanged; use invoice cancellation or refund to adjust the amount."
+  }
 }

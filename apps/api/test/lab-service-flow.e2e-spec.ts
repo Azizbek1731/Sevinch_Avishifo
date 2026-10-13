@@ -31,6 +31,7 @@ describe('lab service flow (e2e)', () => {
   let branchId: string;
   let catalogServiceId: string;
   let manualServiceId: string;
+  let invoiceId: string;
   let orderId: string;
   let orderNumber: string;
 
@@ -96,11 +97,25 @@ describe('lab service flow (e2e)', () => {
   }
 
   beforeAll(async () => {
+    if (
+      !/^\/(?:avishifo_finance_|.*(?:test|e2e))/.test(
+        new URL(process.env.DATABASE_URL ?? '').pathname,
+      )
+    ) {
+      throw new Error('Laboratory tests require an isolated finance/test database');
+    }
+    process.env.SINGLE_CLINIC_MODE = 'true';
     prisma = new PrismaClient();
-    app = await createApp();
+    app = await createApp([]);
     clinic = await createTestClinic(prisma, 'labsvc');
     owner = await login(app, clinic.owner.email);
     branchId = clinic.branchId;
+    await request(app.getHttpServer())
+      .post(`${API}/shifts/open`)
+      .set(auth(owner))
+      .set('x-branch-id', branchId)
+      .send({ openingCash: '0', openingCard: '0', openingClick: '0' })
+      .expect(201);
 
     const cat = await request(app.getHttpServer())
       .post(`${API}/service-categories`)
@@ -276,10 +291,8 @@ describe('lab service flow (e2e)', () => {
         settle: 'DEBT',
         lines: [{ serviceId: catalogServiceId, quantity: 1, unitPrice: '50000.00' }],
       })
-      .expect(201);
-    // The sale itself survives; the lab hook logs and yields no order rather
-    // than stamping a foreign branch onto the worklist.
-    expect(res.body.data.labOrder).toBeNull();
+      .expect(403);
+    expect(res.body.error.code).toBe('FORBIDDEN');
   });
 
   // ------------------------------------------------------------ the sale
@@ -300,6 +313,7 @@ describe('lab service flow (e2e)', () => {
       .expect(201);
 
     expect(res.body.data.labOrder).toBeTruthy();
+    invoiceId = res.body.data.invoice.id as string;
     orderId = res.body.data.labOrder.id as string;
     orderNumber = res.body.data.labOrder.orderNumber as string;
 
@@ -313,8 +327,16 @@ describe('lab service flow (e2e)', () => {
   });
 
   it('a sale with no lab services creates no order', async () => {
-    const cons = await prisma.service.findFirst({
-      where: { clinicId: clinic.clinicId, code: { startsWith: 'CONS-' } },
+    const category = await prisma.serviceCategory.findFirstOrThrow({
+      where: { clinicId: clinic.clinicId, kind: 'OTHER' },
+    });
+    const ordinary = await prisma.service.create({
+      data: {
+        clinicId: clinic.clinicId,
+        categoryId: category.id,
+        code: 'NON-CLINICAL-SERVICE',
+        name: { uz: 'Oddiy xizmat' },
+      },
     });
     const res = await request(app.getHttpServer())
       .post(`${API}/invoices/quick`)
@@ -323,7 +345,7 @@ describe('lab service flow (e2e)', () => {
         patientId,
         branchId,
         settle: 'DEBT',
-        lines: [{ serviceId: cons!.id, quantity: 1, unitPrice: '80000.00' }],
+        lines: [{ serviceId: ordinary.id, quantity: 1, unitPrice: '80000.00' }],
       })
       .expect(201);
     expect(res.body.data.labOrder).toBeNull();
@@ -342,6 +364,17 @@ describe('lab service flow (e2e)', () => {
   // ---------------------------------------------------- results and files
 
   it('the technician enters results and attaches the analyser file', async () => {
+    await request(app.getHttpServer())
+      .post(`${API}/invoices/${invoiceId}/payments`)
+      .set(auth(owner))
+      .set('x-branch-id', branchId)
+      .send({ amount: '90000', method: 'CASH', idempotencyKey: randomUUID() })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`${API}/lab-orders/${orderId}/status`)
+      .set(auth(owner))
+      .send({ status: 'SPECIMEN_COLLECTED' })
+      .expect(201);
     const detail = await request(app.getHttpServer())
       .get(`${API}/lab-orders/${orderId}`)
       .set(auth(owner))
@@ -350,11 +383,15 @@ describe('lab service flow (e2e)', () => {
       id: string;
       labTest: { parameters: Array<{ id: string; code: string | null }> };
     }>) {
-      const param = item.labTest.parameters[0]!;
       await request(app.getHttpServer())
         .post(`${API}/lab-orders/items/${item.id}/results`)
         .set(auth(owner))
-        .send({ values: [{ parameterId: param.id, value: param.code ? '130' : 'Manfiy' }] })
+        .send({
+          values: item.labTest.parameters.map((param) => ({
+            parameterId: param.id,
+            value: param.code ? '130' : 'Manfiy',
+          })),
+        })
         .expect(201);
     }
 
@@ -388,7 +425,11 @@ describe('lab service flow (e2e)', () => {
       .set(auth(owner))
       .expect(200);
     expect(res.headers['content-type']).toContain('application/pdf');
-    expect(Buffer.from(res.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+    expect(
+      Buffer.from(res.body as Buffer)
+        .subarray(0, 5)
+        .toString(),
+    ).toBe('%PDF-');
   });
 
   it('the portal refuses the PDF before approval, serves it after, and never to a stranger', async () => {

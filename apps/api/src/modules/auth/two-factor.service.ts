@@ -3,9 +3,8 @@ import { randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { AUTH_2FA_MAX_ATTEMPTS, AUTH_2FA_TTL_SECONDS, ErrorCode } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
 import { RedisService } from '../../core/redis/redis.service';
-import { AppConfigService } from '../../core/config/app-config.service';
+import { PrismaService } from '../../core/prisma/prisma.service';
 import { TelegramChannel } from '../notifications/channels/telegram.channel';
-import { TelegramGatewayChannel } from '../notifications/channels/telegram-gateway.channel';
 
 /**
  * Which flow a challenge belongs to. A code is only ever valid for the step that
@@ -19,8 +18,8 @@ interface Challenge {
   code: string;
   /** Absent on challenges issued before purposes existed — those were 2FA. */
   purpose?: ChallengePurpose;
-  /** Set when the code went out through Telegram Gateway, so it can be revoked. */
-  gatewayRequestId?: string;
+  /** The linked clinic-bot chat this challenge was issued to. */
+  telegramChatId: string | null;
 }
 
 const key = (id: string): string => `auth:2fa:${id}`;
@@ -31,14 +30,14 @@ const key = (id: string): string => `auth:2fa:${id}`;
  * the case a brute-forcer creates.
  */
 const attemptsKey = (id: string): string => `auth:2fa:${id}:attempts`;
+const resetRecipientKey = (id: string): string => `auth:password-reset:recipient:${id}`;
 
 /**
  * Telegram-delivered login codes for staff and super-admin: the opt-in second
  * factor after a password, and the passwordless sign-in that replaces one.
  *
- * The second factor is opt-in per user and only effective once a Telegram chat
- * is linked — enabling it without a chat would lock the account out, so
- * `isRequiredFor` checks both.
+ * The second factor remains required even when a chat is later unlinked or the
+ * bot is unavailable. A delivery failure must never become password-only login.
  *
  * Challenges live in Redis, not the database: they expire in minutes, must
  * vanish on their own, and a login attempt should never leave a row behind.
@@ -51,126 +50,105 @@ export class TwoFactorService {
   constructor(
     private readonly redis: RedisService,
     private readonly telegram: TelegramChannel,
-    private readonly gateway: TelegramGatewayChannel,
-    private readonly config: AppConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
-  /** Whether Telegram Gateway is configured — it reaches unlinked phones too. */
-  get gatewayEnabled(): boolean {
-    return this.gateway.enabled;
-  }
-
-  /**
-   * A user is challenged only when they asked for it AND the code has somewhere
-   * to arrive. That second half is what keeps the feature from ever locking
-   * anyone out — and Telegram Gateway widens it, because it reaches any phone
-   * on Telegram without the user having linked the bot first.
-   */
+  /** An enabled second factor cannot be bypassed by unlinking the bot. */
   isRequiredFor(user: { twoFactorEnabled: boolean; telegramChatId: string | null }): boolean {
-    return user.twoFactorEnabled && (!!user.telegramChatId || this.gateway.enabled);
+    return user.twoFactorEnabled;
   }
 
-  /**
-   * Delivers a code by whatever route can carry it: the user's own bot chat
-   * first (free, and it can say more than six digits), then Telegram Gateway.
-   * Returns the Gateway request id when that was the route, so the caller can
-   * withdraw the message once the code stops being valid.
-   */
+  /** Read the current binding immediately before sending or accepting a code. */
+  private async recipientMatches(userId: string, chatId: string | null): Promise<boolean> {
+    if (!chatId) return false;
+    // Login is pre-tenant; User is a platform model and is explicitly scoped by id.
+    const user = await this.prisma.unscoped.user.findFirst({
+      where: { id: userId, status: 'ACTIVE', deletedAt: null, role: { not: 'PATIENT' } },
+      select: { telegramChatId: true, clinic: { select: { status: true } } },
+    });
+    return !!user && user.telegramChatId === chatId && (!user.clinic || user.clinic.status === 'ACTIVE');
+  }
+
   private async deliver(
+    userId: string,
     chatId: string | null,
-    phone: string | null,
     code: string,
     fullName: string,
     purpose: ChallengePurpose,
-  ): Promise<{ delivered: boolean; gatewayRequestId?: string }> {
+  ): Promise<{ delivered: boolean }> {
     return this.deliverCode({
+      userId,
       chatId,
-      phone,
-      code,
       botText: this.codeMessage(code, fullName, purpose),
       label: purpose,
     });
   }
 
   /**
-   * Sends a six-digit code by whichever Telegram route is preferred, falling
-   * back to the other. Public because not every code lives in a Redis challenge
-   * — the password-reset code is stored in the database and still has to reach
-   * the user the same way.
+   * Codes only go through the configured clinic bot. Password reset uses this
+   * same delivery guard although its OTP is stored in the database.
    */
   async deliverCode(i: {
+    userId: string;
     chatId: string | null;
-    phone: string | null;
-    code: string;
-    /** What the bot chat says; Gateway renders its own text from the code. */
     botText: string;
     /** Only for the log line, so "no code arrived" is answerable. */
     label: string;
-  }): Promise<{ delivered: boolean; gatewayRequestId?: string }> {
-    const { chatId, phone, code, botText, label: purpose } = i;
-    const viaGateway = async (): Promise<{ delivered: boolean; gatewayRequestId?: string }> => {
-      if (!phone) return { delivered: false };
-      const requestId = await this.gateway.sendCode(phone, code, AUTH_2FA_TTL_SECONDS);
-      if (!requestId) return { delivered: false };
-      // Which route carried a code is the first thing anyone asks when a user
-      // says "no code arrived", and it is not otherwise recoverable.
-      this.logger.log(`Code (${purpose}) delivered via telegram gateway`);
-      return { delivered: true, gatewayRequestId: requestId };
-    };
-
-    const viaBot = async (): Promise<{ delivered: boolean }> => {
-      if (!chatId) return { delivered: false };
-      try {
-        await this.telegram.send(chatId, botText);
-        this.logger.log(`Code (${purpose}) delivered via bot chat`);
-        return { delivered: true };
-      } catch (e) {
-        this.logger.warn(`Bot chat delivery failed: ${String(e)}`);
+  }): Promise<{ delivered: boolean }> {
+    try {
+      if (!i.chatId || !(await this.recipientMatches(i.userId, i.chatId))) {
         return { delivered: false };
       }
-    };
-
-    const order =
-      this.config.env.VERIFICATION_CODE_CHANNEL === 'bot'
-        ? [viaBot, viaGateway]
-        : [viaGateway, viaBot];
-
-    for (const attempt of order) {
-      const result = await attempt();
-      if (result.delivered) return result;
+      await this.telegram.send(i.chatId, i.botText);
+      this.logger.log(`Code (${i.label}) delivered via clinic bot`);
+      return { delivered: true };
+    } catch {
+      // Transport errors can contain request URLs; never log a bot token or code.
+      this.logger.warn(`Clinic bot delivery failed (${i.label})`);
+      return { delivered: false };
     }
+  }
 
-    this.logger.warn(`Code (${purpose}) had no working delivery route`);
-    return { delivered: false };
+  /** A reset OTP is usable only by the same account and bot chat that requested it. */
+  async bindResetRecipient(
+    otpId: string,
+    userId: string,
+    telegramChatId: string,
+    ttlSeconds: number,
+  ): Promise<void> {
+    await this.redis.client.set(
+      resetRecipientKey(otpId),
+      JSON.stringify({ userId, telegramChatId }),
+      'EX',
+      ttlSeconds,
+    );
+  }
+
+  async isResetRecipientCurrent(otpId: string, userId: string): Promise<boolean> {
+    const raw = await this.redis.client.get(resetRecipientKey(otpId));
+    if (!raw) return false;
+    const recipient = JSON.parse(raw) as { userId: string; telegramChatId: string };
+    return recipient.userId === userId && this.recipientMatches(userId, recipient.telegramChatId);
+  }
+
+  async forgetResetRecipient(otpId: string): Promise<void> {
+    await this.redis.client.del(resetRecipientKey(otpId));
   }
 
   private async createChallenge(
     userId: string,
+    telegramChatId: string | null,
     purpose: ChallengePurpose,
   ): Promise<{ challengeId: string; code: string }> {
     const challengeId = randomUUID();
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     await this.redis.client.set(
       key(challengeId),
-      JSON.stringify({ userId, code, purpose } satisfies Challenge),
+      JSON.stringify({ userId, code, purpose, telegramChatId } satisfies Challenge),
       'EX',
       AUTH_2FA_TTL_SECONDS,
     );
     return { challengeId, code };
-  }
-
-  /** Records the Gateway request against a live challenge, for later revocation. */
-  private async attachGatewayRequest(challengeId: string, requestId: string): Promise<void> {
-    const raw = await this.redis.client.get(key(challengeId));
-    if (!raw) return;
-    const ttl = await this.redis.client.ttl(key(challengeId));
-    const challenge = JSON.parse(raw) as Challenge;
-    await this.redis.client.set(
-      key(challengeId),
-      JSON.stringify({ ...challenge, gatewayRequestId: requestId } satisfies Challenge),
-      'EX',
-      ttl > 0 ? ttl : 1,
-    );
   }
 
   /**
@@ -188,15 +166,14 @@ export class TwoFactorService {
     chatId: string | null,
     fullName: string,
     purpose: ChallengePurpose = 'second-factor',
-    phone: string | null = null,
   ): Promise<{
     challengeId: string;
     expiresInSeconds: number;
   }> {
-    const { challengeId, code } = await this.createChallenge(userId, purpose);
-    const { delivered, gatewayRequestId } = await this.deliver(
+    const { challengeId, code } = await this.createChallenge(userId, chatId, purpose);
+    const { delivered } = await this.deliver(
+      userId,
       chatId,
-      phone,
       code,
       fullName,
       purpose,
@@ -211,8 +188,6 @@ export class TwoFactorService {
         503,
       );
     }
-    if (gatewayRequestId) await this.attachGatewayRequest(challengeId, gatewayRequestId);
-
     return { challengeId, expiresInSeconds: AUTH_2FA_TTL_SECONDS };
   }
 
@@ -220,26 +195,24 @@ export class TwoFactorService {
    * Same challenge, but the Telegram round-trip happens after the response is
    * on its way. On an unauthenticated endpoint the delivery latency is itself
    * the answer to "is this phone a staff account with a linked chat?", so it
-   * must not be inside the request. A send that fails simply leaves a challenge
-   * nobody can answer, which is what every other rejection looks like anyway.
+   * must not be inside the request. A failed send discards its challenge, so
+   * the response is indistinguishable from every other rejected request.
    */
   async issueInBackground(
     userId: string,
     chatId: string | null,
     fullName: string,
     purpose: ChallengePurpose,
-    phone: string | null = null,
   ): Promise<{ challengeId: string; expiresInSeconds: number }> {
-    const { challengeId, code } = await this.createChallenge(userId, purpose);
-    void this.deliver(chatId, phone, code, fullName, purpose)
-      .then((r) => {
-        if (!r.delivered) this.logger.warn(`Login code not delivered for user ${userId}`);
-        else if (r.gatewayRequestId) {
-          return this.attachGatewayRequest(challengeId, r.gatewayRequestId);
+    const { challengeId, code } = await this.createChallenge(userId, chatId, purpose);
+    void this.deliver(userId, chatId, code, fullName, purpose)
+      .then(async (r) => {
+        if (!r.delivered) {
+          await this.redis.client.del(key(challengeId), attemptsKey(challengeId));
+          this.logger.warn(`Login code not delivered for user ${userId}`);
         }
-        return undefined;
       })
-      .catch((e: unknown) => this.logger.warn(`Login code delivery failed: ${String(e)}`));
+      .catch(() => this.logger.warn('Login code delivery failed'));
     return { challengeId, expiresInSeconds: AUTH_2FA_TTL_SECONDS };
   }
 
@@ -279,8 +252,9 @@ export class TwoFactorService {
    * one factor is not enough for them, so no usable challenge is created — this
    * message is the only thing that goes out, and it must not fail the request.
    */
-  async notifyPasswordRequired(chatId: string, fullName: string): Promise<void> {
+  async notifyPasswordRequired(userId: string, chatId: string, fullName: string): Promise<void> {
     try {
+      if (!(await this.recipientMatches(userId, chatId))) return;
       await this.telegram.send(
         chatId,
         `🔐 AviShifo — Telegram orqali kirish so‘raldi\n\n` +
@@ -289,8 +263,8 @@ export class TwoFactorService {
           `Parolingiz bilan kiring — tasdiqlash kodi shundan keyin shu yerga keladi.\n\n` +
           `Agar kirishni siz so‘ramagan bo‘lsangiz, parolingizni almashtiring.`,
       );
-    } catch (e) {
-      this.logger.warn(`Passwordless-refusal notice not delivered: ${String(e)}`);
+    } catch {
+      this.logger.warn('Passwordless-refusal notice not delivered');
     }
   }
 
@@ -324,6 +298,17 @@ export class TwoFactorService {
         401,
       );
     }
+    if (
+      !challenge.telegramChatId ||
+      !(await this.recipientMatches(challenge.userId, challenge.telegramChatId))
+    ) {
+      await this.redis.client.del(key(challengeId), attemptsKey(challengeId));
+      throw new AppException(
+        ErrorCode.TWO_FACTOR_CHALLENGE_INVALID,
+        'Kod muddati tugagan. Qaytadan kiring.',
+        401,
+      );
+    }
 
     const expected = Buffer.from(challenge.code);
     const given = Buffer.from(code);
@@ -339,7 +324,6 @@ export class TwoFactorService {
       }
       if (attempts >= AUTH_2FA_MAX_ATTEMPTS) {
         await this.redis.client.del(key(challengeId), attemptsKey(challengeId));
-        if (challenge.gatewayRequestId) await this.gateway.revoke(challenge.gatewayRequestId);
         throw new AppException(
           ErrorCode.TWO_FACTOR_CHALLENGE_INVALID,
           'Juda ko‘p urinish. Qaytadan kiring.',
@@ -349,10 +333,12 @@ export class TwoFactorService {
       throw new AppException(ErrorCode.OTP_INVALID, 'Kod noto‘g‘ri', 401);
     }
 
-    await this.redis.client.del(key(challengeId), attemptsKey(challengeId));
-    // The code is spent; take it out of the user's Telegram so a live-looking
-    // one is not left sitting in their chat history.
-    if (challenge.gatewayRequestId) await this.gateway.revoke(challenge.gatewayRequestId);
+    // Only one simultaneous verifier can burn the challenge and mint a session.
+    const consumed = await this.redis.client.getdel(key(challengeId));
+    if (consumed !== raw) {
+      throw new AppException(ErrorCode.TWO_FACTOR_CHALLENGE_INVALID, 'Kod muddati tugagan. Qaytadan kiring.', 401);
+    }
+    await this.redis.client.del(attemptsKey(challengeId));
     return challenge.userId;
   }
 }

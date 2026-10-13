@@ -35,6 +35,7 @@ import {
   TASHKENT_STREETS,
 } from './seed-data/names';
 import { DRUGS, PACKAGE_DEFS, SERVICE_DEFS, type CategoryKey } from './seed-data/services';
+import { seedPrescriptionDirectory } from './prescription-directory';
 import { NOTIFICATION_TEMPLATE_DEFS } from './seed-data/templates';
 
 const prisma = new PrismaClient();
@@ -477,6 +478,8 @@ async function main(): Promise<void> {
   }
 
   // ---- patients ---------------------------------------------------------
+  await seedPrescriptionDirectory(prisma);
+
   interface PatientRec { id: string; gender: Gender; fullName: string; phone: string }
   const patients: PatientRec[] = [];
   const patientRows: Prisma.PatientCreateManyInput[] = [];
@@ -1138,7 +1141,7 @@ async function main(): Promise<void> {
         clinicId, userId,
         title: pick(['Yangi tahlil natijasi', 'Kassa smenasi yopildi', 'Yangi bemor ro\'yxatdan o\'tdi', 'Qarzdorlik eslatmasi']),
         body: 'Tafsilotlar uchun bosing.',
-        link: pick(['/lab', '/registers', '/patients', '/invoices']),
+        link: pick(['/lab', '/cashier', '/patients', '/invoices']),
         readAt: i < 3 ? day(-i, 12, 0) : null,
         createdAt: day(-i, randInt(9, 18), 0),
       })),

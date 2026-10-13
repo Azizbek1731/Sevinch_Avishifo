@@ -61,7 +61,10 @@
     "invalidPhone": "Telefon raqami noto'g'ri (+998...)",
     "duplicatesFound": "O'xshash bemorlar topildi — takror emasligiga ishonch hosil qiling:",
     "forceCreate": "Baribir yaratish",
-    "created": "Bemor ro'yxatga olindi"
+    "created": "Bemor ro'yxatga olindi",
+    "add": "Yangi bemor qo‘shish",
+    "searchHint": "Qidirish uchun kamida 2 ta belgi kiriting",
+    "selectExisting": "Tanlash"
   },
   "walkIn": {
     "button": "Navbatga yozish (walk-in)",
@@ -88,5 +91,19 @@
   "cashDesk": {
     "title": "Kassa",
     "addServices": "Xizmat qo'shish"
-  }
+  },
+  "workflow": {
+    "services": "Muolaja va tekshiruv",
+    "servicesHint": "Muolaja, instrumental tekshiruv va boshqa xizmatlarni tanlang, hisobni kassaga yuboring.",
+    "lab": "Laboratoriya tahlillari",
+    "labHint": "Tahlillarni yozing: buyurtma laboratoriyaga, hisob kassaga tushadi.",
+    "admit": "Statsionarga yotqizish",
+    "admitHint": "Bemorni tanlang, bo‘lim, palata va o‘rinni belgilang.",
+    "ward": "Statsionar xarajatlari",
+    "wardHint": "Yotgan bemorlar, muolajalar va qo‘shimcha xizmatlar.",
+    "handoff": "Qabulxona xizmatlarni rasmiylashtiradi. Tayyor hisob kassada ko‘rinadi; to‘lovni kassir qabul qiladi.",
+    "invoices": "Yuborilgan hisoblar",
+    "labPaidHint": "Tahlillarni tanlang va hisobni kassaga yuboring. To‘liq to‘lovdan so‘ng buyurtma laboratoriya navbatiga tushadi."
+  },
+  "singleClinicSubtitle": "Bemorlarni ro‘yxatga olish, yo‘llanmalar va to‘lov holatini kuzatish"
 }

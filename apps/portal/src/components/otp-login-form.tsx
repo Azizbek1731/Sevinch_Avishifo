@@ -158,7 +158,7 @@ export function OtpLoginForm({ initialPhone, onSuccess }: OtpLoginFormProps) {
         raqamiga yuborilgan 6 xonali kodni kiriting
       </p>
       <p className="text-center text-xs text-slate-500">
-        Telegramingizni tekshiring — kod «Verification Codes» dan keladi.
+        Klinikaning Telegram botini tekshiring — tasdiqlash kodi shu botga keladi.
       </p>
       <Controller
         control={codeForm.control}

@@ -24,6 +24,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { useEnumLabel } from '@/hooks/use-enum-label';
 import { useSocket, useSocketEvent } from '@/hooks/use-socket';
 import { Link, useRouter } from '@/i18n/routing';
+import { SINGLE_CLINIC_MODE } from '@/lib/deployment';
 import { formatTz } from '@/lib/dates';
 import { useAuthStore } from '@/stores/auth-store';
 import type { VisitListItem } from '../api';
@@ -35,6 +36,7 @@ import {
   useRooms,
   useTicketAction,
 } from '../hooks';
+import { ClinicalWorklist } from '@/features/clinical-orders/components/worklist';
 import { PatientSummary } from './patient-summary';
 
 const NO_ROOM = 'none';
@@ -134,8 +136,8 @@ export function DoctorCockpit() {
   const canCall = user?.permissions.includes('queue.call') ?? false;
   const canWriteVisits = user?.permissions.includes('visits.write') ?? false;
 
-  const { data: queues, isLoading } = useQueues(branchId);
-  const { data: rooms } = useRooms(branchId);
+  const { data: queues, isLoading } = useQueues(SINGLE_CLINIC_MODE ? null : branchId);
+  const { data: rooms } = useRooms(SINGLE_CLINIC_MODE ? null : branchId);
   const callNext = useCallNext();
   const ticketAction = useTicketAction();
   const createVisit = useCreateVisit();
@@ -256,95 +258,101 @@ export function DoctorCockpit() {
     <div className="space-y-4">
       <PageHeader title={t('title')} description={t('subtitle')} />
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard title={t('waiting')} value={waitingCount} icon={Users} />
-        <StatCard title={t('inRoom')} value={inRoomCount} icon={PhoneCall} />
-        <StatCard title={t('doneToday')} value={doneCount} icon={CheckCircle2} />
-      </div>
+      <ClinicalWorklist />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* LEFT: my queue */}
-        <Card>
-          <CardHeader className="space-y-3 pb-3">
-            <CardTitle className="text-lg">{t('myQueue')}</CardTitle>
-            {canCall ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <Select value={roomId} onValueChange={selectRoom}>
-                  <SelectTrigger className="w-44">
-                    <SelectValue placeholder={t('room')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_ROOM}>{t('noRoom')}</SelectItem>
-                    {(rooms ?? []).map((room) => (
-                      <SelectItem key={room.id} value={room.id}>
-                        {t('roomShort', { room: room.number })}
-                        {room.name ? ` — ${room.name}` : ''}
-                      </SelectItem>
+      {!SINGLE_CLINIC_MODE ? (
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <StatCard title={t('waiting')} value={waitingCount} icon={Users} />
+            <StatCard title={t('inRoom')} value={inRoomCount} icon={PhoneCall} />
+            <StatCard title={t('doneToday')} value={doneCount} icon={CheckCircle2} />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* LEFT: my queue */}
+            <Card>
+              <CardHeader className="space-y-3 pb-3">
+                <CardTitle className="text-lg">{t('myQueue')}</CardTitle>
+                {canCall ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Select value={roomId} onValueChange={selectRoom}>
+                      <SelectTrigger className="w-44">
+                        <SelectValue placeholder={t('room')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_ROOM}>{t('noRoom')}</SelectItem>
+                        {(rooms ?? []).map((room) => (
+                          <SelectItem key={room.id} value={room.id}>
+                            {t('roomShort', { room: room.number })}
+                            {room.name ? ` — ${room.name}` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="lg"
+                      className="flex-1 text-base font-semibold"
+                      disabled={!myQueue || busy || waitingCount === 0}
+                      onClick={handleCallNext}
+                    >
+                      <PhoneCall className="mr-2 h-5 w-5" />
+                      {t('callNext')}
+                    </Button>
+                  </div>
+                ) : null}
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {isLoading ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
                     ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  size="lg"
-                  className="flex-1 text-base font-semibold"
-                  disabled={!myQueue || busy || waitingCount === 0}
-                  onClick={handleCallNext}
-                >
-                  <PhoneCall className="mr-2 h-5 w-5" />
-                  {t('callNext')}
-                </Button>
-              </div>
-            ) : null}
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-14 w-full" />
-                ))}
-              </div>
-            ) : !myQueue || activeTickets.length === 0 ? (
-              <EmptyState
-                icon={ListOrdered}
-                title={t('queueEmpty')}
-                description={t('queueEmptyDesc')}
-              />
-            ) : (
-              <ul className="space-y-2">
-                {activeTickets.map((ticket) => (
-                  <TicketRow
-                    key={ticket.id}
-                    ticket={ticket}
-                    onAction={handleAction}
-                    onFinish={handleFinish}
-                    busy={busy}
-                    canAct={canCall}
+                  </div>
+                ) : !myQueue || activeTickets.length === 0 ? (
+                  <EmptyState
+                    icon={ListOrdered}
+                    title={t('queueEmpty')}
+                    description={t('queueEmptyDesc')}
                   />
-                ))}
-              </ul>
-            )}
-            {skippedTickets.length > 0 ? (
-              <div>
-                <p className="mb-2 text-sm font-medium text-muted-foreground">{t('skipped')}</p>
-                <ul className="space-y-2">
-                  {skippedTickets.map((ticket) => (
-                    <TicketRow
-                      key={ticket.id}
-                      ticket={ticket}
-                      onAction={handleAction}
-                      onFinish={handleFinish}
-                      busy={busy}
-                      canAct={canCall}
-                    />
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
+                ) : (
+                  <ul className="space-y-2">
+                    {activeTickets.map((ticket) => (
+                      <TicketRow
+                        key={ticket.id}
+                        ticket={ticket}
+                        onAction={handleAction}
+                        onFinish={handleFinish}
+                        busy={busy}
+                        canAct={canCall}
+                      />
+                    ))}
+                  </ul>
+                )}
+                {skippedTickets.length > 0 ? (
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-muted-foreground">{t('skipped')}</p>
+                    <ul className="space-y-2">
+                      {skippedTickets.map((ticket) => (
+                        <TicketRow
+                          key={ticket.id}
+                          ticket={ticket}
+                          onAction={handleAction}
+                          onFinish={handleFinish}
+                          busy={busy}
+                          canAct={canCall}
+                        />
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
 
-        {/* RIGHT: current patient summary */}
-        <PatientSummary ticket={currentTicket} />
-      </div>
+            {/* RIGHT: current patient summary */}
+            <PatientSummary ticket={currentTicket} />
+          </div>
+        </>
+      ) : null}
 
       <Card>
         <CardHeader className="pb-3">

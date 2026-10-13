@@ -13,6 +13,9 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../common/decorators';
+import { ErrorCode } from '@avishifo/shared';
+import { AppException } from '../../common/app.exception';
+import { AppConfigService } from '../../core/config/app-config.service';
 import type { PaginatedResult } from '../../common/pagination';
 import type { FreeSlot } from '../appointments/slots.service';
 import { PortalAuthGuard, PortalPhone } from './portal-auth.guard';
@@ -32,7 +35,17 @@ import {
   type PortalVisitDto,
   type PortalVisitDetailDto,
 } from './portal.service';
-import { PortalAppointmentsQueryDto, PortalBookDto, PortalCancelAppointmentDto, PortalFeedbackDto, PortalListQueryDto, PortalRequestOtpDto, PortalSlotsQueryDto, PortalUpdateProfileDto, PortalVerifyOtpDto } from './dto';
+import {
+  PortalAppointmentsQueryDto,
+  PortalBookDto,
+  PortalCancelAppointmentDto,
+  PortalFeedbackDto,
+  PortalListQueryDto,
+  PortalRequestOtpDto,
+  PortalSlotsQueryDto,
+  PortalUpdateProfileDto,
+  PortalVerifyOtpDto,
+} from './dto';
 
 const OTP_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
 
@@ -48,6 +61,7 @@ export class PortalController {
   constructor(
     private readonly portal: PortalService,
     private readonly recordAccessService: RecordAccessService,
+    private readonly appConfig: AppConfigService,
   ) {}
 
   // ------------------------------------------------------------------- auth
@@ -56,6 +70,7 @@ export class PortalController {
   @Throttle(OTP_THROTTLE)
   @HttpCode(200)
   requestOtp(@Body() dto: PortalRequestOtpDto): Promise<{ requested: true }> {
+    this.requireWebPortal();
     return this.portal.requestOtp(dto);
   }
 
@@ -65,7 +80,18 @@ export class PortalController {
   verify(
     @Body() dto: PortalVerifyOtpDto,
   ): Promise<{ accessToken: string; phone: string; isNew: boolean }> {
+    this.requireWebPortal();
     return this.portal.verifyOtp(dto);
+  }
+
+  private requireWebPortal(): void {
+    if (this.appConfig.env.SINGLE_CLINIC_MODE) {
+      throw new AppException(
+        ErrorCode.FORBIDDEN,
+        'Bemor ma’lumotlari Telegram bot orqali olinadi.',
+        403,
+      );
+    }
   }
 
   // --------------------------------------------------------- public catalog
@@ -90,10 +116,7 @@ export class PortalController {
 
   @Post('book')
   @UseGuards(PortalAuthGuard)
-  book(
-    @PortalPhone() phone: string,
-    @Body() dto: PortalBookDto,
-  ): Promise<PortalBookingResultDto> {
+  book(@PortalPhone() phone: string, @Body() dto: PortalBookDto): Promise<PortalBookingResultDto> {
     return this.portal.book(phone, dto);
   }
 
@@ -219,6 +242,25 @@ export class PortalController {
 
   // ---------------------------------------------------- medical-record access
 
+  @Get('me/visit-reports')
+  @UseGuards(PortalAuthGuard)
+  visitReports(@PortalPhone() phone: string, @Query() query: PortalListQueryDto) {
+    return this.portal.getVisitReports(phone, query);
+  }
+
+  @Get('me/visit-reports/:id/download')
+  @UseGuards(PortalAuthGuard)
+  async downloadVisitReport(
+    @PortalPhone() phone: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<StreamableFile> {
+    const { buffer, fileName } = await this.portal.visitReportPdfDownload(phone, id);
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${fileName}"`,
+    });
+  }
+
   /**
    * One row per clinic the patient has records in, with its access state. Lab
    * results are never gated by this — only the clinical narrative is.
@@ -251,9 +293,12 @@ export class PortalController {
   @Post('me/telegram/link')
   @UseGuards(PortalAuthGuard)
   @HttpCode(200)
-  telegramLink(
-    @PortalPhone() phone: string,
-  ): Promise<{ token: string; deepLink: string | null; botUsername: string | null; enabled: boolean }> {
+  telegramLink(@PortalPhone() phone: string): Promise<{
+    token: string;
+    deepLink: string | null;
+    botUsername: string | null;
+    enabled: boolean;
+  }> {
     return this.portal.createTelegramLinkToken(phone);
   }
 

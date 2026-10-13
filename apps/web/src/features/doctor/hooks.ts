@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import type {
   AddDiagnosisInput,
   AddPrescriptionInput,
+  ReplacePrescriptionsInput,
   AddReferralInput,
   AmendVisitInput,
   UpdateVisitInput,
@@ -23,7 +24,7 @@ import { doctorApi } from './api';
 export function useApiErrorToast(): (err: unknown) => void {
   const tErr = useTranslations('errors');
   return (err: unknown) => {
-    if (err instanceof ApiError) toast.error(tErr(err.code as never));
+    if (err instanceof ApiError) toast.error(tErr.has(err.code) ? tErr(err.code) : err.message);
     else toast.error(tErr('INTERNAL_ERROR' as never));
   };
 }
@@ -80,8 +81,7 @@ export function usePatientLastVisits(patientId: string | null) {
 export function useMyVisits(doctorUserId: string | null, page: number) {
   return useQuery({
     queryKey: ['visits', { doctorUserId, page }],
-    queryFn: () =>
-      doctorApi.listVisits({ doctorUserId: doctorUserId as string, page, limit: 10 }),
+    queryFn: () => doctorApi.listVisits({ doctorUserId: doctorUserId as string, page, limit: 10 }),
     enabled: !!doctorUserId,
   });
 }
@@ -198,10 +198,12 @@ function useVisitMutation<TVars, TData>(
   const queryClient = useQueryClient();
   const onError = useApiErrorToast();
   return useMutation({
+    mutationKey: ['visits', visitId],
     mutationFn,
     onSuccess: (data) => {
       if (opts?.successMessage) toast.success(opts.successMessage);
-      void queryClient.invalidateQueries({ queryKey: ['visits', visitId] });
+      void queryClient.invalidateQueries({ queryKey: ['visits'] });
+      void queryClient.invalidateQueries({ queryKey: ['clinical-orders'] });
       opts?.onSuccess?.(data);
     },
     onError,
@@ -219,11 +221,10 @@ export function useUpdateVisit(visitId: string) {
 
 export function useAmendVisit(visitId: string, onDone?: () => void) {
   const t = useTranslations('visits');
-  return useVisitMutation(
-    visitId,
-    (body: AmendVisitInput) => doctorApi.amendVisit(visitId, body),
-    { successMessage: t('amendmentSaved'), onSuccess: onDone },
-  );
+  return useVisitMutation(visitId, (body: AmendVisitInput) => doctorApi.amendVisit(visitId, body), {
+    successMessage: t('amendmentSaved'),
+    onSuccess: onDone,
+  });
 }
 
 export function useUpsertVitals(visitId: string) {
@@ -251,6 +252,15 @@ export function useRemoveDiagnosis(visitId: string) {
   });
 }
 
+export function useReplacePrescriptions(visitId: string) {
+  const t = useTranslations('visits');
+  return useVisitMutation(
+    visitId,
+    (body: ReplacePrescriptionsInput) => doctorApi.replacePrescriptions(visitId, body),
+    { successMessage: t('rx.saved') },
+  );
+}
+
 export function useAddPrescription(visitId: string) {
   const t = useTranslations('visits');
   return useVisitMutation(
@@ -262,11 +272,9 @@ export function useAddPrescription(visitId: string) {
 
 export function useRemovePrescription(visitId: string) {
   const tCommon = useTranslations('common');
-  return useVisitMutation(
-    visitId,
-    (rxId: string) => doctorApi.removePrescription(visitId, rxId),
-    { successMessage: tCommon('deleted') },
-  );
+  return useVisitMutation(visitId, (rxId: string) => doctorApi.removePrescription(visitId, rxId), {
+    successMessage: tCommon('deleted'),
+  });
 }
 
 export function useAddReferral(visitId: string) {

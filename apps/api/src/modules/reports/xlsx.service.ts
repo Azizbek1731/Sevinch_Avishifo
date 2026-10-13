@@ -5,8 +5,10 @@ export interface SheetColumn {
   header: string;
   key: string;
   width?: number;
-  /** Money values arrive as decimal strings → rendered as numbers with '#,##0'. */
+  /** Money values arrive as decimal strings → rendered as numbers with '#,##0.00'. */
   money?: boolean;
+  /** Decimal quantities support spreadsheet sums without combining unlike units. */
+  quantity?: boolean;
 }
 
 export interface SheetSpec {
@@ -15,8 +17,7 @@ export interface SheetSpec {
   rows: Array<Record<string, unknown>>;
 }
 
-export const XLSX_MIME_TYPE =
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+export const XLSX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 /** Generic XLSX builder shared by every report export (spec §M12). */
 @Injectable()
@@ -38,16 +39,16 @@ export class XlsxService {
         const values: Record<string, unknown> = {};
         for (const c of spec.columns) {
           const v = row[c.key];
-          values[c.key] =
-            c.money && typeof v === 'string' && v !== '' ? Number(v) : (v ?? null);
+          const numeric = (c.money || c.quantity) && typeof v === 'string' && /^-?\d+(?:\.\d+)?$/.test(v);
+          values[c.key] = numeric ? Number(v) : (v ?? null);
         }
         ws.addRow(values);
       }
 
       for (const c of spec.columns) {
-        if (c.money) {
+        if (c.money || c.quantity) {
           const col = ws.getColumn(c.key);
-          col.numFmt = '#,##0';
+          col.numFmt = c.quantity ? '#,##0.###' : '#,##0.00';
         }
       }
     }

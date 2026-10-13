@@ -60,16 +60,24 @@ export function useLabOrders(params: Omit<LabOrdersQuery, 'branchId'>) {
   return useQuery({
     queryKey: ['lab', 'orders', { ...params, branchId }],
     queryFn: () => labApi.listOrders({ ...params, branchId: branchId ?? undefined }),
+    refetchInterval: 30_000,
   });
 }
 
 /** Per-status totals for the chips row (meta.total of limit-1 queries). */
-export function useLabStatusCounts(): Partial<Record<LabOrderStatus, number>> {
+export function useLabStatusCounts(includeUnpaid = false): Partial<Record<LabOrderStatus, number>> {
   const branchId = useAuthStore((s) => s.activeBranchId);
   return useQueries({
     queries: WORKLIST_STATUSES.map((status) => ({
-      queryKey: ['lab', 'orders', 'count', status, branchId] as const,
-      queryFn: () => labApi.listOrders({ status, branchId: branchId ?? undefined, page: 1, limit: 1 }),
+      queryKey: ['lab', 'orders', 'count', status, branchId, includeUnpaid] as const,
+      queryFn: () =>
+        labApi.listOrders({
+          status,
+          branchId: branchId ?? undefined,
+          page: 1,
+          limit: 1,
+          includeUnpaid,
+        }),
     })),
     combine: (results) => {
       const counts: Partial<Record<LabOrderStatus, number>> = {};
@@ -86,6 +94,7 @@ export function useLabOrder(id: string) {
   return useQuery({
     queryKey: ['lab', 'order', id],
     queryFn: async () => (await labApi.getOrder(id)).data,
+    refetchInterval: 30_000,
   });
 }
 
@@ -128,10 +137,11 @@ export function useLabCatalogSummary(enabled = true) {
 
 function useInvalidateLab() {
   const queryClient = useQueryClient();
-  return useCallback(
-    () => queryClient.invalidateQueries({ queryKey: ['lab'] }),
-    [queryClient],
-  );
+  return useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['patients', 'lab-orders'] });
+    void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    return queryClient.invalidateQueries({ queryKey: ['lab'] });
+  }, [queryClient]);
 }
 
 export function useCreateLabOrder(onCreated?: (orderId: string) => void) {

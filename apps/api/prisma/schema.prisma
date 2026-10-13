@@ -23,6 +23,7 @@ enum UserRole {
   RECEPTIONIST
   CASHIER
   LAB_TECH
+  OPERATING_ROOM
   ACCOUNTANT
   PATIENT
 }
@@ -128,6 +129,9 @@ enum ServiceKind {
   ULTRASOUND
   PROCEDURE
   DIAGNOSTICS
+  SURGERY
+  MATERIAL
+  MEDICINE
   OTHER
 }
 
@@ -497,6 +501,9 @@ model User {
   createdAppointments Appointment[]       @relation("AppointmentCreator")
   doctorQueues        Queue[]             @relation("DoctorQueues")
   doctorTickets       QueueTicket[]       @relation("DoctorTickets")
+  clinicalOrders      ClinicalOrder[]
+  surgeries           SurgeryCase[]
+  surgeryPayouts      SurgeryPayout[]
   doctorVisits        Visit[]             @relation("DoctorVisits")
   compensationRules   CompensationRule[]
   payrollAccruals     PayrollAccrual[]
@@ -686,13 +693,13 @@ model Admission {
   bed                   String? // o'rin
   attendingDoctorUserId String?
 
-  admittedAt   DateTime  @db.Timestamptz(6)
-  dischargedAt DateTime? @db.Timestamptz(6)
+  admittedAt      DateTime  @db.Timestamptz(6)
+  dischargedAt    DateTime? @db.Timestamptz(6)
   /// What this stay still owed at the instant it was closed. 0.00 means it was
   /// settled; a value means it was closed over an acknowledged debt. Stored
   /// rather than derived, because the invoices behind it can later be
   /// cancelled or refunded and would no longer answer the same question.
-  debtAtDischarge Decimal? @db.Decimal(14, 2)
+  debtAtDischarge Decimal?  @db.Decimal(14, 2)
 
   // ------- 003 title page -------
   referredBy                 String? // kim yuborgan
@@ -723,6 +730,7 @@ model Admission {
   orders      TreatmentOrder[]
   dailyNotes  AdmissionDailyNote[]
   chargeItems ChargeItem[]
+  surgeries   SurgeryCase[]
 
   @@unique([clinicId, historyNumber])
   @@index([clinicId, status])
@@ -744,18 +752,24 @@ model TreatmentOrder {
   timesPerDay  Int           @default(1)
   note         String?
   stoppedAt    DateTime?     @db.Timestamptz(6)
+  /// Reception bills the ordered quantity immediately; clinical marks never bill it again.
+  billedOnOrder Boolean     @default(false)
+  billingChargeId String?   @unique
+  requestKey   String?
+  requestFingerprint String?
   createdAt    DateTime      @default(now()) @db.Timestamptz(6)
 
   admission       Admission                 @relation(fields: [admissionId], references: [id])
   service         Service                   @relation(fields: [serviceId], references: [id])
   administrations TreatmentAdministration[]
+  billingCharge   ChargeItem? @relation("TreatmentOrderCharge", fields: [billingChargeId], references: [id], onDelete: Restrict)
 
+  @@unique([clinicId, admissionId, requestKey])
   @@index([clinicId, admissionId])
 }
 
-/// One planned day of one order, marked off by the ward/desk. GIVEN creates
-/// the charge; SKIPPED is the record that it was offered and not taken — the
-/// difference between "not billed" and "forgotten".
+/// One planned day of one order, marked off clinically. Legacy orders bill
+/// GIVEN marks; upfront-billed orders keep these records separate from money.
 model TreatmentAdministration {
   id         String               @id @default(uuid(7))
   clinicId   String
@@ -776,8 +790,8 @@ model TreatmentAdministration {
 
 /// A service written to the patient's account but not necessarily paid yet.
 /// The payment screen lists PENDING ones with checkboxes — pay all, or a few.
-/// Inpatient charges come from administrations; outpatient ones are written
-/// directly (visitId set when from a consultation).
+/// Inpatient charges come from ordered treatment quantities or legacy dose
+/// administrations; outpatient ones can be written directly.
 model ChargeItem {
   id               String       @id @default(uuid(7))
   clinicId         String
@@ -787,6 +801,7 @@ model ChargeItem {
   visitId          String?
   administrationId String?      @unique
   serviceId        String?
+  surgeryId        String?
   /// Name snapshot at write time { uz, ru, en }
   title            Json
   date             DateTime     @db.Date
@@ -795,15 +810,133 @@ model ChargeItem {
   status           ChargeStatus @default(PENDING)
   invoiceLineId    String?
   createdById      String?
+  requestKey       String?
+  requestFingerprint String?
   createdAt        DateTime     @default(now()) @db.Timestamptz(6)
 
   patient        Patient                  @relation(fields: [patientId], references: [id])
   admission      Admission?               @relation(fields: [admissionId], references: [id])
   administration TreatmentAdministration? @relation(fields: [administrationId], references: [id])
   service        Service?                 @relation(fields: [serviceId], references: [id])
+  surgery        SurgeryCase?             @relation("SurgeryCharges", fields: [surgeryId], references: [id])
+  surgeryFee     SurgeryCase?             @relation("SurgeryFee")
+  surgeryEntry   SurgeryEntry?            @relation("SurgeryEntryCharge")
+  treatmentOrder TreatmentOrder?          @relation("TreatmentOrderCharge")
 
+  @@unique([clinicId, requestKey])
   @@index([clinicId, patientId, status])
   @@index([clinicId, admissionId])
+  @@index([clinicId, surgeryId])
+}
+
+enum SurgeryStatus {
+  PLANNED
+  COMPLETED
+  CANCELLED
+}
+
+enum SurgeryEntryKind {
+  MATERIAL
+  ANESTHESIA
+}
+
+enum SurgeryPayoutType {
+  PERCENT
+  FIXED
+}
+
+/// One operation during a hospital stay. Fees and usage enter the existing patient ledger.
+model SurgeryCase {
+  id                 String        @id @default(uuid(7))
+  clinicId           String
+  branchId           String
+  admissionId        String
+  patientId          String
+  serviceId          String
+  surgeonUserId      String
+  serviceChargeId    String        @unique
+  scheduledDate      DateTime      @db.Date
+  status             SurgeryStatus @default(PLANNED)
+  note               String?
+  completedAt        DateTime?     @db.Timestamptz(6)
+  createdById        String
+  requestKey         String
+  requestFingerprint String
+  createdAt          DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime      @updatedAt @db.Timestamptz(6)
+
+  admission     Admission       @relation(fields: [admissionId], references: [id])
+  patient       Patient         @relation(fields: [patientId], references: [id])
+  service       Service         @relation(fields: [serviceId], references: [id])
+  surgeon       User            @relation(fields: [surgeonUserId], references: [id])
+  serviceCharge ChargeItem      @relation("SurgeryFee", fields: [serviceChargeId], references: [id])
+  charges       ChargeItem[]    @relation("SurgeryCharges")
+  entries       SurgeryEntry[]
+  payouts       SurgeryPayout[]
+
+  @@unique([clinicId, requestKey])
+  @@index([clinicId, branchId, scheduledDate])
+  @@index([clinicId, admissionId])
+}
+
+/// Immutable usage snapshot; cancelling its pending charge keeps the clinical history.
+model SurgeryEntry {
+  id                 String           @id @default(uuid(7))
+  clinicId           String
+  surgeryId          String
+  kind               SurgeryEntryKind
+  serviceId          String?
+  title              Json
+  quantity           Decimal          @db.Decimal(12, 3)
+  unit               String
+  unitPrice          Decimal          @db.Decimal(14, 2)
+  chargeItemId       String           @unique
+  note               String?
+  requestKey         String
+  requestFingerprint String
+  lineIndex          Int
+  createdById        String
+  createdAt          DateTime         @default(now()) @db.Timestamptz(6)
+
+  surgery    SurgeryCase @relation(fields: [surgeryId], references: [id])
+  service    Service?    @relation(fields: [serviceId], references: [id])
+  chargeItem ChargeItem  @relation("SurgeryEntryCharge", fields: [chargeItemId], references: [id])
+
+  @@unique([surgeryId, requestKey, lineIndex])
+  @@index([clinicId, surgeryId])
+}
+
+/// A surgeon's same-day fee, backed by exactly one cashier expense.
+model SurgeryPayout {
+  id                 String            @id @default(uuid(7))
+  clinicId           String
+  branchId           String
+  surgeryId          String
+  doctorUserId       String
+  patientId          String
+  type               SurgeryPayoutType
+  value              Decimal           @db.Decimal(14, 2)
+  basisAmount        Decimal           @db.Decimal(14, 2)
+  amount             Decimal           @db.Decimal(14, 2)
+  method             PaymentMethod
+  expenseId          String            @unique
+  requestKey         String
+  requestFingerprint String
+  note               String?
+  paidAt             DateTime          @default(now()) @db.Timestamptz(6)
+  createdById        String
+  voidedAt           DateTime?         @db.Timestamptz(6)
+  voidedById         String?
+  voidReason         String?
+
+  surgery SurgeryCase @relation(fields: [surgeryId], references: [id])
+  doctor  User        @relation(fields: [doctorUserId], references: [id])
+  patient Patient     @relation(fields: [patientId], references: [id])
+  expense Expense     @relation(fields: [expenseId], references: [id])
+
+  @@unique([clinicId, requestKey])
+  @@index([clinicId, branchId, paidAt])
+  @@index([clinicId, surgeryId])
 }
 
 /// Kundalik — the daily note in the 003 history.
@@ -869,11 +1002,14 @@ model Patient {
   appointments        Appointment[]
   queueTickets        QueueTicket[]
   visits              Visit[]
+  clinicalOrders      ClinicalOrder[]
   invoices            Invoice[]
   balanceTransactions PatientBalanceTransaction[]
   labOrders           LabOrder[]
   feedbacks           Feedback[]
   admissions          Admission[]
+  surgeries           SurgeryCase[]
+  surgeryPayouts      SurgeryPayout[]
   chargeItems         ChargeItem[]
   telegramLinks       TelegramLink[]
 
@@ -898,8 +1034,9 @@ model PatientDocument {
   labOrderId   String?
   createdAt    DateTime         @default(now()) @db.Timestamptz(6)
 
-  patient  Patient   @relation(fields: [patientId], references: [id])
-  labOrder LabOrder? @relation(fields: [labOrderId], references: [id])
+  patient    Patient     @relation(fields: [patientId], references: [id])
+  labOrder   LabOrder?   @relation(fields: [labOrderId], references: [id])
+  labResults LabResult[]
 
   @@index([clinicId, patientId])
   @@index([labOrderId])
@@ -1095,26 +1232,32 @@ model QueueTicket {
 // ============================================================ VISITS / EHR (M6)
 
 model Visit {
-  id             String      @id @default(uuid(7))
-  clinicId       String
-  branchId       String
-  patientId      String
-  doctorUserId   String
-  appointmentId  String?     @unique
-  ticketId       String?     @unique
-  status         VisitStatus @default(IN_PROGRESS)
+  id                   String         @id @default(uuid(7))
+  clinicId             String
+  branchId             String
+  patientId            String
+  doctorUserId         String
+  appointmentId        String?        @unique
+  ticketId             String?        @unique
+  status               VisitStatus    @default(IN_PROGRESS)
+  kind                 ServiceKind    @default(CONSULTATION)
+  reportTitle          String?
+  reportBody           String?
+  clinicalOrder        ClinicalOrder?
   // SOAP
-  subjective     String?
-  objective      String?
-  assessmentNote String?
-  plan           String?
-  startedAt      DateTime    @default(now()) @db.Timestamptz(6)
-  completedAt    DateTime?   @db.Timestamptz(6)
+  subjective           String?
+  objective            String?
+  assessmentNote       String?
+  plan                 String?
+  physiotherapy        String?
+  prescriptionRevision Int            @default(0)
+  startedAt            DateTime       @default(now()) @db.Timestamptz(6)
+  completedAt          DateTime?      @db.Timestamptz(6)
   /// completedAt + clinic.visitLockHours → read-only; edits become amendments
-  lockedAt       DateTime?   @db.Timestamptz(6)
-  nextVisitAt    DateTime?   @db.Timestamptz(6)
-  createdAt      DateTime    @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime    @updatedAt @db.Timestamptz(6)
+  lockedAt             DateTime?      @db.Timestamptz(6)
+  nextVisitAt          DateTime?      @db.Timestamptz(6)
+  createdAt            DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime       @updatedAt @db.Timestamptz(6)
 
   patient       Patient          @relation(fields: [patientId], references: [id])
   doctor        User             @relation("DoctorVisits", fields: [doctorUserId], references: [id])
@@ -1168,16 +1311,24 @@ model Diagnosis {
 }
 
 model Prescription {
-  id           String   @id @default(uuid(7))
-  clinicId     String
-  visitId      String
-  drugName     String
-  drugId       String?
-  dosage       String? // "500 mg"
-  frequency    String? // "3 mahal"
-  durationDays Int?
-  instructions String?
-  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  id                  String   @id @default(uuid(7))
+  clinicId            String
+  visitId             String
+  drugName            String
+  drugId              String?
+  dosage              String? // "500 mg"
+  frequency           String? // "3 mahal"
+  durationDays        Int?
+  instructions        String?
+  strength            String?
+  form                String?
+  quantity            String?
+  route               String?
+  durationText        String?
+  dripRate            String?
+  combineWithPrevious Boolean  @default(false)
+  sortOrder           Int      @default(0)
+  createdAt           DateTime @default(now()) @db.Timestamptz(6)
 
   visit Visit          @relation(fields: [visitId], references: [id], onDelete: Cascade)
   drug  DrugDirectory? @relation(fields: [drugId], references: [id])
@@ -1272,6 +1423,7 @@ model Service {
   /// Multilingual name { uz, ru, en }
   name        Json
   durationMin Int      @default(15)
+  unit        String   @default("dona")
   vatIncluded Boolean  @default(true)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now()) @db.Timestamptz(6)
@@ -1286,6 +1438,8 @@ model Service {
   compensationRules   CompensationRule[]
   treatmentOrders     TreatmentOrder[]
   chargeItems         ChargeItem[]
+  surgeries           SurgeryCase[]
+  surgeryEntries      SurgeryEntry[]
 
   @@unique([clinicId, code])
   @@index([clinicId, categoryId])
@@ -1354,31 +1508,39 @@ model DiscountRule {
 // ============================================================ BILLING (M8)
 
 model Invoice {
-  id            String        @id @default(uuid(7))
-  clinicId      String
-  branchId      String
+  id                 String        @id @default(uuid(7))
+  clinicId           String
+  branchId           String
   /// e.g. "INV-2026-000123" per clinic settings format
-  number        String
-  patientId     String
-  visitId       String?
-  status        InvoiceStatus @default(DRAFT)
-  subtotal      Decimal       @default(0) @db.Decimal(14, 2)
-  discountTotal Decimal       @default(0) @db.Decimal(14, 2)
-  total         Decimal       @default(0) @db.Decimal(14, 2)
-  paidTotal     Decimal       @default(0) @db.Decimal(14, 2)
-  note          String?
-  issuedAt      DateTime?     @db.Timestamptz(6)
-  createdById   String?
-  createdAt     DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime      @updatedAt @db.Timestamptz(6)
+  number             String
+  patientId          String
+  visitId            String?
+  status             InvoiceStatus @default(DRAFT)
+  subtotal           Decimal       @default(0) @db.Decimal(14, 2)
+  discountTotal      Decimal       @default(0) @db.Decimal(14, 2)
+  total              Decimal       @default(0) @db.Decimal(14, 2)
+  paidTotal          Decimal       @default(0) @db.Decimal(14, 2)
+  note               String?
+  issuedAt           DateTime?     @db.Timestamptz(6)
+  createdById        String?
+  /// Stable quick-entry request identity, scoped to the clinic.
+  requestKey         String?
+  requestFingerprint String?
+  createdAt          DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime      @updatedAt @db.Timestamptz(6)
 
-  patient  Patient       @relation(fields: [patientId], references: [id])
-  visit    Visit?        @relation(fields: [visitId], references: [id])
-  lines    InvoiceLine[]
-  payments Payment[]
-  refunds  Refund[]
+  clinicalOrderId      String?
+  clinicalOrder        ClinicalOrder? @relation("ClinicalOrderInvoices", fields: [clinicalOrderId], references: [id])
+  initialClinicalOrder ClinicalOrder? @relation("InitialClinicalInvoice")
+  labOrder             LabOrder?
+  patient              Patient        @relation(fields: [patientId], references: [id])
+  visit                Visit?         @relation(fields: [visitId], references: [id])
+  lines                InvoiceLine[]
+  payments             Payment[]
+  refunds              Refund[]
 
   @@unique([clinicId, number])
+  @@unique([clinicId, requestKey])
   @@index([clinicId, branchId, createdAt])
   @@index([clinicId, patientId])
   @@index([clinicId, status])
@@ -1412,6 +1574,7 @@ model Payment {
   invoiceId      String
   amount         Decimal       @db.Decimal(14, 2)
   method         PaymentMethod
+  note           String?
   status         PaymentStatus @default(COMPLETED)
   shiftId        String?
   /// External provider transaction id (Payme/Click/Uzum)
@@ -1501,6 +1664,12 @@ model CashierShift {
   openedAt        DateTime           @default(now()) @db.Timestamptz(6)
   closedAt        DateTime?          @db.Timestamptz(6)
   openingCash     Decimal            @default(0) @db.Decimal(14, 2)
+  openingCard     Decimal            @default(0) @db.Decimal(14, 2)
+  openingClick    Decimal            @default(0) @db.Decimal(14, 2)
+  expectedCard    Decimal?           @db.Decimal(14, 2)
+  expectedClick   Decimal?           @db.Decimal(14, 2)
+  actualCard      Decimal?           @db.Decimal(14, 2)
+  actualClick     Decimal?           @db.Decimal(14, 2)
   /// What the transfer account held when the register opened, entered by the
   /// person opening it. The owner decided both books open and close the same
   /// way, with a starting figure each — this overrides the earlier
@@ -1537,13 +1706,15 @@ model CashierShift {
 }
 
 model ExpenseCategory {
-  id       String  @id @default(uuid(7))
-  clinicId String
-  name     String
-  isActive Boolean @default(true)
+  id        String  @id @default(uuid(7))
+  clinicId  String
+  name      String
+  isActive  Boolean @default(true)
+  systemKey String?
 
   expenses Expense[]
 
+  @@unique([clinicId, systemKey])
   @@index([clinicId])
 }
 
@@ -1570,8 +1741,9 @@ model Expense {
   deletedAt   DateTime?     @db.Timestamptz(6)
   deletedById String?
 
-  category ExpenseCategory @relation(fields: [categoryId], references: [id])
-  shift    CashierShift?   @relation(fields: [shiftId], references: [id])
+  category      ExpenseCategory @relation(fields: [categoryId], references: [id])
+  shift         CashierShift?   @relation(fields: [shiftId], references: [id])
+  surgeryPayout SurgeryPayout?
 
   @@index([clinicId, branchId, date])
   @@index([clinicId, shiftId])
@@ -1669,6 +1841,8 @@ model LabOrder {
   orderNumber        String
   patientId          String
   visitId            String?
+  invoiceId          String?             @unique
+  invoice            Invoice?            @relation(fields: [invoiceId], references: [id])
   status             LabOrderStatus      @default(ORDERED)
   /// Pregnancy trimester or cycle phase at collection time — selects the right
   /// reference interval for hormones, haemoglobin and platelets.
@@ -1713,8 +1887,10 @@ model LabResult {
   createdAt    DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
 
-  orderItem LabOrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  values    LabResultValue[]
+  reportDocumentId String?
+  reportDocument   PatientDocument? @relation(fields: [reportDocumentId], references: [id])
+  orderItem        LabOrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  values           LabResultValue[]
 }
 
 model LabResultValue {
@@ -1943,4 +2119,31 @@ model AuditLog {
 
   @@index([clinicId, entity, createdAt])
   @@index([clinicId, userId, createdAt])
+}
+
+/// Reception's billed outpatient request. Payment state is derived from invoices.
+model ClinicalOrder {
+  id                 String      @id @default(uuid(7))
+  clinicId           String
+  branchId           String
+  patientId          String
+  doctorUserId       String
+  kind               ServiceKind
+  initialInvoiceId   String      @unique
+  visitId            String?     @unique
+  note               String?
+  requestKey         String
+  requestFingerprint String
+  createdAt          DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime    @updatedAt @db.Timestamptz(6)
+  patient            Patient     @relation(fields: [patientId], references: [id])
+  doctor             User        @relation(fields: [doctorUserId], references: [id])
+  initialInvoice     Invoice     @relation("InitialClinicalInvoice", fields: [initialInvoiceId], references: [id])
+  invoices           Invoice[]   @relation("ClinicalOrderInvoices")
+  visit              Visit?      @relation(fields: [visitId], references: [id])
+
+  @@unique([clinicId, requestKey])
+  @@index([clinicId, branchId, createdAt])
+  @@index([clinicId, doctorUserId, createdAt])
+  @@index([clinicId, patientId])
 }

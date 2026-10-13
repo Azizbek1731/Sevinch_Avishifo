@@ -61,7 +61,7 @@ export class LabCatalogController {
   }
 
   @Post('import')
-  @RequirePermissions('lab.orders.write')
+  @RequirePermissions('services.write')
   import(@Body() dto: ImportLabCatalogDto): Promise<Record<string, unknown>> {
     return this.catalog.import(dto);
   }
@@ -73,7 +73,7 @@ export class LabTestsController {
   constructor(private readonly lab: LabService) {}
 
   @Post()
-  @RequirePermissions('lab.orders.write')
+  @RequirePermissions('services.write')
   createTest(@Body() dto: CreateLabTestDto): Promise<Record<string, unknown>> {
     return this.lab.createTest(dto);
   }
@@ -85,7 +85,7 @@ export class LabTestsController {
   }
 
   @Patch(':id')
-  @RequirePermissions('lab.orders.write')
+  @RequirePermissions('services.write')
   updateTest(
     @Param('id') id: string,
     @Body() dto: UpdateLabTestDto,
@@ -110,7 +110,7 @@ export class LabOrdersController {
     @Body() dto: CreateLabOrderDto,
     @CurrentUser() user: AuthUser,
   ): Promise<Record<string, unknown>> {
-    return this.lab.createOrder(dto, user.id);
+    return this.lab.createOrder(dto, user);
   }
 
   @Get()
@@ -135,7 +135,7 @@ export class LabOrdersController {
   }
 
   @Post(':id/status')
-  @RequirePermissions('lab.orders.write')
+  @RequirePermissions('lab.results.write')
   updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateLabOrderStatusDto,
@@ -172,6 +172,22 @@ export class LabOrdersController {
       user.id,
       id,
     );
+  }
+
+  @Get(':id/attachments/:documentId/download')
+  @RequirePermissions('lab.orders.read')
+  async downloadAttachment(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<StreamableFile> {
+    await this.lab.requireAttachment(id, documentId);
+    const file = await this.documents.download(documentId);
+    response.setHeader('Cache-Control', 'no-store');
+    return new StreamableFile(file.stream, {
+      type: file.mimeType,
+      disposition: `attachment; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,
+    });
   }
 
   @Post('items/:itemId/results')

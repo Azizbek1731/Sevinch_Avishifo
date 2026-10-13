@@ -83,6 +83,7 @@ export const dischargeSchema = z.object({
 export type DischargeInput = z.infer<typeof dischargeSchema>;
 
 export const createOrderSchema = z.object({
+  idempotencyKey: z.string().uuid().optional(),
   serviceId: idSchema,
   schedule: orderScheduleSchema,
   startDate: dateOnly,
@@ -127,6 +128,7 @@ export type AdmissionQueryInput = z.infer<typeof admissionQuerySchema>;
 
 /** A charge written directly (an outpatient consultation service). */
 export const addChargeSchema = z.object({
+  idempotencyKey: z.string().uuid().optional(),
   patientId: idSchema,
   serviceId: idSchema.optional(),
   title: z.string().trim().min(1).max(200).optional(),
@@ -148,3 +150,10 @@ export const invoiceChargesSchema = z.object({
   idempotencyKey: z.string().uuid().optional(),
 });
 export type InvoiceChargesInput = z.infer<typeof invoiceChargesSchema>;
+
+export const chargeQuerySchema = z.object({
+  patientId: idSchema,
+  admissionId: idSchema.optional(),
+  status: z.enum(['PENDING', 'INVOICED', 'CANCELLED']).optional(),
+});
+export type ChargeQueryInput = z.infer<typeof chargeQuerySchema>;

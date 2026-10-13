@@ -77,6 +77,11 @@ export function ShiftPaymentsCard() {
                   <p className="text-xs text-muted-foreground">
                     {tb(`methods.${p.method}`)} · {formatTz(p.paidAt)}
                   </p>
+                  {p.note ? (
+                    <p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                      {tb('pay.note')}: {p.note}
+                    </p>
+                  ) : null}
                 </div>
                 <span
                   className={`shrink-0 whitespace-nowrap font-medium tabular-nums${

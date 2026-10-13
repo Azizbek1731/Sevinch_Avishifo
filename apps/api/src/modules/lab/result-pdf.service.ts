@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 import { formatInTimeZone } from 'date-fns-tz';
-import { ResultFlag, TIMEZONE, formatRangeBounds, type ReferenceRangeInput } from '@avishifo/shared';
+import {
+  ResultFlag,
+  TIMEZONE,
+  formatRangeBounds,
+  type ReferenceRangeInput,
+} from '@avishifo/shared';
 
 /**
  * The lab result as a PDF — the artefact a patient keeps.
@@ -47,6 +52,8 @@ export interface ResultPdfData {
         }>;
       };
       result: {
+        approvedAt?: string | null;
+        reportDocument?: { id: string; title: string; fileName: string } | null;
         note: string | null;
         values: Array<{ parameterId: string; value: string; flag: ResultFlag }>;
       } | null;
@@ -76,6 +83,7 @@ interface PdfLabels {
   note: string;
   approved: string;
   notApproved: string;
+  fileResult: string;
   critical: string;
   page: string;
 }
@@ -98,6 +106,7 @@ const LABELS: Record<'uz' | 'ru' | 'en', PdfLabels> = {
     note: 'Izoh',
     approved: 'Tasdiqladi',
     notApproved: 'Natija hali tasdiqlanmagan',
+    fileResult: 'Natija alohida faylda',
     critical: 'DIQQAT: xavfli (kritik) qiymat — shifokorga murojaat qiling',
     page: 'Sahifa',
   },
@@ -118,6 +127,7 @@ const LABELS: Record<'uz' | 'ru' | 'en', PdfLabels> = {
     note: 'Примечание',
     approved: 'Утвердил(а)',
     notApproved: 'Результат ещё не утверждён',
+    fileResult: 'Результат в отдельном файле',
     critical: 'ВНИМАНИЕ: критическое значение — обратитесь к врачу',
     page: 'Стр.',
   },
@@ -138,6 +148,7 @@ const LABELS: Record<'uz' | 'ru' | 'en', PdfLabels> = {
     note: 'Note',
     approved: 'Approved by',
     notApproved: 'Not yet approved',
+    fileResult: 'Result in a separate file',
     critical: 'ATTENTION: critical value — contact your clinician',
     page: 'Page',
   },
@@ -251,10 +262,13 @@ export class ResultPdfService {
     const y = doc.y;
     const cell = (label: string, value: string, x: number, w: number): void => {
       doc.font('body').fontSize(7.5).fillColor(MUTED).text(label.toUpperCase(), x, y, { width: w });
-      doc.font('bold').fontSize(10).fillColor(INK).text(value, x, y + 10, { width: w });
+      doc
+        .font('bold')
+        .fontSize(10)
+        .fillColor(INK)
+        .text(value, x, y + 10, { width: w });
     };
-    const gender =
-      p.gender === 'MALE' ? L.male : p.gender === 'FEMALE' ? L.female : '—';
+    const gender = p.gender === 'MALE' ? L.male : p.gender === 'FEMALE' ? L.female : '—';
     cell(L.patient, p.fullName, MARGIN, CONTENT_W * 0.42);
     cell(L.card, p.mrn, MARGIN + CONTENT_W * 0.44, CONTENT_W * 0.16);
     cell(L.dob, fmtDate(p.dob), MARGIN + CONTENT_W * 0.62, CONTENT_W * 0.2);
@@ -270,14 +284,33 @@ export class ResultPdfService {
     locale: PdfLocale,
   ): boolean {
     let critical = false;
-    const valueById = new Map(
-      (item.result?.values ?? []).map((v) => [v.parameterId, v] as const),
-    );
+    const valueById = new Map((item.result?.values ?? []).map((v) => [v.parameterId, v] as const));
 
     this.ensureRoom(doc, 64);
     doc.moveDown(0.7);
-    doc.font('bold').fontSize(11.5).fillColor(INK).text(localName(item.labTest.name, locale), MARGIN, doc.y);
+    doc
+      .font('bold')
+      .fontSize(11.5)
+      .fillColor(INK)
+      .text(localName(item.labTest.name, locale), MARGIN, doc.y);
     doc.moveDown(0.35);
+
+    if (item.result?.reportDocument) {
+      doc
+        .font('body')
+        .fontSize(10)
+        .fillColor(INK)
+        .text(`${L.fileResult}: ${item.result.reportDocument.fileName}`, MARGIN, doc.y, {
+          width: CONTENT_W,
+        });
+      if (item.result.note)
+        doc
+          .fontSize(9)
+          .fillColor(MUTED)
+          .text(`${L.note}: ${item.result.note}`, { width: CONTENT_W });
+      doc.moveDown(0.5);
+      return false;
+    }
 
     // Table head
     const headY = doc.y;
@@ -310,13 +343,19 @@ export class ResultPdfService {
       const rowH =
         Math.max(
           ...cells.map((c, i) =>
-            doc.font('body').fontSize(9).heightOfString(String(c), { width: this.colW(i) - 6 }),
+            doc
+              .font('body')
+              .fontSize(9)
+              .heightOfString(String(c), { width: this.colW(i) - 6 }),
           ),
         ) + 7;
       this.ensureRoom(doc, rowH);
       const y = doc.y;
       if (zebra) {
-        doc.rect(MARGIN, y - 2, CONTENT_W, rowH).fillColor(ZEBRA).fill();
+        doc
+          .rect(MARGIN, y - 2, CONTENT_W, rowH)
+          .fillColor(ZEBRA)
+          .fill();
       }
       zebra = !zebra;
 
@@ -327,14 +366,24 @@ export class ResultPdfService {
           : v.flag === ResultFlag.LOW
             ? BLUE
             : INK;
-      doc.font('body').fontSize(9).fillColor(INK).text(param.name, xs[0]! + 3, y, { width: this.colW(0) - 6 });
+      doc
+        .font('body')
+        .fontSize(9)
+        .fillColor(INK)
+        .text(param.name, xs[0]! + 3, y, { width: this.colW(0) - 6 });
       doc
         .font(v.flag === ResultFlag.NORMAL ? 'body' : 'bold')
         .fillColor(valueColor)
         .text(v.value, xs[1]! + 3, y, { width: this.colW(1) - 6 });
-      doc.font('body').fillColor(MUTED).text(param.unit ?? '', xs[2]! + 3, y, { width: this.colW(2) - 6 });
+      doc
+        .font('body')
+        .fillColor(MUTED)
+        .text(param.unit ?? '', xs[2]! + 3, y, { width: this.colW(2) - 6 });
       doc.fillColor(MUTED).text(refText, xs[3]! + 3, y, { width: this.colW(3) - 6 });
-      doc.font('bold').fillColor(valueColor).text(mark, xs[4]! + 3, y, { width: this.colW(4) - 6 });
+      doc
+        .font('bold')
+        .fillColor(valueColor)
+        .text(mark, xs[4]! + 3, y, { width: this.colW(4) - 6 });
       doc.y = y + rowH;
     }
     doc
@@ -359,13 +408,14 @@ export class ResultPdfService {
     doc.moveDown(0.6);
     const y = doc.y;
     doc.rect(MARGIN, y, CONTENT_W, 24).fillColor('#fdecec').fill();
+    doc.rect(MARGIN, y, 3, 24).fillColor(RED).fill();
     doc
-      .rect(MARGIN, y, 3, 24)
+      .font('bold')
+      .fontSize(9)
       .fillColor(RED)
-      .fill();
-    doc.font('bold').fontSize(9).fillColor(RED).text(L.critical, MARGIN + 12, y + 7, {
-      width: CONTENT_W - 20,
-    });
+      .text(L.critical, MARGIN + 12, y + 7, {
+        width: CONTENT_W - 20,
+      });
     doc.y = y + 32;
   }
 
@@ -376,6 +426,12 @@ export class ResultPdfService {
     doc.font('body').fontSize(9).fillColor(INK);
     if (data.approvedBy) {
       doc.text(`${L.approved}: ${data.approvedBy.fullName}`, MARGIN, y);
+      const signedAt = data.order.items.find((item) => item.result?.approvedAt)?.result?.approvedAt;
+      if (signedAt)
+        doc
+          .fontSize(8)
+          .fillColor(MUTED)
+          .text(formatInTimeZone(new Date(signedAt), TIMEZONE, 'dd.MM.yyyy HH:mm'), MARGIN, y + 14);
       doc
         .moveTo(A4.width - MARGIN - 150, y + 10)
         .lineTo(A4.width - MARGIN, y + 10)

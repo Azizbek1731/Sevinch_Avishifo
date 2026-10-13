@@ -18,11 +18,12 @@ export interface ExpenseCategoryRow {
 
 export interface ExpenseRow {
   id: string;
+  surgeryId?: string | null;
   branchId: string;
   categoryId: string;
   amount: MoneyString;
   method: ExpenseMethod;
-  /** Set only for cash taken out of a register. */
+  /** Shift whose cash, card or Click account funded this expense. */
   shiftId: string | null;
   date: string;
   note: string | null;

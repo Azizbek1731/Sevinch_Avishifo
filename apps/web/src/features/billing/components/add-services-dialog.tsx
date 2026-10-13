@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,6 +17,7 @@ import {
   type CreateInvoiceInput,
   type InvoiceSettlement,
   type MoneyString,
+  type QuickInvoiceInput,
 } from '@avishifo/shared';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRouter } from '@/i18n/routing';
@@ -37,6 +38,8 @@ import { useApiErrorToast, useInvalidateBilling, usePermission } from '../hooks'
 import { PatientCombobox } from './patient-combobox';
 import { ReceiptPrinter } from './receipt-printer';
 import { PaymentSplit, splitTotalTiyin } from './payment-split';
+import { inputTiyin, needsOpenShift } from '../payment-methods';
+import { identifyInvoiceRequest, type InvoiceRequestIdentity } from '../invoice-request';
 import { ServiceCombobox } from './service-combobox';
 
 const EMPTY_LINE = { quantity: 1, unitPrice: '0' as MoneyString, discount: '0' as MoneyString };
@@ -57,6 +60,8 @@ export interface AddServicesDialogProps {
   patient?: PatientBrief | null;
   /** Attach the sale to a visit, so the doctor gets the KPI credit. */
   visitId?: string;
+  initialKind?: 'LAB';
+  prepareOnly?: boolean;
 }
 
 /**
@@ -70,6 +75,8 @@ export function AddServicesDialog({
   onOpenChange,
   patient: fixedPatient,
   visitId,
+  initialKind,
+  prepareOnly = false,
 }: AddServicesDialogProps) {
   const t = useTranslations('billing');
   const errorToast = useApiErrorToast();
@@ -79,7 +86,19 @@ export function AddServicesDialog({
   const queryClient = useQueryClient();
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
 
-  const canPay = can('payments.create');
+  const canPay = !prepareOnly && can('payments.create');
+  const isLab = initialKind === 'LAB';
+  const isProcedureOrder = prepareOnly && !isLab;
+  const titleKey = isLab
+    ? 'quick.labTitle'
+    : isProcedureOrder
+      ? 'quick.proceduresTitle'
+      : 'quick.title';
+  const subtitleKey = isLab
+    ? 'quick.labSubtitle'
+    : isProcedureOrder
+      ? 'quick.proceduresSubtitle'
+      : 'quick.subtitle';
 
   const [patient, setPatient] = useState<PatientBrief | null>(fixedPatient ?? null);
   /** Selected service per field-array row, keyed by RHF field id. */
@@ -92,8 +111,7 @@ export function AddServicesDialog({
   const [payments, setPayments] = useState<PaymentPart[]>([
     { method: PaymentMethod.CASH, amount: '0' },
   ]);
-  /** One key per dialog opening: a retried submission reuses it. */
-  const [idempotencyKey, setIdempotencyKey] = useState<string>(() => crypto.randomUUID());
+  const requestIdentity = useRef<InvoiceRequestIdentity | null>(null);
   /** Invoice whose receipt is being pushed to the printer, if any. */
   const [printInvoiceId, setPrintInvoiceId] = useState<string | null>(null);
 
@@ -112,13 +130,13 @@ export function AddServicesDialog({
     setPatient(fixedPatient ?? null);
     setRowServices({});
     setPayments([{ method: PaymentMethod.CASH, amount: '0' }]);
-    setIdempotencyKey(crypto.randomUUID());
+    requestIdentity.current = null;
     form.reset({
       patientId: fixedPatient?.id ?? '',
       branchId: activeBranchId ?? '',
       lines: [{ ...EMPTY_LINE }],
     });
-  }, [open, fixedPatient, activeBranchId]);
+  }, [open, fixedPatient, activeBranchId, initialKind, prepareOnly, form]);
 
   // Cash needs an open shift — warn before the server refuses the payment.
   const { data: shift } = useQuery({
@@ -126,12 +144,11 @@ export function AddServicesDialog({
     queryFn: async () => (await billingApi.currentShift()).data,
     enabled: open && canPay,
   });
-  const cashBlocked =
-    canPay && shift === null && payments.some((p) => p.method === PaymentMethod.CASH);
+  const cashBlocked = canPay && !shift?.open && payments.some((p) => needsOpenShift(p.method));
 
   const mutation = useMutation({
-    mutationFn: ({ values, settle }: { values: CreateInvoiceInput; settle: InvoiceSettlement }) =>
-      billingApi.quickInvoice({
+    mutationFn: ({ values, settle }: { values: CreateInvoiceInput; settle: InvoiceSettlement }) => {
+      const payload: Omit<QuickInvoiceInput, 'idempotencyKey'> = {
         patientId: values.patientId,
         branchId: values.branchId,
         visitId,
@@ -141,13 +158,16 @@ export function AddServicesDialog({
           ? {
               payments:
                 payments.length === 1
-                  ? [{ method: payments[0]!.method, amount: fromTiyin(totalTiyin) }]
+                  ? [{ ...payments[0]!, amount: fromTiyin(totalTiyin) }]
                   : payments,
-              idempotencyKey,
             }
           : {}),
-      }),
+      };
+      requestIdentity.current = identifyInvoiceRequest(payload, requestIdentity.current);
+      return billingApi.quickInvoice({ ...payload, idempotencyKey: requestIdentity.current.key });
+    },
     onSuccess: (res) => {
+      requestIdentity.current = null;
       const { invoice, paid } = res.data;
       const labOrder = (res.data as { labOrder?: { orderNumber: string } | null }).labOrder;
       invalidateBilling();
@@ -167,12 +187,15 @@ export function AddServicesDialog({
           },
         });
       } else {
-        toast.success(t('quick.debtSuccess', { number: invoice.number }), {
-          action: {
-            label: t('quick.viewInvoice'),
-            onClick: () => router.push(`/invoices/${invoice.id}`),
+        toast.success(
+          t(canPay ? 'quick.debtSuccess' : 'quick.sentToCashier', { number: invoice.number }),
+          {
+            action: {
+              label: t('quick.viewInvoice'),
+              onClick: () => router.push(`/invoices/${invoice.id}`),
+            },
           },
-        });
+        );
       }
     },
     onError: errorToast,
@@ -189,16 +212,23 @@ export function AddServicesDialog({
   const total = formatUZS(fromTiyin(totalTiyin));
   // Only meaningful once the sale is actually split: a single row always covers
   // the whole total, because its amount is filled in at submit time.
-  const splitUnbalanced = payments.length > 1 && splitTotalTiyin(payments) !== totalTiyin;
+  const splitUnbalanced =
+    payments.length > 1 &&
+    (payments.some((part) => (inputTiyin(part.amount) ?? 0n) <= 0n) ||
+      splitTotalTiyin(payments) !== totalTiyin);
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{t('quick.title')}</DialogTitle>
+            <DialogTitle>{t(titleKey)}</DialogTitle>
             <DialogDescription>
-              {fixedPatient ? fixedPatient.fullName : t('quick.subtitle')}
+              {fixedPatient && !isLab && !isProcedureOrder
+                ? fixedPatient.fullName
+                : fixedPatient
+                  ? `${fixedPatient.fullName} · ${t(subtitleKey)}`
+                  : t(subtitleKey)}
             </DialogDescription>
           </DialogHeader>
 
@@ -207,6 +237,7 @@ export function AddServicesDialog({
               <div className="space-y-2">
                 <Label>{t('form.patient')}</Label>
                 <PatientCombobox
+                  allowCreate
                   value={patient}
                   onChange={(p) => {
                     setPatient(p);
@@ -220,7 +251,10 @@ export function AddServicesDialog({
             )}
 
             <div className="space-y-2">
-              <Label>{t('form.lines')}</Label>
+              <Label>{t(isLab ? 'quick.tests' : 'form.lines')}</Label>
+              {isProcedureOrder ? (
+                <p className="text-sm text-muted-foreground">{t('quick.proceduresHint')}</p>
+              ) : null}
               <div className="space-y-3">
                 {fields.map((field, idx) => {
                   const line = watchedLines[idx];
@@ -233,8 +267,13 @@ export function AddServicesDialog({
                       className="grid grid-cols-2 items-end gap-2 rounded-md border p-3 md:grid-cols-[minmax(0,1fr)_80px_140px_140px_120px_36px]"
                     >
                       <div className="col-span-2 min-w-0 space-y-1 md:col-span-1">
-                        <span className="text-xs text-muted-foreground">{t('form.service')}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {t(isLab ? 'quick.test' : 'form.service')}
+                        </span>
                         <ServiceCombobox
+                          excludeSurgery
+                          kind={initialKind}
+                          proceduresOnly={isProcedureOrder}
                           value={rowServices[field.id] ?? null}
                           onChange={(s) => {
                             setRowServices((prev) => ({ ...prev, [field.id]: s }));
@@ -259,7 +298,9 @@ export function AddServicesDialog({
                         <Input
                           inputMode="decimal"
                           autoComplete="off"
-                          {...form.register(`lines.${idx}.unitPrice`, { setValueAs: sanitizeMoney })}
+                          {...form.register(`lines.${idx}.unitPrice`, {
+                            setValueAs: sanitizeMoney,
+                          })}
                         />
                       </div>
                       <div className="space-y-1">
@@ -307,7 +348,7 @@ export function AddServicesDialog({
                 onClick={() => append({ ...EMPTY_LINE })}
               >
                 <Plus className="mr-1 h-4 w-4" />
-                {t('form.addLine')}
+                {t(isLab ? 'quick.addTest' : 'form.addLine')}
               </Button>
             </div>
 
@@ -320,7 +361,7 @@ export function AddServicesDialog({
                     total={fromTiyin(totalTiyin)}
                     value={payments}
                     onChange={setPayments}
-                    cashBlocked={shift === null}
+                    cashBlocked={!shift?.open}
                   />
                 </div>
               ) : (
@@ -348,7 +389,7 @@ export function AddServicesDialog({
                 onClick={() => void submit('DEBT')}
               >
                 <NotebookPen className="mr-2 h-5 w-5" />
-                {t('quick.debt')}
+                {t(canPay ? 'quick.debt' : 'quick.sendToCashier')}
               </Button>
               {canPay ? (
                 <Button

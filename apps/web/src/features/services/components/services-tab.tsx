@@ -114,6 +114,7 @@ export function ServicesTab() {
           </div>
         ),
       },
+      { accessorKey: 'unit', header: t('table.unit'), cell: ({ row }) => row.original.unit },
       {
         id: 'duration',
         header: t('table.duration'),

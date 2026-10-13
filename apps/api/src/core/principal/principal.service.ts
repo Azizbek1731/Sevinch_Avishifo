@@ -10,6 +10,7 @@ import {
 } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
 import { PrismaService } from '../prisma/prisma.service';
+import { AppConfigService } from '../config/app-config.service';
 
 export interface DisplayPrincipal {
   kind: 'display';
@@ -33,6 +34,7 @@ export class PrincipalService {
   constructor(
     private readonly jwt: JwtService,
     private readonly prisma: PrismaService,
+    private readonly config: AppConfigService,
   ) {}
 
   async verifyToken(token: string): Promise<JwtPayload & { typ?: string; branchId?: string }> {
@@ -52,6 +54,9 @@ export class PrincipalService {
     });
     if (!user || user.deletedAt) {
       throw new AppException(ErrorCode.UNAUTHORIZED, 'User not found', 401);
+    }
+    if (this.config.env.SINGLE_CLINIC_MODE && (user.role === 'SUPER_ADMIN' || !user.clinicId)) {
+      throw new AppException(ErrorCode.FORBIDDEN, 'Platform accounts are disabled', 403);
     }
     if (user.status !== 'ACTIVE') {
       throw new AppException(ErrorCode.ACCOUNT_SUSPENDED, 'Account is suspended', 403);

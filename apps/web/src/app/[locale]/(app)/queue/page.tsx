@@ -1,5 +1,1 @@
-import { QueueBoard } from '@/features/queue/components/queue-board';
-
-export default function QueuePage() {
-  return <QueueBoard />;
-}
+export { HomeRedirect as default } from '@/components/layout/home-redirect';

@@ -1,6 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import {
   addChargeSchema,
+  chargeQuerySchema,
   admissionQuerySchema,
   admitPatientSchema,
   createOrderSchema,
@@ -20,3 +21,5 @@ export class MarkAdministrationDto extends createZodDto(markAdministrationSchema
 export class DailyNoteDto extends createZodDto(dailyNoteSchema) {}
 export class AddChargeDto extends createZodDto(addChargeSchema) {}
 export class InvoiceChargesDto extends createZodDto(invoiceChargesSchema) {}
+
+export class ChargeQueryDto extends createZodDto(chargeQuerySchema) {}

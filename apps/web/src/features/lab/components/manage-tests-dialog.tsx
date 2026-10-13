@@ -14,7 +14,6 @@ import type {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
@@ -317,7 +316,13 @@ export function ManageTestsDialog({
                 {t('newTest')}
               </Button>
             </div>
-            <ScrollArea className="max-h-[50vh] rounded-md border">
+            {/* Constrain the scrolling element itself so every test remains reachable. */}
+            <div
+              className="max-h-[50dvh] overflow-y-auto overscroll-y-contain rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              role="region"
+              aria-label={t('manageTestsTitle')}
+              tabIndex={0}
+            >
               {testsQuery.isLoading ? (
                 <div className="space-y-2 p-3">
                   <Skeleton className="h-6 w-full" />
@@ -351,7 +356,7 @@ export function ManageTestsDialog({
                   ))}
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </div>
         )}
       </DialogContent>

@@ -22,7 +22,8 @@
     "duration": "Duration",
     "price": "Price",
     "active": "Active",
-    "minutes": "{min} min"
+    "minutes": "{min} min",
+    "unit": "Unit"
   },
   "rowActions": {
     "edit": "Edit",
@@ -43,7 +44,10 @@
     "ULTRASOUND": "Ultrasound",
     "PROCEDURE": "Procedure",
     "DIAGNOSTICS": "Diagnostics",
-    "OTHER": "Other"
+    "OTHER": "Other",
+    "SURGERY": "Surgery",
+    "MATERIAL": "Materials",
+    "MEDICINE": "Medicines"
   },
   "categories": {
     "title": "Categories",
@@ -77,7 +81,10 @@
     "labCatalogHint": "Picking from the catalogue fills the name, code and reference values. Not there? Type it below.",
     "labCatalogEmpty": "Not in the catalogue — fill the fields by hand.",
     "labCatalogClear": "Clear selection",
-    "labCatalogTaken": "Already in clinic"
+    "labCatalogTaken": "Already in clinic",
+    "unit": "Unit",
+    "unitPlaceholder": "piece, ml, mg, set…",
+    "unitHint": "Used for operation supplies and fractional quantities."
   },
   "prices": {
     "title": "Price history — {name}",

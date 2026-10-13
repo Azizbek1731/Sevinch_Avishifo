@@ -1,195 +1,139 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowLeft, FlaskConical, Printer } from 'lucide-react';
-import { formatPhone } from '@avishifo/shared';
+import { ArrowLeft, ExternalLink, FileText, Printer, RotateCw } from 'lucide-react';
 import { Link } from '@/i18n/routing';
-import { formatDate, formatTz } from '@/lib/dates';
-import { cn } from '@/lib/utils';
+import { api } from '@/lib/api-client';
+import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/empty-state';
-import { useEnumLabel } from '@/hooks/use-enum-label';
-import { useLabPrintPayload } from '../hooks';
-import {
-  flagClass,
-  flagMark,
-  rangeText,
-  localizedName,
-  referenceText,
-  type ReferenceTextLabels,
-  type UiLocale,
-} from '../lib';
+import { LabPdfDocument } from './lab-pdf-document';
 
 export function LabOrderPrint({ id }: { id: string }) {
   const t = useTranslations('lab');
   const tc = useTranslations('common');
-  const locale = useLocale() as UiLocale;
-  const enumLabel = useEnumLabel();
-  const refLabels: ReferenceTextLabels = {
-    genderLabel: (g) => enumLabel('gender', g),
-    stateLabel: (st) => t(`physiologicalState.${st}` as never),
-    yearsSuffix: t('ageYearsShort'),
-    daysSuffix: t('ageDaysShort'),
-    monthsSuffix: t('ageMonthsShort'),
+  const locale = useLocale();
+  const branchId = useAuthStore((state) => state.activeBranchId);
+  const [preview, setPreview] = useState<{ blob: Blob; url: string } | null>(null);
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const [previewErrorUrl, setPreviewErrorUrl] = useState<string | null>(null);
+  const [printFailed, setPrintFailed] = useState(false);
+  const pdfQuery = useQuery({
+    queryKey: ['lab', 'order', id, 'pdf', locale, branchId],
+    queryFn: async () => (await api.get<Blob>(`/lab-orders/${id}/pdf`, { locale })).data,
+    // A report can change after results are entered or signed. Fetch a fresh
+    // copy on every visit, then keep that document stable while it is printed.
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!pdfQuery.data || pdfQuery.isFetching || pdfQuery.isError) return;
+    const url = URL.createObjectURL(pdfQuery.data);
+    setPreview({ blob: pdfQuery.data, url });
+    setPrintFailed(false);
+    return () => URL.revokeObjectURL(url);
+  }, [pdfQuery.data, pdfQuery.isFetching, pdfQuery.isError]);
+
+  // Never leave an earlier result available for printing during a refetch,
+  // branch/locale change, or failed request.
+  const pdfUrl =
+    !pdfQuery.isFetching && !pdfQuery.isError && preview?.blob === pdfQuery.data
+      ? preview?.url
+      : undefined;
+  const ready = Boolean(pdfUrl && loadedUrl === pdfUrl && previewErrorUrl !== pdfUrl);
+  const previewFailed = Boolean(pdfUrl && previewErrorUrl === pdfUrl);
+
+  const onDocumentReady = useCallback(() => {
+    setLoadedUrl(pdfUrl ?? null);
+    setPreviewErrorUrl(null);
+  }, [pdfUrl]);
+  const onDocumentError = useCallback(() => setPreviewErrorUrl(pdfUrl ?? null), [pdfUrl]);
+
+  const print = (): void => {
+    if (!ready) return;
+    try {
+      setPrintFailed(false);
+      // The named A4 print surface contains only the rendered PDF pages.
+      window.print();
+    } catch {
+      setPrintFailed(true);
+    }
   };
-  const printQuery = useLabPrintPayload(id);
-
-  if (printQuery.isLoading) {
-    return (
-      <div className="mx-auto max-w-3xl space-y-4">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-96 w-full" />
-      </div>
-    );
-  }
-
-  const payload = printQuery.data;
-  if (!payload) {
-    return (
-      <EmptyState
-        icon={FlaskConical}
-        title={t('orderNotFound')}
-        action={
-          <Button variant="outline" asChild>
-            <Link href="/lab">
-              <ArrowLeft className="h-4 w-4" />
-              {tc('back')}
-            </Link>
-          </Button>
-        }
-      />
-    );
-  }
-
-  const { clinic, order, approvedBy } = payload;
-  const savedValues = new Map(
-    order.items.flatMap((it) => (it.result?.values ?? []).map((v) => [v.parameterId, v] as const)),
-  );
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <div className="flex items-center justify-between print:hidden">
+    <div className="mx-auto max-w-4xl space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" asChild>
           <Link href={`/lab/${id}`}>
             <ArrowLeft className="h-4 w-4" />
             {tc('back')}
           </Link>
         </Button>
-        <Button onClick={() => window.print()}>
-          <Printer className="h-4 w-4" />
-          {tc('print')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {pdfUrl ? (
+            <Button variant="outline" asChild>
+              <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4" />
+                {t('printOpenPdf')}
+              </a>
+            </Button>
+          ) : null}
+          <Button disabled={!ready} onClick={print}>
+            <Printer className="h-4 w-4" />
+            {tc('print')}
+          </Button>
+        </div>
       </div>
 
-      <div className="print-area space-y-6 rounded-lg border bg-card p-8 text-sm print:rounded-none print:border-none print:p-0">
-        {/* Letterhead */}
-        <div className="flex items-start justify-between border-b pb-4">
-          <div>
-            <p className="text-xl font-bold">{clinic.name}</p>
-            {clinic.address ? <p className="text-muted-foreground">{clinic.address}</p> : null}
-            {clinic.phone ? (
-              <p className="text-muted-foreground">{formatPhone(clinic.phone)}</p>
-            ) : null}
-          </div>
-          <div className="text-right">
-            <p className="text-lg font-semibold">{t('printFormTitle')}</p>
-            <p className="font-mono">{order.orderNumber}</p>
-            {order.createdAt ? (
-              <p className="text-muted-foreground">{formatTz(order.createdAt)}</p>
-            ) : null}
-          </div>
-        </div>
+      <p className="text-sm text-muted-foreground">{t('printPdfHint')}</p>
 
-        {/* Patient */}
-        <div className="flex flex-wrap gap-x-10 gap-y-1">
-          <p>
-            <span className="text-muted-foreground">{tc('patient')}: </span>
-            <span className="font-semibold">{order.patient.fullName}</span>
-          </p>
-          <p>
-            <span className="text-muted-foreground">{t('mrn')}: </span>
-            <span className="font-mono">{order.patient.mrn}</span>
-          </p>
-          {order.patient.dob ? (
-            <p>
-              <span className="text-muted-foreground">{t('dob')}: </span>
-              {formatDate(order.patient.dob)}
+      {pdfQuery.isError ? (
+        <EmptyState
+          icon={FileText}
+          title={t('pdfFailed')}
+          action={
+            <Button variant="outline" onClick={() => void pdfQuery.refetch()}>
+              <RotateCw className="h-4 w-4" />
+              {t('printRetry')}
+            </Button>
+          }
+        />
+      ) : !pdfUrl ? (
+        <div className="space-y-3" role="status">
+          <p className="text-sm text-muted-foreground">{t('printPreparing')}</p>
+          <Skeleton className="h-[70vh] w-full" />
+        </div>
+      ) : (
+        <>
+          {previewFailed || printFailed ? (
+            <p
+              role="alert"
+              className="rounded-md border border-warning/50 bg-warning/5 p-3 text-sm"
+            >
+              {t(previewFailed ? 'printPreviewFailed' : 'printFailed')}
+            </p>
+          ) : !ready ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              {t('printPreparing')}
             </p>
           ) : null}
-          {order.patient.gender ? (
-            <p>
-              <span className="text-muted-foreground">{t('gender')}: </span>
-              {t(`genderLabel.${order.patient.gender}` as never)}
-            </p>
-          ) : null}
-        </div>
-
-        {/* Per-test result tables */}
-        {order.items.map((item) => (
-          <div key={item.id} className="space-y-2">
-            <p className="font-semibold">
-              {localizedName(item.labTest.name, locale)}
-              <span className="ml-2 font-mono text-xs text-muted-foreground">
-                {item.labTest.code}
-              </span>
-            </p>
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="py-1.5 pr-2 font-medium">{t('parameterName')}</th>
-                  <th className="w-28 py-1.5 pr-2 font-medium">{t('value')}</th>
-                  <th className="w-20 py-1.5 pr-2 font-medium">{t('unit')}</th>
-                  <th className="py-1.5 pr-2 font-medium">{t('reference')}</th>
-                  <th className="w-12 py-1.5 font-medium">{t('flag')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {item.labTest.parameters.map((param) => {
-                  const value = savedValues.get(param.id);
-                  return (
-                    <tr key={param.id} className="border-b border-dashed">
-                      <td className="py-1.5 pr-2">{param.name}</td>
-                      <td className={cn('py-1.5 pr-2 font-medium', value ? flagClass(value.flag) : '')}>
-                        {value?.value ?? '—'}
-                      </td>
-                      <td className="py-1.5 pr-2 text-muted-foreground">{param.unit ?? ''}</td>
-                      <td className="py-1.5 pr-2 text-muted-foreground">
-                        {/* The report prints the interval this patient was measured
-                            against, not the whole table — that is what a clinician
-                            reading it a year from now needs to see. */}
-                        {param.matchedRange
-                          ? rangeText(param.matchedRange, refLabels)
-                          : referenceText(param.referenceRanges, refLabels)}
-                      </td>
-                      <td className={cn('py-1.5 font-bold', value ? flagClass(value.flag) : '')}>
-                        {value ? flagMark(value.flag) : ''}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {item.result?.note ? (
-              <p className="text-xs text-muted-foreground">
-                {t('note')}: {item.result.note}
-              </p>
-            ) : null}
-          </div>
-        ))}
-
-        {/* Approver signature */}
-        <div className="flex items-end justify-between pt-8">
-          <div>
-            <p className="text-muted-foreground">{t('approvedBy')}:</p>
-            <p className="font-semibold">{approvedBy?.fullName ?? '________________'}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-muted-foreground">{t('signature')}:</p>
-            <p className="mt-6 w-48 border-b" />
-          </div>
-        </div>
-      </div>
+          <LabPdfDocument
+            key={pdfUrl}
+            blob={pdfQuery.data!}
+            title={t('printFormTitle')}
+            onReady={onDocumentReady}
+            onError={onDocumentError}
+          />
+        </>
+      )}
     </div>
   );
 }

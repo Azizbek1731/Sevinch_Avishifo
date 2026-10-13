@@ -29,6 +29,7 @@ export const createServiceSchema = z.object({
   categoryId: idSchema,
   code: z.string().min(1),
   name: localizedNameSchema,
+  unit: z.string().trim().min(1).max(30).default('dona'),
   durationMin: z.number().int().min(1).default(15),
   vatIncluded: z.boolean().default(true),
   /** Initial price (creates the first ServicePrice row). */
@@ -84,6 +85,7 @@ export const discountRuleUpsertSchema = z.object({
 export type DiscountRuleUpsertInput = z.infer<typeof discountRuleUpsertSchema>;
 
 export const serviceQuerySchema = paginationQuerySchema.extend({
+  kind: z.nativeEnum(ServiceKind).optional(),
   categoryId: idSchema.optional(),
   search: z.string().min(1).optional(),
   isActive: queryBooleanSchema.optional(),

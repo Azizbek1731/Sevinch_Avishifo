@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
@@ -32,10 +33,12 @@ export function VitalsForm({
   visitId,
   vitals,
   disabled,
+  onUnsavedChange,
 }: {
   visitId: string;
   vitals: VisitVitals | null;
   disabled: boolean;
+  onUnsavedChange?: (value: boolean) => void;
 }) {
   const t = useTranslations('visits');
   const upsert = useUpsertVitals(visitId);
@@ -53,6 +56,11 @@ export function VitalsForm({
       note: vitals?.note ?? undefined,
     },
   });
+
+  const dirty = form.formState.isDirty;
+  useEffect(() => {
+    onUnsavedChange?.(dirty || upsert.isPending);
+  }, [dirty, upsert.isPending, onUnsavedChange]);
 
   /** Auto-save when leaving a field, but only when something actually changed. */
   const saveOnBlur = () => {

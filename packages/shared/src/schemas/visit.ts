@@ -4,6 +4,8 @@ import { idSchema, isoDateTimeSchema, paginationQuerySchema } from './common';
 
 /** SOAP fields of an open (unlocked) visit. */
 export const updateVisitSchema = z.object({
+  reportTitle: z.string().trim().max(200).optional(),
+  reportBody: z.string().max(50000).optional(),
   subjective: z.string().optional(),
   objective: z.string().optional(),
   assessmentNote: z.string().optional(),
@@ -31,15 +33,63 @@ export const addDiagnosisSchema = z.object({
 });
 export type AddDiagnosisInput = z.infer<typeof addDiagnosisSchema>;
 
-export const addPrescriptionSchema = z.object({
-  drugName: z.string().min(2),
-  drugId: idSchema.optional(),
-  dosage: z.string().optional(),
-  frequency: z.string().optional(),
-  durationDays: z.number().int().min(1).optional(),
-  instructions: z.string().optional(),
-});
+const prescriptionText = (limit: number) => z.string().trim().max(limit).optional();
+
+export const addPrescriptionSchema = z
+  .object({
+    drugName: z.string().trim().min(2),
+    drugId: idSchema.optional(),
+    strength: prescriptionText(100),
+    form: prescriptionText(100),
+    quantity: prescriptionText(100),
+    dosage: z.string().optional(),
+    route: prescriptionText(100),
+    dripRate: prescriptionText(100),
+    frequency: z.string().optional(),
+    durationDays: z.number().int().min(1).optional(),
+    durationText: prescriptionText(200),
+    instructions: z.string().optional(),
+    combineWithPrevious: z.boolean().default(false),
+  })
+  .superRefine((item, ctx) => {
+    if (!item.combineWithPrevious) return;
+    // A mixture has one shared form, quantity and administration instruction on its base.
+    for (const field of [
+      'form',
+      'quantity',
+      'dosage',
+      'route',
+      'dripRate',
+      'frequency',
+      'durationDays',
+      'durationText',
+      'instructions',
+    ] as const) {
+      if (item[field] !== undefined && String(item[field]).trim() !== '')
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: 'Combined ingredients use the base prescription directions',
+        });
+    }
+  });
 export type AddPrescriptionInput = z.infer<typeof addPrescriptionSchema>;
+
+export const replacePrescriptionsSchema = z
+  .object({
+    expectedRevision: z.number().int().min(0).max(2147483646),
+    items: z.array(addPrescriptionSchema),
+    physiotherapy: z.string().trim().max(10000).optional(),
+  })
+  .superRefine((draft, ctx) => {
+    if (draft.items[0]?.combineWithPrevious)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['items', 0, 'combineWithPrevious'],
+        message: 'The first prescription cannot be a combined ingredient',
+      });
+  });
+export type ReplacePrescriptionsInput = z.infer<typeof replacePrescriptionsSchema>;
 
 export const addReferralSchema = z.object({
   type: z.nativeEnum(ReferralType),

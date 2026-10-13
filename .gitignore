@@ -38,6 +38,10 @@ coverage/
 playwright-report/
 test-results/
 
+# Unrelated presentation work and generated exports
+/.presentation-build/
+/output/
+
 # OS / editor
 .DS_Store
 .idea/

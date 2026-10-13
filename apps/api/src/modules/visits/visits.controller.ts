@@ -1,10 +1,24 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '@avishifo/shared';
 import { ActiveBranch, CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { PaginatedResult } from '../../common/pagination';
 import { VisitsService } from './visits.service';
-import { AddDiagnosisDto, AddPrescriptionDto, AddReferralDto, AmendVisitDto, CreateVisitDto, PaginationQueryDto, UpdateVisitDto, UpsertVitalsDto, VisitQueryDto, VisitTemplatePatchDto, VisitTemplateUpsertDto } from './dto';
+import {
+  AddDiagnosisDto,
+  AddPrescriptionDto,
+  AddReferralDto,
+  AmendVisitDto,
+  CreateVisitDto,
+  PaginationQueryDto,
+  ReplacePrescriptionsDto,
+  UpdateVisitDto,
+  UpsertVitalsDto,
+  VisitQueryDto,
+  VisitTemplatePatchDto,
+  VisitTemplateUpsertDto,
+} from './dto';
 
 @ApiTags('visits')
 @Controller('visits')
@@ -23,14 +37,36 @@ export class VisitsController {
 
   @Get()
   @RequirePermissions('visits.read')
-  list(@Query() query: VisitQueryDto, @CurrentUser() user: AuthUser): Promise<PaginatedResult<unknown>> {
+  list(
+    @Query() query: VisitQueryDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<PaginatedResult<unknown>> {
     return this.visits.list(query, user);
   }
 
   @Get(':id')
   @RequirePermissions('visits.read')
-  getById(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<Record<string, unknown>> {
+  getById(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Record<string, unknown>> {
     return this.visits.getById(id, user);
+  }
+
+  @Get(':id/history')
+  @RequirePermissions('visits.read')
+  history(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.visits.history(id, user);
+  }
+
+  @Get(':id/pdf')
+  @RequirePermissions('visits.read')
+  async pdf(@Param('id') id: string, @CurrentUser() user: AuthUser, @Res() res: Response) {
+    const buffer = await this.visits.pdf(id, user);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="clinical-report.pdf"');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(buffer);
   }
 
   @Patch(':id')
@@ -45,7 +81,10 @@ export class VisitsController {
 
   @Post(':id/complete')
   @RequirePermissions('visits.write')
-  complete(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<Record<string, unknown>> {
+  complete(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Record<string, unknown>> {
     return this.visits.complete(id, user);
   }
 
@@ -107,6 +146,16 @@ export class VisitsController {
     @CurrentUser() user: AuthUser,
   ): Promise<Record<string, unknown>> {
     return this.visits.addPrescription(id, dto, user);
+  }
+
+  @Put(':id/prescriptions')
+  @RequirePermissions('visits.write')
+  replacePrescriptions(
+    @Param('id') id: string,
+    @Body() dto: ReplacePrescriptionsDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.visits.replacePrescriptions(id, dto, user);
   }
 
   @Delete(':id/prescriptions/:rxId')

@@ -1,15 +1,31 @@
 {
-  "title": "Unpaid services",
-  "owedTotal": "Total owed",
+  "title": "Unbilled services",
+  "owedTotal": "Unbilled total",
   "selectAll": "Select all",
-  "selectToBill": "Tick what is being paid",
-  "billSelected": "{count} service(s) — {amount}",
-  "billed": "Invoice ready: {number}",
+  "selectToBill": "Select charges to send to cashier",
+  "billSelected": "Send to cashier: {count} — {amount}",
+  "billed": "Sent to cashier: {number}",
   "cancel": "Cancel",
   "cancelled": "Service cancelled",
   "fromWard": "Inpatient",
   "empty": {
-    "title": "Nothing unpaid",
-    "description": "Every service written to this patient has been billed."
-  }
+    "title": "No unbilled charges",
+    "description": "All recorded services have been invoiced. Check each invoice for payment status."
+  },
+  "add": {
+    "title": "Add a charge",
+    "hint": "Saving the charge automatically adds its invoice to the cashier’s pending payments.",
+    "catalog": "From catalog",
+    "manual": "Additional charge",
+    "service": "Service",
+    "name": "Charge description",
+    "date": "Date",
+    "quantity": "Quantity",
+    "price": "Unit price",
+    "submit": "Add and send to cashier",
+    "saved": "Charge added and sent to cashier"
+  },
+  "cancelConfirm": "Cancel this patient charge?",
+  "loadError": "Could not load charges. Refresh the page.",
+  "openSurgery": "Operation record"
 }

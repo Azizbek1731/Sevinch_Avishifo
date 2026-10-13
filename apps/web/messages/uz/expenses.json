@@ -1,6 +1,6 @@
 {
   "title": "Chiqimlar",
-  "description": "Klinika xarajatlarini yozib boring. Naqd chiqim ochiq kassadan yechiladi.",
+  "description": "Naqd, karta va Click kassalaridan chiqimlar. Har bir chiqim tegishli kassa qoldig‘idan ayriladi.",
   "add": "Chiqim qo‘shish",
   "newTitle": "Yangi chiqim",
   "editTitle": "Chiqimni tahrirlash",
@@ -33,7 +33,7 @@
   "deleting": "O‘chirilmoqda…",
   "deleted": "Chiqim o‘chirildi",
   "deleteTitle": "Chiqim o‘chirilsinmi?",
-  "deleteDescription": "{amount} — {category}, {date}. Naqd bo‘lsa, summa kassaga qaytariladi. Yozuv administrator uchun ko‘rinib turadi.",
+  "deleteDescription": "{amount} — {category}, {date}. Summa tegishli kassa hisobiga qaytariladi. Yozuv administrator uchun saqlanadi.",
   "categoriesTitle": "Turkumlar",
   "categoryNamePlaceholder": "Turkum nomi",
   "addCategory": "Qo‘shish",
@@ -56,5 +56,12 @@
     "PAYME": "Payme",
     "CLICK": "Click",
     "UZUM": "Uzum"
-  }
+  },
+  "accountHint": "Summa {method} kassasidan ayriladi va smena hisobotida aks etadi.",
+  "shiftRequired": "Chiqim kiritish uchun avval kassa smenasini oching.",
+  "today": "Bugun",
+  "thisMonth": "Shu oy",
+  "loadFailed": "Chiqimlar yuklanmadi. Qayta urinib ko‘ring.",
+  "retry": "Qayta urinish",
+  "surgeryDetails": "Operatsiyani ochish"
 }

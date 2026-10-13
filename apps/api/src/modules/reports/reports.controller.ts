@@ -1,15 +1,51 @@
 import { Controller, Get, Query, StreamableFile } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '@avishifo/shared';
-import { CurrentUser, RequirePermissions } from '../../common/decorators';
+import { ActiveBranch, CurrentUser, RequirePermissions } from '../../common/decorators';
+import { ConsumablesService } from './consumables.service';
+import { CashflowService } from './cashflow.service';
 import { ReportsService } from './reports.service';
 import { XLSX_MIME_TYPE, type SheetSpec } from './xlsx.service';
-import { DashboardQueryDto, ReportRangeQueryDto, RevenueQueryDto } from './dto';
+import { CashflowQueryDto, ConsumablesQueryDto, DashboardQueryDto, ReportRangeQueryDto, RevenueQueryDto } from './dto';
 
 @ApiTags('reports')
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reports: ReportsService) {}
+  constructor(
+    private readonly reports: ReportsService,
+    private readonly cashflow: CashflowService,
+    private readonly consumables: ConsumablesService,
+  ) {}
+
+  @Get('consumables')
+  @RequirePermissions('reports.cash.read')
+  async consumablesReport(
+    @Query() query: ConsumablesQueryDto,
+    @CurrentUser() user: AuthUser,
+    @ActiveBranch() branchId: string,
+  ) {
+    const report = await this.consumables.report(query, user, branchId);
+    if (query.export !== 'xlsx') return report;
+    return new StreamableFile(await this.consumables.export(report, user), {
+      type: XLSX_MIME_TYPE,
+      disposition: `attachment; filename="consumables_${query.from}_${query.to}.xlsx"`,
+    });
+  }
+
+  @Get('cashflow')
+  @RequirePermissions('reports.cash.read')
+  async cashflowReport(
+    @Query() query: CashflowQueryDto,
+    @CurrentUser() user: AuthUser,
+    @ActiveBranch() branchId: string,
+  ) {
+    const report = await this.cashflow.report(query, user, branchId);
+    if (query.export !== 'xlsx') return report;
+    return new StreamableFile(await this.cashflow.export(report, user), {
+      type: XLSX_MIME_TYPE,
+      disposition: `attachment; filename="cashflow_${query.from}_${query.to}.xlsx"`,
+    });
+  }
 
   @Get('dashboard')
   @RequirePermissions('reports.read')

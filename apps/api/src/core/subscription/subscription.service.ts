@@ -3,6 +3,7 @@ import type { ClinicSubscription, SubscriptionPlan } from '@prisma/client';
 import { SubscriptionStatus } from '@avishifo/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { AppConfigService } from '../config/app-config.service';
 
 /** Statuses that represent a subscription the clinic is currently living on. */
 const LIVE_STATUSES: SubscriptionStatus[] = [
@@ -63,6 +64,7 @@ export class SubscriptionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly config: AppConfigService,
   ) {}
 
   /** Days from `now` to `endsAt`, rounded up; 0 once lapsed. */
@@ -103,6 +105,7 @@ export class SubscriptionService {
 
   /** Cached subscription state for a clinic. Never throws — falls back to a DB read. */
   async getState(clinicId: string): Promise<SubscriptionState> {
+    if (this.config.env.SINGLE_CLINIC_MODE) return { ...NO_SUBSCRIPTION };
     const key = cacheKey(clinicId);
     try {
       const cached = await this.redis.client.get(key);

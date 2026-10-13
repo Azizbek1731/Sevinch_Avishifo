@@ -7,6 +7,7 @@ import { AdmissionsService } from './admissions.service';
 import { ChargesService } from './charges.service';
 import {
   AddChargeDto,
+  ChargeQueryDto,
   AdmissionQueryDto,
   AdmitPatientDto,
   CreateOrderDto,
@@ -52,7 +53,10 @@ export class AdmissionsController {
 
   @Patch(':id')
   @RequirePermissions('admissions.write')
-  update(@Param('id') id: string, @Body() dto: UpdateAdmissionDto): Promise<Record<string, unknown>> {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateAdmissionDto,
+  ): Promise<Record<string, unknown>> {
     return this.admissions.update(id, dto);
   }
 
@@ -128,10 +132,10 @@ export class ChargesController {
   @Get()
   @RequirePermissions('charges.read')
   list(
-    @Query('patientId') patientId: string,
-    @Query('status') status?: string,
+    @Query() query: ChargeQueryDto,
+    @ActiveBranch() branchId: string,
   ): Promise<Record<string, unknown>> {
-    return this.charges.listForPatient(patientId, status);
+    return this.charges.listForPatient(query, branchId);
   }
 
   @Post()
@@ -146,13 +150,13 @@ export class ChargesController {
 
   @Delete(':id')
   @RequirePermissions('charges.write')
-  cancel(@Param('id') id: string): Promise<{ id: string }> {
-    return this.charges.cancel(id);
+  cancel(@Param('id') id: string, @ActiveBranch() branchId: string): Promise<{ id: string }> {
+    return this.charges.cancel(id, branchId);
   }
 
   /** Bills the ticked selection — all of what is owed, or only part of it. */
   @Post('invoice')
-  @RequirePermissions('charges.write')
+  @RequirePermissions('charges.write', 'invoices.write')
   invoice(
     @Body() dto: InvoiceChargesDto,
     @CurrentUser() user: AuthUser,

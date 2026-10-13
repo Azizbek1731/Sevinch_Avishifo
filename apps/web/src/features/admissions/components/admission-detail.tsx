@@ -28,6 +28,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useApiErrorToast } from '@/features/services/hooks';
 import { admissionsApi } from '../api';
+import { ChargesPanel } from './charges-panel';
+import { SurgeriesPanel } from '@/features/surgeries/components/surgeries-panel';
 import { TreatmentSheet } from './treatment-sheet';
 import { OrderDialog } from './order-dialog';
 import { DischargeDialog } from './discharge-dialog';
@@ -68,6 +70,7 @@ function NarrativeField({
 export function AdmissionDetail({ admissionId }: { admissionId: string }) {
   const t = useTranslations('admissions');
   const tc = useTranslations('common');
+  const ts = useTranslations('surgeries');
   const can = usePermissions();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -95,6 +98,7 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
   const query = useQuery({
     queryKey: ['admission', admissionId],
     queryFn: async () => (await admissionsApi.get(admissionId)).data,
+    refetchInterval: (current) => current.state.data?.status === 'ACTIVE' ? 10_000 : false,
   });
 
   const save = useMutation({
@@ -167,7 +171,12 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
           {/* For the stay opened on the wrong patient, or the duplicate opened
               because the first attempt looked like it had failed. */}
           {can('admissions.force') ? (
-            <Button variant="ghost" size="icon" onClick={() => setRemoveOpen(true)} aria-label={t('remove')}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setRemoveOpen(true)}
+              aria-label={t('remove')}
+            >
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
           ) : null}
@@ -198,7 +207,23 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
           <TabsTrigger value="sheet">{t('tabs.sheet')}</TabsTrigger>
           <TabsTrigger value="history">{t('tabs.history')}</TabsTrigger>
           <TabsTrigger value="notes">{t('tabs.notes')}</TabsTrigger>
+          {can('surgery.read') ? <TabsTrigger value="surgeries">{ts('title')}</TabsTrigger> : null}
+          {can('charges.read') ? (
+            <TabsTrigger value="charges">{t('tabs.charges')}</TabsTrigger>
+          ) : null}
         </TabsList>
+
+        {can('charges.read') ? (
+          <TabsContent value="charges" className="mt-4">
+            <ChargesPanel patientId={a.patientId} admissionId={admissionId} allowAdd={!closed} />
+          </TabsContent>
+        ) : null}
+
+        {can('surgery.read') ? (
+          <TabsContent value="surgeries" className="mt-4">
+            <SurgeriesPanel admissionId={admissionId} allowSchedule={!closed} />
+          </TabsContent>
+        ) : null}
 
         <TabsContent value="sheet" className="mt-4">
           <Card>
@@ -223,10 +248,34 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
               <CardTitle className="text-base">{t('sections.diagnoses')}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              <NarrativeField label={t('fields.referralDiagnosis')} value={a.referralDiagnosis} onSave={field('referralDiagnosis')} readOnly={!canWrite} rows={2} />
-              <NarrativeField label={t('fields.admissionDiagnosis')} value={a.admissionDiagnosis} onSave={field('admissionDiagnosis')} readOnly={!canWrite} rows={2} />
-              <NarrativeField label={t('fields.clinicalDiagnosis')} value={a.clinicalDiagnosis} onSave={field('clinicalDiagnosis')} readOnly={!canWrite} rows={2} />
-              <NarrativeField label={t('fields.preliminaryDiagnosis')} value={a.preliminaryDiagnosis} onSave={field('preliminaryDiagnosis')} readOnly={!canWrite} rows={2} />
+              <NarrativeField
+                label={t('fields.referralDiagnosis')}
+                value={a.referralDiagnosis}
+                onSave={field('referralDiagnosis')}
+                readOnly={!canWrite}
+                rows={2}
+              />
+              <NarrativeField
+                label={t('fields.admissionDiagnosis')}
+                value={a.admissionDiagnosis}
+                onSave={field('admissionDiagnosis')}
+                readOnly={!canWrite}
+                rows={2}
+              />
+              <NarrativeField
+                label={t('fields.clinicalDiagnosis')}
+                value={a.clinicalDiagnosis}
+                onSave={field('clinicalDiagnosis')}
+                readOnly={!canWrite}
+                rows={2}
+              />
+              <NarrativeField
+                label={t('fields.preliminaryDiagnosis')}
+                value={a.preliminaryDiagnosis}
+                onSave={field('preliminaryDiagnosis')}
+                readOnly={!canWrite}
+                rows={2}
+              />
             </CardContent>
           </Card>
 
@@ -235,12 +284,46 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
               <CardTitle className="text-base">{t('sections.anamnesis')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <NarrativeField label={t('fields.complaints')} value={a.complaints} onSave={field('complaints')} readOnly={!canWrite} />
-              <NarrativeField label={t('fields.anamnesisMorbi')} value={a.anamnesisMorbi} onSave={field('anamnesisMorbi')} readOnly={!canWrite} rows={4} />
-              <NarrativeField label={t('fields.anamnesisVitae')} value={a.anamnesisVitae} onSave={field('anamnesisVitae')} readOnly={!canWrite} rows={4} />
-              <NarrativeField label={t('fields.objectiveStatus')} value={a.objectiveStatus} onSave={field('objectiveStatus')} readOnly={!canWrite} rows={5} />
-              <NarrativeField label={t('fields.treatmentPlan')} value={a.treatmentPlan} onSave={field('treatmentPlan')} readOnly={!canWrite} />
-              <NarrativeField label={t('fields.epicrisis')} value={a.epicrisis} onSave={field('epicrisis')} readOnly={!canWrite} rows={5} />
+              <NarrativeField
+                label={t('fields.complaints')}
+                value={a.complaints}
+                onSave={field('complaints')}
+                readOnly={!canWrite}
+              />
+              <NarrativeField
+                label={t('fields.anamnesisMorbi')}
+                value={a.anamnesisMorbi}
+                onSave={field('anamnesisMorbi')}
+                readOnly={!canWrite}
+                rows={4}
+              />
+              <NarrativeField
+                label={t('fields.anamnesisVitae')}
+                value={a.anamnesisVitae}
+                onSave={field('anamnesisVitae')}
+                readOnly={!canWrite}
+                rows={4}
+              />
+              <NarrativeField
+                label={t('fields.objectiveStatus')}
+                value={a.objectiveStatus}
+                onSave={field('objectiveStatus')}
+                readOnly={!canWrite}
+                rows={5}
+              />
+              <NarrativeField
+                label={t('fields.treatmentPlan')}
+                value={a.treatmentPlan}
+                onSave={field('treatmentPlan')}
+                readOnly={!canWrite}
+              />
+              <NarrativeField
+                label={t('fields.epicrisis')}
+                value={a.epicrisis}
+                onSave={field('epicrisis')}
+                readOnly={!canWrite}
+                rows={5}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -258,13 +341,23 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
                 <div className="flex flex-wrap items-end gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="n-t">{t('fields.temperature')}</Label>
-                    <Input id="n-t" inputMode="decimal" className="w-24" value={note.temperatureC}
-                      onChange={(e) => setNote((n) => ({ ...n, temperatureC: e.target.value }))} />
+                    <Input
+                      id="n-t"
+                      inputMode="decimal"
+                      className="w-24"
+                      value={note.temperatureC}
+                      onChange={(e) => setNote((n) => ({ ...n, temperatureC: e.target.value }))}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="n-p">{t('fields.pulse')}</Label>
-                    <Input id="n-p" inputMode="numeric" className="w-24" value={note.pulseBpm}
-                      onChange={(e) => setNote((n) => ({ ...n, pulseBpm: e.target.value }))} />
+                    <Input
+                      id="n-p"
+                      inputMode="numeric"
+                      className="w-24"
+                      value={note.pulseBpm}
+                      onChange={(e) => setNote((n) => ({ ...n, pulseBpm: e.target.value }))}
+                    />
                   </div>
                   <Button
                     className="ml-auto"
@@ -289,7 +382,11 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
                       <span className="font-medium text-foreground">{n.date}</span>
                       {n.temperatureC ? <span>t° {n.temperatureC}</span> : null}
                       {n.pulseBpm ? <span>Ps {n.pulseBpm}</span> : null}
-                      {n.bpSystolic && n.bpDiastolic ? <span>AD {n.bpSystolic}/{n.bpDiastolic}</span> : null}
+                      {n.bpSystolic && n.bpDiastolic ? (
+                        <span>
+                          AD {n.bpSystolic}/{n.bpDiastolic}
+                        </span>
+                      ) : null}
                     </div>
                     <p className="whitespace-pre-wrap text-sm">{n.condition}</p>
                   </CardContent>

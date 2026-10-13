@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import type { CashierShift } from '@prisma/client';
 import {
   ErrorCode,
+  AuditAction,
   TRANSFER_METHODS,
   type AuthUser,
   type CloseShiftInput,
@@ -12,6 +13,9 @@ import { AppException } from '../../common/app.exception';
 import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
+import { AuditService } from '../../core/audit/audit.service';
+import { AppConfigService } from '../../core/config/app-config.service';
+import { reconcileAccounts, type AccountMovements } from './cash-accounts';
 
 export interface ShiftQuery {
   page: number;
@@ -22,16 +26,9 @@ export interface ShiftQuery {
 
 const ZERO = new Prisma.Decimal(0);
 
-/**
- * What both registers hold at a moment in time.
- *
- * The governing rule, and the reason this is computed in exactly one place:
- * **every som is registered once, in the register that received it.** Cash into
- * the drawer, card and online into the transfer register, a patient's own
- * balance into neither — that money was already registered on the day it
- * arrived, and counting it again when it is spent counts it twice.
- */
+/** Live account movements, plus legacy cash/transfer totals for old clients. */
 interface RegisterTotals {
+  movements: AccountMovements[];
   cashIn: Prisma.Decimal;
   cashCount: number;
   cashRefunds: Prisma.Decimal;
@@ -46,7 +43,11 @@ interface RegisterTotals {
 
 @Injectable()
 export class ShiftsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly config: AppConfigService,
+  ) {}
 
   private mapShift(s: CashierShift): Record<string, unknown> {
     return {
@@ -57,7 +58,15 @@ export class ShiftsService {
       openedAt: s.openedAt.toISOString(),
       closedAt: s.closedAt ? s.closedAt.toISOString() : null,
       openingCash: s.openingCash.toFixed(2),
+      openingCard: s.openingCard.toFixed(2),
+      openingClick: s.openingClick.toFixed(2),
+      expectedCard: s.expectedCard?.toFixed(2) ?? null,
+      expectedClick: s.expectedClick?.toFixed(2) ?? null,
+      actualCard: s.actualCard?.toFixed(2) ?? null,
+      actualClick: s.actualClick?.toFixed(2) ?? null,
       openingTransfer: s.openingTransfer.toFixed(2),
+      unallocatedOpeningTransfer: s.openingTransfer.sub(s.openingCard).sub(s.openingClick).toFixed(2),
+      requiresOpeningAllocation: !s.openingTransfer.eq(s.openingCard.add(s.openingClick)),
       expectedCash: s.expectedCash ? s.expectedCash.toFixed(2) : null,
       actualCash: s.actualCash ? s.actualCash.toFixed(2) : null,
       expectedTransfer: s.expectedTransfer ? s.expectedTransfer.toFixed(2) : null,
@@ -68,83 +77,51 @@ export class ShiftsService {
     };
   }
 
-  /**
-   * Both registers for one shift, from the shift link alone.
-   *
-   * Everything counted here is linked by shiftId. The old code re-derived the
-   * transfer figure from "whoever received money in this branch inside the
-   * shift's time window", which meant the number the cashier watched all day
-   * and the number printed when the drawer closed were produced by two
-   * different rules and were free to disagree.
-   */
+  /** Reconciliation uses only explicitly linked money movements. */
   private async registerTotals(
     shiftId: string,
     db: Pick<typeof this.prisma.db, 'payment' | 'refund' | 'expense' | 'patientBalanceTransaction'> = this.prisma.db,
   ): Promise<RegisterTotals> {
-    const [cashInAgg, cashRefundAgg, expenseAgg, depositAgg, transferRows, transferRefundAgg] =
-      await Promise.all([
-        db.payment.aggregate({
-          where: { shiftId, method: 'CASH', status: 'COMPLETED' },
-          _sum: { amount: true },
-          _count: { _all: true },
-        }),
-        db.refund.aggregate({
-          where: { shiftId, method: 'CASH' },
-          _sum: { amount: true },
-        }),
-        db.expense.aggregate({
-          where: { shiftId, method: 'CASH', deletedAt: null },
-          _sum: { amount: true },
-        }),
-        // Cash handed over as a deposit is in the drawer like any other note.
-        db.patientBalanceTransaction.aggregate({
-          where: { shiftId, method: 'CASH' },
-          _sum: { amount: true },
-        }),
-        db.payment.groupBy({
-          by: ['method'],
-          where: { shiftId, status: 'COMPLETED', method: { in: [...TRANSFER_METHODS] } },
-          _sum: { amount: true },
-          _count: { _all: true },
-        }),
-        db.refund.aggregate({
-          where: { shiftId, method: { in: [...TRANSFER_METHODS] } },
-          _sum: { amount: true },
-        }),
-      ]);
-
-    const cashIn = cashInAgg._sum.amount ?? ZERO;
-    const cashCount = cashInAgg._count._all;
-    const cashRefunds = cashRefundAgg._sum.amount ?? ZERO;
-    const cashExpenses = expenseAgg._sum.amount ?? ZERO;
-    const cashDeposits = depositAgg._sum.amount ?? ZERO;
-    const transferIn = transferRows.reduce((acc, r) => acc.add(r._sum.amount ?? ZERO), ZERO);
-    const transferRefunds = transferRefundAgg._sum.amount ?? ZERO;
-
+    const [payments, refunds, expenses, deposits] = await Promise.all([
+      db.payment.groupBy({ by: ['method'], where: { shiftId, status: 'COMPLETED', method: { not: 'BALANCE' } }, _sum: { amount: true }, _count: { _all: true } }),
+      db.refund.groupBy({ by: ['method'], where: { shiftId, method: { not: 'BALANCE' } }, _sum: { amount: true } }),
+      db.expense.groupBy({ by: ['method'], where: { shiftId, deletedAt: null }, _sum: { amount: true } }),
+      db.patientBalanceTransaction.groupBy({ by: ['method'], where: { shiftId, type: 'DEPOSIT' }, _sum: { amount: true } }),
+    ]);
+    const methods = new Set<string>(['CASH', ...TRANSFER_METHODS]);
+    const movements: AccountMovements[] = [...methods].map((method) => ({
+      method,
+      receipts: payments.find((r) => r.method === method)?._sum.amount ?? ZERO,
+      deposits: deposits.find((r) => r.method === method)?._sum.amount ?? ZERO,
+      refunds: refunds.find((r) => r.method === method)?._sum.amount ?? ZERO,
+      expenses: expenses.find((r) => r.method === method)?._sum.amount ?? ZERO,
+      count: payments.find((r) => r.method === method)?._count._all ?? 0,
+    }));
+    const cash = movements.find((r) => r.method === 'CASH')!;
+    const transfer = movements.filter((r) => r.method !== 'CASH');
+    const total = (key: 'receipts' | 'deposits' | 'refunds' | 'expenses'): Prisma.Decimal =>
+      transfer.reduce((sum, row) => sum.add(row[key]), ZERO);
     return {
-      cashIn,
-      cashCount,
-      cashRefunds,
-      cashExpenses,
-      cashDeposits,
-      // The opening float is added by the caller, which is the only part that
-      // depends on the shift row rather than on its movements.
-      expectedCash: cashIn.add(cashDeposits).sub(cashRefunds).sub(cashExpenses),
-      transferIn,
-      transferRefunds,
-      // Net of refunds, because a card refund nets off the acquirer's own slip.
-      // Deliberately NOT reduced by non-cash expenses: those leave the clinic's
-      // bank account, not the incoming acquiring stream being reconciled here.
-      expectedTransfer: transferIn.sub(transferRefunds),
-      transferByMethod: transferRows.map((r) => ({
-        method: r.method,
-        count: r._count._all,
-        amount: r._sum.amount ?? ZERO,
-      })),
+      movements,
+      cashIn: cash.receipts, cashCount: cash.count, cashRefunds: cash.refunds,
+      cashExpenses: cash.expenses, cashDeposits: cash.deposits,
+      expectedCash: cash.receipts.add(cash.deposits).sub(cash.refunds).sub(cash.expenses),
+      transferIn: total('receipts'), transferRefunds: total('refunds'),
+      expectedTransfer: total('receipts').add(total('deposits')).sub(total('refunds')).sub(total('expenses')),
+      transferByMethod: transfer.map((r) => ({ method: r.method, count: r.count, amount: r.receipts })),
     };
   }
 
+  private accounts(shift: CashierShift, totals: RegisterTotals, counted = false) {
+    return reconcileAccounts(totals.movements, {
+      CASH: shift.openingCash, CARD: shift.openingCard, CLICK: shift.openingClick,
+    }, counted ? { CASH: shift.actualCash, CARD: shift.actualCard, CLICK: shift.actualClick } : undefined);
+  }
+
   async open(dto: OpenShiftInput, user: AuthUser, branchId: string): Promise<Record<string, unknown>> {
+    if (this.config.env.SINGLE_CLINIC_MODE && new Prisma.Decimal(dto.openingTransfer ?? '0').gt(0)) {
+      throw new AppException(ErrorCode.VALIDATION_ERROR, 'Karta va Click boshlang‘ich qoldiqlarini alohida kiriting', 400);
+    }
     // ONE register per branch. Per-user drawers made the owner, reception and
     // the cashier each see "the" register and each see a different one; the
     // clinics this is sold to run one physical box, so the model matches that
@@ -177,9 +154,14 @@ export class ShiftsService {
           cashierUserId: user.id,
           status: 'OPEN',
           openingCash: new Prisma.Decimal(dto.openingCash ?? '0'),
-          openingTransfer: new Prisma.Decimal(dto.openingTransfer ?? '0'),
+          openingCard: new Prisma.Decimal(dto.openingCard ?? '0'),
+          openingClick: new Prisma.Decimal(dto.openingClick ?? '0'),
+          openingTransfer: this.config.env.SINGLE_CLINIC_MODE
+            ? new Prisma.Decimal(dto.openingCard ?? '0').add(dto.openingClick ?? '0')
+            : new Prisma.Decimal(dto.openingTransfer ?? '0'),
         },
       });
+      await this.audit.log({ action: AuditAction.CREATE, entity: 'CashierShift', entityId: shift.id, after: this.mapShift(shift) });
       return this.mapShift(shift);
     } catch (e) {
       // Two people pressed open at once: the partial unique index caught what
@@ -193,6 +175,9 @@ export class ShiftsService {
 
   /** Close the branch register and return the X/Z reconciliation report. */
   async close(dto: CloseShiftInput, user: AuthUser, branchId: string): Promise<Record<string, unknown>> {
+    if (this.config.env.SINGLE_CLINIC_MODE && (dto.actualCard === undefined || dto.actualClick === undefined)) {
+      throw new AppException(ErrorCode.TRANSFER_COUNT_REQUIRED, 'Naqd, karta va Click yakuniy qoldiqlarini alohida kiriting', 400);
+    }
     // Not filtered by opener: the register belongs to the branch, and whoever
     // holds shifts.manage may count it out. closedById records who did.
     const shift = await this.prisma.db.cashierShift.findFirst({
@@ -218,6 +203,19 @@ export class ShiftsService {
         throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'No open shift in this branch', 409);
       }
 
+      const unallocated = shift.openingTransfer.sub(shift.openingCard).sub(shift.openingClick);
+      let accountShift = shift;
+      if (this.config.env.SINGLE_CLINIC_MODE && !unallocated.eq(0)) {
+        if (dto.openingCard === undefined || dto.openingClick === undefined ||
+            !new Prisma.Decimal(dto.openingCard).add(dto.openingClick).eq(shift.openingTransfer)) {
+          throw new AppException(ErrorCode.VALIDATION_ERROR, 'Avval eski o‘tkazma boshlang‘ich qoldig‘ini karta va Click o‘rtasida to‘liq taqsimlang', 400);
+        }
+        accountShift = await tx.cashierShift.update({ where: { id: shift.id }, data: {
+          openingCard: new Prisma.Decimal(dto.openingCard), openingClick: new Prisma.Decimal(dto.openingClick),
+        } });
+      } else if (dto.openingCard !== undefined || dto.openingClick !== undefined) {
+        throw new AppException(ErrorCode.VALIDATION_ERROR, 'Smena boshlang‘ich qoldiqlarini o‘zgartirib bo‘lmaydi', 400);
+      }
       const totals = await this.registerTotals(shift.id, tx);
       const expectedCash = shift.openingCash.add(totals.expectedCash);
       const actualCash = new Prisma.Decimal(dto.actualCash);
@@ -226,7 +224,13 @@ export class ShiftsService {
       // Both books opened with a counted figure, so both close with one — or
       // with a stated reason. Throwing here rolls the claim back and the
       // register stays open.
-      const counted = dto.actualTransfer !== undefined && dto.actualTransfer !== '';
+      const actualCard = dto.actualCard === undefined ? null : new Prisma.Decimal(dto.actualCard);
+      const actualClick = dto.actualClick === undefined ? null : new Prisma.Decimal(dto.actualClick);
+      const separateAccounts = this.accounts(accountShift, totals);
+      const expectedCard = new Prisma.Decimal(separateAccounts.find((a) => a.method === 'CARD')!.expected);
+      const expectedClick = new Prisma.Decimal(separateAccounts.find((a) => a.method === 'CLICK')!.expected);
+      const transferInput = actualCard !== null && actualClick !== null ? actualCard.add(actualClick).toFixed(2) : dto.actualTransfer;
+      const counted = transferInput !== undefined && transferInput !== '';
       const reason = dto.transferUnverifiedReason?.trim();
       if (expectedTransfer.gt(0) && !counted && !reason) {
         throw new AppException(
@@ -235,7 +239,7 @@ export class ShiftsService {
           400,
         );
       }
-      const actualTransfer = counted ? new Prisma.Decimal(dto.actualTransfer as string) : null;
+      const actualTransfer = counted ? new Prisma.Decimal(transferInput as string) : null;
       const unverifiedReason = counted ? null : (reason ?? 'O‘tkazma harakati bo‘lmagan');
 
       const row = await tx.cashierShift.update({
@@ -243,6 +247,7 @@ export class ShiftsService {
         data: {
           expectedCash,
           actualCash,
+          expectedCard, expectedClick, actualCard, actualClick,
           expectedTransfer,
           actualTransfer,
           transferUnverifiedReason: unverifiedReason,
@@ -254,9 +259,11 @@ export class ShiftsService {
 
     const { totals, expectedCash, actualCash, expectedTransfer, actualTransfer, unverifiedReason } = closed;
 
+    await this.audit.log({ action: AuditAction.UPDATE, entity: 'CashierShift', entityId: shift.id, before: { status: 'OPEN' }, after: this.mapShift(closed.row) });
     return {
       shift: this.mapShift(closed.row),
       report: {
+        accounts: this.accounts(closed.row, totals, true),
         openingCash: shift.openingCash.toFixed(2),
         openingTransfer: shift.openingTransfer.toFixed(2),
         cashIn: totals.cashIn.toFixed(2),
@@ -327,6 +334,9 @@ export class ShiftsService {
       ...this.mapShift(shift),
       open: true,
       cashier: shift.cashier,
+      accounts: this.accounts(shift, totals),
+      expectedCardSoFar: this.accounts(shift, totals).find((a) => a.method === 'CARD')!.expected,
+      expectedClickSoFar: this.accounts(shift, totals).find((a) => a.method === 'CLICK')!.expected,
 
       cashIn: totals.cashIn.toFixed(2),
       cashDeposits: totals.cashDeposits.toFixed(2),
@@ -374,6 +384,7 @@ export class ShiftsService {
       id: p.id,
       amount: p.amount.toFixed(2),
       method: p.method,
+      note: p.note,
       status: p.status,
       paidAt: p.paidAt.toISOString(),
       invoiceId: p.invoiceId,
@@ -402,6 +413,8 @@ export class ShiftsService {
         const t = await this.registerTotals(s.id);
         return {
           shiftId: s.id,
+          accounts: this.accounts(s, t),
+          unallocatedOpeningTransfer: s.openingTransfer.sub(s.openingCard).sub(s.openingClick).toFixed(2),
           cashier: s.cashier,
           openedAt: s.openedAt.toISOString(),
           openingCash: s.openingCash.toFixed(2),
@@ -436,6 +449,12 @@ export class ShiftsService {
         expectedCash: sum((r) => r.expectedCash),
         transferTotal: sum((r) => r.transferTotal),
         openDrawers: registers.length,
+        unallocatedOpeningTransfer: sum((r) => r.unallocatedOpeningTransfer),
+        accounts: (['CASH', 'CARD', 'CLICK'] as const).map((method) => {
+          const rows = registers.flatMap((r) => r.accounts).filter((a) => a.method === method);
+          const sumField = (key: 'opening' | 'receipts' | 'deposits' | 'refunds' | 'expenses' | 'expected') => rows.reduce((acc, a) => acc.add(a[key]), ZERO).toFixed(2);
+          return { method, opening: sumField('opening'), receipts: sumField('receipts'), deposits: sumField('deposits'), refunds: sumField('refunds'), expenses: sumField('expenses'), expected: sumField('expected'), actual: null, difference: null };
+        }),
       },
       unattachedOnlineToday: (unattached._sum.amount ?? ZERO).toFixed(2),
     };

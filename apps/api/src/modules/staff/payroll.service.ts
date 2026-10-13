@@ -20,12 +20,7 @@ import { AuditService } from '../../core/audit/audit.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { StaffService } from './staff.service';
-import {
-  calcAccrual,
-  periodRange,
-  type AccrualLine,
-  type AccrualRule,
-} from './payroll.calc';
+import { calcAccrual, periodRange, type AccrualLine, type AccrualRule } from './payroll.calc';
 import type {
   AccrualAdjustInput,
   CompensationRuleListQuery,
@@ -268,22 +263,40 @@ export class PayrollService {
 
     // Revenue basis: lines performed by the doctor on PAID / PARTIALLY_PAID
     // invoices issued inside the period.
-    const lines = await this.prisma.db.invoiceLine.findMany({
-      where: {
-        performerUserId: { in: doctorIds },
-        invoice: {
-          status: { in: [InvoiceStatus.PAID, InvoiceStatus.PARTIALLY_PAID] },
-          issuedAt: { gte: start, lt: end },
-        },
+    // Each operation is settled through its own surgeon payout. Keep its
+    // revenue in KPI reports but never accrue a second monthly commission.
+    const lines = await this.prisma.db.$transaction(
+      async (tx) => {
+        const surgeryFees = await tx.surgeryCase.findMany({
+          where: {
+            surgeonUserId: { in: doctorIds },
+            serviceCharge: { invoiceLineId: { not: null } },
+          },
+          select: { serviceCharge: { select: { invoiceLineId: true } } },
+        });
+        const surgeryLineIds = surgeryFees.flatMap((s) =>
+          s.serviceCharge.invoiceLineId ? [s.serviceCharge.invoiceLineId] : [],
+        );
+        return tx.invoiceLine.findMany({
+          where: {
+            ...(surgeryLineIds.length ? { id: { notIn: surgeryLineIds } } : {}),
+            performerUserId: { in: doctorIds },
+            invoice: {
+              status: { in: [InvoiceStatus.PAID, InvoiceStatus.PARTIALLY_PAID] },
+              issuedAt: { gte: start, lt: end },
+            },
+          },
+          select: {
+            performerUserId: true,
+            serviceId: true,
+            quantity: true,
+            lineTotal: true,
+            service: { select: { categoryId: true } },
+          },
+        });
       },
-      select: {
-        performerUserId: true,
-        serviceId: true,
-        quantity: true,
-        lineTotal: true,
-        service: { select: { categoryId: true } },
-      },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
 
     const linesByDoctor = new Map<string, AccrualLine[]>();
     for (const line of lines) {
@@ -394,8 +407,16 @@ export class PayrollService {
       action: AuditAction.UPDATE,
       entity: 'PayrollAccrual',
       entityId: id,
-      before: { adjustment: before.adjustment.toFixed(2), total: before.total.toFixed(2), note: before.note },
-      after: { adjustment: updated.adjustment.toFixed(2), total: updated.total.toFixed(2), note: updated.note },
+      before: {
+        adjustment: before.adjustment.toFixed(2),
+        total: before.total.toFixed(2),
+        note: before.note,
+      },
+      after: {
+        adjustment: updated.adjustment.toFixed(2),
+        total: updated.total.toFixed(2),
+        note: updated.note,
+      },
     });
 
     return mapAccrual(updated);
@@ -455,7 +476,11 @@ export class PayrollService {
     // Doctors may only see their own accruals (object-level check on payroll.read).
     if (actor.role === UserRole.DOCTOR) {
       if (doctorUserId && doctorUserId !== actor.id) {
-        throw new AppException(ErrorCode.FORBIDDEN, 'Doctors may only view their own accruals', 403);
+        throw new AppException(
+          ErrorCode.FORBIDDEN,
+          'Doctors may only view their own accruals',
+          403,
+        );
       }
       doctorUserId = actor.id;
     }

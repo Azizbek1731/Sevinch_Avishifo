@@ -1,6 +1,7 @@
 import createMiddleware from 'next-intl/middleware';
 import { NextResponse, type NextRequest } from 'next/server';
 import { routing } from './i18n/routing';
+import { SINGLE_CLINIC_MODE } from './lib/deployment';
 import {
   isDedicatedPanelHostname,
   isLocalHostname,
@@ -31,15 +32,16 @@ function externalHostname(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
   const host = forwarded || request.headers.get('host') || request.nextUrl.hostname;
   // Strip the port, and the brackets an IPv6 literal arrives in.
-  return host.replace(/^\[(.+)\]$/, '$1').replace(/:\d+$/, '').toLowerCase();
+  return host
+    .replace(/^\[(.+)\]$/, '$1')
+    .replace(/:\d+$/, '')
+    .toLowerCase();
 }
 
 /** nginx terminates TLS, so the scheme the app sees is plain http. */
 function externalProtocol(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase();
-  return forwarded === 'https' || forwarded === 'http'
-    ? `${forwarded}:`
-    : request.nextUrl.protocol;
+  return forwarded === 'https' || forwarded === 'http' ? `${forwarded}:` : request.nextUrl.protocol;
 }
 
 /**
@@ -57,6 +59,22 @@ function externalProtocol(request: NextRequest): string {
 export default function middleware(request: NextRequest) {
   const { nextUrl } = request;
   const hostname = externalHostname(request);
+
+  if (SINGLE_CLINIC_MODE) {
+    const locale = LOCALE_ROOT.exec(nextUrl.pathname)?.[1];
+    const auth = PANEL_PATH.exec(nextUrl.pathname);
+    if (
+      nextUrl.pathname === '/' ||
+      locale ||
+      auth?.[2] === 'register' ||
+      /^\/(uz|uz-Cyrl|ru|en)\/platform(?:\/|$)/.test(nextUrl.pathname)
+    ) {
+      const target = nextUrl.clone();
+      target.pathname = `/${locale ?? auth?.[1] ?? routing.defaultLocale}/login`;
+      return NextResponse.redirect(target);
+    }
+    return intlMiddleware(request);
+  }
 
   if (isLocalHostname(hostname)) return intlMiddleware(request);
 

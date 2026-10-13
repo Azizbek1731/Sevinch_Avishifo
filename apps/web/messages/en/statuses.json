@@ -80,7 +80,8 @@
     "CASHIER": "Cashier",
     "LAB_TECH": "Lab technician",
     "ACCOUNTANT": "Accountant",
-    "PATIENT": "Patient"
+    "PATIENT": "Patient",
+    "OPERATING_ROOM": "Operating room staff"
   },
   "method": {
     "CASH": "Cash",
@@ -120,7 +121,10 @@
     "ULTRASOUND": "Ultrasound",
     "PROCEDURE": "Procedure",
     "DIAGNOSTICS": "Diagnostics",
-    "OTHER": "Other"
+    "OTHER": "Other",
+    "SURGERY": "Surgery",
+    "MATERIAL": "Materials",
+    "MEDICINE": "Medicines"
   },
   "discount": {
     "PERCENT": "Percent",

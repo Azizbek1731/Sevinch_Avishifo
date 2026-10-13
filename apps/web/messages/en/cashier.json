@@ -102,7 +102,7 @@
   },
   "overview": {
     "title": "Register oversight",
-    "description": "Every open register in the branch, and the clinic total.",
+    "description": "Current balances and movements across the clinic’s cash, card and Click accounts.",
     "noneOpen": "No register is open right now.",
     "totalCash": "Cash — total",
     "totalCashHint": "Expected cash across every open register",

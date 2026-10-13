@@ -45,9 +45,12 @@ export const createInvoiceSchema = z
   });
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
 
+const paymentNoteSchema = z.string().trim().max(500).optional();
+
 export const addPaymentSchema = z.object({
   amount: moneySchema,
   method: z.nativeEnum(PaymentMethod),
+  note: paymentNoteSchema,
   idempotencyKey: z.string().uuid(),
 });
 export type AddPaymentInput = z.infer<typeof addPaymentSchema>;
@@ -69,6 +72,7 @@ export type InvoiceSettlement = (typeof INVOICE_SETTLEMENTS)[number];
 export const paymentPartSchema = z.object({
   method: z.nativeEnum(PaymentMethod),
   amount: moneySchema,
+  note: paymentNoteSchema,
 });
 export type PaymentPart = z.infer<typeof paymentPartSchema>;
 
@@ -125,13 +129,20 @@ export type CreateRefundInput = z.infer<typeof createRefundSchema>;
 export const openShiftSchema = z.object({
   /** Cash physically in the box when the branch register opens. */
   openingCash: moneySchema.default('0'),
+  openingCard: moneySchema.default('0'),
+  openingClick: moneySchema.default('0'),
   /** What the transfer account holds at opening, read off the terminal/PSP. */
   openingTransfer: moneySchema.default('0'),
 });
 export type OpenShiftInput = z.infer<typeof openShiftSchema>;
 
 export const closeShiftSchema = z.object({
+  /** Explicit allocation of a legacy unsplit opening transfer balance. */
+  openingCard: moneySchema.optional(),
+  openingClick: moneySchema.optional(),
   actualCash: moneySchema,
+  actualCard: moneySchema.optional(),
+  actualClick: moneySchema.optional(),
   /**
    * What the card terminal's sverka and the PSP cabinets actually reported.
    * Optional here because zod cannot know whether the register saw any
@@ -164,6 +175,8 @@ export type PayFromBalanceInput = z.infer<typeof payFromBalanceSchema>;
 
 export const invoiceQuerySchema = paginationQuerySchema.extend({
   status: z.nativeEnum(InvoiceStatus).optional(),
+  search: z.string().trim().max(120).optional(),
+  pending: z.preprocess((v) => v === 'true' ? true : v === 'false' ? false : v, z.boolean().optional()),
   patientId: idSchema.optional(),
   branchId: idSchema.optional(),
   from: isoDateTimeSchema.optional(),
@@ -187,7 +200,7 @@ export type ExpenseMethod = z.infer<typeof expenseMethodSchema>;
 export const createExpenseSchema = z.object({
   categoryId: idSchema,
   amount: moneySchema,
-  /** CASH is charged to the recorder's own open shift; the rest never touch a drawer. */
+  /** The account charged; all three methods require the branch's open shift in single-clinic mode. */
   method: expenseMethodSchema.default('CASH'),
   date: dateOnlySchema,
   note: z.string().trim().max(300).optional(),

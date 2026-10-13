@@ -1,5 +1,6 @@
 'use client';
 
+import type { Permission } from '@avishifo/shared';
 import { useTranslations } from 'next-intl';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,14 +15,21 @@ export interface ExportButtonProps {
   filters: ReportFilters;
   /** Extra query params (e.g. revenue dimension). */
   extra?: Record<string, string>;
+  permission?: Permission;
 }
 
-export function ExportButton({ path, filenameBase, filters, extra }: ExportButtonProps) {
+export function ExportButton({
+  path,
+  filenameBase,
+  filters,
+  extra,
+  permission = 'reports.export',
+}: ExportButtonProps) {
   const t = useTranslations('reports');
   const can = usePermission();
   const exportXlsx = useExportXlsx(path, filenameBase, filters, extra);
 
-  if (!can('reports.export')) return null;
+  if (!can(permission)) return null;
 
   return (
     <Button

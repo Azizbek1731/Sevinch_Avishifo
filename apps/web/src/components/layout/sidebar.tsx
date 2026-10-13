@@ -6,18 +6,16 @@ import {
   BarChart3,
   Banknote,
   BedDouble,
-  Vault,
   Building2,
-  CalendarDays,
   ClipboardList,
   CreditCard,
   FlaskConical,
   LayoutDashboard,
-  ListOrdered,
   Menu,
   MessageSquareHeart,
   Receipt,
   ScrollText,
+  Scissors,
   Settings,
   Sparkles,
   ShieldCheck,
@@ -50,25 +48,34 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard, permissions: ['reports.read'] },
   { key: 'ai', href: '/ai', icon: Sparkles, permissions: ['ai.use'] },
   { key: 'reception', href: '/reception', icon: ClipboardList, permissions: ['queue.manage'] },
-  { key: 'doctor', href: '/doctor', icon: Stethoscope, permissions: ['queue.call'], roles: ['DOCTOR'] },
-  { key: 'queue', href: '/queue', icon: ListOrdered, permissions: ['queue.read'] },
+  {
+    key: 'doctor',
+    href: '/doctor',
+    icon: Stethoscope,
+    permissions: ['queue.call'],
+    roles: ['DOCTOR'],
+  },
   { key: 'patients', href: '/patients', icon: Users, permissions: ['patients.read'] },
   { key: 'admissions', href: '/admissions', icon: BedDouble, permissions: ['admissions.read'] },
+  { key: 'surgeries', href: '/surgeries', icon: Scissors, permissions: ['surgery.read'] },
   {
     key: 'recordAccess',
     href: '/patients/record-access',
     icon: ShieldCheck,
     permissions: ['patients.recordAccess.manage'],
   },
-  { key: 'calendar', href: '/appointments', icon: CalendarDays, permissions: ['appointments.read'] },
   { key: 'cashier', href: '/cashier', icon: CreditCard, permissions: ['payments.create'] },
-  { key: 'registers', href: '/registers', icon: Vault, permissions: ['shifts.oversee'] },
   { key: 'invoices', href: '/invoices', icon: Receipt, permissions: ['invoices.read'] },
   { key: 'expenses', href: '/expenses', icon: Banknote, permissions: ['expenses.read'] },
   { key: 'lab', href: '/lab', icon: FlaskConical, permissions: ['lab.orders.read'] },
   { key: 'services', href: '/services', icon: Tags, permissions: ['services.write'] },
   { key: 'staff', href: '/staff', icon: UserRound, permissions: ['staff.read'] },
-  { key: 'reports', href: '/reports', icon: BarChart3, permissions: ['reports.read'] },
+  {
+    key: 'reports',
+    href: '/reports',
+    icon: BarChart3,
+    permissions: ['reports.read', 'reports.cash.read'],
+  },
   { key: 'feedback', href: '/feedback', icon: MessageSquareHeart, permissions: ['feedback.read'] },
   { key: 'audit', href: '/audit', icon: ScrollText, permissions: ['audit.read'] },
   { key: 'settings', href: '/settings', icon: Settings, permissions: ['clinic.settings.read'] },
@@ -77,9 +84,19 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const PLATFORM_ITEMS: NavItem[] = [
-  { key: 'clinics', href: '/platform/clinics', icon: Building2, permissions: ['platform.clinics.read'] },
+  {
+    key: 'clinics',
+    href: '/platform/clinics',
+    icon: Building2,
+    permissions: ['platform.clinics.read'],
+  },
   { key: 'plans', href: '/platform/plans', icon: Tags, permissions: ['platform.plans.write'] },
-  { key: 'analytics', href: '/platform/analytics', icon: BarChart3, permissions: ['platform.analytics.read'] },
+  {
+    key: 'analytics',
+    href: '/platform/analytics',
+    icon: BarChart3,
+    permissions: ['platform.analytics.read'],
+  },
 ];
 
 function NavLink({
@@ -198,7 +215,12 @@ export function MobileNav() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="-ml-1 shrink-0 md:hidden" aria-label={t('menu')}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="-ml-1 shrink-0 md:hidden"
+          aria-label={t('menu')}
+        >
           <Menu className="h-5 w-5" />
         </Button>
       </SheetTrigger>

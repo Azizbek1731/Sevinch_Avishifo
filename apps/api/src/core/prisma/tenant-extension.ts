@@ -25,6 +25,7 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'Queue',
   'QueueTicket',
   'Visit',
+  'ClinicalOrder',
   'VisitVital',
   'Diagnosis',
   'Prescription',
@@ -36,6 +37,9 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'TreatmentOrder',
   'TreatmentAdministration',
   'ChargeItem',
+  'SurgeryCase',
+  'SurgeryEntry',
+  'SurgeryPayout',
   'Referral',
   'VisitTemplate',
   'VisitAmendment',
@@ -157,3 +161,6 @@ export function createExtendedClient(base: PrismaClient) {
 }
 
 export type TenantPrismaClient = ReturnType<typeof createExtendedClient>;
+
+/** Transaction callback client retaining the tenant extension's method types. */
+export type TenantTransactionClient = Omit<TenantPrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;

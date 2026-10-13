@@ -14,6 +14,7 @@ import { usePatientVisits } from '../hooks';
 
 export function PatientVisitsTab({ patientId }: { patientId: string }) {
   const t = useTranslations('patients');
+  const tr = useTranslations('doctor.clinical');
   const [page, setPage] = useState(1);
 
   const query = usePatientVisits(patientId, page, true);
@@ -28,6 +29,16 @@ export function PatientVisitsTab({ patientId }: { patientId: string }) {
         cell: ({ row }) => (
           <span className="whitespace-nowrap">
             {row.original.startedAt ? formatTz(row.original.startedAt) : '—'}
+          </span>
+        ),
+      },
+      {
+        id: 'kind',
+        header: tr('services'),
+        cell: ({ row }) => (
+          <span>
+            {row.original.reportTitle ||
+              tr(row.original.kind === 'ULTRASOUND' ? 'ultrasound' : 'consultation')}
           </span>
         ),
       },
@@ -59,7 +70,7 @@ export function PatientVisitsTab({ patientId }: { patientId: string }) {
         ),
       },
     ],
-    [t],
+    [t, tr],
   );
 
   return (

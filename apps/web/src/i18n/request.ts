@@ -36,6 +36,7 @@ export const MESSAGE_NAMESPACES = [
   'expenses',
   'charges',
   'admissions',
+  'surgeries',
   'admissionPrint',
   'cardPrint',
 ] as const;

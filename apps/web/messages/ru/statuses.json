@@ -80,7 +80,8 @@
     "CASHIER": "Кассир",
     "LAB_TECH": "Лаборант",
     "ACCOUNTANT": "Бухгалтер",
-    "PATIENT": "Пациент"
+    "PATIENT": "Пациент",
+    "OPERATING_ROOM": "Сотрудник операционной"
   },
   "method": {
     "CASH": "Наличные",
@@ -120,7 +121,10 @@
     "ULTRASOUND": "УЗИ",
     "PROCEDURE": "Процедура",
     "DIAGNOSTICS": "Диагностика",
-    "OTHER": "Другое"
+    "OTHER": "Другое",
+    "SURGERY": "Операции",
+    "MATERIAL": "Расходные материалы",
+    "MEDICINE": "Препараты"
   },
   "discount": {
     "PERCENT": "Процент",

@@ -3,35 +3,52 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { ListPlus, Plus, UserPlus } from 'lucide-react';
+import {
+  ArrowRight,
+  BedDouble,
+  ClipboardList,
+  FlaskConical,
+  ListPlus,
+  Receipt,
+  UserPlus,
+  Stethoscope,
+  Activity,
+} from 'lucide-react';
+import { Link } from '@/i18n/routing';
+import { SINGLE_CLINIC_MODE } from '@/lib/deployment';
 import { useAuthStore } from '@/stores/auth-store';
 import { useSocket, useSocketEvent } from '@/hooks/use-socket';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/page-header';
 import { AddServicesDialog } from '@/features/billing/components/add-services-dialog';
-import { PendingInvoicesTab } from '@/features/billing/components/pending-invoices-tab';
-import { ShiftPanel } from '@/features/billing/components/shift-panel';
+import { AdmitDialog } from '@/features/admissions/components/admit-dialog';
+import { AdmitPickerDialog } from '@/features/admissions/components/admit-picker-dialog';
 import { AppointmentsPanel } from './appointments-panel';
 import { QueuePanel } from './queue-panel';
 import { NewPatientDialog } from './new-patient-dialog';
 import { WalkInDialog } from './walk-in-dialog';
+import { ClinicalOrderDialog } from '@/features/clinical-orders/components/order-dialog';
+import { ClinicalWorklist } from '@/features/clinical-orders/components/worklist';
+import type { ClinicalKind } from '@/features/clinical-orders/api';
 
 export function ReceptionDashboard() {
   const t = useTranslations('reception');
-  const tc = useTranslations('cashier');
+  const tClinical = useTranslations('doctor.clinical');
   const qc = useQueryClient();
   const branchId = useAuthStore((s) => s.activeBranchId);
   const permissions = useAuthStore((s) => s.user?.permissions);
   const canCreatePatient = Boolean(permissions?.includes('patients.write'));
-  const canWalkIn = Boolean(permissions?.includes('appointments.write'));
-  // Most clinics run the cash desk from the front desk: sell the services and
-  // take the money without leaving this screen.
+  const canWalkIn = !SINGLE_CLINIC_MODE && Boolean(permissions?.includes('appointments.write'));
   const canSell = Boolean(permissions?.includes('invoices.write'));
-  const canCashier = Boolean(permissions?.includes('payments.create'));
+  const canAdmit = Boolean(permissions?.includes('admissions.write'));
 
+  const [clinicalKind, setClinicalKind] = useState<ClinicalKind | null>(null);
   const [newPatientOpen, setNewPatientOpen] = useState(false);
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [addServicesOpen, setAddServicesOpen] = useState(false);
+  const [serviceKind, setServiceKind] = useState<'LAB' | undefined>();
+  const [admitPickerOpen, setAdmitPickerOpen] = useState(false);
+  const [admitPatient, setAdmitPatient] = useState<{ id: string; fullName: string } | null>(null);
 
   // Join the branch queue room so ticket events reach this screen.
   const { socket, connected } = useSocket();
@@ -51,22 +68,19 @@ export function ReceptionDashboard() {
   });
   useSocketEvent('invoice.paid', () => {
     void qc.invalidateQueries({ queryKey: ['invoices'] });
-    void qc.invalidateQueries({ queryKey: ['shifts'] });
+    void qc.invalidateQueries({ queryKey: ['clinical-orders'] });
   });
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t('title')} description={t('subtitle')}>
+      <PageHeader
+        title={t('title')}
+        description={t(SINGLE_CLINIC_MODE ? 'singleClinicSubtitle' : 'subtitle')}
+      >
         {canCreatePatient ? (
           <Button variant="outline" onClick={() => setNewPatientOpen(true)}>
             <UserPlus className="mr-2 h-4 w-4" />
             {t('newPatient.button')}
-          </Button>
-        ) : null}
-        {canSell ? (
-          <Button variant="outline" onClick={() => setAddServicesOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('cashDesk.addServices')}
           </Button>
         ) : null}
         {canWalkIn ? (
@@ -77,26 +91,131 @@ export function ReceptionDashboard() {
         ) : null}
       </PageHeader>
 
-      {canCashier ? <ShiftPanel /> : null}
-
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <AppointmentsPanel />
-        <QueuePanel />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {canSell ? (
+          <>
+            {(['CONSULTATION', 'ULTRASOUND'] as const).map((kind) => {
+              const Icon = kind === 'ULTRASOUND' ? Activity : Stethoscope;
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  className="rounded-xl border bg-card p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
+                  onClick={() => setClinicalKind(kind)}
+                >
+                  <Icon className="mb-4 h-6 w-6 text-primary" />
+                  <p className="font-semibold">
+                    {tClinical(kind === 'ULTRASOUND' ? 'newUltrasound' : 'newConsultation')}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">{tClinical('handoff')}</p>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              className="rounded-xl border bg-card p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
+              onClick={() => {
+                setServiceKind(undefined);
+                setAddServicesOpen(true);
+              }}
+            >
+              <ClipboardList className="mb-4 h-6 w-6 text-primary" />
+              <p className="font-semibold">{t('workflow.services')}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t('workflow.servicesHint')}</p>
+            </button>
+            <button
+              type="button"
+              className="rounded-xl border bg-card p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
+              onClick={() => {
+                setServiceKind('LAB');
+                setAddServicesOpen(true);
+              }}
+            >
+              <FlaskConical className="mb-4 h-6 w-6 text-primary" />
+              <p className="font-semibold">{t('workflow.lab')}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t(SINGLE_CLINIC_MODE ? 'workflow.labPaidHint' : 'workflow.labHint')}
+              </p>
+            </button>
+          </>
+        ) : null}
+        {canAdmit ? (
+          <button
+            type="button"
+            className="rounded-xl border bg-card p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
+            onClick={() => setAdmitPickerOpen(true)}
+          >
+            <BedDouble className="mb-4 h-6 w-6 text-primary" />
+            <p className="font-semibold">{t('workflow.admit')}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t('workflow.admitHint')}</p>
+          </button>
+        ) : null}
+        {permissions?.includes('admissions.read') ? (
+          <Link
+            href="/admissions"
+            className="rounded-xl border bg-card p-5 transition-colors hover:border-primary/50 hover:bg-primary/5"
+          >
+            <Receipt className="mb-4 h-6 w-6 text-primary" />
+            <p className="font-semibold">{t('workflow.ward')}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t('workflow.wardHint')}</p>
+          </Link>
+        ) : null}
       </div>
 
-      {canCashier ? (
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">{t('cashDesk.title')}</h2>
-            <p className="text-sm text-muted-foreground">{tc('tabs.pending')}</p>
-          </div>
-          <PendingInvoicesTab />
-        </section>
+      {canSell ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-3">
+          <p className="max-w-3xl text-sm text-muted-foreground">{t('workflow.handoff')}</p>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/invoices">
+              {t('workflow.invoices')}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
       ) : null}
 
+      {canSell ? <ClinicalWorklist reception /> : null}
+
+      {!SINGLE_CLINIC_MODE ? (
+        <div className="grid items-start gap-4 xl:grid-cols-2">
+          <AppointmentsPanel />
+          <QueuePanel />
+        </div>
+      ) : null}
+
+      {clinicalKind ? (
+        <ClinicalOrderDialog
+          open
+          kind={clinicalKind}
+          onOpenChange={(open) => {
+            if (!open) setClinicalKind(null);
+          }}
+        />
+      ) : null}
       <NewPatientDialog open={newPatientOpen} onOpenChange={setNewPatientOpen} />
-      <WalkInDialog open={walkInOpen} onOpenChange={setWalkInOpen} />
-      <AddServicesDialog open={addServicesOpen} onOpenChange={setAddServicesOpen} />
+      {!SINGLE_CLINIC_MODE ? <WalkInDialog open={walkInOpen} onOpenChange={setWalkInOpen} /> : null}
+      <AddServicesDialog
+        key={serviceKind === 'LAB' ? 'laboratory' : 'procedures'}
+        open={addServicesOpen}
+        onOpenChange={setAddServicesOpen}
+        initialKind={serviceKind}
+        prepareOnly
+      />
+      <AdmitPickerDialog
+        open={admitPickerOpen}
+        onOpenChange={setAdmitPickerOpen}
+        onPick={setAdmitPatient}
+      />
+      {admitPatient ? (
+        <AdmitDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setAdmitPatient(null);
+          }}
+          patientId={admitPatient.id}
+          patientName={admitPatient.fullName}
+        />
+      ) : null}
     </div>
   );
 }

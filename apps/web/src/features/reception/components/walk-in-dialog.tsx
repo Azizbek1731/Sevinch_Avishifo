@@ -223,6 +223,7 @@ export function WalkInDialog({ open, onOpenChange }: WalkInDialogProps) {
         open={newPatientOpen}
         onOpenChange={setNewPatientOpen}
         onCreated={(p) => setPatient(p)}
+        onSelectExisting={(p) => setPatient(p)}
       />
     </Dialog>
   );

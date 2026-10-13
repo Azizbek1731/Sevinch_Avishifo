@@ -3,6 +3,7 @@
 import type {
   AddDiagnosisInput,
   AddPrescriptionInput,
+  ReplacePrescriptionsInput,
   AddReferralInput,
   AmendVisitInput,
   Gender,
@@ -120,6 +121,14 @@ export interface VisitPrescription {
   id: string;
   drugName: string;
   drugId: string | null;
+  strength: string | null;
+  form: string | null;
+  quantity: string | null;
+  route: string | null;
+  durationText: string | null;
+  dripRate: string | null;
+  combineWithPrevious: boolean;
+  sortOrder: number;
   dosage: string | null;
   frequency: string | null;
   durationDays: number | null;
@@ -141,6 +150,10 @@ export interface VisitReferral {
 
 export interface VisitDetail {
   id: string;
+  kind: 'CONSULTATION' | 'ULTRASOUND';
+  clinicalOrderId: string | null;
+  reportTitle: string | null;
+  reportBody: string | null;
   branchId: string;
   patientId: string;
   doctorUserId: string;
@@ -151,6 +164,8 @@ export interface VisitDetail {
   objective: string | null;
   assessmentNote: string | null;
   plan: string | null;
+  physiotherapy: string | null;
+  prescriptionRevision: number;
   startedAt: string | null;
   completedAt: string | null;
   nextVisitAt: string | null;
@@ -175,6 +190,8 @@ export interface VisitDetail {
 
 export interface VisitListItem {
   id: string;
+  kind: 'CONSULTATION' | 'ULTRASOUND';
+  reportTitle: string | null;
   branchId: string;
   patientId: string;
   doctorUserId: string;
@@ -246,9 +263,14 @@ export const doctorApi = {
   // ------------------------------------------------------------ visits
   createVisit: (ticketId: string) => api.post<VisitDetail>('/visits', { ticketId }),
   getVisit: (id: string) => api.get<VisitDetail>(`/visits/${id}`),
-  listVisits: (params: { doctorUserId?: string; patientId?: string; page?: number; limit?: number }) =>
-    api.get<VisitListItem[]>('/visits', params),
-  updateVisit: (id: string, body: UpdateVisitInput) => api.patch<VisitDetail>(`/visits/${id}`, body),
+  listVisits: (params: {
+    doctorUserId?: string;
+    patientId?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get<VisitListItem[]>('/visits', params),
+  updateVisit: (id: string, body: UpdateVisitInput) =>
+    api.patch<VisitDetail>(`/visits/${id}`, body),
   amendVisit: (id: string, body: AmendVisitInput) =>
     api.post<{ id: string; visit: VisitDetail }>(`/visits/${id}/amendments`, body),
   completeVisit: (id: string) => api.post<VisitDetail>(`/visits/${id}/complete`),
@@ -258,6 +280,12 @@ export const doctorApi = {
     api.post<VisitDiagnosis>(`/visits/${id}/diagnoses`, body),
   removeDiagnosis: (id: string, dxId: string) =>
     api.delete<{ id: string }>(`/visits/${id}/diagnoses/${dxId}`),
+  replacePrescriptions: (id: string, body: ReplacePrescriptionsInput) =>
+    api.put<{
+      prescriptions: VisitPrescription[];
+      prescriptionRevision: number;
+      physiotherapy: string | null;
+    }>(`/visits/${id}/prescriptions`, body),
   addPrescription: (id: string, body: AddPrescriptionInput) =>
     api.post<VisitPrescription>(`/visits/${id}/prescriptions`, body),
   removePrescription: (id: string, rxId: string) =>

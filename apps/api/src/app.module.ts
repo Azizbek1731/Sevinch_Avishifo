@@ -36,10 +36,12 @@ import { ClinicsModule } from './modules/clinics/clinics.module';
 import { PatientsModule } from './modules/patients/patients.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
 import { QueueModule } from './modules/queue/queue.module';
+import { ClinicalOrdersModule } from './modules/clinical-orders/clinical-orders.module';
 import { VisitsModule } from './modules/visits/visits.module';
 import { ServicesModule } from './modules/services/services.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { AdmissionsModule } from './modules/admissions/admissions.module';
+import { SurgeriesModule } from './modules/surgeries/surgeries.module';
 import { LabModule } from './modules/lab/lab.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ReportsModule } from './modules/reports/reports.module';
@@ -121,16 +123,18 @@ import { AiModule } from './modules/ai/ai.module';
     AppointmentsModule,
     QueueModule,
     VisitsModule,
+    ClinicalOrdersModule,
     ServicesModule,
     BillingModule,
     AdmissionsModule,
+    SurgeriesModule,
     LabModule,
     NotificationsModule,
     ReportsModule,
     StaffModule,
     FeedbackModule,
     AuditViewerModule,
-    SuperAdminModule,
+    ...(process.env.SINGLE_CLINIC_MODE === 'false' ? [SuperAdminModule] : []),
     RecordAccessModule,
     AiModule,
     PortalModule,

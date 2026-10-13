@@ -48,6 +48,8 @@ const pg = new EmbeddedPostgres({
 
 const redis = new RedisMemoryServer({
   instance: { port: redisPort },
+  // Redis 7 matches docker-compose and builds without Redis 8's optional modules.
+  binary: { version: '7.4.0' },
   autoStart: false,
 });
 
@@ -64,7 +66,9 @@ async function main() {
 
   await redis.start();
   console.log('[dev-local] Redis ready on port', await redis.getPort());
-  console.log(`[dev-local] DATABASE_URL=postgresql://avishifo:avishifo@localhost:${pgPort}/avishifo`);
+  console.log(
+    `[dev-local] DATABASE_URL=postgresql://avishifo:avishifo@localhost:${pgPort}/avishifo`,
+  );
   console.log(`[dev-local] REDIS_URL=redis://localhost:${redisPort}`);
   console.log('[dev-local] Press Ctrl+C to stop.');
 }

@@ -102,7 +102,7 @@
   },
   "overview": {
     "title": "Kassa nazorati",
-    "description": "Filialdagi barcha ochiq kassalar va klinikaning umumiy summasi.",
+    "description": "Klinikaning naqd, karta va Click kassalari bo‘yicha joriy qoldiq va harakatlar.",
     "noneOpen": "Hozir ochiq kassa yo‘q.",
     "totalCash": "Naqd — jami",
     "totalCashHint": "Barcha ochiq kassalardagi kutilayotgan naqd",

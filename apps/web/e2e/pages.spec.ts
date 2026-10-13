@@ -10,9 +10,7 @@ import { test, expect } from './test-base';
 const ROUTES = [
   '/uz/dashboard',
   '/uz/reception',
-  '/uz/queue',
   '/uz/patients',
-  '/uz/appointments',
   '/uz/doctor',
   '/uz/cashier',
   '/uz/invoices',
@@ -46,6 +44,13 @@ test('owner: all main screens render without crashes', async ({ page }) => {
     await expect(page.getByText(/server xatosi/i)).toHaveCount(0);
     // The sidebar must be present (layout mounted, session alive).
     await expect(page.getByText('AviShifo').first()).toBeVisible();
+  }
+
+  for (const route of ['queue', 'appointments', 'registers']) {
+    await expect(page.locator(`a[href="/uz/${route}"]`)).toHaveCount(0);
+    await page.goto(`/uz/${route}`, { waitUntil: 'networkidle' });
+    await expect(page).toHaveURL(/\/uz\/dashboard$/);
+    await expect(page.getByText('Application error', { exact: false })).toHaveCount(0);
   }
 
   expect(consoleErrors, `Uncaught page errors:\n${consoleErrors.join('\n')}`).toHaveLength(0);

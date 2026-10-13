@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
@@ -26,6 +26,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuthStore } from '@/stores/auth-store';
+import { billingApi } from '@/features/billing/api';
+import { EXTERNAL_PAYMENT_METHODS, inputTiyin } from '@/features/billing/payment-methods';
 import { useApiErrorToast } from '@/features/services/hooks';
 import {
   expensesApi,
@@ -35,7 +38,7 @@ import {
   type ExpenseRow,
 } from '../api';
 
-const METHODS: ExpenseMethod[] = ['CASH', 'CARD', 'PAYME', 'CLICK', 'UZUM'];
+const METHODS = EXTERNAL_PAYMENT_METHODS;
 
 export interface ExpenseDialogProps {
   open: boolean;
@@ -50,10 +53,22 @@ export function ExpenseDialog({ open, onOpenChange, categories, expense }: Expen
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
   const isEdit = expense !== null;
+  const activeBranchId = useAuthStore((state) => state.activeBranchId);
+  const shiftQuery = useQuery({
+    queryKey: ['shifts', 'current', activeBranchId],
+    queryFn: async () => (await billingApi.currentShift()).data,
+    enabled: open,
+  });
 
   const form = useForm<CreateExpenseInput>({
     resolver: zodResolver(createExpenseSchema),
-    defaultValues: { categoryId: '', amount: '', method: 'CASH', date: todayInTashkent(), note: '' },
+    defaultValues: {
+      categoryId: '',
+      amount: '',
+      method: 'CASH',
+      date: todayInTashkent(),
+      note: '',
+    },
   });
 
   useEffect(() => {
@@ -79,13 +94,16 @@ export function ExpenseDialog({ open, onOpenChange, categories, expense }: Expen
       // The drawer total moves with the expense, so the shift panel has to
       // re-read too — otherwise the cashier sees a figure that is already wrong.
       void queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      void queryClient.invalidateQueries({ queryKey: ['shift'] });
+      void queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      void queryClient.invalidateQueries({ queryKey: ['reports'] });
       onOpenChange(false);
     },
     onError: errorToast,
   });
 
   const method = form.watch('method');
+  const amountTiyin = inputTiyin(form.watch('amount'));
+  const amountInvalid = amountTiyin === null || amountTiyin <= 0n;
   const activeCategories = categories.filter((c) => c.isActive || c.id === expense?.categoryId);
 
   return (
@@ -96,7 +114,10 @@ export function ExpenseDialog({ open, onOpenChange, categories, expense }: Expen
         </DialogHeader>
 
         <form
-          onSubmit={form.handleSubmit((v) => save.mutate(v))}
+          onSubmit={form.handleSubmit((values) => {
+            if (!amountInvalid && (isEdit || shiftQuery.data?.open) && !save.isPending)
+              save.mutate(values);
+          })}
           className="space-y-4"
         >
           <div className="space-y-1.5">
@@ -155,12 +176,12 @@ export function ExpenseDialog({ open, onOpenChange, categories, expense }: Expen
             </Select>
             {isEdit ? (
               <p className="text-xs text-muted-foreground">{t('methodLocked')}</p>
-            ) : method === 'CASH' ? (
+            ) : (
               <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
                 <Wallet className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                {t('cashHint')}
+                {t('accountHint', { method: t(`methods.${method}`) })}
               </p>
-            ) : null}
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -178,11 +199,22 @@ export function ExpenseDialog({ open, onOpenChange, categories, expense }: Expen
             />
           </div>
 
+          {!isEdit && !shiftQuery.data?.open ? (
+            <p className="text-sm text-warning-foreground">{t('shiftRequired')}</p>
+          ) : null}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {t('cancel')}
             </Button>
-            <Button type="submit" disabled={save.isPending}>
+            <Button
+              type="submit"
+              disabled={
+                save.isPending ||
+                amountInvalid ||
+                activeCategories.length === 0 ||
+                (!isEdit && !shiftQuery.data?.open)
+              }
+            >
               {save.isPending ? t('saving') : t('save')}
             </Button>
           </DialogFooter>

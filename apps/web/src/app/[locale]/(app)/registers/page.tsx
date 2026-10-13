@@ -1,5 +1,1 @@
-import { RegistersOverviewPage } from '@/features/billing/components/registers-overview';
-
-export default function Page() {
-  return <RegistersOverviewPage />;
-}
+export { HomeRedirect as default } from '@/components/layout/home-redirect';

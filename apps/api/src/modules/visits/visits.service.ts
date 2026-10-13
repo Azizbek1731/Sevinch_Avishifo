@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import type { TenantTransactionClient } from '../../core/prisma/tenant-extension';
+import { AppConfigService } from '../../core/config/app-config.service';
+import { VisitReportPdfService } from './visit-report-pdf.service';
+import { buildVisitReportPdfData } from './visit-report.data';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   AuditAction,
@@ -17,21 +21,53 @@ import { TenantContext } from '../../core/prisma/tenant-context';
 import { AuditService } from '../../core/audit/audit.service';
 import { LabService } from '../lab/lab.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { AddDiagnosisDto, AddDrugDto, AddPrescriptionDto, AddReferralDto, AmendVisitDto, CreateVisitDto, DrugQueryDto, Icd10QueryDto, PaginationQueryDto, UpdateVisitDto, UpsertVitalsDto, VisitQueryDto, VisitTemplatePatchDto, VisitTemplateUpsertDto } from './dto';
-
-const HOUR_MS = 3_600_000;
-const DEFAULT_VISIT_LOCK_HOURS = 24;
+import {
+  AddDiagnosisDto,
+  AddDrugDto,
+  AddPrescriptionDto,
+  AddReferralDto,
+  AmendVisitDto,
+  CreateVisitDto,
+  DrugQueryDto,
+  Icd10QueryDto,
+  PaginationQueryDto,
+  ReplacePrescriptionsDto,
+  UpdateVisitDto,
+  UpsertVitalsDto,
+  VisitQueryDto,
+  VisitTemplatePatchDto,
+  VisitTemplateUpsertDto,
+} from './dto';
 
 /** SOAP-ish fields amendable/patchable on a visit. */
-const VISIT_EDIT_FIELDS = ['subjective', 'objective', 'assessmentNote', 'plan', 'nextVisitAt'] as const;
+const VISIT_EDIT_FIELDS = [
+  'subjective',
+  'objective',
+  'assessmentNote',
+  'plan',
+  'nextVisitAt',
+  'reportTitle',
+  'reportBody',
+] as const;
 type VisitEditField = (typeof VISIT_EDIT_FIELDS)[number];
 
 const iso = (d: Date | null | undefined): string | null => (d ? d.toISOString() : null);
 const dateOnly = (d: Date | null | undefined): string | null =>
   d ? d.toISOString().slice(0, 10) : null;
+const PRESCRIPTION_ORDER = [
+  { sortOrder: 'asc' as const },
+  { createdAt: 'asc' as const },
+  { id: 'asc' as const },
+];
 
 type VisitDetailRow = Prisma.VisitGetPayload<{
   include: {
+    clinicalOrder: { select: { id: true } };
+    amendments: {
+      orderBy: { createdAt: 'desc' };
+      take: 1;
+      select: { createdAt: true; authorId: true; reason: true };
+    };
     vitals: true;
     diagnoses: { include: { icd10: true } };
     prescriptions: { include: { drug: true } };
@@ -47,11 +83,14 @@ type VisitListRow = Prisma.VisitGetPayload<{
 
 @Injectable()
 export class VisitsService {
+  private readonly logger = new Logger(VisitsService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly labService: LabService,
     private readonly notifications: NotificationsService,
+    private readonly config: AppConfigService,
+    private readonly reportPdf: VisitReportPdfService,
   ) {}
 
   // ------------------------------------------------------------ helpers
@@ -70,45 +109,111 @@ export class VisitsService {
       : {};
   }
 
-  private async visitLockHours(): Promise<number> {
-    const settings = await this.clinicSettings();
-    const raw = settings['visitLockHours'];
-    return typeof raw === 'number' && raw > 0 ? raw : DEFAULT_VISIT_LOCK_HOURS;
-  }
-
   private async isBranchWideDoctorAccess(): Promise<boolean> {
     const settings = await this.clinicSettings();
     return settings['doctorPatientAccess'] === 'branch';
   }
 
-  /** Object-level access: DOCTOR sees only own visits unless clinic allows branch-wide. */
-  private async assertVisitAccess(user: AuthUser, visit: { doctorUserId: string }): Promise<void> {
-    if (user.role !== UserRole.DOCTOR) return;
-    if (visit.doctorUserId === user.id) return;
-    if (await this.isBranchWideDoctorAccess()) return;
+  /** Authors can edit; a treating doctor can read this patient's signed history. */
+  private async assertVisitAccess(
+    user: AuthUser,
+    visit: { doctorUserId: string; patientId: string; branchId: string; status: string },
+  ): Promise<void> {
+    if (user.branchIds.length && !user.branchIds.includes(visit.branchId))
+      throw new AppException(ErrorCode.FORBIDDEN, 'Branch access required', 403);
+    if (user.role !== UserRole.DOCTOR || visit.doctorUserId === user.id) return;
+    if (visit.status === 'COMPLETED') {
+      const care = await this.prisma.db.clinicalOrder.findFirst({
+        where: {
+          patientId: visit.patientId,
+          branchId: visit.branchId,
+          doctorUserId: user.id,
+          initialInvoice: { status: 'PAID', refunds: { none: {} } },
+          visit: { status: { in: ['IN_PROGRESS', 'COMPLETED'] } },
+        },
+        select: { id: true },
+      });
+      if (care || (await this.isBranchWideDoctorAccess())) return;
+    }
     throw new AppException(ErrorCode.FORBIDDEN, 'No access to this visit', 403);
   }
 
-  /** Lock rule: completedAt + visitLockHours passed → read-only (use amendments). */
-  private async ensureEditable(visit: { completedAt: Date | null }): Promise<void> {
-    if (!visit.completedAt) return;
-    const lockHours = await this.visitLockHours();
-    if (Date.now() > visit.completedAt.getTime() + lockHours * HOUR_MS) {
+  private assertVisitWrite(
+    user: AuthUser,
+    visit: { doctorUserId: string },
+    allowNurse = false,
+  ): void {
+    if (
+      (user.role === UserRole.DOCTOR && visit.doctorUserId !== user.id) ||
+      (user.role === UserRole.NURSE && !allowNurse)
+    ) {
       throw new AppException(
-        ErrorCode.VISIT_LOCKED,
-        'Visit is locked; changes require an amendment',
-        423,
+        ErrorCode.FORBIDDEN,
+        'Only the treating doctor can change this report',
+        403,
       );
     }
+  }
+
+  private async ensureEditable(visit: {
+    completedAt: Date | null;
+    status?: string;
+  }): Promise<void> {
+    if (visit.completedAt || (visit.status && visit.status !== 'IN_PROGRESS'))
+      throw new AppException(
+        ErrorCode.VISIT_LOCKED,
+        'Confirmed reports are read-only; use an audited amendment',
+        423,
+      );
+  }
+
+  private async edit<T>(
+    id: string,
+    action: (tx: TenantTransactionClient) => Promise<T>,
+  ): Promise<T> {
+    const clinicId = TenantContext.requireClinicId();
+    return this.prisma.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "ClinicalOrder" WHERE "visitId" = ${id} AND "clinicId" = ${clinicId} FOR UPDATE`;
+      const order = await tx.clinicalOrder.findFirst({ where: { visitId: id } });
+      if (order) {
+        await tx.$queryRaw`SELECT "id" FROM "Invoice" WHERE "clinicalOrderId" = ${order.id} AND "clinicId" = ${clinicId} ORDER BY "id" FOR UPDATE`;
+        const cancelled = await tx.invoice.count({
+          where: {
+            clinicalOrderId: order.id,
+            OR: [
+              { id: order.initialInvoiceId, status: { in: ['CANCELLED', 'REFUNDED'] } },
+              { refunds: { some: {} } },
+            ],
+          },
+        });
+        if (cancelled)
+          throw new AppException(
+            ErrorCode.VISIT_LOCKED,
+            'Cancelled examinations are read-only',
+            423,
+          );
+      }
+
+      await tx.$queryRaw`SELECT "id" FROM "Visit" WHERE "id" = ${id} AND "clinicId" = ${clinicId} FOR UPDATE`;
+      const visit = await tx.visit.findFirstOrThrow({ where: { id } });
+      await this.ensureEditable(visit);
+      return action(tx);
+    });
   }
 
   private async requireVisit(id: string, user: AuthUser): Promise<VisitDetailRow> {
     const visit = await this.prisma.db.visit.findUnique({
       where: { id },
       include: {
+        clinicalOrder: { select: { id: true } },
+        amendments: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { createdAt: true, authorId: true, reason: true },
+        },
         vitals: true,
         diagnoses: { include: { icd10: true }, orderBy: { createdAt: 'asc' } },
-        prescriptions: { include: { drug: true }, orderBy: { createdAt: 'asc' } },
+        prescriptions: { include: { drug: true }, orderBy: PRESCRIPTION_ORDER },
         referrals: { orderBy: { createdAt: 'asc' } },
         patient: true,
         doctor: { include: { staffProfile: true } },
@@ -160,10 +265,18 @@ export class VisitsService {
       id: p.id,
       drugName: p.drugName,
       drugId: p.drugId,
+      strength: p.strength,
+      form: p.form,
+      quantity: p.quantity,
       dosage: p.dosage,
+      route: p.route,
+      dripRate: p.dripRate,
       frequency: p.frequency,
       durationDays: p.durationDays,
+      durationText: p.durationText,
       instructions: p.instructions,
+      combineWithPrevious: p.combineWithPrevious,
+      sortOrder: p.sortOrder,
       createdAt: iso(p.createdAt),
       drug: p.drug
         ? { id: p.drug.id, name: p.drug.name, form: p.drug.form, strength: p.drug.strength }
@@ -187,6 +300,10 @@ export class VisitsService {
   private toDetail(v: VisitDetailRow): Record<string, unknown> {
     return {
       id: v.id,
+      kind: v.kind,
+      reportTitle: v.reportTitle,
+      reportBody: v.reportBody,
+      clinicalOrderId: v.clinicalOrder?.id ?? null,
       branchId: v.branchId,
       patientId: v.patientId,
       doctorUserId: v.doctorUserId,
@@ -197,6 +314,8 @@ export class VisitsService {
       objective: v.objective,
       assessmentNote: v.assessmentNote,
       plan: v.plan,
+      physiotherapy: v.physiotherapy,
+      prescriptionRevision: v.prescriptionRevision,
       startedAt: iso(v.startedAt),
       completedAt: iso(v.completedAt),
       nextVisitAt: iso(v.nextVisitAt),
@@ -227,6 +346,8 @@ export class VisitsService {
   private toListItem(v: VisitListRow): Record<string, unknown> {
     return {
       id: v.id,
+      kind: v.kind,
+      reportTitle: v.reportTitle,
       branchId: v.branchId,
       patientId: v.patientId,
       doctorUserId: v.doctorUserId,
@@ -248,6 +369,13 @@ export class VisitsService {
     user: AuthUser,
     activeBranchId: string,
   ): Promise<Record<string, unknown>> {
+    if (this.config.env.SINGLE_CLINIC_MODE) {
+      throw new AppException(
+        ErrorCode.INVOICE_INVALID_STATE,
+        'Start a paid clinical order from the worklist',
+        409,
+      );
+    }
     const doctorUserId = user.role === UserRole.DOCTOR ? user.id : input.doctorUserId;
     if (!doctorUserId) {
       throw new AppException(ErrorCode.VALIDATION_ERROR, 'doctorUserId is required', 400);
@@ -303,10 +431,7 @@ export class VisitsService {
     if (ticketId || appointmentId) {
       const existing = await this.prisma.db.visit.findFirst({
         where: {
-          OR: [
-            ...(ticketId ? [{ ticketId }] : []),
-            ...(appointmentId ? [{ appointmentId }] : []),
-          ],
+          OR: [...(ticketId ? [{ ticketId }] : []), ...(appointmentId ? [{ appointmentId }] : [])],
         },
         select: { id: true },
       });
@@ -367,7 +492,9 @@ export class VisitsService {
   }
 
   async list(query: VisitQueryDto, user: AuthUser): Promise<PaginatedResult<unknown>> {
-    const where: Prisma.VisitWhereInput = {};
+    const where: Prisma.VisitWhereInput = user.branchIds.length
+      ? { branchId: { in: user.branchIds } }
+      : {};
     if (query.patientId) where.patientId = query.patientId;
     if (query.doctorUserId) where.doctorUserId = query.doctorUserId;
     if (query.from || query.to) {
@@ -376,9 +503,25 @@ export class VisitsService {
         ...(query.to ? { lte: new Date(query.to) } : {}),
       };
     }
-    // Object-level scope: DOCTOR only sees own visits unless branch-wide mode.
-    if (user.role === UserRole.DOCTOR && !(await this.isBranchWideDoctorAccess())) {
-      where.doctorUserId = user.id;
+    if (user.role === UserRole.DOCTOR) {
+      const readable: Prisma.VisitWhereInput[] = [{ doctorUserId: user.id }];
+      if (await this.isBranchWideDoctorAccess()) {
+        readable.push({ status: 'COMPLETED' });
+      } else {
+        const care = await this.prisma.db.clinicalOrder.findMany({
+          where: {
+            doctorUserId: user.id,
+            ...(query.patientId ? { patientId: query.patientId } : {}),
+            ...(user.branchIds.length ? { branchId: { in: user.branchIds } } : {}),
+            initialInvoice: { status: 'PAID', refunds: { none: {} } },
+            visit: { status: { in: ['IN_PROGRESS', 'COMPLETED'] } },
+          },
+          select: { patientId: true, branchId: true },
+          distinct: ['patientId', 'branchId'],
+        });
+        readable.push(...care.map((scope) => ({ ...scope, status: VisitStatus.COMPLETED })));
+      }
+      where.AND = [{ OR: readable }];
     }
 
     const [rows, total] = await Promise.all([
@@ -403,22 +546,27 @@ export class VisitsService {
 
   async update(id: string, dto: UpdateVisitDto, user: AuthUser): Promise<Record<string, unknown>> {
     const visit = await this.requireVisit(id, user);
+    this.assertVisitWrite(user, visit);
     await this.ensureEditable(visit);
 
     const data: Prisma.VisitUpdateInput = {};
+    if (dto.reportTitle !== undefined) data.reportTitle = dto.reportTitle;
+    if (dto.reportBody !== undefined) data.reportBody = dto.reportBody;
     if (dto.subjective !== undefined) data.subjective = dto.subjective;
     if (dto.objective !== undefined) data.objective = dto.objective;
     if (dto.assessmentNote !== undefined) data.assessmentNote = dto.assessmentNote;
     if (dto.plan !== undefined) data.plan = dto.plan;
     if (dto.nextVisitAt !== undefined) data.nextVisitAt = new Date(dto.nextVisitAt);
 
-    await this.prisma.db.visit.update({ where: { id }, data });
+    await this.edit(id, (tx) => tx.visit.update({ where: { id }, data }));
 
     await this.audit.log({
       action: AuditAction.UPDATE,
       entity: 'Visit',
       entityId: id,
       before: {
+        reportTitle: visit.reportTitle,
+        reportBody: visit.reportBody,
         subjective: visit.subjective,
         objective: visit.objective,
         assessmentNote: visit.assessmentNote,
@@ -426,6 +574,8 @@ export class VisitsService {
         nextVisitAt: iso(visit.nextVisitAt),
       },
       after: {
+        reportTitle: dto.reportTitle ?? visit.reportTitle,
+        reportBody: dto.reportBody ?? visit.reportBody,
         subjective: dto.subjective ?? visit.subjective,
         objective: dto.objective ?? visit.objective,
         assessmentNote: dto.assessmentNote ?? visit.assessmentNote,
@@ -439,38 +589,77 @@ export class VisitsService {
 
   async complete(id: string, user: AuthUser): Promise<Record<string, unknown>> {
     const visit = await this.requireVisit(id, user);
-    if (visit.status === VisitStatus.COMPLETED) {
-      throw new AppException(
-        ErrorCode.INVALID_STATUS_TRANSITION,
-        'Visit is already completed',
-        409,
-      );
-    }
-
+    this.assertVisitWrite(user, visit);
     const completedAt = new Date();
+    const clinicId = TenantContext.requireClinicId();
     await this.prisma.db.$transaction(async (tx) => {
+      if (visit.clinicalOrder) {
+        // Extras and confirmation take the order lock first, so a concurrently
+        // added examination cannot escape the final payment check.
+        await tx.$queryRaw`SELECT "id" FROM "ClinicalOrder" WHERE "id" = ${visit.clinicalOrder.id} AND "clinicId" = ${clinicId} FOR UPDATE`;
+        await tx.$queryRaw`SELECT "id" FROM "Invoice" WHERE "clinicalOrderId" = ${visit.clinicalOrder.id} AND "clinicId" = ${clinicId} ORDER BY "id" FOR UPDATE`;
+        const invoices = await tx.invoice.findMany({
+          where: { clinicalOrderId: visit.clinicalOrder.id, status: { not: 'CANCELLED' } },
+          include: { refunds: true },
+        });
+        if (
+          !invoices.length ||
+          invoices.some(
+            (invoice) =>
+              invoice.status !== 'PAID' ||
+              invoice.paidTotal
+                .sub(
+                  invoice.refunds.reduce(
+                    (sum, refund) => sum.add(refund.amount),
+                    new Prisma.Decimal(0),
+                  ),
+                )
+                .lt(invoice.total),
+          )
+        ) {
+          throw new AppException(
+            ErrorCode.INVOICE_INVALID_STATE,
+            'Pay all examination invoices before confirming the report',
+            409,
+          );
+        }
+      }
+      await tx.$queryRaw`SELECT "id" FROM "Visit" WHERE "id" = ${id} AND "clinicId" = ${clinicId} FOR UPDATE`;
+      const current = await tx.visit.findFirstOrThrow({
+        where: { id },
+        include: { diagnoses: true },
+      });
+      await this.ensureEditable(current);
+      if (
+        current.kind === 'ULTRASOUND' &&
+        (!current.reportTitle?.trim() || !current.reportBody?.trim())
+      ) {
+        throw new AppException(
+          ErrorCode.VALIDATION_ERROR,
+          'Ultrasound report title and findings are required',
+          400,
+        );
+      }
+      if (
+        current.kind === 'CONSULTATION' &&
+        !current.assessmentNote?.trim() &&
+        !current.diagnoses.length
+      ) {
+        throw new AppException(
+          ErrorCode.VALIDATION_ERROR,
+          'Record a diagnosis before confirming the consultation',
+          400,
+        );
+      }
       await tx.visit.update({
         where: { id },
-        data: { status: 'COMPLETED', completedAt },
+        data: { status: 'COMPLETED', completedAt, lockedAt: completedAt },
       });
-      if (visit.appointmentId) {
+      if (visit.appointmentId)
         await tx.appointment.update({
           where: { id: visit.appointmentId },
           data: { status: 'COMPLETED' },
         });
-      }
-    });
-
-    await this.notifications.enqueueEvent({
-      event: NotificationEvent.FEEDBACK_REQUEST,
-      clinicId: TenantContext.requireClinicId(),
-      patientId: visit.patientId,
-      vars: {
-        patient_name: visit.patient.fullName,
-        doctor_name: visit.doctor.fullName,
-        // Portal feedback link is produced later (portal module) — empty for now.
-        link: '',
-      },
     });
 
     await this.audit.log({
@@ -481,6 +670,22 @@ export class VisitsService {
       after: { status: VisitStatus.COMPLETED, completedAt: completedAt.toISOString() },
     });
 
+    await this.notifications
+      .enqueueEvent({
+        event: NotificationEvent.FEEDBACK_REQUEST,
+        clinicId: TenantContext.requireClinicId(),
+        patientId: visit.patientId,
+        vars: {
+          patient_name: visit.patient.fullName,
+          doctor_name: visit.doctor.fullName,
+          // Portal feedback link is produced later (portal module) — empty for now.
+          link: '',
+        },
+      })
+      .catch(() => {
+        this.logger.warn('Visit confirmed; feedback notification could not be queued');
+      });
+
     return this.getById(id, user);
   }
 
@@ -489,35 +694,61 @@ export class VisitsService {
   async amend(id: string, dto: AmendVisitDto, user: AuthUser): Promise<Record<string, unknown>> {
     // Amendments are allowed even when the visit is locked (append-only history).
     const visit = await this.requireVisit(id, user);
+    this.assertVisitWrite(user, visit);
 
-    const diff: Record<string, { before: unknown; after: unknown }> = {};
-    const data: Prisma.VisitUpdateInput = {};
-    for (const field of VISIT_EDIT_FIELDS) {
-      const next = dto[field as VisitEditField];
-      if (next === undefined) continue;
-      if (field === 'nextVisitAt') {
-        const before = iso(visit.nextVisitAt);
-        const after = new Date(next).toISOString();
-        if (before !== after) {
-          diff[field] = { before, after };
-          data.nextVisitAt = new Date(next);
-        }
-      } else {
-        const before = visit[field];
-        if (before !== next) {
-          diff[field] = { before, after: next };
+    const clinicId = TenantContext.requireClinicId();
+    const { amendmentId, diff } = await this.prisma.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Visit" WHERE "id" = ${id} AND "clinicId" = ${clinicId} FOR UPDATE`;
+      const current = await tx.visit.findFirstOrThrow({
+        where: { id },
+        include: { diagnoses: true },
+      });
+      if (current.status !== 'COMPLETED')
+        throw new AppException(
+          ErrorCode.INVALID_STATUS_TRANSITION,
+          'Only confirmed reports can be amended',
+          409,
+        );
+      const nextTitle = dto.reportTitle ?? current.reportTitle;
+      const nextBody = dto.reportBody ?? current.reportBody;
+      if (current.kind === 'ULTRASOUND' && (!nextTitle?.trim() || !nextBody?.trim()))
+        throw new AppException(
+          ErrorCode.VALIDATION_ERROR,
+          'A confirmed ultrasound report cannot be empty',
+          400,
+        );
+      if (
+        current.kind === 'CONSULTATION' &&
+        !(dto.assessmentNote ?? current.assessmentNote)?.trim() &&
+        !current.diagnoses.length
+      )
+        throw new AppException(
+          ErrorCode.VALIDATION_ERROR,
+          'A confirmed consultation must retain its diagnosis',
+          400,
+        );
+      const diff: Record<string, { before: unknown; after: unknown }> = {};
+      const data: Prisma.VisitUpdateInput = {};
+      for (const field of VISIT_EDIT_FIELDS) {
+        const next = dto[field as VisitEditField];
+        if (next === undefined) continue;
+        if (field === 'nextVisitAt') {
+          const before = iso(current.nextVisitAt);
+          const after = new Date(next).toISOString();
+          if (before !== after) {
+            diff[field] = { before, after };
+            data.nextVisitAt = new Date(next);
+          }
+        } else if (current[field] !== next) {
+          diff[field] = { before: current[field], after: next };
           data[field] = next;
         }
       }
-    }
-    if (Object.keys(diff).length === 0) {
-      throw new AppException(ErrorCode.VALIDATION_ERROR, 'Nothing to amend', 400);
-    }
-
-    const amendmentId = await this.prisma.db.$transaction(async (tx) => {
+      if (!Object.keys(diff).length)
+        throw new AppException(ErrorCode.VALIDATION_ERROR, 'Nothing to amend', 400);
       const amendment = await tx.visitAmendment.create({
         data: {
-          clinicId: TenantContext.requireClinicId(),
+          clinicId,
           visitId: id,
           authorId: user.id,
           diff: diff as Prisma.InputJsonValue,
@@ -525,7 +756,7 @@ export class VisitsService {
         },
       });
       await tx.visit.update({ where: { id }, data });
-      return amendment.id;
+      return { amendmentId: amendment.id, diff };
     });
 
     await this.audit.log({
@@ -575,6 +806,7 @@ export class VisitsService {
     user: AuthUser,
   ): Promise<Record<string, unknown> | null> {
     const visit = await this.requireVisit(id, user);
+    this.assertVisitWrite(user, visit, true);
     await this.ensureEditable(visit);
 
     const fields = {
@@ -587,16 +819,18 @@ export class VisitsService {
       spo2: dto.spo2,
       note: dto.note,
     };
-    const vitals = await this.prisma.db.visitVital.upsert({
-      where: { visitId: id },
-      create: {
-        clinicId: TenantContext.requireClinicId(),
-        visitId: id,
-        ...fields,
-        recordedById: user.id,
-      },
-      update: { ...fields, recordedById: user.id, recordedAt: new Date() },
-    });
+    const vitals = await this.edit(id, (tx) =>
+      tx.visitVital.upsert({
+        where: { visitId: id },
+        create: {
+          clinicId: TenantContext.requireClinicId(),
+          visitId: id,
+          ...fields,
+          recordedById: user.id,
+        },
+        update: { ...fields, recordedById: user.id, recordedAt: new Date() },
+      }),
+    );
 
     await this.audit.log({
       action: AuditAction.UPDATE,
@@ -617,13 +851,14 @@ export class VisitsService {
     user: AuthUser,
   ): Promise<Record<string, unknown>> {
     const visit = await this.requireVisit(id, user);
+    this.assertVisitWrite(user, visit);
     await this.ensureEditable(visit);
 
     // Icd10Code is a global read-only directory (no clinicId) — justified unscoped read.
     const icd10 = await this.prisma.unscoped.icd10Code.findUnique({ where: { id: dto.icd10Id } });
     if (!icd10) throw new AppException(ErrorCode.NOT_FOUND, 'ICD-10 code not found', 404);
 
-    const created = await this.prisma.db.$transaction(async (tx) => {
+    const created = await this.edit(id, async (tx) => {
       if (dto.isPrimary) {
         await tx.diagnosis.updateMany({ where: { visitId: id }, data: { isPrimary: false } });
       }
@@ -651,13 +886,14 @@ export class VisitsService {
 
   async removeDiagnosis(id: string, dxId: string, user: AuthUser): Promise<{ id: string }> {
     const visit = await this.requireVisit(id, user);
+    this.assertVisitWrite(user, visit);
     await this.ensureEditable(visit);
 
     const diagnosis = await this.prisma.db.diagnosis.findFirst({
       where: { id: dxId, visitId: id },
     });
     if (!diagnosis) throw new AppException(ErrorCode.NOT_FOUND, 'Diagnosis not found', 404);
-    await this.prisma.db.diagnosis.delete({ where: { id: dxId } });
+    await this.edit(id, (tx) => tx.diagnosis.delete({ where: { id: dxId } }));
 
     await this.audit.log({
       action: AuditAction.DELETE,
@@ -671,68 +907,183 @@ export class VisitsService {
 
   // ------------------------------------------------------------ prescriptions
 
+  private prescriptionData(id: string, dto: AddPrescriptionDto, sortOrder: number) {
+    const direction = (value: string | undefined) =>
+      dto.combineWithPrevious ? null : value || null;
+    return {
+      clinicId: TenantContext.requireClinicId(),
+      visitId: id,
+      drugName: dto.drugName,
+      drugId: dto.drugId ?? null,
+      strength: dto.strength || null,
+      form: direction(dto.form),
+      quantity: direction(dto.quantity),
+      dosage: direction(dto.dosage),
+      route: direction(dto.route),
+      dripRate: direction(dto.dripRate),
+      frequency: direction(dto.frequency),
+      durationDays: dto.combineWithPrevious ? null : (dto.durationDays ?? null),
+      durationText: direction(dto.durationText),
+      instructions: direction(dto.instructions),
+      combineWithPrevious: dto.combineWithPrevious,
+      sortOrder,
+    };
+  }
+
+  private async validatePrescriptionDrugs(
+    tx: TenantTransactionClient,
+    items: AddPrescriptionDto[],
+  ) {
+    const ids = [...new Set(items.flatMap((item) => (item.drugId ? [item.drugId] : [])))];
+    if (!ids.length) return;
+    // DrugDirectory mixes global and clinic rows and is not tenant-extended.
+    const count = await tx.drugDirectory.count({
+      where: {
+        id: { in: ids },
+        OR: [{ clinicId: null }, { clinicId: TenantContext.requireClinicId() }],
+      },
+    });
+    if (count !== ids.length) throw new AppException(ErrorCode.NOT_FOUND, 'Drug not found', 404);
+  }
+
+  async replacePrescriptions(id: string, dto: ReplacePrescriptionsDto, user: AuthUser) {
+    const visit = await this.requireVisit(id, user);
+    this.assertVisitWrite(user, visit);
+    const saved = await this.edit(id, async (tx) => {
+      const current = await tx.visit.findUniqueOrThrow({ where: { id } });
+      if (current.prescriptionRevision !== dto.expectedRevision)
+        throw new AppException(
+          ErrorCode.VALIDATION_ERROR,
+          'Retsept boshqa oynada o‘zgartirilgan. Yangilangan ma’lumotlarni yuklang.',
+          409,
+          [{ prescriptionRevision: current.prescriptionRevision }],
+        );
+      await this.validatePrescriptionDrugs(tx, dto.items);
+      const previous = await tx.prescription.findMany({
+        where: { visitId: id },
+        include: { drug: true },
+        orderBy: PRESCRIPTION_ORDER,
+      });
+      await tx.prescription.deleteMany({ where: { visitId: id } });
+      if (dto.items.length)
+        await tx.prescription.createMany({
+          data: dto.items.map((item, index) => this.prescriptionData(id, item, index)),
+        });
+      const updated = await tx.visit.update({
+        where: { id },
+        data: {
+          prescriptionRevision: { increment: 1 },
+          ...(dto.physiotherapy === undefined ? {} : { physiotherapy: dto.physiotherapy || null }),
+        },
+      });
+      const prescriptions = await tx.prescription.findMany({
+        where: { visitId: id },
+        include: { drug: true },
+        orderBy: PRESCRIPTION_ORDER,
+      });
+      return {
+        before: {
+          prescriptions: previous.map((p) => this.toPrescription(p)),
+          prescriptionRevision: current.prescriptionRevision,
+          physiotherapy: current.physiotherapy,
+        },
+        after: {
+          prescriptions: prescriptions.map((p) => this.toPrescription(p)),
+          prescriptionRevision: updated.prescriptionRevision,
+          physiotherapy: updated.physiotherapy,
+        },
+      };
+    });
+    await this.audit.log({
+      action: AuditAction.UPDATE,
+      entity: 'VisitPrescriptions',
+      entityId: id,
+      before: saved.before,
+      after: saved.after,
+    });
+    return saved.after;
+  }
+
   async addPrescription(
     id: string,
     dto: AddPrescriptionDto,
     user: AuthUser,
   ): Promise<Record<string, unknown>> {
     const visit = await this.requireVisit(id, user);
-    await this.ensureEditable(visit);
-
-    if (dto.drugId) {
-      // DrugDirectory mixes global (clinicId null) and clinic rows — justified unscoped read.
-      const drug = await this.prisma.unscoped.drugDirectory.findFirst({
-        where: {
-          id: dto.drugId,
-          OR: [{ clinicId: null }, { clinicId: TenantContext.requireClinicId() }],
-        },
-        select: { id: true },
+    this.assertVisitWrite(user, visit);
+    // A legacy append has no base identity or revision; concurrent appends could
+    // otherwise attach an ingredient to a different doctor's intended mixture.
+    if (dto.combineWithPrevious)
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'Aralashma dorilarini retsept bilan birgalikda saqlang',
+        400,
+      );
+    const saved = await this.edit(id, async (tx) => {
+      const previous = await tx.prescription.findMany({
+        where: { visitId: id },
+        orderBy: PRESCRIPTION_ORDER,
       });
-      if (!drug) throw new AppException(ErrorCode.NOT_FOUND, 'Drug not found', 404);
-    }
-
-    const created = await this.prisma.db.prescription.create({
-      data: {
-        clinicId: TenantContext.requireClinicId(),
-        visitId: id,
-        drugName: dto.drugName,
-        drugId: dto.drugId,
-        dosage: dto.dosage,
-        frequency: dto.frequency,
-        durationDays: dto.durationDays,
-        instructions: dto.instructions,
-      },
-      include: { drug: true },
+      await this.validatePrescriptionDrugs(tx, [dto]);
+      const created = await tx.prescription.create({
+        data: this.prescriptionData(id, dto, (previous.at(-1)?.sortOrder ?? -1) + 1),
+        include: { drug: true },
+      });
+      const updated = await tx.visit.update({
+        where: { id },
+        data: { prescriptionRevision: { increment: 1 } },
+      });
+      return { created, prescriptionRevision: updated.prescriptionRevision };
     });
-
     await this.audit.log({
       action: AuditAction.CREATE,
       entity: 'Prescription',
-      entityId: created.id,
-      after: { visitId: id, drugName: dto.drugName },
+      entityId: saved.created.id,
+      after: {
+        visitId: id,
+        ...this.toPrescription(saved.created),
+        prescriptionRevision: saved.prescriptionRevision,
+      },
     });
-
-    return this.toPrescription(created);
+    return {
+      ...this.toPrescription(saved.created),
+      prescriptionRevision: saved.prescriptionRevision,
+    };
   }
 
-  async removePrescription(id: string, rxId: string, user: AuthUser): Promise<{ id: string }> {
+  async removePrescription(id: string, rxId: string, user: AuthUser) {
     const visit = await this.requireVisit(id, user);
-    await this.ensureEditable(visit);
-
-    const prescription = await this.prisma.db.prescription.findFirst({
-      where: { id: rxId, visitId: id },
+    this.assertVisitWrite(user, visit);
+    const saved = await this.edit(id, async (tx) => {
+      const prescriptions = await tx.prescription.findMany({
+        where: { visitId: id },
+        include: { drug: true },
+        orderBy: PRESCRIPTION_ORDER,
+      });
+      const index = prescriptions.findIndex((p) => p.id === rxId);
+      const prescription = prescriptions[index];
+      if (!prescription) throw new AppException(ErrorCode.NOT_FOUND, 'Prescription not found', 404);
+      if (!prescription.combineWithPrevious && prescriptions[index + 1]?.combineWithPrevious)
+        throw new AppException(
+          ErrorCode.VALIDATION_ERROR,
+          'Aralashma asosini alohida o‘chirib bo‘lmaydi. Retsept guruhini birgalikda tahrirlang.',
+          409,
+        );
+      await tx.prescription.delete({ where: { id: rxId } });
+      const updated = await tx.visit.update({
+        where: { id },
+        data: { prescriptionRevision: { increment: 1 } },
+      });
+      return { prescription, prescriptionRevision: updated.prescriptionRevision };
     });
-    if (!prescription) throw new AppException(ErrorCode.NOT_FOUND, 'Prescription not found', 404);
-    await this.prisma.db.prescription.delete({ where: { id: rxId } });
-
     await this.audit.log({
       action: AuditAction.DELETE,
       entity: 'Prescription',
       entityId: rxId,
-      before: { visitId: id, drugName: prescription.drugName },
+      before: { visitId: id, ...this.toPrescription(saved.prescription) },
+      after: { prescriptionRevision: saved.prescriptionRevision },
     });
-
-    return { id: rxId };
+    return { id: rxId, prescriptionRevision: saved.prescriptionRevision };
   }
 
   // ------------------------------------------------------------ referrals
@@ -743,44 +1094,50 @@ export class VisitsService {
     user: AuthUser,
   ): Promise<Record<string, unknown>> {
     const visit = await this.requireVisit(id, user);
+    this.assertVisitWrite(user, visit);
     await this.ensureEditable(visit);
 
-    let labOrderId: string | undefined;
-    if (dto.type === ReferralType.LAB) {
-      if (!dto.labTestIds || dto.labTestIds.length === 0) {
-        throw new AppException(
-          ErrorCode.VALIDATION_ERROR,
-          'labTestIds are required for a LAB referral',
-          400,
+    const created = await this.edit(id, async (tx) => {
+      let labOrderId: string | undefined;
+      if (dto.type === ReferralType.LAB) {
+        if (!dto.labTestIds?.length)
+          throw new AppException(
+            ErrorCode.VALIDATION_ERROR,
+            'labTestIds are required for a LAB referral',
+            400,
+          );
+        const order = await this.labService.createOrderFromReferral(
+          {
+            patientId: visit.patientId,
+            branchId: visit.branchId,
+            visitId: visit.id,
+            testIds: dto.labTestIds,
+            orderedById: user.id,
+          },
+          tx,
         );
+        labOrderId = order.id;
       }
-      const order = await this.labService.createOrderFromReferral({
-        patientId: visit.patientId,
-        branchId: visit.branchId,
-        visitId: visit.id,
-        testIds: dto.labTestIds,
+      return tx.referral.create({
+        data: {
+          clinicId: TenantContext.requireClinicId(),
+          visitId: id,
+          type: dto.type,
+          targetSpecialty: dto.type === ReferralType.SPECIALIST ? dto.targetSpecialty : undefined,
+          targetDoctorUserId:
+            dto.type === ReferralType.SPECIALIST ? dto.targetDoctorUserId : undefined,
+          labOrderId,
+          note: dto.note,
+        },
       });
-      labOrderId = order.id;
-    }
-
-    const created = await this.prisma.db.referral.create({
-      data: {
-        clinicId: TenantContext.requireClinicId(),
-        visitId: id,
-        type: dto.type,
-        targetSpecialty: dto.type === ReferralType.SPECIALIST ? dto.targetSpecialty : undefined,
-        targetDoctorUserId:
-          dto.type === ReferralType.SPECIALIST ? dto.targetDoctorUserId : undefined,
-        labOrderId,
-        note: dto.note,
-      },
     });
+    if (created.labOrderId) await this.labService.announceReferralOrder(created.labOrderId);
 
     await this.audit.log({
       action: AuditAction.CREATE,
       entity: 'Referral',
       entityId: created.id,
-      after: { visitId: id, type: dto.type, labOrderId: labOrderId ?? null },
+      after: { visitId: id, type: dto.type, labOrderId: created.labOrderId ?? null },
     });
 
     return this.toReferral(created);
@@ -790,6 +1147,12 @@ export class VisitsService {
 
   async printPayload(id: string, user: AuthUser): Promise<Record<string, unknown>> {
     const visit = await this.requireVisit(id, user);
+    if (visit.status !== 'COMPLETED')
+      throw new AppException(
+        ErrorCode.INVALID_STATUS_TRANSITION,
+        'Confirm the report before printing',
+        409,
+      );
     // Clinic is not tenant-auto-scoped — justified letterhead read of own clinic row.
     const clinic = await this.prisma.unscoped.clinic.findUnique({
       where: { id: TenantContext.requireClinicId() },
@@ -813,6 +1176,93 @@ export class VisitsService {
         specialty: visit.doctor.staffProfile?.specialty ?? null,
       },
     };
+  }
+
+  async history(id: string, user: AuthUser): Promise<Record<string, unknown>> {
+    const active = await this.requireVisit(id, user);
+    const [visits, labOrders] = await Promise.all([
+      this.prisma.db.visit.findMany({
+        where: {
+          patientId: active.patientId,
+          branchId: active.branchId,
+          status: 'COMPLETED',
+          id: { not: id },
+        },
+        include: {
+          doctor: { select: { fullName: true } },
+          diagnoses: { include: { icd10: true } },
+          prescriptions: { orderBy: PRESCRIPTION_ORDER },
+        },
+        orderBy: { startedAt: 'desc' },
+        take: 100,
+      }),
+      this.prisma.db.labOrder.findMany({
+        where: {
+          patientId: active.patientId,
+          branchId: active.branchId,
+          status: { in: ['APPROVED', 'DELIVERED'] },
+        },
+        select: { id: true, orderNumber: true, status: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+    ]);
+    return {
+      visits: visits.map((v) => ({
+        id: v.id,
+        kind: v.kind,
+        reportTitle: v.reportTitle,
+        reportBody: v.reportBody,
+        subjective: v.subjective,
+        objective: v.objective,
+        assessmentNote: v.assessmentNote,
+        plan: v.plan,
+        physiotherapy: v.physiotherapy,
+        prescriptionRevision: v.prescriptionRevision,
+        startedAt: v.startedAt.toISOString(),
+        doctor: v.doctor,
+        diagnoses: v.diagnoses.map((d) => ({ code: d.icd10.code, name: d.icd10.nameUz })),
+        prescriptions: v.prescriptions.map((p) => ({
+          drugName: p.drugName,
+          strength: p.strength,
+          form: p.form,
+          quantity: p.quantity,
+          dosage: p.dosage,
+          route: p.route,
+          dripRate: p.dripRate,
+          frequency: p.frequency,
+          durationDays: p.durationDays,
+          durationText: p.durationText,
+          instructions: p.instructions,
+          combineWithPrevious: p.combineWithPrevious,
+          sortOrder: p.sortOrder,
+        })),
+      })),
+      labOrders: labOrders.map((order) => ({ ...order, createdAt: order.createdAt.toISOString() })),
+    };
+  }
+
+  async pdf(id: string, user: AuthUser): Promise<Buffer> {
+    const visit = await this.requireVisit(id, user);
+    if (visit.status !== 'COMPLETED')
+      throw new AppException(
+        ErrorCode.INVALID_STATUS_TRANSITION,
+        'Only confirmed reports can be downloaded',
+        409,
+      );
+    // Clinic is not auto-scoped; this explicit own-clinic lookup supplies the letterhead.
+    const clinic = await this.prisma.unscoped.clinic.findUniqueOrThrow({
+      where: { id: TenantContext.requireClinicId() },
+      select: { name: true, legalName: true, address: true, phone: true },
+    });
+    const authorId = visit.amendments[0]?.authorId;
+    const author = authorId
+      ? await this.prisma.unscoped.user.findFirst({
+          where: { id: authorId, clinicId: TenantContext.requireClinicId() },
+          select: { fullName: true },
+        })
+      : null;
+    return this.reportPdf.render(buildVisitReportPdfData(visit, clinic, author), 'uz');
   }
 
   // ------------------------------------------------------------ visit templates
@@ -864,10 +1314,7 @@ export class VisitsService {
     return this.toTemplate(created);
   }
 
-  async updateTemplate(
-    id: string,
-    dto: VisitTemplatePatchDto,
-  ): Promise<Record<string, unknown>> {
+  async updateTemplate(id: string, dto: VisitTemplatePatchDto): Promise<Record<string, unknown>> {
     const existing = await this.prisma.db.visitTemplate.findUnique({ where: { id } });
     if (!existing) throw new AppException(ErrorCode.NOT_FOUND, 'Template not found', 404);
     const updated = await this.prisma.db.visitTemplate.update({

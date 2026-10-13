@@ -1,7 +1,7 @@
 /**
  * AviShifo demo/dev seed (spec §13). Runs with `tsx prisma/seed.ts` using the
  * raw PrismaClient (no Nest, NO tenant auto-scope — clinicId is set explicitly
- * on every tenant row). Idempotent: exits 0 if the super-admin already exists.
+ * on every tenant row). Defaults to one clinic without a platform account.
  *
  * Pseudo-random data is deterministic (mulberry32, fixed seed) relative to the
  * run date: re-seeding after a reset on the same day produces identical data.
@@ -19,8 +19,11 @@ import {
 } from '@prisma/client';
 import argon2 from 'argon2';
 import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
+import { config as loadDotenv } from 'dotenv';
 
 import { ICD10_CODES } from './seed-data/icd10';
+import { seedSurgeryDemo } from './surgery-demo';
 import { LAB_TEST_DEFS } from './seed-data/lab-tests';
 import {
   ALLERGY_POOL,
@@ -31,9 +34,12 @@ import {
   TASHKENT_STREETS,
 } from './seed-data/names';
 import { PACKAGE_DEFS, SERVICE_DEFS, DRUGS, type CategoryKey } from './seed-data/services';
+import { seedPrescriptionDirectory } from './prescription-directory';
 import { NOTIFICATION_TEMPLATE_DEFS } from './seed-data/templates';
 
+loadDotenv({ path: [resolve(__dirname, '../../../.env.local'), resolve(__dirname, '../../../.env')] });
 const prisma = new PrismaClient();
+const SINGLE_CLINIC_MODE = process.env.SINGLE_CLINIC_MODE !== 'false';
 
 // ============================================================ deterministic PRNG
 function mulberry32(seed: number) {
@@ -116,8 +122,8 @@ interface ClinicCfg {
 const CLINIC_CFGS: ClinicCfg[] = [
   {
     key: 'shifomed',
-    name: 'Shifo Med Servis',
-    legalName: '"SHIFO MED SERVIS" MChJ',
+    name: SINGLE_CLINIC_MODE ? 'Sevinch Medical Center' : 'Shifo Med Servis',
+    legalName: SINGLE_CLINIC_MODE ? 'Sevinch Medical Center' : '"SHIFO MED SERVIS" MChJ',
     planCode: 'standard',
     domain: 'shifomed.uz',
     phone: '+998712001122',
@@ -323,7 +329,7 @@ async function seedClinic(
   });
   const clinicId = clinic.id;
 
-  await prisma.clinicSubscription.create({
+  if (!SINGLE_CLINIC_MODE) await prisma.clinicSubscription.create({
     data: {
       clinicId,
       planId,
@@ -417,6 +423,9 @@ async function seedClinic(
   }
   staff.cashierId = await createUser('CASHIER', cfg.cashier, 'kassir', allBranchIdxs);
   staff.labTechId = await createUser('LAB_TECH', cfg.labTech, 'labor', [0]);
+  await seedSurgeryDemo(prisma, { clinicId, branchIds: [branchIds[0]!], domain: cfg.domain, passwordHash: demoHash });
+  loginRows.push({ clinic: cfg.name, role: 'OPERATING_ROOM', email: `operatsiya@${cfg.domain}`, phone: '', password: 'Demo123!' });
+  loginRows.push({ clinic: cfg.name, role: 'DOCTOR', email: `jarroh@${cfg.domain}`, phone: '', password: 'Demo123!' });
   console.log('  staff: 10 users (owner, admin, 4 doctors, 2 receptionists, cashier, lab tech)');
 
   // ---- service catalog --------------------------------------------------
@@ -981,11 +990,16 @@ async function seedClinic(
 // ============================================================ main
 async function main() {
   const existing = await prisma.user.findFirst({
-    where: { role: 'SUPER_ADMIN', email: 'admin@avishifo.uz' },
+    where: SINGLE_CLINIC_MODE
+      ? { role: 'CLINIC_OWNER', email: 'owner@shifomed.uz' }
+      : { role: 'SUPER_ADMIN', email: 'admin@avishifo.uz' },
   });
   if (existing) {
     console.log('already seeded');
     return;
+  }
+  if (SINGLE_CLINIC_MODE && (await prisma.clinic.count()) > 0) {
+    throw new Error('Single-clinic seed requires an empty database or the existing demo clinic.');
   }
 
   if (ICD10_CODES.length !== 200) throw new Error(`ICD10_CODES must have 200 entries, got ${ICD10_CODES.length}`);
@@ -1004,7 +1018,7 @@ async function main() {
     { code: 'pro', name: 'Pro', priceMonthly: money(3_990_000), maxBranches: 10, maxUsers: 100, modules: ['lab', 'portal', 'telegram', 'analytics'] },
   ];
   const planIdByCode = new Map<string, string>();
-  for (const p of planDefs) {
+  for (const p of SINGLE_CLINIC_MODE ? [] : planDefs) {
     const plan = await prisma.subscriptionPlan.upsert({
       where: { code: p.code },
       create: p,
@@ -1012,10 +1026,10 @@ async function main() {
     });
     planIdByCode.set(p.code, plan.id);
   }
-  console.log(`plans: ${planDefs.length}`);
+  console.log(`plans: ${SINGLE_CLINIC_MODE ? 0 : planDefs.length}`);
 
   // ---- super admin ------------------------------------------------------
-  await prisma.user.create({
+  if (!SINGLE_CLINIC_MODE) await prisma.user.create({
     data: {
       clinicId: null,
       email: 'admin@avishifo.uz',
@@ -1026,7 +1040,7 @@ async function main() {
       locale: 'uz',
     },
   });
-  console.log('super admin: admin@avishifo.uz');
+  if (!SINGLE_CLINIC_MODE) console.log('super admin: admin@avishifo.uz');
 
   // ---- global ICD-10 directory -----------------------------------------
   if ((await prisma.icd10Code.count()) === 0) {
@@ -1050,16 +1064,17 @@ async function main() {
   } else {
     console.log('drugs: already present, skipped');
   }
+  await seedPrescriptionDirectory(prisma);
   const drugRows = await prisma.drugDirectory.findMany({
     where: { clinicId: null },
     select: { id: true, name: true, strength: true },
   });
 
   // ---- clinics ----------------------------------------------------------
-  const loginRows: { clinic: string; role: string; email: string; phone: string; password: string }[] = [
+  const loginRows: { clinic: string; role: string; email: string; phone: string; password: string }[] = SINGLE_CLINIC_MODE ? [] : [
     { clinic: 'PLATFORM', role: 'SUPER_ADMIN', email: 'admin@avishifo.uz', phone: '+998900000000', password: 'Admin123!' },
   ];
-  for (const cfg of CLINIC_CFGS) {
+  for (const cfg of SINGLE_CLINIC_MODE ? CLINIC_CFGS.slice(0, 1) : CLINIC_CFGS) {
     await seedClinic(cfg, planIdByCode.get(cfg.planCode)!, demoHash, icdIdByCode, drugRows, loginRows);
   }
 

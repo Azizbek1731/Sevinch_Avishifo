@@ -41,12 +41,12 @@ export class ClickProvider implements PaymentProvider {
   constructor(private readonly config: AppConfigService) {}
 
   verifyWebhook(req: WebhookRequest): boolean {
+    if (this.config.env.SINGLE_CLINIC_MODE) return false;
     const b = asRecord(req.body);
     const secret = this.config.env.CLICK_SECRET_KEY;
     if (!secret) {
-      // Sandbox-safe: no credentials configured — verify structurally and log.
-      this.logger.warn('CLICK_SECRET_KEY not configured — structural webhook verification only (sandbox)');
-      return str(b.click_trans_id) !== '' && str(b.merchant_trans_id) !== '';
+      this.logger.warn('CLICK_SECRET_KEY not configured — webhook rejected');
+      return false;
     }
     const action = str(b.action);
     const prepareId = action === '1' ? str(b.merchant_prepare_id) : '';

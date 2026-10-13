@@ -9,6 +9,7 @@ import {
   icd10QuerySchema,
   idSchema,
   paginationQuerySchema,
+  replacePrescriptionsSchema,
   updateVisitSchema,
   upsertVitalsSchema,
   visitQuerySchema,
@@ -45,6 +46,7 @@ export class AmendVisitDto extends createZodDto(amendVisitSchema) {}
 export class UpsertVitalsDto extends createZodDto(upsertVitalsSchema) {}
 export class AddDiagnosisDto extends createZodDto(addDiagnosisSchema) {}
 export class AddPrescriptionDto extends createZodDto(addPrescriptionSchema) {}
+export class ReplacePrescriptionsDto extends createZodDto(replacePrescriptionsSchema) {}
 export class AddReferralDto extends createZodDto(addReferralSchema) {}
 export class VisitQueryDto extends createZodDto(visitQuerySchema) {}
 export class VisitTemplateUpsertDto extends createZodDto(visitTemplateUpsertSchema) {}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocale, useTranslations } from 'next-intl';
@@ -32,10 +32,12 @@ export function ReferralsSection({
   visitId,
   referrals,
   disabled,
+  onUnsavedChange,
 }: {
   visitId: string;
   referrals: VisitReferral[];
   disabled: boolean;
+  onUnsavedChange?: (value: boolean) => void;
 }) {
   const t = useTranslations('visits');
   const tCommon = useTranslations('common');
@@ -50,14 +52,16 @@ export function ReferralsSection({
     resolver: zodResolver(addReferralSchema),
     defaultValues: { type: ReferralType.SPECIALIST, targetSpecialty: '', note: '' },
   });
+  const dirty = form.formState.isDirty;
+  useEffect(() => {
+    onUnsavedChange?.(dirty || selectedTests.length > 0 || addReferral.isPending);
+  }, [dirty, selectedTests.length, addReferral.isPending, onUnsavedChange]);
   const type = form.watch('type');
 
   const { data: labTests } = useLabTests(type === ReferralType.LAB);
 
   const toggleTest = (id: string) => {
-    setSelectedTests((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setSelectedTests((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
     setLabError(false);
   };
 

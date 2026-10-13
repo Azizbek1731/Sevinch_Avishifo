@@ -16,6 +16,7 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TelegramChannel } from '../notifications/channels/telegram.channel';
+import { TelegramPatientAccessService } from '../notifications/telegram-patient-access.service';
 
 /**
  * Governs whether a patient may read their own clinical history (SOAP notes,
@@ -40,6 +41,7 @@ export class RecordAccessService {
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly telegram: TelegramChannel,
+    private readonly patientAccess: TelegramPatientAccessService,
   ) {}
 
   // ------------------------------------------------------------ read model
@@ -281,9 +283,7 @@ export class RecordAccessService {
       after: { status: input.status, note: input.note ?? null },
     });
 
-    if (existing.patient.phone) {
-      await this.notifyPatient(existing.clinicId, existing.patient.phone, input.status);
-    }
+    await this.notifyPatient(existing.clinicId, existing.patient.id, input.status);
 
     return {
       ...updated,
@@ -363,7 +363,7 @@ export class RecordAccessService {
 
   private async notifyPatient(
     clinicId: string,
-    phone: string,
+    patientId: string,
     status: RecordAccessStatus,
   ): Promise<void> {
     const text =
@@ -375,11 +375,8 @@ export class RecordAccessService {
 
     try {
       await TenantContext.run({ clinicId }, async () => {
-        const link = await this.prisma.db.telegramLink.findFirst({
-          where: { patient: { phone, deletedAt: null }, isActive: true },
-          select: { chatId: true },
-        });
-        if (link) await this.telegram.send(link.chatId, text);
+        const chatId = await this.patientAccess.recipientFor(patientId, clinicId);
+        if (chatId) await this.telegram.send(chatId, text);
       });
     } catch (e) {
       this.logger.warn(`record-access patient notification failed: ${String(e)}`);

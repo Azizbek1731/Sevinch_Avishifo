@@ -3,7 +3,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { INestApplication } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
-import { API, createApp, createTestClinic, login, type LoginResult, type TestClinic } from './setup';
+import {
+  API,
+  createApp,
+  createTestClinic,
+  login,
+  type LoginResult,
+  type TestClinic,
+} from './setup';
 
 /**
  * The standard laboratory catalogue, and the reference intervals a clinic ends
@@ -61,8 +68,16 @@ describe('lab catalogue and reference intervals (e2e)', () => {
   };
 
   beforeAll(async () => {
+    if (
+      !/^\/(?:avishifo_finance_|.*(?:test|e2e))/.test(
+        new URL(process.env.DATABASE_URL ?? '').pathname,
+      )
+    ) {
+      throw new Error('Laboratory tests require an isolated finance/test database');
+    }
+    process.env.SINGLE_CLINIC_MODE = 'true';
     prisma = new PrismaClient();
-    app = await createApp();
+    app = await createApp([]);
     clinicA = await createTestClinic(prisma, 'labcat-a');
     clinicB = await createTestClinic(prisma, 'labcat-b');
     ownerA = await login(app, clinicA.owner.email);
@@ -74,6 +89,28 @@ describe('lab catalogue and reference intervals (e2e)', () => {
     await app.close();
     await prisma.$disconnect();
   });
+
+  async function linkFreeService(labTestId: string): Promise<void> {
+    const category = await prisma.serviceCategory.create({
+      data: { clinicId: clinicA.clinicId, name: 'Reference range fixture', kind: 'LAB' },
+    });
+    const service = await prisma.service.create({
+      data: {
+        clinicId: clinicA.clinicId,
+        categoryId: category.id,
+        code: `FREE-${randomUUID()}`,
+        name: { uz: 'Reference range test' },
+        prices: {
+          create: {
+            clinicId: clinicA.clinicId,
+            price: '0',
+            effectiveFrom: new Date(Date.now() - 60_000),
+          },
+        },
+      },
+    });
+    await prisma.labTest.update({ where: { id: labTestId }, data: { serviceId: service.id } });
+  }
 
   // ------------------------------------------------------------- browsing
 
@@ -104,7 +141,9 @@ describe('lab catalogue and reference intervals (e2e)', () => {
       .expect(200);
 
     expect(res.body.data.length).toBeGreaterThan(0);
-    expect(res.body.data.every((t: { biomaterial: string }) => t.biomaterial === 'URINE')).toBe(true);
+    expect(res.body.data.every((t: { biomaterial: string }) => t.biomaterial === 'URINE')).toBe(
+      true,
+    );
     expect(res.body.data.some((t: { code: string }) => t.code === 'URINALYSIS')).toBe(true);
   });
 
@@ -197,7 +236,7 @@ describe('lab catalogue and reference intervals (e2e)', () => {
 
   // -------------------------------------------------------------- importing
 
-  it('refuses an import from a caller without lab.orders.write', async () => {
+  it('refuses an import from a caller without services.write', async () => {
     // The receptionist may browse the catalogue — services.read — but stocking
     // the clinic's own analyser menu is not front-desk work.
     await request(app.getHttpServer()).get(`${API}/lab-catalog`).set(authA(recepA)).expect(200);
@@ -292,7 +331,9 @@ describe('lab catalogue and reference intervals (e2e)', () => {
       .expect(201);
     expect(again.body.data).toMatchObject({ created: 0, updated: 0, skipped: CODES.length });
 
-    expect(await prisma.labTest.count({ where: { clinicId: clinicA.clinicId } })).toBe(CODES.length);
+    expect(await prisma.labTest.count({ where: { clinicId: clinicA.clinicId } })).toBe(
+      CODES.length,
+    );
     expect(
       await prisma.labTestParameter.count({
         where: { clinicId: clinicA.clinicId, labTest: { code: 'CBC' } },
@@ -346,7 +387,9 @@ describe('lab catalogue and reference intervals (e2e)', () => {
       .set(authA(ownerA))
       .expect(200);
     const test = list.body.data.find((t: { code: string }) => t.code === 'CBC');
-    const original = test.parameters.find((p: { code: string }) => p.code === 'HGB').referenceRanges;
+    const original = test.parameters.find(
+      (p: { code: string }) => p.code === 'HGB',
+    ).referenceRanges;
     expect(original.length).toBeGreaterThan(1);
 
     // Clinic A's own analyser says something narrower. Sending the whole
@@ -488,6 +531,7 @@ describe('lab catalogue and reference intervals (e2e)', () => {
         })
         .expect(201);
       labTestId = created.body.data.id;
+      await linkFreeService(labTestId);
       paramId = Object.fromEntries(
         created.body.data.parameters.map((p: { code: string; id: string }) => [p.code, p.id]),
       );
@@ -500,6 +544,12 @@ describe('lab catalogue and reference intervals (e2e)', () => {
       orderId = order.body.data.id;
       itemId = order.body.data.items[0].id;
       expect(order.body.data.physiologicalState).toBeNull();
+      expect(order.body.data.billing.status).toBe('PAID');
+      await request(app.getHttpServer())
+        .post(`${API}/lab-orders/${orderId}/status`)
+        .set(authA(ownerA))
+        .send({ status: 'SPECIMEN_COLLECTED' })
+        .expect(201);
     });
 
     const flagsOf = async (): Promise<Record<string, string>> => {
@@ -637,6 +687,7 @@ describe('lab catalogue and reference intervals (e2e)', () => {
         })
         .expect(201);
 
+      await linkFreeService(created.body.data.id as string);
       const order = await request(app.getHttpServer())
         .post(`${API}/lab-orders`)
         .set(authA(ownerA))
@@ -661,6 +712,12 @@ describe('lab catalogue and reference intervals (e2e)', () => {
       expect(param('NORANGE').matchedRange).toBeNull();
       expect(param('NORANGE').referenceMissing).toBe(false);
 
+      await request(app.getHttpServer())
+        .post(`${API}/lab-orders/${order.body.data.id as string}/status`)
+        .set(authA(ownerA))
+        .send({ status: 'SPECIMEN_COLLECTED' })
+        .expect(201);
+
       // With nothing to compare against, nothing is flagged either.
       const entered = await request(app.getHttpServer())
         .post(`${API}/lab-orders/items/${order.body.data.items[0].id}/results`)
@@ -672,9 +729,7 @@ describe('lab catalogue and reference intervals (e2e)', () => {
           ],
         })
         .expect(201);
-      const flags = entered.body.data.items[0].result.values.map(
-        (v: { flag: string }) => v.flag,
-      );
+      const flags = entered.body.data.items[0].result.values.map((v: { flag: string }) => v.flag);
       expect(flags).toEqual(['NORMAL', 'NORMAL']);
     });
   });

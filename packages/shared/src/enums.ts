@@ -12,6 +12,7 @@ export const UserRole = {
   RECEPTIONIST: 'RECEPTIONIST',
   CASHIER: 'CASHIER',
   LAB_TECH: 'LAB_TECH',
+  OPERATING_ROOM: 'OPERATING_ROOM',
   ACCOUNTANT: 'ACCOUNTANT',
   PATIENT: 'PATIENT',
 } as const;
@@ -126,6 +127,9 @@ export const ScheduleExceptionType = {
 export type ScheduleExceptionType = (typeof ScheduleExceptionType)[keyof typeof ScheduleExceptionType];
 
 export const ServiceKind = {
+  SURGERY: 'SURGERY',
+  MATERIAL: 'MATERIAL',
+  MEDICINE: 'MEDICINE',
   CONSULTATION: 'CONSULTATION',
   LAB: 'LAB',
   ULTRASOUND: 'ULTRASOUND',
@@ -134,6 +138,13 @@ export const ServiceKind = {
   OTHER: 'OTHER',
 } as const;
 export type ServiceKind = (typeof ServiceKind)[keyof typeof ServiceKind];
+
+export const SurgeryStatus = { PLANNED: 'PLANNED', COMPLETED: 'COMPLETED', CANCELLED: 'CANCELLED' } as const;
+export type SurgeryStatus = (typeof SurgeryStatus)[keyof typeof SurgeryStatus];
+export const SurgeryEntryKind = { MATERIAL: 'MATERIAL', ANESTHESIA: 'ANESTHESIA' } as const;
+export type SurgeryEntryKind = (typeof SurgeryEntryKind)[keyof typeof SurgeryEntryKind];
+export const SurgeryPayoutType = { PERCENT: 'PERCENT', FIXED: 'FIXED' } as const;
+export type SurgeryPayoutType = (typeof SurgeryPayoutType)[keyof typeof SurgeryPayoutType];
 
 export const DiscountType = {
   PERCENT: 'PERCENT',
@@ -161,14 +172,11 @@ export const PaymentMethod = {
 } as const;
 export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];
 
-/**
- * The methods that route money through the clinic's acquiring accounts, and so
- * land in the transfer register.
- *
- * BALANCE is deliberately absent. Applying a patient's own deposit moves no
- * money today — it was registered on the day it actually arrived, into that
- * day's register. Counting it again here is counting the same som twice.
- */
+/** Supported real-money accounts for the single-clinic cashier. */
+export const CASH_ACCOUNT_METHODS = ['CASH', 'CARD', 'CLICK'] as const;
+export type CashAccountMethod = (typeof CASH_ACCOUNT_METHODS)[number];
+
+/** Legacy aggregate kept for historical and multi-clinic acquiring records. */
 export const TRANSFER_METHODS = ['CARD', 'PAYME', 'CLICK', 'UZUM'] as const;
 export type TransferMethod = (typeof TRANSFER_METHODS)[number];
 

@@ -10,3 +10,4 @@ export * from './utils/money';
 export * from './utils/ticket';
 export * from './utils/lab-ranges';
 export * from './schemas';
+export * from './prescriptions';

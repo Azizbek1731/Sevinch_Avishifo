@@ -25,6 +25,10 @@ describe('homePath', () => {
     expect(homePath(forRole('RECEPTIONIST'))).toBe('/reception');
   });
 
+  it('sends operating room staff to their surgery worklist', () => {
+    expect(homePath(forRole('OPERATING_ROOM'))).toBe('/surgeries');
+  });
+
   it('never sends a role without reports.read to the dashboard', () => {
     const roles = Object.keys(ROLE_PERMISSIONS) as UserRole[];
     for (const role of roles) {

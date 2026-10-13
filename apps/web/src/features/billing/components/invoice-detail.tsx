@@ -31,6 +31,8 @@ import { useApiErrorToast, useInvalidateBilling, usePermission } from '../hooks'
 import { PayDialog } from './pay-dialog';
 import { VoidPaymentButton } from './void-payment-button';
 import { RefundDialog } from './refund-dialog';
+import { ReceiptPrinter } from './receipt-printer';
+import type { ReceiptPrintRequest } from '../receipt-print';
 
 export function InvoiceDetailView({ id }: { id: string }) {
   const t = useTranslations('billing');
@@ -42,6 +44,7 @@ export function InvoiceDetailView({ id }: { id: string }) {
   const queryClient = useQueryClient();
 
   const [payOpen, setPayOpen] = useState(false);
+  const [receipt, setReceipt] = useState<ReceiptPrintRequest | null>(null);
   const [refundOpen, setRefundOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
 
@@ -90,8 +93,7 @@ export function InvoiceDetailView({ id }: { id: string }) {
   const canPay =
     (inv.status === 'ISSUED' || inv.status === 'PARTIALLY_PAID') && can('payments.create');
   const canIssue = inv.status === 'DRAFT' && can('invoices.write');
-  const canCancel =
-    (inv.status === 'DRAFT' || inv.status === 'ISSUED') && can('invoices.cancel');
+  const canCancel = (inv.status === 'DRAFT' || inv.status === 'ISSUED') && can('invoices.cancel');
   const canRefund = compareMoney(inv.paidTotal, '0') > 0 && can('refunds.create');
 
   return (
@@ -238,6 +240,11 @@ export function InvoiceDetailView({ id }: { id: string }) {
                         <TableCell>{formatTz(p.paidAt)}</TableCell>
                         <TableCell className={voided ? 'line-through' : undefined}>
                           {t(`methods.${p.method}`)}
+                          {p.note ? (
+                            <p className="mt-1 max-w-sm whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                              {t('pay.note')}: {p.note}
+                            </p>
+                          ) : null}
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={p.status} />
@@ -299,8 +306,17 @@ export function InvoiceDetailView({ id }: { id: string }) {
       <PayDialog
         open={payOpen}
         onOpenChange={setPayOpen}
-        invoice={{ id: inv.id, number: inv.number, due: inv.due }}
+        onPaid={setReceipt}
+        invoice={{
+          id: inv.id,
+          number: inv.number,
+          due: inv.due,
+          patientName: inv.patient.fullName,
+        }}
       />
+      {receipt ? (
+        <ReceiptPrinter key={receipt.requestId} {...receipt} onPrinted={() => setReceipt(null)} />
+      ) : null}
       <RefundDialog
         open={refundOpen}
         onOpenChange={setRefundOpen}

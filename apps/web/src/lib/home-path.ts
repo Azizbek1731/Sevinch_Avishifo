@@ -16,6 +16,7 @@ import type { Permission, UserRole } from '@avishifo/shared';
  */
 export function homePath(user: { role: UserRole; permissions: readonly Permission[] }): string {
   if (user.role === 'SUPER_ADMIN') return '/platform/clinics';
+  if (user.role === 'OPERATING_ROOM') return '/surgeries';
 
   const can = (p: Permission): boolean => user.permissions.includes(p);
   if (can('reports.read')) return '/dashboard';
@@ -23,6 +24,5 @@ export function homePath(user: { role: UserRole; permissions: readonly Permissio
   if (can('queue.call')) return '/doctor';
   if (can('payments.create')) return '/cashier';
   if (can('lab.orders.write')) return '/lab';
-  if (can('queue.read')) return '/queue';
   return '/patients';
 }

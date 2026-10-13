@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { Check, ChevronsUpDown } from 'lucide-react';
@@ -17,6 +17,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { billingApi, type ServiceOption } from '../api';
+import { searchServiceCatalogue } from '../service-catalogue';
 
 export function serviceName(s: ServiceOption, locale: string): string {
   if (locale === 'ru' && s.name.ru) return s.name.ru;
@@ -29,25 +30,56 @@ export interface ServiceComboboxProps {
   value: ServiceOption | null;
   onChange: (service: ServiceOption) => void;
   className?: string;
+  kind?: 'LAB' | 'CONSULTATION' | 'ULTRASOUND';
+  excludeIds?: string[];
+  proceduresOnly?: boolean;
+  /** Surgery cases are scheduled through the dedicated inpatient workflow. */
+  excludeSurgery?: boolean;
+  disabled?: boolean;
 }
 
-export function ServiceCombobox({ value, onChange, className }: ServiceComboboxProps) {
+export function ServiceCombobox({
+  value,
+  onChange,
+  className,
+  kind,
+  excludeIds = [],
+  proceduresOnly = false,
+  excludeSurgery = false,
+  disabled = false,
+}: ServiceComboboxProps) {
   const t = useTranslations('common');
   const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
 
+  useEffect(() => {
+    setSearch('');
+    setOpen(false);
+  }, [kind, proceduresOnly, excludeSurgery]);
+
   const { data } = useQuery({
-    queryKey: ['services', 'billing-search', search],
-    queryFn: async () => (await billingApi.searchServices(search.trim())).data,
-    enabled: open,
+    queryKey: ['services', 'billing-search', kind, search, { proceduresOnly, excludeSurgery }],
+    queryFn: () =>
+      searchServiceCatalogue(billingApi.searchServices, search, {
+        kind,
+        proceduresOnly,
+        excludeSurgery,
+      }),
+    enabled: open && !disabled,
   });
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open && !disabled}
+      onOpenChange={(value) => {
+        if (!disabled) setOpen(value);
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"
+          disabled={disabled}
           variant="outline"
           role="combobox"
           aria-expanded={open}
@@ -61,30 +93,42 @@ export function ServiceCombobox({ value, onChange, className }: ServiceComboboxP
       </PopoverTrigger>
       <PopoverContent className="w-[340px] p-0" align="start">
         <Command shouldFilter={false}>
-          <CommandInput placeholder={t('search')} value={search} onValueChange={setSearch} />
+          <CommandInput
+            disabled={disabled}
+            placeholder={t('search')}
+            value={search}
+            onValueChange={setSearch}
+          />
           <CommandList>
             <CommandEmpty>{t('notFound')}</CommandEmpty>
             <CommandGroup>
-              {(data ?? []).map((s) => (
-                <CommandItem
-                  key={s.id}
-                  value={s.id}
-                  onSelect={() => {
-                    onChange(s);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn('mr-2 h-4 w-4', value?.id === s.id ? 'opacity-100' : 'opacity-0')}
-                  />
-                  <div className="flex w-full items-center justify-between gap-2">
-                    <span className="truncate">{serviceName(s, locale)}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {s.currentPrice ? formatUZS(s.currentPrice) : s.code}
-                    </span>
-                  </div>
-                </CommandItem>
-              ))}
+              {(data ?? [])
+                .filter((s) => !excludeIds.includes(s.id))
+                .map((s) => (
+                  <CommandItem
+                    key={s.id}
+                    value={s.id}
+                    disabled={disabled}
+                    onSelect={() => {
+                      if (disabled) return;
+                      onChange(s);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        'mr-2 h-4 w-4',
+                        value?.id === s.id ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <span className="truncate">{serviceName(s, locale)}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {s.currentPrice ? formatUZS(s.currentPrice) : s.code}
+                      </span>
+                    </div>
+                  </CommandItem>
+                ))}
             </CommandGroup>
           </CommandList>
         </Command>

@@ -1,6 +1,6 @@
 {
   "title": "Expenses",
-  "description": "Record what the clinic spends. Cash comes out of the open register.",
+  "description": "Expenses from cash, card and Click accounts. Each expense reduces its account balance.",
   "add": "Add expense",
   "newTitle": "New expense",
   "editTitle": "Edit expense",
@@ -33,7 +33,7 @@
   "deleting": "Deleting…",
   "deleted": "Expense deleted",
   "deleteTitle": "Delete this expense?",
-  "deleteDescription": "{amount} — {category}, {date}. If it was cash, the amount goes back into the register. The record stays visible to the administrator.",
+  "deleteDescription": "{amount} — {category}, {date}. The amount is restored to its account. The record remains visible to administrators.",
   "categoriesTitle": "Categories",
   "categoryNamePlaceholder": "Category name",
   "addCategory": "Add",
@@ -56,5 +56,12 @@
     "PAYME": "Payme",
     "CLICK": "Click",
     "UZUM": "Uzum"
-  }
+  },
+  "accountHint": "This amount is deducted from the {method} account and included in the shift report.",
+  "shiftRequired": "Open a cashier shift before recording an expense.",
+  "today": "Today",
+  "thisMonth": "This month",
+  "loadFailed": "Expenses could not be loaded. Please retry.",
+  "retry": "Retry",
+  "surgeryDetails": "Open operation"
 }

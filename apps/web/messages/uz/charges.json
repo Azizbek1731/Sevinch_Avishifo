@@ -1,15 +1,31 @@
 {
-  "title": "To‘lanmagan xizmatlar",
-  "owedTotal": "Jami qarz",
+  "title": "Hisobga kiritilmagan xizmatlar",
+  "owedTotal": "Hisobga kiritilmagan jami",
   "selectAll": "Hammasini belgilash",
-  "selectToBill": "To‘lash uchun belgilang",
-  "billSelected": "{count} ta xizmat — {amount}",
-  "billed": "Hisob-faktura tayyor: {number}",
+  "selectToBill": "Kassaga yuborish uchun belgilang",
+  "billSelected": "Kassaga yuborish: {count} ta — {amount}",
+  "billed": "Kassaga yuborildi: {number}",
   "cancel": "Bekor qilish",
   "cancelled": "Xizmat bekor qilindi",
   "fromWard": "Statsionar",
   "empty": {
-    "title": "To‘lanmagan xizmat yo‘q",
-    "description": "Bemorga yozilgan barcha xizmatlar to‘langan."
-  }
+    "title": "Yangi xarajat yo‘q",
+    "description": "Barcha yozilgan xizmatlar hisobga kiritilgan. To‘lov holati hisob-fakturada ko‘rinadi."
+  },
+  "add": {
+    "title": "Xarajat qo‘shish",
+    "hint": "Xarajat saqlanishi bilan kassadagi “To‘lov kutilmoqda” ro‘yxatiga avtomatik tushadi.",
+    "catalog": "Katalogdan",
+    "manual": "Qo‘shimcha xarajat",
+    "service": "Xizmat",
+    "name": "Xarajat nomi",
+    "date": "Sana",
+    "quantity": "Miqdor",
+    "price": "Birlik narxi",
+    "submit": "Qo‘shish va kassaga yuborish",
+    "saved": "Xarajat qo‘shildi va kassaga yuborildi"
+  },
+  "cancelConfirm": "Bu xizmatni bemor hisobidan bekor qilasizmi?",
+  "loadError": "Xarajatlarni yuklab bo‘lmadi. Sahifani yangilang.",
+  "openSurgery": "Operatsiya kartasi"
 }

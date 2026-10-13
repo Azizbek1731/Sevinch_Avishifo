@@ -19,6 +19,7 @@ export interface ChargeRow {
   admissionId: string | null;
   visitId: string | null;
   serviceId: string | null;
+  surgeryId?: string | null;
   /** { uz, ru, en } snapshot taken when the service was delivered. */
   title: Record<string, string> | string;
   date: string;
@@ -45,7 +46,13 @@ export interface AdmissionRow {
   bed: string | null;
   admittedAt: string;
   dischargedAt: string | null;
-  patient?: { id: string; mrn: string; fullName: string; dob: string | null; gender: string | null };
+  patient?: {
+    id: string;
+    mrn: string;
+    fullName: string;
+    dob: string | null;
+    gender: string | null;
+  };
 }
 
 export interface OrderSlot {
@@ -69,6 +76,20 @@ export interface AdmissionOrder {
   timesPerDay: number;
   note: string | null;
   stoppedAt: string | null;
+  billedOnOrder: boolean;
+  billing: {
+    chargeId: string;
+    status: ChargeStatus;
+    lineTotal: MoneyString;
+    invoice: {
+      id: string;
+      number: string;
+      status: string;
+      total: MoneyString;
+      paidTotal: MoneyString;
+      due: MoneyString;
+    } | null;
+  } | null;
   days: OrderDay[];
 }
 
@@ -116,7 +137,12 @@ export interface DischargeCheck {
   unbilled: {
     count: number;
     total: MoneyString;
-    items: Array<{ id: string; title: ChargeRow['title']; unitPrice: MoneyString; quantity: number }>;
+    items: Array<{
+      id: string;
+      title: ChargeRow['title'];
+      unitPrice: MoneyString;
+      quantity: number;
+    }>;
   };
   stayDebt: MoneyString;
   stayInvoices: Array<{
@@ -136,8 +162,10 @@ export const admissionsApi = {
     api.get<AdmissionRow[]>('/admissions', { ...q }),
   get: (id: string) => api.get<AdmissionDetail>(`/admissions/${id}`),
   admit: (body: AdmitPatientInput) => api.post<AdmissionRow>('/admissions', body),
-  update: (id: string, body: UpdateAdmissionInput) => api.patch<AdmissionRow>(`/admissions/${id}`, body),
-  discharge: (id: string, body: DischargeInput) => api.post<AdmissionRow>(`/admissions/${id}/discharge`, body),
+  update: (id: string, body: UpdateAdmissionInput) =>
+    api.patch<AdmissionRow>(`/admissions/${id}`, body),
+  discharge: (id: string, body: DischargeInput) =>
+    api.post<AdmissionRow>(`/admissions/${id}/discharge`, body),
   dischargeCheck: (id: string) => api.get<DischargeCheck>(`/admissions/${id}/discharge-check`),
   remove: (id: string) => api.delete<{ id: string; invoicedKept: number }>(`/admissions/${id}`),
 
@@ -151,8 +179,8 @@ export const admissionsApi = {
 };
 
 export const chargesApi = {
-  list: (patientId: string, status?: ChargeStatus) =>
-    api.get<ChargeList>('/charges', { patientId, status }),
+  list: (patientId: string, status?: ChargeStatus, admissionId?: string) =>
+    api.get<ChargeList>('/charges', { patientId, status, admissionId }),
   add: (body: AddChargeInput) => api.post<ChargeRow>('/charges', body),
   cancel: (id: string) => api.delete<{ id: string }>(`/charges/${id}`),
   invoice: (chargeIds: string[]) =>

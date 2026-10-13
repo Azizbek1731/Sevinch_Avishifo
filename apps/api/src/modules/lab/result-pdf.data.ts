@@ -9,7 +9,7 @@ export const RESULT_PDF_INCLUDE = {
   items: {
     include: {
       labTest: { include: { parameters: true } },
-      result: { include: { values: true } },
+      result: { include: { values: true, reportDocument: true } },
     },
   },
 } satisfies Prisma.LabOrderInclude;
@@ -71,6 +71,14 @@ export function buildResultPdfData(
         result: it.result
           ? {
               note: it.result.note,
+              approvedAt: iso(it.result.approvedAt),
+              reportDocument: it.result.reportDocument
+                ? {
+                    id: it.result.reportDocument.id,
+                    title: it.result.reportDocument.title,
+                    fileName: it.result.reportDocument.fileName,
+                  }
+                : null,
               values: it.result.values.map((v) => ({
                 parameterId: v.parameterId,
                 value: v.value,

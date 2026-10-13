@@ -134,6 +134,8 @@ export interface PatientInvoice {
 
 export interface PatientVisit {
   id: string;
+  kind: 'CONSULTATION' | 'ULTRASOUND';
+  reportTitle: string | null;
   patientId: string;
   doctorUserId: string;
   status: VisitStatus;

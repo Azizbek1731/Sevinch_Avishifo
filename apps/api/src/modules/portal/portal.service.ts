@@ -32,12 +32,13 @@ import { AppointmentsService } from '../appointments/appointments.service';
 import { SlotsService } from '../appointments/slots.service';
 import { type FreeSlot } from '../appointments/slots.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { SmsChannel } from '../notifications/channels/sms.channel';
 import { StorageService } from '../../core/storage/storage.service';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { RecordAccessService } from '../record-access/record-access.service';
 import { TelegramChannel } from '../notifications/channels/telegram.channel';
-import { TelegramGatewayChannel } from '../notifications/channels/telegram-gateway.channel';
+import { patientDocumentVisibility } from '../patients/patient-document-access';
+import { VisitReportPdfService } from '../visits/visit-report-pdf.service';
+import { VISIT_REPORT_INCLUDE, buildVisitReportPdfData } from '../visits/visit-report.data';
 import type {
   PortalAppointmentsQueryInput,
   PortalBookExtendedInput,
@@ -326,13 +327,12 @@ export class PortalService {
     private readonly appointments: AppointmentsService,
     private readonly slots: SlotsService,
     private readonly notifications: NotificationsService,
-    private readonly sms: SmsChannel,
     private readonly storage: StorageService,
     private readonly resultPdf: ResultPdfService,
     private readonly config: AppConfigService,
     private readonly recordAccess: RecordAccessService,
     private readonly telegram: TelegramChannel,
-    private readonly gateway: TelegramGatewayChannel,
+    private readonly visitReportPdf: VisitReportPdfService,
   ) {}
 
   // ------------------------------------------------------------------- auth
@@ -343,13 +343,26 @@ export class PortalService {
       throw new AppException(ErrorCode.VALIDATION_ERROR, 'Invalid phone number', 400);
     }
 
+    // A submitted phone is not proof of a Telegram recipient. Only the
+    // currently verified account can receive a code through the clinic bot.
+    const recipient = await this.prisma.unscoped.portalAccount.findUnique({
+      where: { phone },
+      select: { telegramChatId: true, phoneVerifiedAt: true },
+    });
+    if (!recipient?.phoneVerifiedAt || !recipient.telegramChatId)
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'Avval klinikaning Telegram botiga /start yuboring va o‘z telefon raqamingizni ulang.',
+        409,
+      );
+
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     // Unscoped (justified): OtpCode is a platform model (no clinicId), pre-auth flow.
     await this.prisma.unscoped.otpCode.updateMany({
       where: { phone, purpose: OTP_PURPOSE, usedAt: null },
       data: { usedAt: new Date() }, // invalidate previous outstanding codes
     });
-    await this.prisma.unscoped.otpCode.create({
+    const otp = await this.prisma.unscoped.otpCode.create({
       data: {
         phone,
         codeHash: await argon2.hash(code, ARGON2_OPTS),
@@ -360,59 +373,33 @@ export class PortalService {
 
     const message = `AviShifo tasdiqlash kodi: ${code}. Uni hech kimga bermang. Kod ${OTP_TTL_MINUTES} daqiqa amal qiladi.`;
 
-    // Telegram first when the patient has already bound a chat: it is free,
-    // instant, and works even when the SMS provider is unconfigured. SMS is the
-    // fallback for everyone else.
-    // Unscoped (justified): pre-auth lookup keyed by the submitted phone.
-    const chat = await this.prisma.unscoped.telegramLink.findFirst({
-      where: { isActive: true, patient: { phone, deletedAt: null } },
-      select: { chatId: true },
-    });
-
-    // Telegram Gateway reaches any number registered on Telegram without the
-    // patient ever having opened our bot — which is most of them, and the whole
-    // reason a first sign-in used to depend on SMS. VERIFICATION_CODE_CHANNEL
-    // decides which of the two Telegram routes is tried first; the other is the
-    // fallback, and SMS is the last resort.
-    const preferBot = this.config.env.VERIFICATION_CODE_CHANNEL === 'bot';
-
-    const viaBot = async (): Promise<boolean> => {
-      if (!chat) return false;
-      try {
-        await this.telegram.send(chat.chatId, `🔐 ${message}`);
-        return true;
-      } catch (err) {
-        this.logger.warn(`OTP Telegram delivery failed for ${maskPhone(phone)}: ${String(err)}`);
-        return false;
-      }
-    };
-    const viaGateway = async (): Promise<boolean> =>
-      (await this.gateway.sendCode(phone, code, OTP_TTL_MINUTES * 60)) !== null;
-
-    let via = '';
-    for (const [name, attempt] of preferBot
-      ? ([['bot', viaBot], ['gateway', viaGateway]] as const)
-      : ([['gateway', viaGateway], ['bot', viaBot]] as const)) {
-      if (await attempt()) {
-        via = name;
-        break;
-      }
-    }
-
-    if (!via) {
-      // Real SMS delivery via the Eskiz channel (falls back to app-log when
-      // SMS_PROVIDER=log, where SmsChannel prints the full message for dev).
-      try {
-        await this.sms.send(phone, message);
-      } catch (err) {
-        // Delivery failure must neither leak provider internals nor block the
-        // flow — the code is stored and the patient can request a new one.
-        this.logger.error(`OTP SMS delivery failed for ${maskPhone(phone)}: ${String(err)}`);
-      }
+    try {
+      // Resolve again at the actual send attempt, after hashing/persistence.
+      // An unlink or phone rebind must not send the code to the old chat.
+      const account = await this.prisma.unscoped.portalAccount.findUnique({
+        where: { phone },
+        select: { telegramChatId: true, phoneVerifiedAt: true },
+      });
+      if (!account?.phoneVerifiedAt || !account.telegramChatId)
+        throw new Error('Telegram recipient is no longer verified');
+      await this.telegram.send(account.telegramChatId, `🔐 ${message}`);
+    } catch {
+      // Revoke only this attempt: a concurrent successful request must remain
+      // usable. Provider errors may contain secrets and are never logged.
+      await this.prisma.unscoped.otpCode.updateMany({
+        where: { id: otp.id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+      this.logger.warn(`OTP clinic bot delivery failed for ${maskPhone(phone)}`);
+      throw new AppException(
+        ErrorCode.INTERNAL_ERROR,
+        'Telegram bot orqali kod yuborilmadi. Botga /start yuboring, raqamingizni ulang va qayta urinib ko‘ring.',
+        503,
+      );
     }
 
     this.logger.log(
-      `[PORTAL OTP → ${maskPhone(phone)}] issued via ${via || 'sms'} (expires in ${OTP_TTL_MINUTES}m)`,
+      `[PORTAL OTP → ${maskPhone(phone)}] delivered via clinic bot (expires in ${OTP_TTL_MINUTES}m)`,
     );
     return { requested: true };
   }
@@ -513,7 +500,7 @@ export class PortalService {
           })
         : 0,
       patientIds.length
-        ? this.prisma.unscoped.patientDocument.count({ where: { patientId: { in: patientIds } } })
+        ? this.prisma.unscoped.patientDocument.count({ where: patientDocumentVisibility(patientIds) })
         : 0,
       patientIds.length
         ? this.prisma.unscoped.labOrder.count({
@@ -601,7 +588,7 @@ export class PortalService {
     if (patientIds.length === 0) {
       return paginated([], { page: query.page, limit: query.limit, total: 0 });
     }
-    const where: Prisma.PatientDocumentWhereInput = { patientId: { in: patientIds } };
+    const where = patientDocumentVisibility(patientIds);
     const { skip, take } = skipTake(query);
 
     // Unscoped (justified): patient-owned records across clinics by verified phone.
@@ -651,7 +638,7 @@ export class PortalService {
     const patientIds = patients.map((p) => p.id);
     const doc = patientIds.length
       ? await this.prisma.unscoped.patientDocument.findFirst({
-          where: { id: docId, patientId: { in: patientIds } },
+          where: { AND: [patientDocumentVisibility(patientIds), { id: docId }] },
           select: { fileKey: true, mimeType: true, fileName: true },
         })
       : null;
@@ -713,6 +700,50 @@ export class PortalService {
     );
     const buffer = await this.resultPdf.render(data, 'uz');
     return { buffer, fileName: `natija-${order.orderNumber}.pdf` };
+  }
+
+  /** Confirmed consultation/UZI reports are released independently of raw-history access. */
+  async getVisitReports(phone: string, query: PageQuery): Promise<PaginatedResult<{
+    id: string; kind: string; title: string; doctorName: string; confirmedAt: string;
+  }>> {
+    const patientIds = (await this.ownPatients(phone)).map((patient) => patient.id);
+    const where: Prisma.VisitWhereInput = {
+      patientId: { in: patientIds }, status: 'COMPLETED', completedAt: { not: null },
+    };
+    const { skip, take } = skipTake(query);
+    const [visits, total] = await Promise.all([
+      this.prisma.unscoped.visit.findMany({ where, skip, take,
+        orderBy: [{ completedAt: 'desc' }, { id: 'desc' }],
+        select: { id: true, kind: true, reportTitle: true, completedAt: true, doctor: { select: { fullName: true } } },
+      }),
+      this.prisma.unscoped.visit.count({ where }),
+    ]);
+    return paginated(visits.map((visit) => ({
+      id: visit.id, kind: visit.kind,
+      title: visit.reportTitle || (visit.kind === 'ULTRASOUND' ? 'UZI xulosasi' : 'Shifokor xulosasi'),
+      doctorName: visit.doctor.fullName, confirmedAt: visit.completedAt!.toISOString(),
+    })), { page: query.page, limit: query.limit, total });
+  }
+
+  async visitReportPdfDownload(phone: string, visitId: string): Promise<{ buffer: Buffer; fileName: string }> {
+    const patientIds = (await this.ownPatients(phone)).map((patient) => patient.id);
+    // Patient-owned records across clinics, always filtered by verified phone.
+    const visit = patientIds.length ? await this.prisma.unscoped.visit.findFirst({
+      where: { id: visitId, patientId: { in: patientIds }, status: 'COMPLETED', completedAt: { not: null } },
+      include: VISIT_REPORT_INCLUDE,
+    }) : null;
+    if (!visit) throw new AppException(ErrorCode.NOT_FOUND, 'Xulosa topilmadi', 404);
+    const clinic = await this.prisma.unscoped.clinic.findUnique({ where: { id: visit.clinicId },
+      select: { name: true, legalName: true, address: true, phone: true } });
+    if (!clinic) throw new AppException(ErrorCode.NOT_FOUND, 'Klinika topilmadi', 404);
+    const latestAmendment = visit.amendments[0];
+    const amendmentAuthor = latestAmendment ? await this.prisma.unscoped.user.findFirst({
+      where: { id: latestAmendment.authorId, clinicId: visit.clinicId }, select: { fullName: true },
+    }) : null;
+    const buffer = await this.visitReportPdf.render(buildVisitReportPdfData(visit, clinic, amendmentAuthor));
+    await this.audit.log({ action: AuditAction.EXPORT, entity: 'VisitReport', entityId: visit.id,
+      clinicId: visit.clinicId, after: { channel: 'portal', requestedByPatient: true } });
+    return { buffer, fileName: `xulosa-${visit.id}.pdf` };
   }
 
   // --------------------------------------------------------------- telegram

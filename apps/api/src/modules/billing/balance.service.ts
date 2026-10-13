@@ -13,12 +13,15 @@ import { skipTake } from '../../common/pagination';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { AuditService } from '../../core/audit/audit.service';
+import { AppConfigService } from '../../core/config/app-config.service';
+import { assertManualMethod, lockOpenShift } from './cash-accounts';
 
 @Injectable()
 export class BalanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly config: AppConfigService,
   ) {}
 
   private mapTransaction(t: PatientBalanceTransaction): Record<string, unknown> {
@@ -26,6 +29,8 @@ export class BalanceService {
       id: t.id,
       patientId: t.patientId,
       type: t.type,
+      method: t.method,
+      shiftId: t.shiftId,
       amount: t.amount.toFixed(2),
       invoiceId: t.invoiceId,
       note: t.note,
@@ -34,17 +39,14 @@ export class BalanceService {
     };
   }
 
-  /**
-   * Cash-desk deposit onto the patient balance. Deposits are taken at the
-   * cashier desk in cash (addDepositSchema carries no method), so an open
-   * cashier shift in the active branch is required (spec §M8).
-   */
+  /** Credit a patient deposit and its receiving cash account atomically. */
   async addDeposit(
     patientId: string,
     dto: AddDepositInput,
     user: AuthUser,
     branchId: string,
   ): Promise<Record<string, unknown>> {
+    assertManualMethod(dto.method, this.config.env.SINGLE_CLINIC_MODE);
     if (dto.patientId !== patientId) {
       throw new AppException(ErrorCode.VALIDATION_ERROR, 'patientId mismatch between path and body', 400);
     }
@@ -54,12 +56,11 @@ export class BalanceService {
     });
     if (!patient) throw new AppException(ErrorCode.PATIENT_NOT_FOUND, 'Patient not found', 404);
 
-    // A deposit is money arriving at the desk, so it lands in a register like
-    // any other payment. Cash must have a drawer open — the notes go into it.
+    // Deposits are real receipts; applying them to an invoice later is not.
     const shift = await this.prisma.db.cashierShift.findFirst({
       where: { branchId, status: 'OPEN' },
     });
-    if (!shift && dto.method === 'CASH') {
+    if (!shift && (this.config.env.SINGLE_CLINIC_MODE || dto.method === 'CASH')) {
       throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'Open cashier shift required for cash deposits', 409);
     }
 
@@ -69,14 +70,7 @@ export class BalanceService {
     const { tx, balance } = await this.prisma.db.$transaction(async (db) => {
       // Same rule as payments: the register must still be open when the row
       // lands, and the share lock makes a racing close() count this deposit.
-      if (shift) {
-        const rows = (await db.$queryRaw`
-          SELECT "id" FROM "CashierShift" WHERE "id" = ${shift.id} AND "status" = 'OPEN' FOR SHARE
-        `) as unknown[];
-        if (rows.length === 0 && dto.method === 'CASH') {
-          throw new AppException(ErrorCode.SHIFT_NOT_OPEN, 'Kassa hozirgina yopildi — smenani qayta oching', 409);
-        }
-      }
+      const liveShiftId = await lockOpenShift(db, shift?.id ?? null, this.config.env.SINGLE_CLINIC_MODE || dto.method === 'CASH');
       const updated = await db.patient.update({
         where: { id: patientId },
         data: { balance: { increment: amount } },
@@ -92,7 +86,7 @@ export class BalanceService {
           // Recorded so the drawer knows about it. Without this the cash was
           // physically in the till and invisible to the system, and the shift
           // closed over by exactly the deposit every time.
-          shiftId: shift?.id ?? null,
+          shiftId: liveShiftId,
           method: dto.method,
           note: dto.note ?? null,
           createdById: user.id,
@@ -105,7 +99,7 @@ export class BalanceService {
       action: AuditAction.CREATE,
       entity: 'PatientBalanceTransaction',
       entityId: tx.id,
-      after: { patientId, type: 'DEPOSIT', amount: amount.toFixed(2) },
+      after: { patientId, type: 'DEPOSIT', amount: amount.toFixed(2), method: dto.method, shiftId: tx.shiftId },
     });
 
     return { balance: balance.toFixed(2), transaction: this.mapTransaction(tx) };

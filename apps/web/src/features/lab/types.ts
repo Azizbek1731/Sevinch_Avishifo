@@ -82,6 +82,15 @@ export interface LabImportResult {
   missingCodes: string[];
 }
 
+export interface LabBilling {
+  invoiceId: string;
+  number: string;
+  status: string;
+  total: string;
+  paidTotal: string;
+  due: string;
+}
+
 export interface LabOrderListItem {
   id: string;
   branchId: string;
@@ -89,6 +98,8 @@ export interface LabOrderListItem {
   patientId: string;
   visitId: string | null;
   status: LabOrderStatus;
+  canWork: boolean;
+  billing: LabBilling | null;
   itemCount: number;
   collectedAt: string | null;
   deliveredAt: string | null;
@@ -104,6 +115,9 @@ export interface LabResultValue {
 }
 
 export interface LabResult {
+  reportDocumentId: string | null;
+  reportDocument: { id: string; title: string; fileName: string } | null;
+  updatedAt: string | null;
   id: string;
   enteredById: string | null;
   approvedById: string | null;
@@ -113,6 +127,7 @@ export interface LabResult {
 }
 
 export interface LabOrderItem {
+  complete: boolean;
   id: string;
   labTestId: string;
   labTest: {
@@ -128,6 +143,8 @@ export interface LabOrderItem {
 }
 
 export interface LabOrderDetail {
+  canWork: boolean;
+  billing: LabBilling | null;
   id: string;
   branchId: string;
   orderNumber: string;

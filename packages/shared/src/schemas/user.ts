@@ -11,6 +11,7 @@ export const staffRoleSchema = z.enum([
   UserRole.RECEPTIONIST,
   UserRole.CASHIER,
   UserRole.LAB_TECH,
+  UserRole.OPERATING_ROOM,
   UserRole.ACCOUNTANT,
 ]);
 export type StaffRole = z.infer<typeof staffRoleSchema>;

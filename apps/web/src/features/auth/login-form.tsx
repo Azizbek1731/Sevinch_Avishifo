@@ -16,8 +16,8 @@ import {
 import { ArrowLeft, Send } from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
 import { useAuthStore, type MeResponse } from '@/stores/auth-store';
-import { homePath } from '@/lib/home-path';
-import { Link, useRouter } from '@/i18n/routing';
+import { SINGLE_CLINIC_MODE } from '@/lib/deployment';
+import { Link } from '@/i18n/routing';
 import { LogoMark } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,6 +69,7 @@ const DEMO_ACCOUNTS = [
   { roleKey: 'role.RECEPTIONIST', identifier: 'qabul1@shifomed.uz', password: 'Demo123!' },
   { roleKey: 'role.CASHIER', identifier: 'kassir@shifomed.uz', password: 'Demo123!' },
   { roleKey: 'role.LAB_TECH', identifier: 'labor@shifomed.uz', password: 'Demo123!' },
+  { roleKey: 'role.OPERATING_ROOM', identifier: 'operatsiya@shifomed.uz', password: 'Demo123!' },
   { roleKey: 'role.SUPER_ADMIN', identifier: 'admin@avishifo.uz', password: 'Admin123!' },
 ] as const;
 
@@ -76,7 +77,6 @@ export function LoginForm() {
   const t = useTranslations('auth');
   const tErr = useTranslations('errors');
   const tStatus = useTranslations('statuses');
-  const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
   const [serverError, setServerError] = useState<string | null>(null);
   /** Which way in the user picked; the code screen sits on top of both. */
@@ -147,9 +147,7 @@ export function LoginForm() {
     useAuthStore.getState().setAccessToken(data.accessToken);
     const me = await api.get<MeResponse>('/auth/me');
     setSession({ ...me.data, accessToken: data.accessToken });
-    // The login page bounces an authenticated visitor to homePath too, and it
-    // fires on this same setSession — both must agree or the later one wins.
-    router.replace(homePath(data.user));
+    // LoginPage observes this session and performs the single role-aware redirect.
   }
 
   async function onVerify(e: React.FormEvent): Promise<void> {
@@ -307,6 +305,12 @@ export function LoginForm() {
           <p className="mt-4 text-center text-xs text-muted-foreground">
             {t('telegramLogin.linkHint')}
           </p>
+          <Button asChild variant="outline" size="sm" className="mt-3 w-full">
+            <a href={`https://t.me/${BOT_USERNAME}`} target="_blank" rel="noreferrer noopener">
+              <Send className="h-4 w-4" />
+              {t('telegramLogin.openBot', { bot: BOT_USERNAME })}
+            </a>
+          </Button>
         </CardContent>
       </Card>
     );
@@ -368,25 +372,27 @@ export function LoginForm() {
           {t('telegramLogin.cta')}
         </Button>
 
-        <div className="mt-6 space-y-3 border-t pt-4">
-          <p className="text-center text-sm text-muted-foreground">
-            {t('noAccount')}{' '}
-            {/* The padding grows the thumb target; the equal negative margin
+        {!SINGLE_CLINIC_MODE && (
+          <div className="mt-6 space-y-3 border-t pt-4">
+            <p className="text-center text-sm text-muted-foreground">
+              {t('noAccount')}{' '}
+              {/* The padding grows the thumb target; the equal negative margin
                 keeps the line box — and so the whole card — where it was. */}
-            <Link
-              href="/register"
-              className="font-medium text-primary hover:underline max-md:-my-3 max-md:inline-block max-md:py-3"
-            >
-              {t('registerFree')}
-            </Link>
-          </p>
-          <Button asChild variant="ghost" size="sm" className="w-full text-muted-foreground">
-            <Link href="/">
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              {t('backHome')}
-            </Link>
-          </Button>
-        </div>
+              <Link
+                href="/register"
+                className="font-medium text-primary hover:underline max-md:-my-3 max-md:inline-block max-md:py-3"
+              >
+                {t('registerFree')}
+              </Link>
+            </p>
+            <Button asChild variant="ghost" size="sm" className="w-full text-muted-foreground">
+              <Link href="/">
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                {t('backHome')}
+              </Link>
+            </Button>
+          </div>
+        )}
 
         {SHOW_DEMO ? (
           <details className="mt-6 rounded-lg border bg-muted/40 p-3 text-sm">
@@ -394,7 +400,9 @@ export function LoginForm() {
               {t('demoAccounts')}
             </summary>
             <div className="mt-3 grid gap-1.5">
-              {DEMO_ACCOUNTS.map((acc) => (
+              {DEMO_ACCOUNTS.filter(
+                (acc) => !SINGLE_CLINIC_MODE || acc.roleKey !== 'role.SUPER_ADMIN',
+              ).map((acc) => (
                 <button
                   key={acc.identifier}
                   type="button"

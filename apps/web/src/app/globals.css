@@ -96,6 +96,37 @@
     width: auto;
   }
 
+  /* Receipts need normal document flow to paginate on a long roll or A4.
+     visibility:hidden alone preserves the app's height and creates blank
+     pages. Only while printing a receipt, remove unrelated elements entirely
+     and flatten its ancestor layout (including the centered preview dialog). */
+  body:has(.receipt-print) *:not(:has(.receipt-print)):not(.receipt-print):not(.receipt-print *) {
+    display: none !important;
+  }
+  body:has(.receipt-print),
+  body:has(.receipt-print) *:has(.receipt-print) {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    animation: none !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .receipt-print .receipt-line,
+  .receipt-print .receipt-totals {
+    break-inside: avoid;
+  }
+
   /*
    * Multi-page documents opt out of the absolute positioning above.
    *
@@ -121,6 +152,85 @@
    */
   @page {
     margin: 12mm;
+  }
+
+  /* The lab pages already include the PDF's margins. Give only this document
+     a full A4 sheet; receipt paper continues to come from its printer queue. */
+  @page lab-result {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  body:has(.lab-pdf-print) *:not(:has(.lab-pdf-print)):not(.lab-pdf-print):not(.lab-pdf-print *) {
+    display: none !important;
+  }
+  body:has(.lab-pdf-print),
+  body:has(.lab-pdf-print) *:has(.lab-pdf-print) {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    animation: none !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .print-area.print-flow.lab-pdf-print {
+    page: lab-result;
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    width: 210mm !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    line-height: 0 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .lab-pdf-print > .lab-pdf-page {
+    display: block !important;
+    box-sizing: border-box;
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    overflow: hidden !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    break-after: page;
+  }
+  .lab-pdf-print > .lab-pdf-page:last-child {
+    break-after: auto;
+  }
+  .lab-pdf-print .lab-pdf-page-image {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    padding: 0 !important;
+    object-fit: contain;
+    filter: none !important;
+    opacity: 1 !important;
   }
 
   /*

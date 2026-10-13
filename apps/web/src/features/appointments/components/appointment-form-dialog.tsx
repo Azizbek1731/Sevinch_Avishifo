@@ -5,25 +5,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocale, useTranslations } from 'next-intl';
 import { format, parseISO } from 'date-fns';
-import { CalendarIcon, Check, ChevronsUpDown } from 'lucide-react';
-import {
-  createAppointmentSchema,
-  formatPhone,
-  type CreateAppointmentInput,
-} from '@avishifo/shared';
+import { CalendarIcon, ChevronsUpDown } from 'lucide-react';
+import { createAppointmentSchema, type CreateAppointmentInput } from '@avishifo/shared';
 import { formatTime, formatTz, tashkentToUtcIso, todayTashkent } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Command,
-  CommandEmpty,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
 import {
   Dialog,
   DialogContent,
@@ -41,13 +30,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PatientCombobox } from '@/features/billing/components/patient-combobox';
+import type { PatientBrief } from '@/features/billing/api';
 import { localizedName, type Appointment, type FreeSlot } from '../api';
 import {
   useActiveServices,
   useCreateAppointment,
-  useDebouncedValue,
   useDoctors,
-  usePatientSearch,
   useSlots,
   useUpdateAppointment,
 } from '../hooks';
@@ -79,12 +68,9 @@ export function AppointmentFormDialog({
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
 
   const [dateStr, setDateStr] = useState<string>(todayTashkent());
-  const [patientLabel, setPatientLabel] = useState<string | null>(null);
-  const [patientOpen, setPatientOpen] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<PatientBrief | null>(null);
   const [servicesOpen, setServicesOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebouncedValue(search, 300);
 
   const form = useForm<CreateAppointmentInput>({
     resolver: zodResolver(createAppointmentSchema),
@@ -103,7 +89,7 @@ export function AppointmentFormDialog({
         note: appointment.note ?? undefined,
       });
       setDateStr(formatTz(appointment.startAt, 'yyyy-MM-dd'));
-      setPatientLabel(appointment.patient.fullName);
+      setSelectedPatient(null);
     } else {
       const date = prefill?.date ?? todayTashkent();
       form.reset({
@@ -115,19 +101,16 @@ export function AppointmentFormDialog({
         note: undefined,
       });
       setDateStr(date);
-      setPatientLabel(null);
+      setSelectedPatient(null);
     }
-    setSearch('');
   }, [open, mode, appointment, prefill, activeBranchId, form]);
 
   const doctorUserId = form.watch('doctorUserId');
   const serviceIds = form.watch('serviceIds') ?? [];
   const startAt = form.watch('startAt');
-  const patientId = form.watch('patientId');
 
   const { data: doctors } = useDoctors();
   const { data: services } = useActiveServices();
-  const { data: patients } = usePatientSearch(debouncedSearch, open && patientOpen);
   const { data: slots, isLoading: slotsLoading } = useSlots(
     {
       doctorUserId,
@@ -188,59 +171,25 @@ export function AppointmentFormDialog({
           {/* Patient */}
           <div className="space-y-2">
             <Label>{t('form.patient')}</Label>
-            <Popover open={patientOpen} onOpenChange={setPatientOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  role="combobox"
-                  disabled={mode === 'edit'}
-                  className={cn(
-                    'w-full justify-between font-normal',
-                    !patientLabel && 'text-muted-foreground',
-                  )}
-                >
-                  <span className="truncate">{patientLabel ?? t('form.selectPatient')}</span>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                <Command shouldFilter={false}>
-                  <CommandInput
-                    placeholder={t('form.searchPatient')}
-                    value={search}
-                    onValueChange={setSearch}
-                  />
-                  <CommandList>
-                    <CommandEmpty>{t('form.patientNotFound')}</CommandEmpty>
-                    {(patients ?? []).map((p) => (
-                      <CommandItem
-                        key={p.id}
-                        value={p.id}
-                        onSelect={() => {
-                          form.setValue('patientId', p.id, { shouldValidate: true });
-                          setPatientLabel(p.fullName);
-                          setPatientOpen(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            'mr-2 h-4 w-4',
-                            patientId === p.id ? 'opacity-100' : 'opacity-0',
-                          )}
-                        />
-                        <div className="flex w-full items-center justify-between gap-2">
-                          <span className="truncate font-medium">{p.fullName}</span>
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            {p.phone ? formatPhone(p.phone) : p.mrn}
-                          </span>
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            {mode === 'edit' ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled
+                className="w-full justify-start font-normal"
+              >
+                <span className="truncate">{appointment?.patient.fullName}</span>
+              </Button>
+            ) : (
+              <PatientCombobox
+                value={selectedPatient}
+                allowCreate
+                onChange={(patient) => {
+                  setSelectedPatient(patient);
+                  form.setValue('patientId', patient?.id ?? '', { shouldValidate: true });
+                }}
+              />
+            )}
             {errors.patientId ? (
               <p className="text-sm font-medium text-destructive">{t('form.required')}</p>
             ) : null}
@@ -330,7 +279,11 @@ export function AppointmentFormDialog({
             <Label>{t('form.date')}</Label>
             <Popover open={dateOpen} onOpenChange={setDateOpen}>
               <PopoverTrigger asChild>
-                <Button type="button" variant="outline" className="w-full justify-start font-normal">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start font-normal"
+                >
                   <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
                   {formatTz(tashkentToUtcIso(dateStr, '12:00'), 'dd.MM.yyyy')}
                 </Button>
@@ -373,9 +326,7 @@ export function AppointmentFormDialog({
                           ? 'border-primary bg-primary text-primary-foreground'
                           : 'hover:bg-accent',
                       )}
-                      onClick={() =>
-                        form.setValue('startAt', s.startAt, { shouldValidate: true })
-                      }
+                      onClick={() => form.setValue('startAt', s.startAt, { shouldValidate: true })}
                     >
                       {formatTime(s.startAt)}
                     </button>

@@ -80,7 +80,8 @@
     "CASHIER": "Кассир",
     "LAB_TECH": "Лаборант",
     "ACCOUNTANT": "Бухгалтер",
-    "PATIENT": "Бемор"
+    "PATIENT": "Бемор",
+    "OPERATING_ROOM": "Операцион ходим"
   },
   "method": {
     "CASH": "Нақд",
@@ -120,7 +121,10 @@
     "ULTRASOUND": "УТТ",
     "PROCEDURE": "Муолажа",
     "DIAGNOSTICS": "Диагностика",
-    "OTHER": "Бошқа"
+    "OTHER": "Бошқа",
+    "SURGERY": "Операция",
+    "MATERIAL": "Сарф материаллари",
+    "MEDICINE": "Дорилар"
   },
   "discount": {
     "PERCENT": "Фоиз",

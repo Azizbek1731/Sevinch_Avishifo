@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { Check, ChevronsUpDown, X } from 'lucide-react';
+import { Check, ChevronsUpDown, UserPlus, X } from 'lucide-react';
 import { formatPhone } from '@avishifo/shared';
 import { cn } from '@/lib/utils';
+import { usePermissions } from '@/hooks/use-permissions';
+import { NewPatientDialog } from '@/features/reception/components/new-patient-dialog';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -23,12 +25,24 @@ export interface PatientComboboxProps {
   onChange: (patient: PatientBrief | null) => void;
   /** Show a clear (×) affordance when a patient is selected. */
   clearable?: boolean;
+  /** Enable patient registration within a care workflow, subject to permissions. */
+  allowCreate?: boolean;
   className?: string;
 }
 
-export function PatientCombobox({ value, onChange, clearable = false, className }: PatientComboboxProps) {
+export function PatientCombobox({
+  value,
+  onChange,
+  clearable = false,
+  allowCreate = false,
+  className,
+}: PatientComboboxProps) {
   const t = useTranslations('common');
+  const tr = useTranslations('reception');
+  const can = usePermissions();
+  const canCreate = allowCreate && can('patients.write');
   const [open, setOpen] = useState(false);
+  const [newPatientOpen, setNewPatientOpen] = useState(false);
   const [search, setSearch] = useState('');
 
   const { data } = useQuery({
@@ -54,11 +68,23 @@ export function PatientCombobox({ value, onChange, clearable = false, className 
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[320px] p-0" align="start">
+        <PopoverContent
+          className="w-[320px] max-w-[calc(100vw-2rem)] p-0"
+          align="start"
+          onCloseAutoFocus={(event) => {
+            if (newPatientOpen) event.preventDefault();
+          }}
+        >
           <Command shouldFilter={false}>
-            <CommandInput placeholder={t('search')} value={search} onValueChange={setSearch} />
+            <CommandInput
+              placeholder={tr('walkIn.searchPlaceholder')}
+              value={search}
+              onValueChange={setSearch}
+            />
             <CommandList>
-              <CommandEmpty>{t('notFound')}</CommandEmpty>
+              <CommandEmpty>
+                {search.trim().length < 2 ? tr('newPatient.searchHint') : t('notFound')}
+              </CommandEmpty>
               <CommandGroup>
                 {(data ?? []).map((p) => (
                   <CommandItem
@@ -70,7 +96,10 @@ export function PatientCombobox({ value, onChange, clearable = false, className 
                     }}
                   >
                     <Check
-                      className={cn('mr-2 h-4 w-4', value?.id === p.id ? 'opacity-100' : 'opacity-0')}
+                      className={cn(
+                        'mr-2 h-4 w-4',
+                        value?.id === p.id ? 'opacity-100' : 'opacity-0',
+                      )}
                     />
                     <div className="flex w-full items-center justify-between gap-2">
                       <span className="truncate">{p.fullName}</span>
@@ -83,6 +112,22 @@ export function PatientCombobox({ value, onChange, clearable = false, className 
               </CommandGroup>
             </CommandList>
           </Command>
+          {canCreate ? (
+            <div className="border-t p-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full justify-start gap-2"
+                onClick={() => {
+                  setOpen(false);
+                  setNewPatientOpen(true);
+                }}
+              >
+                <UserPlus className="h-4 w-4" />
+                {tr('newPatient.add')}
+              </Button>
+            </div>
+          ) : null}
         </PopoverContent>
       </Popover>
       {clearable && value ? (
@@ -95,6 +140,14 @@ export function PatientCombobox({ value, onChange, clearable = false, className 
         >
           <X className="h-4 w-4" />
         </Button>
+      ) : null}
+      {canCreate ? (
+        <NewPatientDialog
+          open={newPatientOpen}
+          onOpenChange={setNewPatientOpen}
+          onCreated={onChange}
+          onSelectExisting={onChange}
+        />
       ) : null}
     </div>
   );

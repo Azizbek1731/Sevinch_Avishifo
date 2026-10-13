@@ -18,9 +18,8 @@ import {
  * Opt-in Telegram second factor.
  *
  * The rule this suite exists to protect: enabling 2FA must never be able to
- * lock a user out. That means it cannot be switched on without a linked chat,
- * and a flag set on an account with no chat is ignored at login rather than
- * blocking it.
+ * silently weaken authentication. It cannot be enabled without a linked bot,
+ * and losing that binding later must not turn an enabled second factor off.
  */
 describe('two-factor sign-in (e2e)', () => {
   let app: INestApplication;
@@ -31,6 +30,11 @@ describe('two-factor sign-in (e2e)', () => {
   const sent: CapturedTelegram[] = [];
 
   beforeAll(async () => {
+    if (
+      new URL(process.env.DATABASE_URL ?? '').pathname !== '/avishifo_finance_migration' ||
+      process.env.TELEGRAM_ENABLED !== 'false'
+    )
+      throw new Error('Use isolated avishifo_finance_migration with Telegram disabled');
     prisma = new PrismaClient();
     app = await createApp(sent);
     clinic = await createTestClinic(prisma, 'two-factor');
@@ -66,9 +70,8 @@ describe('two-factor sign-in (e2e)', () => {
     expect(row?.twoFactorEnabled).toBe(false);
   });
 
-  it('still signs in normally when the flag is set but no chat is linked', async () => {
-    // Force the inconsistent state the API refuses to create, and prove login
-    // degrades to password-only instead of demanding an undeliverable code.
+  it('fails closed when the flag is set but the bot is no longer linked', async () => {
+    // An unlinked second factor must never become password-only authentication.
     await prisma.user.update({
       where: { id: clinic.owner.id },
       data: { twoFactorEnabled: true, telegramChatId: null },
@@ -78,9 +81,9 @@ describe('two-factor sign-in (e2e)', () => {
       .post(`${API}/auth/login`)
       .set('X-Forwarded-For', uniqueIp())
       .send({ identifier: clinic.owner.email, password: PASSWORD })
-      .expect(200);
-    expect(res.body.data.accessToken).toBeTypeOf('string');
-    expect(res.body.data.twoFactorRequired).toBeUndefined();
+      .expect(503);
+    expect(res.body.error.code).toBe('TELEGRAM_NOT_LINKED');
+    expect(res.headers['set-cookie']).toBeUndefined();
 
     await prisma.user.update({
       where: { id: clinic.owner.id },

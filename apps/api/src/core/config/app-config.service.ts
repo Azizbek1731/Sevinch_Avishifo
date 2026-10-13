@@ -4,12 +4,18 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const envSchema = z.object({
+  SINGLE_CLINIC_MODE: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_PORT: z.coerce.number().int().default(3001),
   API_URL: z.string().default('http://localhost:3001'),
   WEB_URL: z.string().default('http://localhost:3000'),
   PORTAL_URL: z.string().default('http://localhost:3003'),
-  CORS_ORIGINS: z.string().default('http://localhost:3000,http://localhost:3002,http://localhost:3003'),
+  CORS_ORIGINS: z
+    .string()
+    .default('http://localhost:3000,http://localhost:3002,http://localhost:3003'),
   DATABASE_URL: z.string(),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   JWT_PRIVATE_KEY_PATH: z.string().default('.keys/jwt-private.pem'),
@@ -20,7 +26,10 @@ const envSchema = z.object({
   STORAGE_LOCAL_DIR: z.string().default('./uploads'),
   // Refresh-cookie Secure flag. Default follows NODE_ENV (prod → secure).
   // Set "false" only for a plain-HTTP deployment (e.g. IP demo before TLS).
-  COOKIE_SECURE: z.enum(['true', 'false']).optional(),
+  COOKIE_SECURE: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.enum(['true', 'false']).optional(),
+  ),
   SMS_PROVIDER: z.enum(['log', 'eskiz']).default('log'),
   ESKIZ_EMAIL: z.string().optional(),
   ESKIZ_PASSWORD: z.string().optional(),
@@ -32,24 +41,8 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   /** Bot @username (without @) — used to build t.me deep links for web linking. */
   TELEGRAM_BOT_USERNAME: z.string().optional(),
-  /**
-   * Telegram Gateway (gatewayapi.telegram.org) access token. Delivers
-   * verification codes to ANY phone registered on Telegram, from the verified
-   * "Verification Codes" sender — no bot linking needed, which is what makes it
-   * usable for first-time sign-ins. Unset disables the channel entirely.
-   */
-  TELEGRAM_GATEWAY_TOKEN: z.string().optional(),
-  /** Optional verified channel to send as, instead of the generic sender. */
-  TELEGRAM_GATEWAY_SENDER: z.string().optional(),
-  /**
-   * Which Telegram route carries verification codes when both are available.
-   * `gateway` is the default: it is the purpose-built verification channel, it
-   * looks the same to every user whether or not they ever linked our bot, and
-   * it costs about $0.01 a code. Set `bot` to prefer the user's linked chat
-   * instead, which is free but only reaches people who already pressed /start.
-   * Either way the other route is the fallback.
-   */
-  VERIFICATION_CODE_CHANNEL: z.enum(['gateway', 'bot']).default('gateway'),
+  /** Limit the local patient bot to this clinic; blank auto-detects one active clinic. */
+  TELEGRAM_CLINIC_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().uuid().optional()),
   PAYME_MERCHANT_ID: z.string().optional(),
   PAYME_KEY: z.string().optional(),
   CLICK_MERCHANT_ID: z.string().optional(),

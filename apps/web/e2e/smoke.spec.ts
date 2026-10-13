@@ -46,7 +46,7 @@ test.describe('clinic smoke flow', () => {
     await expect(page.getByText(fullName)).toBeVisible();
 
     // ---- 3. enqueue the patient (walk-in) -----------------------------
-    await page.getByRole('link', { name: /navbat|queue/i }).click();
+    await page.getByRole('link', { name: /qabulxona|reception/i }).click();
     await page.getByRole('button', { name: /navbatga|walk-in|enqueue|add to queue/i }).click();
     await page.getByLabel(/bemor|patient/i).fill(patientName.firstName);
     await page.getByRole('option', { name: new RegExp(patientName.firstName, 'i') }).click();
@@ -58,7 +58,7 @@ test.describe('clinic smoke flow', () => {
     // ---- 4. doctor calls the ticket and opens the visit ---------------
     const doctorPage = await page.context().browser()!.newPage();
     await login(doctorPage, DOCTOR);
-    await doctorPage.getByRole('link', { name: /navbat|queue/i }).click();
+    await doctorPage.getByRole('link', { name: /shifokor kabineti|doctor/i }).click();
     await doctorPage.getByRole('button', { name: /keyingi|call next|chaqirish/i }).click();
     await doctorPage.getByRole('button', { name: /qabulni boshlash|start visit|start/i }).click();
 

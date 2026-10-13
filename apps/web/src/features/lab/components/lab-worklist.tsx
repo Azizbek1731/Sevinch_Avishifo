@@ -25,6 +25,7 @@ import {
 } from '../hooks';
 import type { LabOrderListItem } from '../types';
 import { CreateOrderDialog } from './create-order-dialog';
+import { hasUnpaidLabWork } from '../lib';
 import { ManageTestsDialog } from './manage-tests-dialog';
 import { CatalogImportDialog } from './catalog-import-dialog';
 
@@ -34,6 +35,8 @@ export function LabWorklist() {
   const t = useTranslations('lab');
   const tc = useTranslations('common');
   const canWrite = useHasPermission('lab.orders.write');
+  const canPerform = useHasPermission('lab.results.write');
+  const canManageTests = useHasPermission('services.write');
   const queryClient = useQueryClient();
 
   const [status, setStatus] = useState<LabOrderStatus | undefined>(undefined);
@@ -45,16 +48,21 @@ export function LabWorklist() {
   const [catalogOpen, setCatalogOpen] = useState(false);
 
   const ordersQuery = useLabOrders({
+    includeUnpaid: canWrite && !canPerform,
     status,
     search: debouncedSearch,
     page,
     limit: PAGE_SIZE,
   });
-  const counts = useLabStatusCounts();
+  const counts = useLabStatusCounts(canWrite && !canPerform);
   const updateStatus = useUpdateOrderStatus();
 
   useSocketEvent('lab.order.updated', () => {
     void queryClient.invalidateQueries({ queryKey: ['lab', 'orders'] });
+  });
+
+  useSocketEvent('invoice.paid', () => {
+    void queryClient.invalidateQueries({ queryKey: ['lab'] });
   });
 
   const columns = useMemo<ColumnDef<LabOrderListItem>[]>(
@@ -104,7 +112,11 @@ export function LabWorklist() {
         cell: ({ row }) => (
           <StatusBadge
             status={row.original.status}
-            label={t(`status.${row.original.status}` as never)}
+            label={
+              hasUnpaidLabWork(row.original)
+                ? t('paymentWaiting')
+                : t(`status.${row.original.status}` as never)
+            }
           />
         ),
       },
@@ -115,7 +127,7 @@ export function LabWorklist() {
           const order = row.original;
           return (
             <div className="flex items-center justify-end gap-2">
-              {canWrite && order.status === LabOrderStatus.ORDERED ? (
+              {canPerform && order.canWork && order.status === LabOrderStatus.ORDERED ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -131,7 +143,7 @@ export function LabWorklist() {
                   {t('actionCollect')}
                 </Button>
               ) : null}
-              {canWrite && order.status === LabOrderStatus.SPECIMEN_COLLECTED ? (
+              {canPerform && order.canWork && order.status === LabOrderStatus.SPECIMEN_COLLECTED ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -155,7 +167,7 @@ export function LabWorklist() {
         },
       },
     ],
-    [t, tc, canWrite, updateStatus],
+    [t, tc, canPerform, updateStatus],
   );
 
   const meta = ordersQuery.data?.meta;
@@ -163,7 +175,7 @@ export function LabWorklist() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('title')} description={t('subtitle')}>
-        {canWrite ? (
+        {canManageTests ? (
           <>
             <Button variant="outline" onClick={() => setCatalogOpen(true)}>
               <BookOpen className="h-4 w-4" />
@@ -173,11 +185,13 @@ export function LabWorklist() {
               <FlaskConical className="h-4 w-4" />
               {t('manageTests')}
             </Button>
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4" />
-              {t('newOrder')}
-            </Button>
           </>
+        ) : null}
+        {canWrite ? (
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            {t('newOrder')}
+          </Button>
         ) : null}
       </PageHeader>
 

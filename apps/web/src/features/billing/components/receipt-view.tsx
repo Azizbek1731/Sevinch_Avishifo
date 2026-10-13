@@ -15,10 +15,11 @@ export function ReceiptView({ id }: { id: string }) {
   const tc = useTranslations('common');
 
   const { data, isLoading } = useQuery({
-    // See receipt-printer: kept out of the ['invoices'] prefix, which every
-    // sale invalidates. A settled receipt is immutable.
+    // Partial payments, payment reversals and refunds can change this receipt.
+    // Always fetch its current values when reopening the page.
     queryKey: ['receipt', id],
-    staleTime: Infinity,
+    staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async () => (await billingApi.getReceipt(id)).data,
   });
 
