@@ -128,3 +128,42 @@ export interface ConsumablesReport {
     orderedEntries: number;
   }>;
 }
+
+export const labReferralReportQuerySchema = reportRangeQuerySchema
+  .extend({ export: z.enum(['xlsx']).optional() })
+  .superRefine((value, ctx) => {
+    const result = cashflowQuerySchema.safeParse(value);
+    if (!result.success) for (const issue of result.error.issues) ctx.addIssue(issue);
+  });
+export type LabReferralReportQueryInput = z.infer<typeof labReferralReportQuerySchema>;
+export interface LabReferralCounts {
+  patients: number;
+  orders: number;
+  tests: number;
+  paidOrders: number;
+  pendingPaymentOrders: number;
+  approvedOrders: number;
+}
+export interface LabReferralReport {
+  from: string;
+  to: string;
+  branchId: string;
+  timezone: string;
+  groupBy: 'day' | 'week' | 'month';
+  doctorUserId: string | null;
+  totals: LabReferralCounts;
+  doctors: Array<
+    LabReferralCounts & {
+      doctorUserId: string | null;
+      doctorName: string | null;
+      testsBreakdown: Array<
+        LabReferralCounts & {
+          labTestId: string;
+          code: string;
+          name: Record<string, string>;
+        }
+      >;
+    }
+  >;
+  periods: Array<LabReferralCounts & { bucket: string }>;
+}

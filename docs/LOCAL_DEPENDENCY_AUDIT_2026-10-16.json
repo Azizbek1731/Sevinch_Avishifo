@@ -1,0 +1,716 @@
+{
+  "auditDate": "2026-10-16",
+  "timezone": "Asia/Samarkand",
+  "command": "pnpm audit --prod --json",
+  "scope": "Production dependency advisory matches; not an exploitation test",
+  "lockfileSha256": "73d13082362f507f908f014af9f396533a85363ad9a2bf6a73f26f30e1dd9fd8",
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 1,
+      "moderate": 21,
+      "high": 28,
+      "critical": 3
+    },
+    "dependencies": 688,
+    "devDependencies": 0,
+    "optionalDependencies": 0,
+    "totalDependencies": 688
+  },
+  "advisories": [
+    {
+      "module": "file-type",
+      "title": "file-type affected by infinite loop in ASF parser on malformed input with zero-size sub-header",
+      "severity": "moderate",
+      "vulnerableVersions": ">=13.0.0 <21.3.1",
+      "patchedVersions": ">=21.3.1",
+      "url": "https://github.com/advisories/GHSA-5v7r-6r5c-r473",
+      "installedVersions": [
+        "16.5.4"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > file-type@16.5.4"
+      ]
+    },
+    {
+      "module": "postcss",
+      "title": "PostCSS has XSS via Unescaped </style> in its CSS Stringify Output",
+      "severity": "moderate",
+      "vulnerableVersions": "<8.5.10",
+      "patchedVersions": ">=8.5.10",
+      "url": "https://github.com/advisories/GHSA-qx2v-qp2m-jg93",
+      "installedVersions": [
+        "8.4.31"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20 > postcss@8.4.31"
+      ]
+    },
+    {
+      "module": "next-intl",
+      "title": "next-intl has an open redirect vulnerability",
+      "severity": "moderate",
+      "vulnerableVersions": "<4.9.1",
+      "patchedVersions": ">=4.9.1",
+      "url": "https://github.com/advisories/GHSA-8f24-v5vv-gm5j",
+      "installedVersions": [
+        "3.26.5"
+      ],
+      "exampleDependencyPaths": [
+        "apps/web > next-intl@3.26.5"
+      ]
+    },
+    {
+      "module": "next-intl",
+      "title": "next-intl has prototype pollution with `experimental.messages.precompile` via attacker-controlled translation catalog keys",
+      "severity": "moderate",
+      "vulnerableVersions": "<=4.9.1",
+      "patchedVersions": ">=4.9.2",
+      "url": "https://github.com/advisories/GHSA-4c35-wcg5-mm9h",
+      "installedVersions": [
+        "3.26.5"
+      ],
+      "exampleDependencyPaths": [
+        "apps/web > next-intl@3.26.5"
+      ]
+    },
+    {
+      "module": "uuid",
+      "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+      "severity": "moderate",
+      "vulnerableVersions": "<11.1.1",
+      "patchedVersions": ">=11.1.1",
+      "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+      "installedVersions": [
+        "8.3.2"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > exceljs@4.4.0 > uuid@8.3.2"
+      ]
+    },
+    {
+      "module": "sharp",
+      "title": "sharp inherited vulnerabilities in libvips: CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591",
+      "severity": "high",
+      "vulnerableVersions": "<0.35.0",
+      "patchedVersions": ">=0.35.0",
+      "url": "https://github.com/advisories/GHSA-f88m-g3jw-g9cj",
+      "installedVersions": [
+        "0.33.5",
+        "0.34.5"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > sharp@0.33.5",
+        "apps/display > next@15.5.20 > sharp@0.34.5"
+      ]
+    },
+    {
+      "module": "next",
+      "title": "Next.js: Denial of Service in App Router using Server Actions",
+      "severity": "high",
+      "vulnerableVersions": ">=13.0.0 <15.5.21",
+      "patchedVersions": ">=15.5.21",
+      "url": "https://github.com/advisories/GHSA-m99w-x7hq-7vfj",
+      "installedVersions": [
+        "15.5.20"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20"
+      ]
+    },
+    {
+      "module": "next",
+      "title": "Next.js: Server-Side Request Forgery in Server Actions on custom servers",
+      "severity": "high",
+      "vulnerableVersions": ">=14.1.1 <15.5.21",
+      "patchedVersions": ">=15.5.21",
+      "url": "https://github.com/advisories/GHSA-89xv-2m56-2m9x",
+      "installedVersions": [
+        "15.5.20"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20"
+      ]
+    },
+    {
+      "module": "next",
+      "title": "Next.js: Cache confusion of response bodies for requests with bodies",
+      "severity": "moderate",
+      "vulnerableVersions": ">=13.0.0 <15.5.21",
+      "patchedVersions": ">=15.5.21",
+      "url": "https://github.com/advisories/GHSA-68g3-v927-f742",
+      "installedVersions": [
+        "15.5.20"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20"
+      ]
+    },
+    {
+      "module": "next",
+      "title": "Next.js: Cache confusion of response bodies for requests with bodies containing invalid UTF-8 byte sequences",
+      "severity": "moderate",
+      "vulnerableVersions": ">=13.0.0 <15.5.21",
+      "patchedVersions": ">=15.5.21",
+      "url": "https://github.com/advisories/GHSA-4633-3j49-mh5q",
+      "installedVersions": [
+        "15.5.20"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20"
+      ]
+    },
+    {
+      "module": "next",
+      "title": "Next.js: Unbounded Server Action payload in Edge runtime",
+      "severity": "moderate",
+      "vulnerableVersions": ">=13.0.0 <15.5.21",
+      "patchedVersions": ">=15.5.21",
+      "url": "https://github.com/advisories/GHSA-4c39-4ccg-62r3",
+      "installedVersions": [
+        "15.5.20"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20"
+      ]
+    },
+    {
+      "module": "next",
+      "title": "Next.js: Server-Side Request Forgery in rewrites via attacker-controlled destination hostname",
+      "severity": "high",
+      "vulnerableVersions": ">=12.0.0 <15.5.21",
+      "patchedVersions": ">=15.5.21",
+      "url": "https://github.com/advisories/GHSA-p9j2-gv94-2wf4",
+      "installedVersions": [
+        "15.5.20"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20"
+      ]
+    },
+    {
+      "module": "next",
+      "title": "Next.js: Denial of Service in the Image Optimization API using SVGs",
+      "severity": "moderate",
+      "vulnerableVersions": ">=15.5.0 <15.5.21",
+      "patchedVersions": ">=15.5.21",
+      "url": "https://github.com/advisories/GHSA-q8wf-6r8g-63ch",
+      "installedVersions": [
+        "15.5.20"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20"
+      ]
+    },
+    {
+      "module": "next",
+      "title": "Next.js: Unauthenticated disclosure of internal Server Function endpoints",
+      "severity": "moderate",
+      "vulnerableVersions": ">=13.0.0 <15.5.21",
+      "patchedVersions": ">=15.5.21",
+      "url": "https://github.com/advisories/GHSA-955p-x3mx-jcvp",
+      "installedVersions": [
+        "15.5.20"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20"
+      ]
+    },
+    {
+      "module": "postcss",
+      "title": "PostCSS: Arbitrary file read and information disclosure via attacker-controlled sourceMappingURL in CSS comments",
+      "severity": "high",
+      "vulnerableVersions": "<=8.5.11",
+      "patchedVersions": ">=8.5.12",
+      "url": "https://github.com/advisories/GHSA-6g55-p6wh-862q",
+      "installedVersions": [
+        "8.4.31"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20 > postcss@8.4.31"
+      ]
+    },
+    {
+      "module": "brace-expansion",
+      "title": "brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash",
+      "severity": "high",
+      "vulnerableVersions": "<1.1.17",
+      "patchedVersions": ">=1.1.17",
+      "url": "https://github.com/advisories/GHSA-mh99-v99m-4gvg",
+      "installedVersions": [
+        "1.1.16"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > exceljs@4.4.0 > archiver@5.3.2 > archiver-utils@2.1.0 > glob@7.2.3 > minimatch@3.1.5 > brace-expansion@1.1.16"
+      ]
+    },
+    {
+      "module": "brace-expansion",
+      "title": "brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash",
+      "severity": "high",
+      "vulnerableVersions": ">=2.0.0 <2.1.3",
+      "patchedVersions": ">=2.1.3",
+      "url": "https://github.com/advisories/GHSA-mh99-v99m-4gvg",
+      "installedVersions": [
+        "2.1.2"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > exceljs@4.4.0 > archiver@5.3.2 > readdir-glob@1.1.3 > minimatch@5.1.9 > brace-expansion@2.1.2"
+      ]
+    },
+    {
+      "module": "postcss",
+      "title": "PostCSS: incomplete fix of GHSA-6g55-p6wh-862q — attacker-controlled sourceMappingURL reads arbitrary .map files when `from` is unset",
+      "severity": "moderate",
+      "vulnerableVersions": "<=8.5.22",
+      "patchedVersions": ">=8.5.23",
+      "url": "https://github.com/advisories/GHSA-fxqj-rqcc-2cmp",
+      "installedVersions": [
+        "8.4.31",
+        "8.5.19"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20 > postcss@8.4.31",
+        "apps/web > tailwindcss-animate@1.0.7 > tailwindcss@3.4.19 > postcss@8.5.19"
+      ]
+    },
+    {
+      "module": "brace-expansion",
+      "title": "brace-expansion: DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation",
+      "severity": "high",
+      "vulnerableVersions": ">=2.0.0 <2.1.4",
+      "patchedVersions": ">=2.1.4",
+      "url": "https://github.com/advisories/GHSA-rgw5-rvv9-x895",
+      "installedVersions": [
+        "2.1.2"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > exceljs@4.4.0 > archiver@5.3.2 > readdir-glob@1.1.3 > minimatch@5.1.9 > brace-expansion@2.1.2"
+      ]
+    },
+    {
+      "module": "brace-expansion",
+      "title": "brace-expansion: DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation",
+      "severity": "high",
+      "vulnerableVersions": "<1.1.18",
+      "patchedVersions": ">=1.1.18",
+      "url": "https://github.com/advisories/GHSA-rgw5-rvv9-x895",
+      "installedVersions": [
+        "1.1.16"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > exceljs@4.4.0 > archiver@5.3.2 > archiver-utils@2.1.0 > glob@7.2.3 > minimatch@3.1.5 > brace-expansion@1.1.16"
+      ]
+    },
+    {
+      "module": "nanoid",
+      "title": "nanoid: custom generators can loop indefinitely when size is zero",
+      "severity": "high",
+      "vulnerableVersions": "<3.3.18",
+      "patchedVersions": ">=3.3.18",
+      "url": "https://github.com/advisories/GHSA-2v37-7h3g-55p8",
+      "installedVersions": [
+        "3.3.16"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20 > postcss@8.4.31 > nanoid@3.3.16"
+      ]
+    },
+    {
+      "module": "js-yaml",
+      "title": "js-yaml: Exponential parsing time in flow collections leads to denial of service",
+      "severity": "high",
+      "vulnerableVersions": ">=5.0.0 <=5.2.1",
+      "patchedVersions": ">=5.2.2",
+      "url": "https://github.com/advisories/GHSA-pm4m-ph32-ghv5",
+      "installedVersions": [
+        "5.2.1"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > @nestjs/swagger@11.4.6 > js-yaml@5.2.1"
+      ]
+    },
+    {
+      "module": "postcss",
+      "title": "PostCSS: Path Traversal in Previous Source Map Auto-Loading (sourceMappingURL) leads to Arbitrary .map File Disclosure",
+      "severity": "high",
+      "vulnerableVersions": "<=8.5.17",
+      "patchedVersions": ">=8.5.18",
+      "url": "https://github.com/advisories/GHSA-r28c-9q8g-f849",
+      "installedVersions": [
+        "8.4.31"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20 > postcss@8.4.31"
+      ]
+    },
+    {
+      "module": "deepmerge-ts",
+      "title": "DeepmergeTS has stack exhaustion when merging recursive object graphs",
+      "severity": "high",
+      "vulnerableVersions": "<8.0.0",
+      "patchedVersions": ">=8.0.0",
+      "url": "https://github.com/advisories/GHSA-ggr8-5vv4-36mx",
+      "installedVersions": [
+        "7.1.5"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > @prisma/client@6.19.3 > prisma@6.19.3 > @prisma/config@6.19.3 > deepmerge-ts@7.1.5"
+      ]
+    },
+    {
+      "module": "qs",
+      "title": "qs array-limit bypass via bracket-key comma parsing",
+      "severity": "moderate",
+      "vulnerableVersions": ">=6.14.2 <=6.15.3",
+      "patchedVersions": ">=6.16.0",
+      "url": "https://github.com/advisories/GHSA-x5fp-wj9c-mxmx",
+      "installedVersions": [
+        "6.15.3"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > @nest-lab/throttler-storage-redis@1.2.0 > @nestjs/core@11.1.28 > @nestjs/platform-express@11.1.28 > express@5.2.1 > body-parser@2.3.0 > qs@6.15.3"
+      ]
+    },
+    {
+      "module": "qs",
+      "title": "qs: Denial of Service via Attacker Controlled isBuffer",
+      "severity": "moderate",
+      "vulnerableVersions": ">=2.2.5 <6.16.0",
+      "patchedVersions": ">=6.16.0",
+      "url": "https://github.com/advisories/GHSA-4mjr-xmp4-gh2g",
+      "installedVersions": [
+        "6.15.3"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > @nest-lab/throttler-storage-redis@1.2.0 > @nestjs/core@11.1.28 > @nestjs/platform-express@11.1.28 > express@5.2.1 > body-parser@2.3.0 > qs@6.15.3"
+      ]
+    },
+    {
+      "module": "next",
+      "title": "Next.js: Unauthenticated Remote Code Execution on windows-hosted servers",
+      "severity": "critical",
+      "vulnerableVersions": ">=13.4.0 <15.5.24",
+      "patchedVersions": ">=15.5.24",
+      "url": "https://github.com/advisories/GHSA-p293-qw3h-jr36",
+      "installedVersions": [
+        "15.5.20"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20"
+      ]
+    },
+    {
+      "module": "sharp",
+      "title": "sharp: Vulnerabilities in libheif: GHSA-g89c-p67h-r497 and GHSA-2jg2-4ch7-h545",
+      "severity": "high",
+      "vulnerableVersions": "<0.35.4",
+      "patchedVersions": ">=0.35.4",
+      "url": "https://github.com/advisories/GHSA-rgj7-g3m4-5g8c",
+      "installedVersions": [
+        "0.33.5",
+        "0.34.5"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > sharp@0.33.5",
+        "apps/display > next@15.5.20 > sharp@0.34.5"
+      ]
+    },
+    {
+      "module": "next",
+      "title": "Next.js: Unauthenticated Remote Code Execution in Image Optimization API when AVIF files are used",
+      "severity": "critical",
+      "vulnerableVersions": ">=10.0.0 <15.5.24",
+      "patchedVersions": ">=15.5.24",
+      "url": "https://github.com/advisories/GHSA-2xp9-vwfh-vxw4",
+      "installedVersions": [
+        "15.5.20"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20"
+      ]
+    },
+    {
+      "module": "multer",
+      "title": "multer vulnerable to Denial of Service via crafted multipart field names",
+      "severity": "high",
+      "vulnerableVersions": "<2.3.0",
+      "patchedVersions": ">=2.3.0",
+      "url": "https://github.com/advisories/GHSA-wc9g-mqfw-jrwm",
+      "installedVersions": [
+        "2.2.0"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > @nest-lab/throttler-storage-redis@1.2.0 > @nestjs/core@11.1.28 > @nestjs/platform-express@11.1.28 > multer@2.2.0"
+      ]
+    },
+    {
+      "module": "multer",
+      "title": "multer vulnerable to Denial of Service via file descriptor leak on aborted uploads",
+      "severity": "high",
+      "vulnerableVersions": "=2.2.0",
+      "patchedVersions": ">=2.3.0",
+      "url": "https://github.com/advisories/GHSA-qfvm-cv95-jqjf",
+      "installedVersions": [
+        "2.2.0"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > @nest-lab/throttler-storage-redis@1.2.0 > @nestjs/core@11.1.28 > @nestjs/platform-express@11.1.28 > multer@2.2.0"
+      ]
+    },
+    {
+      "module": "multer",
+      "title": "multer vulnerable to file size limit bypass via async fileFilter race condition",
+      "severity": "low",
+      "vulnerableVersions": "<2.3.0",
+      "patchedVersions": ">=2.3.0",
+      "url": "https://github.com/advisories/GHSA-qvfw-j98x-7q72",
+      "installedVersions": [
+        "2.2.0"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > @nest-lab/throttler-storage-redis@1.2.0 > @nestjs/core@11.1.28 > @nestjs/platform-express@11.1.28 > multer@2.2.0"
+      ]
+    },
+    {
+      "module": "multer",
+      "title": "multer vulnerable to Denial of Service via oversized array index in field names",
+      "severity": "high",
+      "vulnerableVersions": "<2.3.0",
+      "patchedVersions": ">=2.3.0",
+      "url": "https://github.com/advisories/GHSA-535w-7cp7-47q4",
+      "installedVersions": [
+        "2.2.0"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > @nest-lab/throttler-storage-redis@1.2.0 > @nestjs/core@11.1.28 > @nestjs/platform-express@11.1.28 > multer@2.2.0"
+      ]
+    },
+    {
+      "module": "multer",
+      "title": "multer vulnerable to Denial of Service via orphaned disk writes on aborted uploads",
+      "severity": "moderate",
+      "vulnerableVersions": ">=2.2.0 <2.4.0",
+      "patchedVersions": ">=2.4.0",
+      "url": "https://github.com/advisories/GHSA-3pph-fpjx-jg34",
+      "installedVersions": [
+        "2.2.0"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > @nest-lab/throttler-storage-redis@1.2.0 > @nestjs/core@11.1.28 > @nestjs/platform-express@11.1.28 > multer@2.2.0"
+      ]
+    },
+    {
+      "module": "js-yaml",
+      "title": "js-yaml: maxTotalMergeKeys does not limit CPU use for empty merge sources",
+      "severity": "moderate",
+      "vulnerableVersions": ">=5.0.0 <=5.4.0",
+      "patchedVersions": ">=5.4.1",
+      "url": "https://github.com/advisories/GHSA-r3ph-w7gj-g6xm",
+      "installedVersions": [
+        "5.2.1"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > @nestjs/swagger@11.4.6 > js-yaml@5.2.1"
+      ]
+    },
+    {
+      "module": "brace-expansion",
+      "title": "brace-expansion: Quadratic-time expansion of the `{a},b}` rewrite causes CPU denial of service",
+      "severity": "moderate",
+      "vulnerableVersions": "<1.1.21",
+      "patchedVersions": ">=1.1.21",
+      "url": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "installedVersions": [
+        "1.1.16"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > exceljs@4.4.0 > archiver@5.3.2 > archiver-utils@2.1.0 > glob@7.2.3 > minimatch@3.1.5 > brace-expansion@1.1.16"
+      ]
+    },
+    {
+      "module": "brace-expansion",
+      "title": "brace-expansion: Quadratic-time expansion of the `{a},b}` rewrite causes CPU denial of service",
+      "severity": "moderate",
+      "vulnerableVersions": ">=2.0.0 <2.1.7",
+      "patchedVersions": ">=2.1.7",
+      "url": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "installedVersions": [
+        "2.1.2"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > exceljs@4.4.0 > archiver@5.3.2 > readdir-glob@1.1.3 > minimatch@5.1.9 > brace-expansion@2.1.2"
+      ]
+    },
+    {
+      "module": "brace-expansion",
+      "title": "brace-expansion: DoS via uncontrolled recursion on nested brace groups causing stack exhaustion",
+      "severity": "high",
+      "vulnerableVersions": "<1.1.20",
+      "patchedVersions": ">=1.1.20",
+      "url": "https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+      "installedVersions": [
+        "1.1.16"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > exceljs@4.4.0 > archiver@5.3.2 > archiver-utils@2.1.0 > glob@7.2.3 > minimatch@3.1.5 > brace-expansion@1.1.16"
+      ]
+    },
+    {
+      "module": "brace-expansion",
+      "title": "brace-expansion: DoS via uncontrolled recursion on nested brace groups causing stack exhaustion",
+      "severity": "high",
+      "vulnerableVersions": ">=2.0.0 <2.1.6",
+      "patchedVersions": ">=2.1.6",
+      "url": "https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+      "installedVersions": [
+        "2.1.2"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > exceljs@4.4.0 > archiver@5.3.2 > readdir-glob@1.1.3 > minimatch@5.1.9 > brace-expansion@2.1.2"
+      ]
+    },
+    {
+      "module": "brace-expansion",
+      "title": "brace-expansion: DoS via uncontrolled recursion in parseCommaParts causing stack exhaustion",
+      "severity": "high",
+      "vulnerableVersions": "<1.1.19",
+      "patchedVersions": ">=1.1.19",
+      "url": "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+      "installedVersions": [
+        "1.1.16"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > exceljs@4.4.0 > archiver@5.3.2 > archiver-utils@2.1.0 > glob@7.2.3 > minimatch@3.1.5 > brace-expansion@1.1.16"
+      ]
+    },
+    {
+      "module": "brace-expansion",
+      "title": "brace-expansion: DoS via uncontrolled recursion in parseCommaParts causing stack exhaustion",
+      "severity": "high",
+      "vulnerableVersions": ">=2.0.0 <2.1.5",
+      "patchedVersions": ">=2.1.5",
+      "url": "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+      "installedVersions": [
+        "2.1.2"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > exceljs@4.4.0 > archiver@5.3.2 > readdir-glob@1.1.3 > minimatch@5.1.9 > brace-expansion@2.1.2"
+      ]
+    },
+    {
+      "module": "engine.io",
+      "title": "Socket.IO: Engine.IO Protocol Revision Mismatch DoS",
+      "severity": "high",
+      "vulnerableVersions": ">=6.6.0 <6.6.10",
+      "patchedVersions": ">=6.6.10",
+      "url": "https://github.com/advisories/GHSA-2gc4-cqfq-p2gv",
+      "installedVersions": [
+        "6.6.9"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > @nest-lab/throttler-storage-redis@1.2.0 > @nestjs/core@11.1.28 > @nestjs/websockets@11.1.28 > @nestjs/platform-socket.io@11.1.28 > socket.io@4.8.3 > engine.io@6.6.9"
+      ]
+    },
+    {
+      "module": "braces",
+      "title": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns",
+      "severity": "high",
+      "vulnerableVersions": "<=3.0.3",
+      "patchedVersions": "<0.0.0",
+      "url": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+      "installedVersions": [
+        "3.0.3"
+      ],
+      "exampleDependencyPaths": [
+        "apps/web > tailwindcss-animate@1.0.7 > tailwindcss@3.4.19 > chokidar@3.6.0 > braces@3.0.3"
+      ]
+    },
+    {
+      "module": "source-map-js",
+      "title": "source-map-js allows event-loop denial of service through indexed source-map section offsets",
+      "severity": "high",
+      "vulnerableVersions": ">=1.0.0 <1.2.2",
+      "patchedVersions": ">=1.2.2",
+      "url": "https://github.com/advisories/GHSA-68fv-2mgg-jv7q",
+      "installedVersions": [
+        "1.2.1"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20 > postcss@8.4.31 > source-map-js@1.2.1"
+      ]
+    },
+    {
+      "module": "proxy-addr",
+      "title": "proxy-addr vulnerable to IP spoofing via IPv4-mapped IPv6 trust subnet",
+      "severity": "critical",
+      "vulnerableVersions": ">=1.1.0 <2.0.8",
+      "patchedVersions": ">=2.0.8",
+      "url": "https://github.com/advisories/GHSA-jqcg-44mw-7w3h",
+      "installedVersions": [
+        "2.0.7"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > @nest-lab/throttler-storage-redis@1.2.0 > @nestjs/core@11.1.28 > @nestjs/platform-express@11.1.28 > express@5.2.1 > proxy-addr@2.0.7"
+      ]
+    },
+    {
+      "module": "postcss-selector-parser",
+      "title": "PostCSS: Quadratic complexity in flat selector parsing allows CPU exhaustion",
+      "severity": "moderate",
+      "vulnerableVersions": "<7.1.6",
+      "patchedVersions": ">=7.1.6",
+      "url": "https://github.com/advisories/GHSA-rj75-hqrm-r3gf",
+      "installedVersions": [
+        "6.1.4"
+      ],
+      "exampleDependencyPaths": [
+        "apps/web > tailwindcss-animate@1.0.7 > tailwindcss@3.4.19 > postcss-nested@6.2.0 > postcss-selector-parser@6.1.4"
+      ]
+    },
+    {
+      "module": "sharp",
+      "title": "sharp : Vulnerability in librsvg dependency CVE-2026-96889",
+      "severity": "high",
+      "vulnerableVersions": "<0.35.5",
+      "patchedVersions": ">=0.35.5",
+      "url": "https://github.com/advisories/GHSA-wq5f-xc86-pv6w",
+      "installedVersions": [
+        "0.33.5",
+        "0.34.5"
+      ],
+      "exampleDependencyPaths": [
+        "apps/api > sharp@0.33.5",
+        "apps/display > next@15.5.20 > sharp@0.34.5"
+      ]
+    },
+    {
+      "module": "next",
+      "title": "Next.js has cache poisoning of SSG and ISR pages in self-hosted applications",
+      "severity": "moderate",
+      "vulnerableVersions": ">=15.0.0 <15.5.27",
+      "patchedVersions": ">=15.5.27",
+      "url": "https://github.com/advisories/GHSA-4jqv-mc3x-m676",
+      "installedVersions": [
+        "15.5.20"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20"
+      ]
+    },
+    {
+      "module": "next",
+      "title": "Next.js has cache poisoning in SSG/ISR rendering that leads to cross-user content substitution and persistent denial of service",
+      "severity": "moderate",
+      "vulnerableVersions": ">=15.0.0 <15.5.27",
+      "patchedVersions": ">=15.5.27",
+      "url": "https://github.com/advisories/GHSA-mcj8-r9mp-w47p",
+      "installedVersions": [
+        "15.5.20"
+      ],
+      "exampleDependencyPaths": [
+        "apps/display > next@15.5.20"
+      ]
+    }
+  ]
+}

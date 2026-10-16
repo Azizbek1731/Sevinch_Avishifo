@@ -187,3 +187,11 @@ export function useExportXlsx(
     onError,
   });
 }
+
+export function useLabReferralReport(filters: ReportFilters, doctorUserId?: string) {
+  return useQuery({
+    queryKey: ['reports', 'lab-referrals', { ...filters, doctorUserId }],
+    queryFn: () => reportsApi.labReferrals(filters, doctorUserId),
+    refetchInterval: 30_000,
+  });
+}

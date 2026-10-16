@@ -20,6 +20,7 @@ import { ReceiptDocument } from './receipt-document';
 
 export interface ReceiptPrinterProps {
   invoiceId: string;
+  checkout?: boolean;
   /** Unique successful submission, including a subsequent partial payment. */
   requestId?: string;
   /** Close the preview after printing, cancelling, or using the manual fallback. */
@@ -27,7 +28,12 @@ export interface ReceiptPrinterProps {
 }
 
 /** Keep this outside the payment dialog: a settled invoice leaves the queue. */
-export function ReceiptPrinter({ invoiceId, requestId, onPrinted }: ReceiptPrinterProps) {
+export function ReceiptPrinter({
+  invoiceId,
+  requestId,
+  onPrinted,
+  checkout = false,
+}: ReceiptPrinterProps) {
   const t = useTranslations('billing');
   const tc = useTranslations('common');
   const [mountId] = useState(() => crypto.randomUUID());
@@ -38,8 +44,10 @@ export function ReceiptPrinter({ invoiceId, requestId, onPrinted }: ReceiptPrint
   const { data, isError, isFetching, refetch } = useQuery({
     // A receipt changes after partial payments, reversals and refunds. A unique
     // submission key prevents the previous payment's cached slip being printed.
-    queryKey: ['receipt', invoiceId, printRequestId],
-    queryFn: async () => (await billingApi.getReceipt(invoiceId)).data,
+    queryKey: ['receipt', checkout ? 'checkout' : 'invoice', invoiceId, printRequestId],
+    queryFn: async () =>
+      (await (checkout ? billingApi.checkoutReceipt(invoiceId) : billingApi.getReceipt(invoiceId)))
+        .data,
     refetchOnWindowFocus: false,
     retry: 1,
   });

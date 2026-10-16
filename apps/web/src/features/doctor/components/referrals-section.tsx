@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from '@/i18n/routing';
+import { labApi } from '@/features/lab/api';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocale, useTranslations } from 'next-intl';
@@ -47,10 +50,17 @@ export function ReferralsSection({
   const [selectedTests, setSelectedTests] = useState<string[]>([]);
   const [testsOpen, setTestsOpen] = useState(false);
   const [labError, setLabError] = useState(false);
+  const [testSearch, setTestSearch] = useState('');
+  const orders = useQuery({
+    queryKey: ['lab-orders', { visitId, includeUnpaid: true }],
+    queryFn: () => labApi.listOrders({ visitId, includeUnpaid: true, limit: 100 }),
+    select: (response) => response.data,
+    refetchInterval: 10_000,
+  });
 
   const form = useForm<AddReferralInput>({
     resolver: zodResolver(addReferralSchema),
-    defaultValues: { type: ReferralType.SPECIALIST, targetSpecialty: '', note: '' },
+    defaultValues: { type: ReferralType.LAB, note: '' },
   });
   const dirty = form.formState.isDirty;
   useEffect(() => {
@@ -58,7 +68,11 @@ export function ReferralsSection({
   }, [dirty, selectedTests.length, addReferral.isPending, onUnsavedChange]);
   const type = form.watch('type');
 
-  const { data: labTests } = useLabTests(type === ReferralType.LAB);
+  const {
+    data: labTests,
+    isLoading: testsLoading,
+    isError: testsError,
+  } = useLabTests(type === ReferralType.LAB, testSearch);
 
   const toggleTest = (id: string) => {
     setSelectedTests((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -84,7 +98,9 @@ export function ReferralsSection({
       },
       {
         onSuccess: () => {
-          form.reset({ type: ReferralType.SPECIALIST, targetSpecialty: '', note: '' });
+          form.reset({ type: ReferralType.LAB, note: '' });
+          setTestSearch('');
+          setTestsOpen(false);
           setSelectedTests([]);
         },
       },
@@ -97,6 +113,9 @@ export function ReferralsSection({
         <CardTitle className="text-lg">{t('referrals')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <p className="rounded-lg bg-primary/5 p-3 text-sm text-muted-foreground">
+          {t('labReferral.workflow')}
+        </p>
         {!disabled ? (
           <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
             <div className="space-y-1.5">
@@ -105,6 +124,7 @@ export function ReferralsSection({
                 value={type}
                 onValueChange={(v) => {
                   form.setValue('type', v as ReferralType);
+                  if (v === ReferralType.LAB) form.unregister('targetSpecialty');
                   setLabError(false);
                 }}
               >
@@ -135,31 +155,60 @@ export function ReferralsSection({
                 <Label>{t('labTests')}</Label>
                 <Popover open={testsOpen} onOpenChange={setTestsOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-56 justify-between font-normal">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={addReferral.isPending}
+                      className="w-64 justify-between font-normal"
+                    >
                       {selectedTests.length > 0
                         ? t('labTestsSelected', { count: selectedTests.length })
                         : tCommon('select')}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="max-h-72 w-72 overflow-auto p-2" align="start">
-                    {(labTests ?? [])
-                      .filter((test) => test.isActive)
-                      .map((test) => (
-                        <label
-                          key={test.id}
-                          className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-                        >
-                          <Checkbox
-                            checked={selectedTests.includes(test.id)}
-                            onCheckedChange={() => toggleTest(test.id)}
-                          />
-                          <span className="truncate">
-                            {labTestName(test, locale)}{' '}
-                            <span className="text-muted-foreground">{test.code}</span>
-                          </span>
-                        </label>
-                      ))}
+                  <PopoverContent className="w-[min(28rem,90vw)] p-2" align="start">
+                    <Input
+                      value={testSearch}
+                      onChange={(event) => setTestSearch(event.target.value)}
+                      placeholder={t('labReferral.search')}
+                      className="mb-2"
+                    />
+                    <div
+                      className="max-h-64 overflow-y-auto"
+                      onWheel={(event) => event.stopPropagation()}
+                    >
+                      {testsLoading ? (
+                        <p className="p-2 text-sm text-muted-foreground">
+                          {t('labReferral.loading')}
+                        </p>
+                      ) : null}
+                      {testsError ? (
+                        <p className="p-2 text-sm text-destructive">{t('labReferral.loadError')}</p>
+                      ) : null}
+                      {!testsLoading && !testsError && labTests?.length === 0 ? (
+                        <p className="p-2 text-sm text-muted-foreground">
+                          {t('labReferral.noTests')}
+                        </p>
+                      ) : null}
+                      {(labTests ?? [])
+                        .filter((test) => test.isActive)
+                        .map((test) => (
+                          <label
+                            key={test.id}
+                            className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                          >
+                            <Checkbox
+                              checked={selectedTests.includes(test.id)}
+                              onCheckedChange={() => toggleTest(test.id)}
+                            />
+                            <span className="min-w-0 whitespace-normal">
+                              {labTestName(test, locale)}{' '}
+                              <span className="text-muted-foreground">{test.code}</span>
+                            </span>
+                          </label>
+                        ))}
+                    </div>
                   </PopoverContent>
                 </Popover>
                 {labError ? (
@@ -173,7 +222,7 @@ export function ReferralsSection({
               <Input id="ref-note" {...form.register('note')} />
             </div>
             <Button type="submit" disabled={addReferral.isPending}>
-              {t('sendReferral')}
+              {type === ReferralType.LAB ? t('labReferral.sendToCashier') : t('sendReferral')}
             </Button>
           </form>
         ) : null}
@@ -196,6 +245,50 @@ export function ReferralsSection({
                       ? (ref.targetSpecialty ?? '—')
                       : t('labOrderCreated')}
                   </p>
+                  {ref.labOrderId
+                    ? (() => {
+                        const order = orders.data?.find((item) => item.id === ref.labOrderId);
+                        return (
+                          <div className="mt-2 space-y-2">
+                            {order ? (
+                              <p className="text-sm">
+                                {order.tests
+                                  .map((test) => test.name[locale] ?? test.name.uz ?? test.code)
+                                  .join(', ')}
+                              </p>
+                            ) : null}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {order ? (
+                                <Badge
+                                  variant={
+                                    order.status === 'APPROVED' || order.status === 'DELIVERED'
+                                      ? 'default'
+                                      : 'outline'
+                                  }
+                                >
+                                  {order.status === 'CANCELLED'
+                                    ? t('labReferral.cancelled')
+                                    : !order.canWork
+                                      ? t('labReferral.waitingPayment')
+                                      : order.status === 'APPROVED' || order.status === 'DELIVERED'
+                                        ? t('labReferral.ready')
+                                        : t('labReferral.inLab')}
+                                </Badge>
+                              ) : null}
+                              <Button asChild variant="outline" size="sm">
+                                <Link
+                                  href={`/lab/${ref.labOrderId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {t('labReferral.openResults')}
+                                </Link>
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    : null}
                   {ref.note ? (
                     <p className="truncate text-xs text-muted-foreground">{ref.note}</p>
                   ) : null}

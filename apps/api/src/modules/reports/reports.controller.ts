@@ -1,3 +1,4 @@
+import { LabReferralReportService } from './lab-referral-report.service';
 import { Controller, Get, Query, StreamableFile } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '@avishifo/shared';
@@ -6,16 +7,39 @@ import { ConsumablesService } from './consumables.service';
 import { CashflowService } from './cashflow.service';
 import { ReportsService } from './reports.service';
 import { XLSX_MIME_TYPE, type SheetSpec } from './xlsx.service';
-import { CashflowQueryDto, ConsumablesQueryDto, DashboardQueryDto, ReportRangeQueryDto, RevenueQueryDto } from './dto';
+import {
+  LabReferralReportQueryDto,
+  CashflowQueryDto,
+  ConsumablesQueryDto,
+  DashboardQueryDto,
+  ReportRangeQueryDto,
+  RevenueQueryDto,
+} from './dto';
 
 @ApiTags('reports')
 @Controller('reports')
 export class ReportsController {
   constructor(
     private readonly reports: ReportsService,
+    private readonly labReferrals: LabReferralReportService,
     private readonly cashflow: CashflowService,
     private readonly consumables: ConsumablesService,
   ) {}
+
+  @Get('lab-referrals')
+  // Lab staff and report readers may view this; the service enforces either permission.
+  async labReferralReport(
+    @Query() query: LabReferralReportQueryDto,
+    @CurrentUser() user: AuthUser,
+    @ActiveBranch() branchId: string,
+  ) {
+    const report = await this.labReferrals.report(query, user, branchId);
+    if (query.export !== 'xlsx') return report;
+    return new StreamableFile(await this.labReferrals.export(report, user), {
+      type: XLSX_MIME_TYPE,
+      disposition: `attachment; filename="lab-referrals_${query.from}_${query.to}.xlsx"`,
+    });
+  }
 
   @Get('consumables')
   @RequirePermissions('reports.cash.read')

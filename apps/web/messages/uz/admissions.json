@@ -127,5 +127,23 @@
     "cancelled": "Xarajat bekor qilingan",
     "legacy": "Avvalgi tayinlov — hisoblar Xarajatlar va hisob bo‘limida.",
     "stopHint": "Tayinlov jadvali to‘xtatiladi. Kassaga yuborilgan hisob o‘zgarmaydi; summani tuzatish kerak bo‘lsa, hisob orqali bekor qilish yoki qaytarish rasmiylashtiriladi."
+  },
+  "roomBilling": {
+    "title": "Palata hisobi",
+    "dailyRate": "Palataning bir kunlik narxi",
+    "rule": "Har yangi kun uchun hisoblanadi (Toshkent vaqti). Yotqizilgan va chiqarilgan kunlar ham kiradi.",
+    "zeroHint": "Bepul palata uchun 0 kiriting.",
+    "invalidRate": "Noldan kam bo‘lmagan narx kiriting.",
+    "save": "Narxni saqlash",
+    "saved": "Palata narxi saqlandi",
+    "currency": "so‘m",
+    "total": "Jami · {days} kun",
+    "enableHint": "Narx bugundan hisoblanadi. Oldingi kunlarga avtomatik hisob yozilmaydi.",
+    "editHint": "Yangi narx {date} sanasidan qo‘llanadi. Avvalgi kunlarning hisobi o‘zgarmaydi.",
+    "breakdown": "Kunlar bo‘yicha hisob",
+    "date": "Sana",
+    "place": "Palata / o‘rin",
+    "amount": "Summa",
+    "cancelled": "Bekor qilingan"
   }
 }

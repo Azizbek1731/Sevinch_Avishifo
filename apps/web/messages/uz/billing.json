@@ -198,5 +198,22 @@
     "pagination": "{page} / {pages} sahifa · {total} ta hisob",
     "previous": "Oldingi sahifa",
     "next": "Keyingi sahifa"
+  },
+  "checkout": {
+    "title": "Bemor uchun yagona to‘lov",
+    "description": "To‘lanadigan xizmatlarni tanlang. Tanlangan hisoblarning qoldig‘i bir martada to‘lanadi va bitta chek chiqadi.",
+    "queueDescription": "Har bir bemorning xizmatlari birga ko‘rsatiladi. Keraklilarini yoki barchasini tanlab to‘lang.",
+    "selectAll": "Barchasini tanlash",
+    "selected": "{count} ta hisob tanlandi",
+    "invoiceCount": "{count} ta hisob",
+    "selectInvoice": "{number} hisobini tanlash",
+    "total": "To‘lanadigan jami",
+    "previouslyPaid": "Avval to‘langan",
+    "paidNow": "Hozir to‘langan",
+    "payAndPrint": "To‘lash va chek chiqarish",
+    "empty": "To‘lov kutilayotgan xizmat yo‘q.",
+    "limit": "Bir to‘lovda 100 tagacha hisob tanlash mumkin.",
+    "recoveryHint": "To‘lov javobi olinmadi. Oldingi to‘lovni tekshirish va chekni olish uchun qayta urinib ko‘ring. Shu so‘rov takroriy to‘lov yaratmaydi.",
+    "recoverReceipt": "To‘lovni tekshirish va chekni olish"
   }
 }

@@ -33,12 +33,14 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   // so every admission query ran unscoped and one clinic's owner could read
   // another clinic's inpatients, rounds and charges.
   'Admission',
+  'AdmissionRoomCharge',
   'AdmissionDailyNote',
   'TreatmentOrder',
   'TreatmentAdministration',
   'ChargeItem',
   'SurgeryCase',
   'SurgeryEntry',
+  'SurgeryStaffFee',
   'SurgeryPayout',
   'Referral',
   'VisitTemplate',
@@ -52,6 +54,7 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'Invoice',
   'InvoiceLine',
   'Payment',
+  'PaymentCheckout',
   'Refund',
   'PatientBalanceTransaction',
   'CashierShift',

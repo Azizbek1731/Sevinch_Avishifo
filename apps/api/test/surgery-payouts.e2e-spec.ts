@@ -201,10 +201,17 @@ describe('surgeon payouts backed by the cashier ledger', () => {
   });
 
   it('bills the fee once, preserves payment notes, and does not accrue a second monthly commission', async () => {
-    const bill = await post('/charges/invoice', reception).send({ chargeIds: [feeChargeId] });
-    expect(bill.status).toBe(201);
-    const invoiceId = bill.body.data.id as string;
-    expect(bill.body.data.lines[0].performerUserId).toBe(clinic.doctor.id);
+    // Surgery scheduling already issues its fee. The cashier pays that invoice;
+    // requesting another one must not duplicate the patient charge.
+    expect(
+      (await post('/charges/invoice', reception).send({ chargeIds: [feeChargeId] })).status,
+    ).toBe(409);
+    const charge = await prisma.chargeItem.findUniqueOrThrow({ where: { id: feeChargeId } });
+    const line = await prisma.invoiceLine.findUniqueOrThrow({
+      where: { id: charge.invoiceLineId! },
+    });
+    const invoiceId = line.invoiceId;
+    expect(line.performerUserId).toBe(clinic.doctor.id);
     const paid = await post(`/invoices/${invoiceId}/payments`).send({
       method: 'CARD',
       amount: '333.33',

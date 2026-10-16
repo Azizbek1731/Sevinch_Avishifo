@@ -198,5 +198,18 @@
       ]
     },
     "combineGroupHint": "Ushbu guruhdagi {count} ta dori oldingi aralashmaga qo‘shiladi. Yuborish ko‘rsatmalari oldingi aralashmadan olinadi; bu guruhning alohida ko‘rsatmalari tozalanadi."
+  },
+  "labReferral": {
+    "workflow": "Tahlillarni tanlab kassaga yuboring. To‘lovdan keyin laboratoriya ish boshlaydi, tasdiqlangan natijalar shu bemorning tarixida ko‘rinadi.",
+    "search": "Tahlil nomi yoki kodi bo‘yicha qidirish",
+    "loading": "Tahlillar yuklanmoqda…",
+    "loadError": "Tahlillarni yuklab bo‘lmadi.",
+    "noTests": "Tahlil topilmadi.",
+    "sendToCashier": "Kassaga yuborish",
+    "cancelled": "Bekor qilingan",
+    "waitingPayment": "To‘lov kutilmoqda",
+    "ready": "Natijalar tayyor",
+    "inLab": "Laboratoriyada",
+    "openResults": "Yo‘llanma va natijalar"
   }
 }

@@ -127,5 +127,23 @@
     "cancelled": "Charge cancelled",
     "legacy": "Legacy order — see invoices in Charges and billing.",
     "stopHint": "The treatment schedule will stop. Its cashier invoice will remain unchanged; use invoice cancellation or refund to adjust the amount."
+  },
+  "roomBilling": {
+    "title": "Room charges",
+    "dailyRate": "Daily room rate",
+    "rule": "Charged per new calendar date in Tashkent time, including admission and discharge dates.",
+    "zeroHint": "Enter 0 for a free room.",
+    "invalidRate": "Enter a non-negative amount.",
+    "save": "Save rate",
+    "saved": "Room rate saved",
+    "currency": "UZS",
+    "total": "Total · {days} days",
+    "enableHint": "Billing starts today. Previous days are not charged automatically.",
+    "editHint": "The new rate applies from {date}. Earlier daily charges stay unchanged.",
+    "breakdown": "Daily breakdown",
+    "date": "Date",
+    "place": "Room / bed",
+    "amount": "Amount",
+    "cancelled": "Cancelled"
   }
 }

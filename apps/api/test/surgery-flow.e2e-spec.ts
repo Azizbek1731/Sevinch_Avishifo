@@ -1,8 +1,8 @@
-import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { INestApplication } from '@nestjs/common';
-import { PrismaClient, type ServiceKind } from '@prisma/client';
-import request from 'supertest';
+import { randomUUID } from "node:crypto";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { INestApplication } from "@nestjs/common";
+import { PrismaClient, type ServiceKind } from "@prisma/client";
+import request from "supertest";
 import {
   API,
   createApp,
@@ -11,9 +11,9 @@ import {
   uniquePhone,
   type LoginResult,
   type TestClinic,
-} from './setup';
+} from "./setup";
 
-describe('inpatient surgery workflow', () => {
+describe("inpatient surgery workflow", () => {
   let app: INestApplication;
   let prisma: PrismaClient;
   let clinic: TestClinic;
@@ -33,19 +33,19 @@ describe('inpatient surgery workflow', () => {
   let medicineServiceId: string;
   let procedureServiceId: string;
   let surgeryId: string;
-  const scheduledDate = '2026-10-13';
+  const scheduledDate = "2026-10-13";
   const req = (
-    method: 'get' | 'post' | 'delete',
+    method: "get" | "post" | "delete",
     path: string,
     user: LoginResult = reception,
     branch?: string,
   ) =>
     request(app.getHttpServer())
       [method](`${API}${path}`)
-      .set('Authorization', `Bearer ${user.accessToken}`)
-      .set('x-branch-id', branch ?? clinic.branchId);
+      .set("Authorization", `Bearer ${user.accessToken}`)
+      .set("x-branch-id", branch ?? clinic.branchId);
   const create = async (overrides: Record<string, unknown> = {}) => {
-    const result = await req('post', '/surgeries').send({
+    const result = await req("post", "/surgeries").send({
       admissionId,
       serviceId: surgeryServiceId,
       surgeonUserId: clinic.doctor.id,
@@ -57,22 +57,24 @@ describe('inpatient surgery workflow', () => {
     return result.body.data as { id: string; serviceCharge: { id: string } };
   };
   const manualEntry = (id: string) =>
-    req('post', `/surgeries/${id}/entries`, room).send({
+    req("post", `/surgeries/${id}/entries`, room).send({
       idempotencyKey: randomUUID(),
       items: [
         {
-          kind: 'MATERIAL',
-          title: 'Qo‘shimcha material',
-          quantity: '1.500',
-          unit: 'dona',
-          unitPrice: '20',
+          kind: "MATERIAL",
+          title: "Qo‘shimcha material",
+          quantity: "1.500",
+          unit: "dona",
+          unitPrice: "20",
         },
       ],
     });
 
   const invoiceForCharge = async (chargeId: string) => {
-    const charge = await prisma.chargeItem.findUniqueOrThrow({ where: { id: chargeId } });
-    expect(charge.status).toBe('INVOICED');
+    const charge = await prisma.chargeItem.findUniqueOrThrow({
+      where: { id: chargeId },
+    });
+    expect(charge.status).toBe("INVOICED");
     expect(charge.invoiceLineId).toBeTruthy();
     const line = await prisma.invoiceLine.findUniqueOrThrow({
       where: { id: charge.invoiceLineId! },
@@ -81,19 +83,34 @@ describe('inpatient surgery workflow', () => {
     return { charge, line, invoice: line.invoice };
   };
   const pendingInvoices = async () => {
-    const response = await req('get', `/invoices?pending=true&patientId=${patientId}`, cashier);
+    const response = await req(
+      "get",
+      `/invoices?pending=true&patientId=${patientId}`,
+      cashier,
+    );
     expect(response.status, JSON.stringify(response.body)).toBe(200);
-    return response.body.data as Array<{ id: string; total: string; due: string; status: string }>;
+    return response.body.data as Array<{
+      id: string;
+      total: string;
+      due: string;
+      status: string;
+    }>;
   };
 
   beforeAll(async () => {
-    const database = new URL(process.env.DATABASE_URL ?? '').pathname;
-    if (database !== '/avishifo_finance_migration' || process.env.TELEGRAM_ENABLED !== 'false')
-      throw new Error('Use an isolated test database');
+    const database = new URL(process.env.DATABASE_URL ?? "").pathname;
+    if (
+      database !== "/avishifo_finance_migration" ||
+      process.env.TELEGRAM_ENABLED !== "false"
+    )
+      throw new Error("Use an isolated test database");
     prisma = new PrismaClient();
     app = await createApp([]);
     clinic = await createTestClinic(prisma, `surgery-${Date.now()}`);
-    foreignClinic = await createTestClinic(prisma, `surgery-other-${Date.now()}`);
+    foreignClinic = await createTestClinic(
+      prisma,
+      `surgery-other-${Date.now()}`,
+    );
     const credentials = await prisma.user.findUniqueOrThrow({
       where: { id: clinic.doctor.id },
       select: { passwordHash: true },
@@ -101,32 +118,40 @@ describe('inpatient surgery workflow', () => {
     const operating = await prisma.user.create({
       data: {
         clinicId: clinic.clinicId,
-        fullName: 'Operatsiya xonasi',
+        fullName: "Operatsiya xonasi",
         email: `room-${clinic.tag}@e2e.avishifo.test`,
         phone: uniquePhone(),
         passwordHash: credentials.passwordHash,
-        role: 'OPERATING_ROOM',
+        role: "OPERATING_ROOM",
       },
     });
     await prisma.userBranch.create({
-      data: { clinicId: clinic.clinicId, branchId: clinic.branchId, userId: operating.id },
+      data: {
+        clinicId: clinic.clinicId,
+        branchId: clinic.branchId,
+        userId: operating.id,
+      },
     });
     const otherBranch = await prisma.branch.create({
-      data: { clinicId: clinic.clinicId, name: 'Other surgery branch' },
+      data: { clinicId: clinic.clinicId, name: "Other surgery branch" },
     });
     otherBranchId = otherBranch.id;
     const otherDoctor = await prisma.user.create({
       data: {
         clinicId: clinic.clinicId,
-        fullName: 'Other branch doctor',
+        fullName: "Other branch doctor",
         email: `surgeon-other-${clinic.tag}@e2e.avishifo.test`,
         passwordHash: credentials.passwordHash,
-        role: 'DOCTOR',
+        role: "DOCTOR",
       },
     });
     otherDoctorId = otherDoctor.id;
     await prisma.userBranch.create({
-      data: { clinicId: clinic.clinicId, branchId: otherBranchId, userId: otherDoctor.id },
+      data: {
+        clinicId: clinic.clinicId,
+        branchId: otherBranchId,
+        userId: otherDoctor.id,
+      },
     });
     reception = await login(app, clinic.receptionist.email);
     room = await login(app, operating.email!);
@@ -134,17 +159,25 @@ describe('inpatient surgery workflow', () => {
     doctor = await login(app, clinic.doctor.email);
     cashier = await login(app, clinic.cashier.email);
     foreignOwner = await login(app, foreignClinic.owner.email);
-    const patient = await req('post', '/patients').send({
-      firstName: 'Operatsiya',
-      lastName: 'Sinov',
+    const patient = await req("post", "/patients").send({
+      firstName: "Operatsiya",
+      lastName: "Sinov",
       phone: uniquePhone(),
     });
     expect(patient.status).toBe(201);
     patientId = patient.body.data.id as string;
-    const admission = await req('post', '/admissions').send({ patientId, ward: 'A-2', bed: '3' });
+    const admission = await req("post", "/admissions").send({
+      patientId,
+      ward: "A-2",
+      bed: "3",
+    });
     expect(admission.status).toBe(201);
     admissionId = admission.body.data.id as string;
-    const catalogue = async (kind: ServiceKind, price: string, unit = 'dona') => {
+    const catalogue = async (
+      kind: ServiceKind,
+      price: string,
+      unit = "dona",
+    ) => {
       const category = await prisma.serviceCategory.create({
         data: { clinicId: clinic.clinicId, name: kind, kind },
       });
@@ -156,43 +189,48 @@ describe('inpatient surgery workflow', () => {
           name: { uz: `${kind} sinov` },
           unit,
           prices: {
-            create: { clinicId: clinic.clinicId, price, effectiveFrom: new Date('2020-01-01') },
+            create: {
+              clinicId: clinic.clinicId,
+              price,
+              effectiveFrom: new Date("2020-01-01"),
+            },
           },
         },
       });
     };
-    surgeryServiceId = (await catalogue('SURGERY', '2500')).id;
+    surgeryServiceId = (await catalogue("SURGERY", "2500")).id;
     await prisma.servicePrice.create({
       data: {
         clinicId: clinic.clinicId,
         branchId: clinic.branchId,
         serviceId: surgeryServiceId,
-        price: '2999.99',
-        effectiveFrom: new Date('2020-01-01'),
+        price: "2999.99",
+        effectiveFrom: new Date("2020-01-01"),
       },
     });
-    materialServiceId = (await catalogue('MATERIAL', '100.11', 'dona')).id;
-    medicineServiceId = (await catalogue('MEDICINE', '200.01', 'ml')).id;
-    procedureServiceId = (await catalogue('PROCEDURE', '5')).id;
+    materialServiceId = (await catalogue("MATERIAL", "100.11", "dona")).id;
+    medicineServiceId = (await catalogue("MEDICINE", "200.01", "ml")).id;
+    procedureServiceId = (await catalogue("PROCEDURE", "5")).id;
   });
   afterAll(async () => {
     await app?.close();
     await prisma?.$disconnect();
   });
 
-  it('rejects surgery services in ordinary ward orders and manual admission charges', async () => {
-    expect((await prisma.admission.findUniqueOrThrow({ where: { id: admissionId } })).status).toBe(
-      'ACTIVE',
-    );
-    const order = await req('post', `/admissions/${admissionId}/orders`).send({
+  it("rejects surgery services in ordinary ward orders and manual admission charges", async () => {
+    expect(
+      (await prisma.admission.findUniqueOrThrow({ where: { id: admissionId } }))
+        .status,
+    ).toBe("ACTIVE");
+    const order = await req("post", `/admissions/${admissionId}/orders`).send({
       serviceId: surgeryServiceId,
-      schedule: 'ONCE',
+      schedule: "ONCE",
       startDate: scheduledDate,
       timesPlanned: 1,
       timesPerDay: 1,
     });
     expect(order.status).toBe(400);
-    const charge = await req('post', '/charges').send({
+    const charge = await req("post", "/charges").send({
       patientId,
       admissionId,
       serviceId: surgeryServiceId,
@@ -200,11 +238,13 @@ describe('inpatient surgery workflow', () => {
       quantity: 1,
     });
     expect(charge.status).toBe(400);
-    expect(await prisma.treatmentOrder.count({ where: { admissionId } })).toBe(0);
+    expect(await prisma.treatmentOrder.count({ where: { admissionId } })).toBe(
+      0,
+    );
     expect(await prisma.chargeItem.count({ where: { admissionId } })).toBe(0);
   });
 
-  it('creates one priced fee for concurrent reception retries and rejects changed reuse', async () => {
+  it("creates one priced fee for concurrent reception retries and rejects changed reuse", async () => {
     const payload = {
       admissionId,
       serviceId: surgeryServiceId,
@@ -213,64 +253,87 @@ describe('inpatient surgery workflow', () => {
       idempotencyKey: randomUUID(),
     };
     const results = await Promise.all([
-      req('post', '/surgeries').send(payload),
-      req('post', '/surgeries').send(payload),
+      req("post", "/surgeries").send(payload),
+      req("post", "/surgeries").send(payload),
     ]);
-    for (const result of results) expect(result.status, JSON.stringify(result.body)).toBe(201);
+    for (const result of results)
+      expect(result.status, JSON.stringify(result.body)).toBe(201);
     surgeryId = results[0]!.body.data.id as string;
     expect(results[1]!.body.data.id).toBe(surgeryId);
     expect(results[0]!.body.data).toMatchObject({
-      feeAmount: '2999.99',
-      totalAmount: '2999.99',
-      status: 'PLANNED',
+      feeAmount: "2999.99",
+      totalAmount: "2999.99",
+      status: "PLANNED",
       patientId,
       admissionId,
     });
     expect(await prisma.chargeItem.count({ where: { surgeryId } })).toBe(1);
-    const fee = await invoiceForCharge(results[0]!.body.data.serviceCharge.id as string);
-    expect(fee.invoice).toMatchObject({ status: 'ISSUED', patientId, branchId: clinic.branchId });
-    expect(fee.invoice.total.toFixed(2)).toBe('2999.99');
+    const fee = await invoiceForCharge(
+      results[0]!.body.data.serviceCharge.id as string,
+    );
+    expect(fee.invoice).toMatchObject({
+      status: "ISSUED",
+      patientId,
+      branchId: clinic.branchId,
+    });
+    expect(fee.invoice.total.toFixed(2)).toBe("2999.99");
     expect(fee.line.performerUserId).toBe(clinic.doctor.id);
     expect(await prisma.invoice.count({ where: { patientId } })).toBe(1);
     expect(await pendingInvoices()).toContainEqual(
       expect.objectContaining({
         id: fee.invoice.id,
-        total: '2999.99',
-        due: '2999.99',
-        status: 'ISSUED',
+        total: "2999.99",
+        due: "2999.99",
+        status: "ISSUED",
       }),
     );
     expect(
       await prisma.surgeryCase.count({
-        where: { clinicId: clinic.clinicId, requestKey: payload.idempotencyKey },
+        where: {
+          clinicId: clinic.clinicId,
+          requestKey: payload.idempotencyKey,
+        },
       }),
     ).toBe(1);
     expect(
-      (await req('post', '/surgeries').send({ ...payload, scheduledDate: '2026-10-14' })).status,
+      (
+        await req("post", "/surgeries").send({
+          ...payload,
+          scheduledDate: "2026-10-14",
+        })
+      ).status,
     ).toBe(409);
   });
 
-  it('exposes minimal scoped selectors while preserving reception, room and cashier duties', async () => {
-    const doctors = await req('get', '/surgeries/doctors', room);
+  it("exposes minimal scoped selectors while preserving reception, room and cashier duties", async () => {
+    const doctors = await req("get", "/surgeries/doctors", room);
     expect(doctors.status).toBe(200);
-    expect(doctors.body.data).toEqual([expect.objectContaining({ id: clinic.doctor.id })]);
-    expect(Object.keys(doctors.body.data[0]).sort()).toEqual(['fullName', 'id', 'specialty']);
-    const admissions = await req('get', '/surgeries/admissions', room);
+    expect(doctors.body.data).toEqual([
+      expect.objectContaining({ id: clinic.doctor.id }),
+    ]);
+    expect(Object.keys(doctors.body.data[0]).sort()).toEqual([
+      "fullName",
+      "id",
+      "specialty",
+    ]);
+    const admissions = await req("get", "/surgeries/admissions", room);
     expect(admissions.body.data).toContainEqual(
-      expect.objectContaining({ id: admissionId, ward: 'A-2', bed: '3' }),
+      expect.objectContaining({ id: admissionId, ward: "A-2", bed: "3" }),
     );
-    expect((await req('get', '/patients', room)).status).toBe(403);
+    expect((await req("get", "/patients", room)).status).toBe(403);
     expect(
       (
-        await req('post', `/surgeries/${surgeryId}/entries`).send({
+        await req("post", `/surgeries/${surgeryId}/entries`).send({
           idempotencyKey: randomUUID(),
-          items: [{ kind: 'MATERIAL', serviceId: materialServiceId, quantity: '1' }],
+          items: [
+            { kind: "MATERIAL", serviceId: materialServiceId, quantity: "1" },
+          ],
         })
       ).status,
     ).toBe(403);
     expect(
       (
-        await req('post', '/surgeries', room).send({
+        await req("post", "/surgeries", room).send({
           admissionId,
           serviceId: surgeryServiceId,
           surgeonUserId: clinic.doctor.id,
@@ -281,60 +344,72 @@ describe('inpatient surgery workflow', () => {
     ).toBe(403);
     expect(
       (
-        await req('post', `/surgeries/${surgeryId}/entries`, cashier).send({
+        await req("post", `/surgeries/${surgeryId}/entries`, cashier).send({
           idempotencyKey: randomUUID(),
-          items: [{ kind: 'MATERIAL', serviceId: materialServiceId, quantity: '1' }],
+          items: [
+            { kind: "MATERIAL", serviceId: materialServiceId, quantity: "1" },
+          ],
         })
       ).status,
     ).toBe(403);
   });
 
-  it('records fractional use once with server catalogue prices and exact rounded charges', async () => {
+  it("records fractional use once with server catalogue prices and exact rounded charges", async () => {
     const payload = {
       idempotencyKey: randomUUID(),
       items: [
         {
-          kind: 'MATERIAL',
+          kind: "MATERIAL",
           serviceId: materialServiceId,
-          quantity: '1.125',
-          unitPrice: '0.01',
-          unit: 'wrong',
+          quantity: "1.125",
+          unitPrice: "0.01",
+          unit: "wrong",
         },
-        { kind: 'ANESTHESIA', serviceId: medicineServiceId, quantity: '0.333', unitPrice: '0.01' },
         {
-          kind: 'ANESTHESIA',
-          title: 'Qo‘shimcha anesteziya',
-          quantity: '0.500',
-          unit: 'ml',
-          unitPrice: '1.01',
+          kind: "ANESTHESIA",
+          serviceId: medicineServiceId,
+          quantity: "0.333",
+          unitPrice: "0.01",
+        },
+        {
+          kind: "ANESTHESIA",
+          title: "Qo‘shimcha anesteziya",
+          quantity: "0.500",
+          unit: "ml",
+          unitPrice: "1.01",
         },
       ],
     };
     const results = await Promise.all([
-      req('post', `/surgeries/${surgeryId}/entries`, room).send(payload),
-      req('post', `/surgeries/${surgeryId}/entries`, room).send(payload),
+      req("post", `/surgeries/${surgeryId}/entries`, room).send(payload),
+      req("post", `/surgeries/${surgeryId}/entries`, room).send(payload),
     ]);
-    for (const result of results) expect(result.status, JSON.stringify(result.body)).toBe(201);
+    for (const result of results)
+      expect(result.status, JSON.stringify(result.body)).toBe(201);
     expect(results[0]!.body.data).toMatchObject({
-      materialTotal: '112.62',
-      anesthesiaTotal: '67.11',
-      totalAmount: '3179.72',
+      materialTotal: "112.62",
+      anesthesiaTotal: "67.11",
+      totalAmount: "3179.72",
     });
     expect(results[0]!.body.data.entries).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          quantity: '1.125',
-          unit: 'dona',
-          unitPrice: '100.11',
-          lineTotal: '112.62',
+          quantity: "1.125",
+          unit: "dona",
+          unitPrice: "100.11",
+          lineTotal: "112.62",
         }),
         expect.objectContaining({
-          quantity: '0.333',
-          unit: 'ml',
-          unitPrice: '200.01',
-          lineTotal: '66.60',
+          quantity: "0.333",
+          unit: "ml",
+          unitPrice: "200.01",
+          lineTotal: "66.60",
         }),
-        expect.objectContaining({ quantity: '0.500', unit: 'ml', lineTotal: '0.51' }),
+        expect.objectContaining({
+          quantity: "0.500",
+          unit: "ml",
+          lineTotal: "0.51",
+        }),
       ]),
     );
     expect(await prisma.surgeryEntry.count({ where: { surgeryId } })).toBe(3);
@@ -343,49 +418,69 @@ describe('inpatient surgery workflow', () => {
       where: { surgeryId, serviceId: materialServiceId },
     });
     expect(charge.quantity).toBe(1);
-    expect(charge.unitPrice.toFixed(2)).toBe('112.62');
-    expect(charge.title).toEqual({ uz: 'MATERIAL sinov (1.125 dona)' });
+    expect(charge.unitPrice.toFixed(2)).toBe("112.62");
+    expect(charge.title).toEqual({ uz: "MATERIAL sinov (1.125 dona)" });
     const usage = await invoiceForCharge(charge.id);
-    expect(usage.invoice.total.toFixed(2)).toBe('179.73');
-    expect(await prisma.invoiceLine.count({ where: { invoiceId: usage.invoice.id } })).toBe(3);
+    expect(usage.invoice.total.toFixed(2)).toBe("179.73");
+    expect(
+      await prisma.invoiceLine.count({
+        where: { invoiceId: usage.invoice.id },
+      }),
+    ).toBe(3);
     expect(await prisma.invoice.count({ where: { patientId } })).toBe(2);
     expect(await pendingInvoices()).toContainEqual(
       expect.objectContaining({
         id: usage.invoice.id,
-        total: '179.73',
-        due: '179.73',
+        total: "179.73",
+        due: "179.73",
       }),
     );
     expect(
       (
-        await req('post', `/surgeries/${surgeryId}/entries`, room).send({
+        await req("post", `/surgeries/${surgeryId}/entries`, room).send({
           ...payload,
-          items: [{ ...payload.items[0], quantity: '2' }],
+          items: [{ ...payload.items[0], quantity: "2" }],
         })
       ).status,
     ).toBe(409);
   });
 
-  it('rejects invalid sources and rolls the whole usage batch back', async () => {
+  it("rejects invalid sources and rolls the whole usage batch back", async () => {
     const before = await prisma.surgeryEntry.count({ where: { surgeryId } });
     const invoiceCount = await prisma.invoice.count({ where: { patientId } });
-    const badBatch = await req('post', `/surgeries/${surgeryId}/entries`, room).send({
+    const badBatch = await req(
+      "post",
+      `/surgeries/${surgeryId}/entries`,
+      room,
+    ).send({
       idempotencyKey: randomUUID(),
       items: [
-        { kind: 'MATERIAL', title: 'Must rollback', quantity: '1', unit: 'dona', unitPrice: '10' },
-        { kind: 'ANESTHESIA', serviceId: materialServiceId, quantity: '1' },
+        {
+          kind: "MATERIAL",
+          title: "Must rollback",
+          quantity: "1",
+          unit: "dona",
+          unitPrice: "10",
+        },
+        { kind: "ANESTHESIA", serviceId: materialServiceId, quantity: "1" },
       ],
     });
     expect(badBatch.status).toBe(400);
-    expect(await prisma.surgeryEntry.count({ where: { surgeryId } })).toBe(before);
-    expect(await prisma.invoice.count({ where: { patientId } })).toBe(invoiceCount);
+    expect(await prisma.surgeryEntry.count({ where: { surgeryId } })).toBe(
+      before,
+    );
+    expect(await prisma.invoice.count({ where: { patientId } })).toBe(
+      invoiceCount,
+    );
     expect(await prisma.chargeItem.count({ where: { surgeryId } })).toBe(4);
-    for (const quantity of ['0', '-1', '1.0001']) {
+    for (const quantity of ["0", "-1", "1.0001"]) {
       expect(
         (
-          await req('post', `/surgeries/${surgeryId}/entries`, room).send({
+          await req("post", `/surgeries/${surgeryId}/entries`, room).send({
             idempotencyKey: randomUUID(),
-            items: [{ kind: 'MATERIAL', serviceId: materialServiceId, quantity }],
+            items: [
+              { kind: "MATERIAL", serviceId: materialServiceId, quantity },
+            ],
           })
         ).status,
       ).toBe(400);
@@ -394,11 +489,11 @@ describe('inpatient surgery workflow', () => {
       { surgeonUserId: foreignClinic.doctor.id },
       { surgeonUserId: otherDoctorId },
       { serviceId: procedureServiceId },
-      { scheduledDate: '2026-02-30' },
+      { scheduledDate: "2026-02-30" },
     ]) {
       expect(
         (
-          await req('post', '/surgeries').send({
+          await req("post", "/surgeries").send({
             admissionId,
             serviceId: surgeryServiceId,
             surgeonUserId: clinic.doctor.id,
@@ -411,23 +506,27 @@ describe('inpatient surgery workflow', () => {
     }
   });
 
-  it('rolls back a foreign third row and retries the corrected bulk request without duplicates', async () => {
+  it("rolls back a foreign third row and retries the corrected bulk request without duplicates", async () => {
     const surgery = await create();
     const foreignCategory = await prisma.serviceCategory.create({
-      data: { clinicId: foreignClinic.clinicId, name: 'Foreign medicine', kind: 'MEDICINE' },
+      data: {
+        clinicId: foreignClinic.clinicId,
+        name: "Foreign medicine",
+        kind: "MEDICINE",
+      },
     });
     const foreignMedicine = await prisma.service.create({
       data: {
         clinicId: foreignClinic.clinicId,
         categoryId: foreignCategory.id,
-        code: 'FOREIGN-BULK-MEDICINE',
-        name: { uz: 'Foreign medicine' },
-        unit: 'ml',
+        code: "FOREIGN-BULK-MEDICINE",
+        name: { uz: "Foreign medicine" },
+        unit: "ml",
         prices: {
           create: {
             clinicId: foreignClinic.clinicId,
-            price: '1',
-            effectiveFrom: new Date('2020-01-01'),
+            price: "1",
+            effectiveFrom: new Date("2020-01-01"),
           },
         },
       },
@@ -435,52 +534,86 @@ describe('inpatient surgery workflow', () => {
     const payload = {
       idempotencyKey: randomUUID(),
       items: [
-        { kind: 'MATERIAL', serviceId: materialServiceId, quantity: '0.125' },
+        { kind: "MATERIAL", serviceId: materialServiceId, quantity: "0.125" },
         {
-          kind: 'ANESTHESIA',
-          title: 'Bulk manual anesthesia',
-          quantity: '0.500',
-          unit: 'ml',
-          unitPrice: '10.01',
+          kind: "ANESTHESIA",
+          title: "Bulk manual anesthesia",
+          quantity: "0.500",
+          unit: "ml",
+          unitPrice: "10.01",
         },
-        { kind: 'ANESTHESIA', serviceId: foreignMedicine.id, quantity: '1.250' },
+        {
+          kind: "ANESTHESIA",
+          serviceId: foreignMedicine.id,
+          quantity: "1.250",
+        },
       ],
     };
-    const auditWhere = { clinicId: clinic.clinicId, entity: 'SurgeryEntry', entityId: surgery.id };
+    const auditWhere = {
+      clinicId: clinic.clinicId,
+      entity: "SurgeryEntry",
+      entityId: surgery.id,
+    };
     const invoiceCount = await prisma.invoice.count({ where: { patientId } });
-    const rejected = await req('post', `/surgeries/${surgery.id}/entries`, room).send(payload);
+    const rejected = await req(
+      "post",
+      `/surgeries/${surgery.id}/entries`,
+      room,
+    ).send(payload);
     expect(rejected.status, JSON.stringify(rejected.body)).toBe(400);
-    expect(await prisma.surgeryEntry.count({ where: { surgeryId: surgery.id } })).toBe(0);
-    expect(await prisma.chargeItem.count({ where: { surgeryId: surgery.id } })).toBe(1);
+    expect(
+      await prisma.surgeryEntry.count({ where: { surgeryId: surgery.id } }),
+    ).toBe(0);
+    expect(
+      await prisma.chargeItem.count({ where: { surgeryId: surgery.id } }),
+    ).toBe(1);
     expect(await prisma.auditLog.count({ where: auditWhere })).toBe(0);
-    expect(await prisma.invoice.count({ where: { patientId } })).toBe(invoiceCount);
+    expect(await prisma.invoice.count({ where: { patientId } })).toBe(
+      invoiceCount,
+    );
 
     // A failed transaction must not consume its request key or leave the earlier rows behind.
     payload.items[2]!.serviceId = medicineServiceId;
-    const saved = await req('post', `/surgeries/${surgery.id}/entries`, room).send(payload);
+    const saved = await req(
+      "post",
+      `/surgeries/${surgery.id}/entries`,
+      room,
+    ).send(payload);
     expect(saved.status, JSON.stringify(saved.body)).toBe(201);
     expect(saved.body.data).toMatchObject({
-      materialTotal: '12.51',
-      anesthesiaTotal: '255.02',
-      totalAmount: '3267.52',
+      materialTotal: "12.51",
+      anesthesiaTotal: "255.02",
+      totalAmount: "3267.52",
     });
-    expect(saved.body.data.entries.map((entry: { lineTotal: string }) => entry.lineTotal)).toEqual([
-      '12.51',
-      '5.01',
-      '250.01',
-    ]);
-    const replay = await req('post', `/surgeries/${surgery.id}/entries`, room).send(payload);
+    expect(
+      saved.body.data.entries.map(
+        (entry: { lineTotal: string }) => entry.lineTotal,
+      ),
+    ).toEqual(["12.51", "5.01", "250.01"]);
+    const replay = await req(
+      "post",
+      `/surgeries/${surgery.id}/entries`,
+      room,
+    ).send(payload);
     expect(replay.status, JSON.stringify(replay.body)).toBe(201);
     expect(replay.body.data.entries).toEqual(saved.body.data.entries);
-    expect(replay.body.data.totalAmount).toBe('3267.52');
-    expect(await prisma.surgeryEntry.count({ where: { surgeryId: surgery.id } })).toBe(3);
-    expect(await prisma.chargeItem.count({ where: { surgeryId: surgery.id } })).toBe(4);
+    expect(replay.body.data.totalAmount).toBe("3267.52");
+    expect(
+      await prisma.surgeryEntry.count({ where: { surgeryId: surgery.id } }),
+    ).toBe(3);
+    expect(
+      await prisma.chargeItem.count({ where: { surgeryId: surgery.id } }),
+    ).toBe(4);
     expect(await prisma.auditLog.count({ where: auditWhere })).toBe(1);
-    expect(await prisma.invoice.count({ where: { patientId } })).toBe(invoiceCount + 1);
-    const bulk = await invoiceForCharge(saved.body.data.entries[0].chargeItemId as string);
-    expect(bulk.invoice.total.toFixed(2)).toBe('267.53');
+    expect(await prisma.invoice.count({ where: { patientId } })).toBe(
+      invoiceCount + 1,
+    );
+    const bulk = await invoiceForCharge(
+      saved.body.data.entries[0].chargeItemId as string,
+    );
+    expect(bulk.invoice.total.toFixed(2)).toBe("267.53");
     expect(await pendingInvoices()).toContainEqual(
-      expect.objectContaining({ id: bulk.invoice.id, due: '267.53' }),
+      expect.objectContaining({ id: bulk.invoice.id, due: "267.53" }),
     );
     expect(
       await prisma.surgeryEntry.count({
@@ -489,99 +622,178 @@ describe('inpatient surgery workflow', () => {
     ).toBe(0);
   });
 
-  it('isolates tenant and branch reads and limits doctors to their own operations', async () => {
+  it("isolates tenant and branch reads and limits doctors to their own operations", async () => {
     expect(
-      (await req('get', `/surgeries/${surgeryId}`, foreignOwner, foreignClinic.branchId)).status,
+      (
+        await req(
+          "get",
+          `/surgeries/${surgeryId}`,
+          foreignOwner,
+          foreignClinic.branchId,
+        )
+      ).status,
     ).toBe(404);
     expect(
-      (await req('get', '/surgeries', foreignOwner, foreignClinic.branchId)).body.meta.total,
+      (await req("get", "/surgeries", foreignOwner, foreignClinic.branchId))
+        .body.meta.total,
     ).toBe(0);
-    expect((await req('get', `/surgeries/${surgeryId}`, reception, otherBranchId)).status).toBe(
-      403,
+    expect(
+      (await req("get", `/surgeries/${surgeryId}`, reception, otherBranchId))
+        .status,
+    ).toBe(403);
+    expect((await req("get", `/surgeries/${surgeryId}`, doctor)).status).toBe(
+      200,
     );
-    expect((await req('get', `/surgeries/${surgeryId}`, doctor)).status).toBe(200);
     // Move the second doctor into this branch only after testing the branch mismatch.
     await prisma.userBranch.create({
-      data: { clinicId: clinic.clinicId, branchId: clinic.branchId, userId: otherDoctorId },
+      data: {
+        clinicId: clinic.clinicId,
+        branchId: clinic.branchId,
+        userId: otherDoctorId,
+      },
     });
     const other = await create({ surgeonUserId: otherDoctorId });
-    expect((await req('get', `/surgeries/${other.id}`, doctor)).status).toBe(404);
-    const list = await req('get', '/surgeries', doctor);
-    expect(list.body.data.map((row: { id: string }) => row.id)).not.toContain(other.id);
-    await req('post', `/surgeries/${other.id}/cancel`);
+    expect((await req("get", `/surgeries/${other.id}`, doctor)).status).toBe(
+      404,
+    );
+    const list = await req("get", "/surgeries", doctor);
+    expect(list.body.data.map((row: { id: string }) => row.id)).not.toContain(
+      other.id,
+    );
+    await req("post", `/surgeries/${other.id}/cancel`);
   });
 
-  it('keeps cancelled entry history and protects invoice-linked fees and consumables', async () => {
+  it("keeps cancelled entry history and protects invoice-linked fees and consumables", async () => {
     const surgery = await create();
     const added = await manualEntry(surgery.id);
     expect(added.status).toBe(201);
-    const entry = added.body.data.entries[0] as { id: string; chargeItemId: string };
-    expect((await req('post', `/surgeries/${surgery.id}/cancel`)).status).toBe(409);
-    const bill = await invoiceForCharge(entry.chargeItemId);
-    expect(JSON.stringify(bill.line.title)).toContain('1.5 dona');
-    expect(
-      (await req('post', '/charges/invoice').send({ chargeIds: [entry.chargeItemId] })).status,
-    ).toBe(409);
-    expect((await req('delete', `/surgeries/${surgery.id}/entries/${entry.id}`, room)).status).toBe(
+    const entry = added.body.data.entries[0] as {
+      id: string;
+      chargeItemId: string;
+    };
+    expect((await req("post", `/surgeries/${surgery.id}/cancel`)).status).toBe(
       409,
     );
-    expect((await req('post', `/invoices/${bill.invoice.id}/cancel`, owner)).status).toBe(201);
-    const removed = await req('delete', `/surgeries/${surgery.id}/entries/${entry.id}`, room);
+    const bill = await invoiceForCharge(entry.chargeItemId);
+    expect(JSON.stringify(bill.line.title)).toContain("1.5 dona");
+    expect(
+      (
+        await req("post", "/charges/invoice").send({
+          chargeIds: [entry.chargeItemId],
+        })
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await req(
+          "delete",
+          `/surgeries/${surgery.id}/entries/${entry.id}`,
+          room,
+        )
+      ).status,
+    ).toBe(409);
+    expect(
+      (await req("post", `/invoices/${bill.invoice.id}/cancel`, owner)).status,
+    ).toBe(201);
+    const removed = await req(
+      "delete",
+      `/surgeries/${surgery.id}/entries/${entry.id}`,
+      room,
+    );
     expect(removed.status).toBe(200);
-    expect(removed.body.data.entries[0].status).toBe('CANCELLED');
-    expect(await prisma.surgeryEntry.count({ where: { surgeryId: surgery.id } })).toBe(1);
+    expect(removed.body.data.entries[0].status).toBe("CANCELLED");
+    expect(
+      await prisma.surgeryEntry.count({ where: { surgeryId: surgery.id } }),
+    ).toBe(1);
     // Automatically issued fees must also be cancelled before cancelling the case.
     const serviceBill = await invoiceForCharge(surgery.serviceCharge.id);
-    expect((await req('post', `/invoices/${serviceBill.invoice.id}/cancel`, owner)).status).toBe(
+    expect(
+      (await req("post", `/invoices/${serviceBill.invoice.id}/cancel`, owner))
+        .status,
+    ).toBe(201);
+    const cancelled = await req("post", `/surgeries/${surgery.id}/cancel`);
+    expect(cancelled.status).toBe(201);
+    expect(cancelled.body.data).toMatchObject({
+      status: "CANCELLED",
+      totalAmount: "0.00",
+    });
+    expect((await req("post", `/surgeries/${surgery.id}/cancel`)).status).toBe(
       201,
     );
-    const cancelled = await req('post', `/surgeries/${surgery.id}/cancel`);
-    expect(cancelled.status).toBe(201);
-    expect(cancelled.body.data).toMatchObject({ status: 'CANCELLED', totalAmount: '0.00' });
-    expect((await req('post', `/surgeries/${surgery.id}/cancel`)).status).toBe(201);
     expect((await manualEntry(surgery.id)).status).toBe(409);
-    expect((await req('post', `/surgeries/${surgery.id}/complete`, room)).status).toBe(409);
+    expect(
+      (await req("post", `/surgeries/${surgery.id}/complete`, room)).status,
+    ).toBe(409);
     const feeCase = await create();
     const feeBill = await invoiceForCharge(feeCase.serviceCharge.id);
-    expect(feeBill.invoice.status).toBe('ISSUED');
-    expect((await req('post', `/surgeries/${feeCase.id}/cancel`)).status).toBe(409);
-    expect((await req('delete', `/charges/${feeCase.serviceCharge.id}`)).status).toBe(409);
+    expect(feeBill.invoice.status).toBe("ISSUED");
+    expect((await req("post", `/surgeries/${feeCase.id}/cancel`)).status).toBe(
+      409,
+    );
+    expect(
+      (await req("delete", `/charges/${feeCase.serviceCharge.id}`)).status,
+    ).toBe(409);
   });
 
-  it('preserves doctor ownership even when mutation permissions are explicitly granted', async () => {
+  it("preserves doctor ownership even when mutation permissions are explicitly granted", async () => {
     await prisma.user.update({
       where: { id: clinic.doctor.id },
-      data: { permissionOverrides: { grant: ['surgery.schedule', 'surgery.record'] } },
+      data: {
+        permissionOverrides: { grant: ["surgery.schedule", "surgery.record"] },
+      },
     });
     const empoweredDoctor = await login(app, clinic.doctor.email);
     const other = await create({ surgeonUserId: otherDoctorId });
     const added = await manualEntry(other.id);
     expect(added.status).toBe(201);
-    const entry = added.body.data.entries[0] as { id: string; chargeItemId: string };
-    expect((await req('post', `/surgeries/${other.id}/complete`, empoweredDoctor)).status).toBe(
-      404,
-    );
-    expect((await req('post', `/surgeries/${other.id}/cancel`, empoweredDoctor)).status).toBe(404);
+    const entry = added.body.data.entries[0] as {
+      id: string;
+      chargeItemId: string;
+    };
     expect(
-      (await req('delete', `/surgeries/${other.id}/entries/${entry.id}`, empoweredDoctor)).status,
+      (await req("post", `/surgeries/${other.id}/complete`, empoweredDoctor))
+        .status,
+    ).toBe(404);
+    expect(
+      (await req("post", `/surgeries/${other.id}/cancel`, empoweredDoctor))
+        .status,
     ).toBe(404);
     expect(
       (
-        await req('post', `/surgeries/${other.id}/entries`, empoweredDoctor).send({
+        await req(
+          "delete",
+          `/surgeries/${other.id}/entries/${entry.id}`,
+          empoweredDoctor,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await req(
+          "post",
+          `/surgeries/${other.id}/entries`,
+          empoweredDoctor,
+        ).send({
           idempotencyKey: randomUUID(),
-          items: [{ kind: 'MATERIAL', serviceId: materialServiceId, quantity: '1' }],
+          items: [
+            { kind: "MATERIAL", serviceId: materialServiceId, quantity: "1" },
+          ],
         })
       ).status,
     ).toBe(404);
-    expect(await prisma.surgeryCase.findUnique({ where: { id: other.id } })).toMatchObject({
-      status: 'PLANNED',
+    expect(
+      await prisma.surgeryCase.findUnique({ where: { id: other.id } }),
+    ).toMatchObject({
+      status: "PLANNED",
     });
-    expect(await prisma.surgeryEntry.count({ where: { surgeryId: other.id } })).toBe(1);
-    expect(await prisma.chargeItem.findUnique({ where: { id: entry.chargeItemId } })).toMatchObject(
-      {
-        status: 'INVOICED',
-      },
-    );
+    expect(
+      await prisma.surgeryEntry.count({ where: { surgeryId: other.id } }),
+    ).toBe(1);
+    expect(
+      await prisma.chargeItem.findUnique({ where: { id: entry.chargeItemId } }),
+    ).toMatchObject({
+      status: "INVOICED",
+    });
     const payload = {
       admissionId,
       serviceId: surgeryServiceId,
@@ -589,59 +801,385 @@ describe('inpatient surgery workflow', () => {
       scheduledDate,
       idempotencyKey: randomUUID(),
     };
-    expect((await req('post', '/surgeries', empoweredDoctor).send(payload)).status).toBe(403);
+    expect(
+      (await req("post", "/surgeries", empoweredDoctor).send(payload)).status,
+    ).toBe(403);
     expect(
       await prisma.surgeryCase.count({
-        where: { clinicId: clinic.clinicId, requestKey: payload.idempotencyKey },
+        where: {
+          clinicId: clinic.clinicId,
+          requestKey: payload.idempotencyKey,
+        },
       }),
     ).toBe(0);
-    expect((await req('post', `/surgeries/${surgeryId}/complete`, empoweredDoctor)).status).toBe(
-      201,
-    );
+    expect(
+      (await req("post", `/surgeries/${surgeryId}/complete`, empoweredDoctor))
+        .status,
+    ).toBe(201);
   });
 
-  it('shows added surgery usage at the cashier after the original fee is paid', async () => {
+  it("shows added surgery usage at the cashier after the original fee is paid", async () => {
     const surgery = await create();
     const fee = await invoiceForCharge(surgery.serviceCharge.id);
-    expect((await req('post', '/shifts/open', cashier).send({ openingCash: '0.00' })).status).toBe(
-      201,
-    );
-    const paid = await req('post', `/invoices/${fee.invoice.id}/payments`, cashier).send({
-      amount: '2999.99',
-      method: 'CASH',
+    expect(
+      (await req("post", "/shifts/open", cashier).send({ openingCash: "0.00" }))
+        .status,
+    ).toBe(201);
+    const paid = await req(
+      "post",
+      `/invoices/${fee.invoice.id}/payments`,
+      cashier,
+    ).send({
+      amount: "2999.99",
+      method: "CASH",
       idempotencyKey: randomUUID(),
     });
     expect(paid.status, JSON.stringify(paid.body)).toBe(201);
-    expect((await pendingInvoices()).map((invoice) => invoice.id)).not.toContain(fee.invoice.id);
+    expect(
+      (await pendingInvoices()).map((invoice) => invoice.id),
+    ).not.toContain(fee.invoice.id);
     const used = await manualEntry(surgery.id);
     expect(used.status, JSON.stringify(used.body)).toBe(201);
-    const added = await invoiceForCharge(used.body.data.entries[0].chargeItemId as string);
+    const added = await invoiceForCharge(
+      used.body.data.entries[0].chargeItemId as string,
+    );
     expect(added.invoice.id).not.toBe(fee.invoice.id);
-    expect(added.invoice.total.toFixed(2)).toBe('30.00');
+    expect(added.invoice.total.toFixed(2)).toBe("30.00");
     expect(await pendingInvoices()).toContainEqual(
-      expect.objectContaining({ id: added.invoice.id, due: '30.00' }),
+      expect.objectContaining({ id: added.invoice.id, due: "30.00" }),
     );
     expect(
-      (await prisma.invoice.findUniqueOrThrow({ where: { id: fee.invoice.id } })).paidTotal.toFixed(
-        2,
-      ),
-    ).toBe('2999.99');
+      (
+        await prisma.invoice.findUniqueOrThrow({
+          where: { id: fee.invoice.id },
+        })
+      ).paidTotal.toFixed(2),
+    ).toBe("2999.99");
   });
 
-  it('completes idempotently and accepts late usage only while the admission remains active', async () => {
-    const first = await req('post', `/surgeries/${surgeryId}/complete`, room);
+  it("adds optional staff services to a new cashier invoice after the operation price was paid", async () => {
+    const surgery = await create();
+    const base = await invoiceForCharge(surgery.serviceCharge.id);
+    expect(
+      (
+        await req(
+          "post",
+          `/invoices/${base.invoice.id}/payments`,
+          cashier,
+        ).send({
+          amount: "2999.99",
+          method: "CARD",
+          idempotencyKey: randomUUID(),
+        })
+      ).status,
+    ).toBe(201);
+    const payload = {
+      idempotencyKey: randomUUID(),
+      items: [
+        { role: "SURGEON", amount: "100.01", note: "Qo‘shimcha xizmat" },
+        { role: "ANESTHESIOLOGIST", amount: "200.02" },
+        { role: "NURSE", amount: "30.00" },
+      ],
+    };
+    const invoicesBefore = await prisma.invoice.count({ where: { patientId } });
+    const calls = await Promise.all([
+      req("post", `/surgeries/${surgery.id}/staff-fees`, room).send(payload),
+      req("post", `/surgeries/${surgery.id}/staff-fees`, room).send(payload),
+    ]);
+    for (const response of calls) {
+      expect(response.status, JSON.stringify(response.body)).toBe(201);
+      expect(response.body.data).toMatchObject({
+        staffFeeTotal: "330.03",
+        totalAmount: "3330.02",
+      });
+      expect(response.body.data.staffFees).toHaveLength(3);
+    }
+    const fees = await prisma.surgeryStaffFee.findMany({
+      where: { surgeryId: surgery.id },
+    });
+    expect(fees).toHaveLength(3);
+    expect(await prisma.invoice.count({ where: { patientId } })).toBe(
+      invoicesBefore + 1,
+    );
+    const bill = await invoiceForCharge(fees[0]!.chargeItemId);
+    expect(bill.invoice.id).not.toBe(base.invoice.id);
+    expect(bill.invoice.total.toFixed(2)).toBe("330.03");
+    expect(await pendingInvoices()).toContainEqual(
+      expect.objectContaining({ id: bill.invoice.id, due: "330.03" }),
+    );
+    expect(
+      (
+        await prisma.invoice.findUniqueOrThrow({
+          where: { id: base.invoice.id },
+        })
+      ).paidTotal.toFixed(2),
+    ).toBe("2999.99");
+    const lines = await prisma.invoiceLine.findMany({
+      where: { invoiceId: bill.invoice.id },
+    });
+    expect(lines).toHaveLength(3);
+    expect(
+      lines.every(
+        (line) => line.serviceId === null && line.performerUserId === null,
+      ),
+    ).toBe(true);
+    expect(
+      await prisma.surgeryPayout.count({ where: { surgeryId: surgery.id } }),
+    ).toBe(0);
+    expect(
+      await prisma.expense.count({ where: { clinicId: clinic.clinicId } }),
+    ).toBe(0);
+    expect(
+      await prisma.auditLog.count({
+        where: {
+          clinicId: clinic.clinicId,
+          entity: "SurgeryStaffFee",
+          entityId: surgery.id,
+        },
+      }),
+    ).toBe(1);
+    const receptionView = await req("get", `/surgeries/${surgery.id}`);
+    expect(receptionView.body.data.staffFees).toHaveLength(3);
+    for (const fee of fees) {
+      const charge = await prisma.chargeItem.findUniqueOrThrow({
+        where: { id: fee.chargeItemId },
+      });
+      expect(charge).toMatchObject({
+        surgeryId: surgery.id,
+        patientId,
+        admissionId,
+        status: "INVOICED",
+      });
+    }
+    const altered = await req(
+      "post",
+      `/surgeries/${surgery.id}/staff-fees`,
+      room,
+    ).send({
+      ...payload,
+      items: [{ role: "SURGEON", amount: "101" }],
+    });
+    expect(altered.status).toBe(409);
+    const duplicate = await req(
+      "post",
+      `/surgeries/${surgery.id}/staff-fees`,
+      room,
+    ).send({
+      idempotencyKey: randomUUID(),
+      items: [{ role: "SURGEON", amount: "999" }],
+    });
+    expect(duplicate.status).toBe(409);
+    expect(
+      await prisma.surgeryStaffFee.count({ where: { surgeryId: surgery.id } }),
+    ).toBe(3);
+    expect(
+      (
+        await req(
+          "post",
+          `/invoices/${bill.invoice.id}/payments`,
+          cashier,
+        ).send({
+          amount: "330.03",
+          method: "CLICK",
+          idempotencyKey: randomUUID(),
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      await prisma.payrollAccrual.count({
+        where: { clinicId: clinic.clinicId },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.surgeryPayout.count({ where: { surgeryId: surgery.id } }),
+    ).toBe(0);
+    expect(
+      (await req("post", `/surgeries/${surgery.id}/complete`, room)).status,
+    ).toBe(201);
+    const payout = await req(
+      "post",
+      `/surgeries/${surgery.id}/payouts`,
+      cashier,
+    ).send({
+      type: "PERCENT",
+      value: "10",
+      method: "CASH",
+      idempotencyKey: randomUUID(),
+    });
+    expect(payout.status, JSON.stringify(payout.body)).toBe(201);
+    expect(payout.body.data).toMatchObject({
+      basisAmount: "2999.99",
+      amount: "300.00",
+    });
+    expect(
+      await prisma.expense.count({ where: { clinicId: clinic.clinicId } }),
+    ).toBe(1);
+  });
+
+  it("rejects unauthorized, duplicate-role and oversized staff charges without partial writes", async () => {
+    const surgery = await create();
+    const payload = {
+      idempotencyKey: randomUUID(),
+      items: [{ role: "NURSE", amount: "10.25" }],
+    };
+    expect(
+      (
+        await req("post", `/surgeries/${surgery.id}/staff-fees`, cashier).send(
+          payload,
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await req(
+          "post",
+          `/surgeries/${surgery.id}/staff-fees`,
+          foreignOwner,
+          foreignClinic.branchId,
+        ).send(payload)
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await req(
+          "post",
+          `/surgeries/${surgery.id}/staff-fees`,
+          room,
+          otherBranchId,
+        ).send(payload)
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await req("post", `/surgeries/${surgery.id}/staff-fees`, room).send({
+          ...payload,
+          items: [
+            { role: "NURSE", amount: "1" },
+            { role: "NURSE", amount: "2" },
+          ],
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await req("post", `/surgeries/${surgery.id}/staff-fees`, room).send({
+          ...payload,
+          items: [{ role: "SURGEON", amount: "0" }],
+        })
+      ).status,
+    ).toBe(400);
+    const before = await prisma.invoice.count({ where: { patientId } });
+    expect(
+      (
+        await req("post", `/surgeries/${surgery.id}/staff-fees`, room).send({
+          ...payload,
+          items: [
+            { role: "SURGEON", amount: "999999999999.99" },
+            { role: "NURSE", amount: "0.01" },
+          ],
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      await prisma.surgeryStaffFee.count({ where: { surgeryId: surgery.id } }),
+    ).toBe(0);
+    expect(
+      await prisma.chargeItem.count({ where: { surgeryId: surgery.id } }),
+    ).toBe(1);
+    expect(await prisma.invoice.count({ where: { patientId } })).toBe(before);
+    const other = await create({ surgeonUserId: otherDoctorId });
+    const empoweredDoctor = await login(app, clinic.doctor.email);
+    expect(
+      (
+        await req(
+          "post",
+          `/surgeries/${other.id}/staff-fees`,
+          empoweredDoctor,
+        ).send(payload)
+      ).status,
+    ).toBe(404);
+  });
+
+  it("serializes new submission keys for the same staff role and keeps cancelled fee history", async () => {
+    const surgery = await create();
+    const responses = await Promise.all(
+      [1, 2].map(() =>
+        req("post", `/surgeries/${surgery.id}/staff-fees`, room).send({
+          idempotencyKey: randomUUID(),
+          items: [{ role: "NURSE", amount: "10.25" }],
+        }),
+      ),
+    );
+    expect(responses.map((r) => r.status).sort()).toEqual([201, 409]);
+    const fees = await prisma.surgeryStaffFee.findMany({
+      where: { surgeryId: surgery.id },
+    });
+    expect(fees).toHaveLength(1);
+    const fee = fees[0]!;
+    expect(
+      (
+        await req(
+          "delete",
+          `/surgeries/${surgery.id}/staff-fees/${fee.id}`,
+          room,
+        )
+      ).status,
+    ).toBe(409);
+    const bill = await invoiceForCharge(fee.chargeItemId);
+    expect(
+      (await req("post", `/invoices/${bill.invoice.id}/cancel`, owner)).status,
+    ).toBe(201);
+    const removed = await req(
+      "delete",
+      `/surgeries/${surgery.id}/staff-fees/${fee.id}`,
+      room,
+    );
+    expect(removed.status).toBe(200);
+    expect(removed.body.data.staffFeeTotal).toBe("0.00");
+    expect(removed.body.data.staffFees[0].status).toBe("CANCELLED");
+    const readded = await req(
+      "post",
+      `/surgeries/${surgery.id}/staff-fees`,
+      room,
+    ).send({
+      idempotencyKey: randomUUID(),
+      items: [{ role: "NURSE", amount: "9.99" }],
+    });
+    expect(readded.status).toBe(201);
+    expect(readded.body.data.staffFeeTotal).toBe("9.99");
+    expect(readded.body.data.staffFees).toHaveLength(2);
+    // Base fee release does not permit cancelling a case with live staff fees.
+    const base = await invoiceForCharge(surgery.serviceCharge.id);
+    expect(
+      (await req("post", `/invoices/${base.invoice.id}/cancel`, owner)).status,
+    ).toBe(201);
+    expect((await req("post", `/surgeries/${surgery.id}/cancel`)).status).toBe(
+      409,
+    );
+  });
+
+  it("completes idempotently and accepts late usage only while the admission remains active", async () => {
+    const first = await req("post", `/surgeries/${surgeryId}/complete`, room);
     expect(first.status).toBe(201);
-    const repeat = await req('post', `/surgeries/${surgeryId}/complete`, room);
+    const repeat = await req("post", `/surgeries/${surgeryId}/complete`, room);
     expect(repeat.body.data.completedAt).toBe(first.body.data.completedAt);
     expect((await manualEntry(surgeryId)).status).toBe(201);
     await prisma.admission.update({
       where: { id: admissionId },
-      data: { status: 'DISCHARGED', dischargedAt: new Date() },
+      data: { status: "DISCHARGED", dischargedAt: new Date() },
     });
     expect((await manualEntry(surgeryId)).status).toBe(409);
     expect(
       (
-        await req('post', '/surgeries').send({
+        await req("post", `/surgeries/${surgeryId}/staff-fees`, room).send({
+          idempotencyKey: randomUUID(),
+          items: [{ role: "NURSE", amount: "5" }],
+        })
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await req("post", "/surgeries").send({
           admissionId,
           serviceId: surgeryServiceId,
           surgeonUserId: clinic.doctor.id,
@@ -650,6 +1188,8 @@ describe('inpatient surgery workflow', () => {
         })
       ).status,
     ).toBe(409);
-    expect((await req('post', `/surgeries/${surgeryId}/complete`, room)).status).toBe(201);
+    expect(
+      (await req("post", `/surgeries/${surgeryId}/complete`, room)).status,
+    ).toBe(201);
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import type {
+  PatientCheckoutInput,
   AddDepositInput,
   AddPaymentInput,
   AddPaymentsInput,
@@ -165,6 +166,7 @@ export interface CurrentShift extends CashierShift {
 
 export interface ShiftPaymentRow {
   id: string;
+  checkoutId: string | null;
   amount: MoneyString;
   method: PaymentMethod;
   note: string | null;
@@ -287,7 +289,32 @@ export interface ReceiptSettings {
   showBranch?: boolean;
 }
 
+export interface PendingPatient {
+  id: string;
+  mrn: string;
+  fullName: string;
+  phone: string | null;
+  invoiceCount: number;
+  due: string;
+  oldestAt: string;
+}
+export interface PatientOutstanding {
+  patient: PatientBrief & { balance: string };
+  invoices: Array<
+    Pick<
+      InvoiceListItem,
+      'id' | 'number' | 'status' | 'total' | 'paidTotal' | 'due' | 'createdAt' | 'lines'
+    >
+  >;
+}
+
 export interface ReceiptPayload {
+  checkout?: {
+    id: string;
+    amount: string;
+    paidBefore: string;
+    invoices: Array<{ id: string; number: string; amount: string }>;
+  };
   clinic: {
     name: string;
     legalName: string | null;
@@ -327,6 +354,13 @@ export interface InvoiceListQuery {
 // ============================================================ fetchers
 
 export const billingApi = {
+  pendingPatients: (query: { search?: string; page?: number; limit?: number }) =>
+    api.get<PendingPatient[]>('/patient-payments/pending', query),
+  patientOutstanding: (patientId: string) =>
+    api.get<PatientOutstanding>(`/patient-payments/patients/${patientId}`),
+  checkout: (input: PatientCheckoutInput) =>
+    api.post<{ checkoutId: string; total: string }>('/patient-payments', input),
+  checkoutReceipt: (id: string) => api.get<ReceiptPayload>(`/patient-payments/${id}/receipt`),
   // shifts
   currentShift: () => api.get<CurrentShift | null>('/shifts/current'),
   registersOverview: () => api.get<RegistersOverview>('/shifts/overview'),

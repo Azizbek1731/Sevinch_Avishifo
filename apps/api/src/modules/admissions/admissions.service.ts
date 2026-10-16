@@ -22,6 +22,8 @@ import type { TenantTransactionClient } from '../../core/prisma/tenant-extension
 import { AuditService } from '../../core/audit/audit.service';
 import { PricingService } from '../services/pricing.service';
 import { InvoicesService } from '../billing/invoices.service';
+import { RoomBillingService } from '../billing/room-billing.service';
+import { roomBillingDate, roomBillingDayCount } from '../billing/room-billing-calendar';
 
 /** Every planned date of an order, from its schedule. */
 function plannedDates(
@@ -46,6 +48,7 @@ export class AdmissionsService {
     private readonly pricing: PricingService,
     private readonly audit: AuditService,
     private readonly invoices: InvoicesService,
+    private readonly roomBilling: RoomBillingService,
   ) {}
 
   private map(a: Admission): Record<string, unknown> {
@@ -58,6 +61,9 @@ export class AdmissionsService {
       department: a.department,
       ward: a.ward,
       bed: a.bed,
+      dailyRoomRate: a.dailyRoomRate?.toFixed(2) ?? null,
+      roomBillingStartsOn: a.roomBillingStartsOn?.toISOString().slice(0, 10) ?? null,
+      roomBillingNextDate: a.roomBillingNextDate?.toISOString().slice(0, 10) ?? null,
       attendingDoctorUserId: a.attendingDoctorUserId,
       admittedAt: a.admittedAt.toISOString(),
       dischargedAt: a.dischargedAt ? a.dischargedAt.toISOString() : null,
@@ -85,10 +91,10 @@ export class AdmissionsService {
   }
 
   /** "KT-2026-0001", sequential per clinic per year. */
-  private async nextHistoryNumber(): Promise<string> {
+  private async nextHistoryNumber(db: TenantTransactionClient = this.prisma.db): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = `KT-${year}-`;
-    const last = await this.prisma.db.admission.findFirst({
+    const last = await db.admission.findFirst({
       where: { historyNumber: { startsWith: prefix } },
       orderBy: { historyNumber: 'desc' },
       select: { historyNumber: true },
@@ -125,29 +131,33 @@ export class AdmissionsService {
       dto.attendingDoctorUserId ?? (user.role === 'DOCTOR' ? user.id : null);
     if (attendingDoctorUserId) await this.validateDoctor(attendingDoctorUserId, branchId);
 
-    const created = await this.prisma.db.admission.create({
-      // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
-      data: {
-        clinicId: TenantContext.requireClinicId(),
-        branchId,
-        patientId: dto.patientId,
-        historyNumber: await this.nextHistoryNumber(),
-        department: dto.department ?? null,
-        ward: dto.ward ?? null,
-        bed: dto.bed ?? null,
-        attendingDoctorUserId,
-        admittedAt: dto.admittedAt ? new Date(dto.admittedAt) : new Date(),
-        referredBy: dto.referredBy ?? null,
-        referralDiagnosis: dto.referralDiagnosis ?? null,
-        admissionDiagnosis: dto.admissionDiagnosis ?? null,
-        firstTimeThisYear: dto.firstTimeThisYear ?? null,
-      },
-    });
-    // Admitting is also the moment the patient becomes an inpatient.
-    await this.prisma.db.patient.update({
-      where: { id: dto.patientId },
-      data: { careType: 'INPATIENT' },
-    });
+    const admittedAt = dto.admittedAt ? new Date(dto.admittedAt) : new Date();
+    if (admittedAt.getTime() > Date.now())
+      throw new AppException(ErrorCode.VALIDATION_ERROR, 'Yotqizish sanasi kelajakda bo‘lishi mumkin emas', 400);
+    if (user.branchIds.length && !user.branchIds.includes(branchId))
+      throw new AppException(ErrorCode.FORBIDDEN, 'Bu filialga kirish huquqi yo‘q', 403);
+    const clinicId = TenantContext.requireClinicId();
+    const created = await this.prisma.db.$transaction(async (tx) => {
+      // Concurrent admission retries must not create two stays or duplicate room fees.
+      await tx.$queryRaw`SELECT "id" FROM "Patient" WHERE "id" = ${dto.patientId} AND "clinicId" = ${clinicId} FOR UPDATE`;
+      const existing = await tx.admission.findFirst({ where: { patientId: dto.patientId, status: 'ACTIVE' } });
+      if (existing) throw new AppException(ErrorCode.VALIDATION_ERROR, `Bemor allaqachon statsionarda (${existing.historyNumber})`, 409);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${clinicId + ':admission-number'}, 0))`;
+      const hasRate = dto.dailyRoomRate !== undefined;
+      const start = hasRate ? new Date(roomBillingDate(admittedAt)) : null;
+      const stay = await tx.admission.create({ data: {
+        clinicId, branchId, patientId: dto.patientId, historyNumber: await this.nextHistoryNumber(tx),
+        department: dto.department ?? null, ward: dto.ward ?? null, bed: dto.bed ?? null,
+        attendingDoctorUserId, admittedAt,
+        dailyRoomRate: dto.dailyRoomRate ?? null,
+        roomBillingStartsOn: start, roomBillingNextDate: start,
+        roomRateSetById: hasRate ? user.id : null,
+        referredBy: dto.referredBy ?? null, referralDiagnosis: dto.referralDiagnosis ?? null,
+        admissionDiagnosis: dto.admissionDiagnosis ?? null, firstTimeThisYear: dto.firstTimeThisYear ?? null,
+      } });
+      await tx.patient.update({ where: { id: dto.patientId }, data: { careType: 'INPATIENT' } });
+      return hasRate ? this.roomBilling.accrueInTransaction(tx, stay.id, user) : stay;
+    }, { timeout: 30_000 });
     await this.audit.log({
       action: AuditAction.CREATE,
       entity: 'Admission',
@@ -230,6 +240,7 @@ export class AdmissionsService {
         select: { id: true },
       });
       const orderIds = orders.map((o) => o.id);
+      await tx.admissionRoomCharge.deleteMany({ where: { admissionId: id } });
       await tx.treatmentOrder.updateMany({
         where: { admissionId: id, billingChargeId: { not: null } },
         data: { billingChargeId: null },
@@ -272,22 +283,38 @@ export class AdmissionsService {
     return { id, invoicedKept };
   }
 
-  async update(id: string, dto: UpdateAdmissionInput): Promise<Record<string, unknown>> {
+  async update(id: string, dto: UpdateAdmissionInput, user?: AuthUser): Promise<Record<string, unknown>> {
     const updated = await this.prisma.db.$transaction(async (tx) => {
       const a = await this.lockAdmission(tx, id);
       this.requireActive(a);
+      if (user?.branchIds.length && !user.branchIds.includes(a.branchId))
+        throw new AppException(ErrorCode.FORBIDDEN, 'Bu filialga kirish huquqi yo‘q', 403);
       if (dto.attendingDoctorUserId)
         await this.validateDoctor(dto.attendingDoctorUserId, a.branchId);
-      return tx.admission.update({
+      // Already-started calendar dates keep their original rate and location.
+      // Newly configured legacy stays begin today, never at an unknown old tariff.
+      if (dto.dailyRoomRate !== undefined && !user)
+        throw new AppException(ErrorCode.FORBIDDEN, 'Palata narxini saqlash uchun foydalanuvchi kerak', 403);
+      if (dto.dailyRoomRate !== undefined || dto.ward !== undefined || dto.bed !== undefined)
+        await this.roomBilling.accrueInTransaction(tx, id, user);
+      const row = await tx.admission.update({
         where: { id },
         data: {
           ...dto,
-          clinicalDiagnosisAt: dto.clinicalDiagnosisAt
-            ? new Date(dto.clinicalDiagnosisAt)
-            : undefined,
+          ...(dto.dailyRoomRate !== undefined ? {
+            roomRateSetById: user!.id,
+            ...(a.dailyRoomRate === null ? {
+              roomBillingStartsOn: new Date(roomBillingDate(new Date())),
+              roomBillingNextDate: new Date(roomBillingDate(new Date())),
+            } : {}),
+          } : {}),
+          clinicalDiagnosisAt: dto.clinicalDiagnosisAt ? new Date(dto.clinicalDiagnosisAt) : undefined,
         },
       });
-    });
+      return dto.dailyRoomRate !== undefined && a.dailyRoomRate === null
+        ? this.roomBilling.accrueInTransaction(tx, id, user)
+        : row;
+    }, { timeout: 30_000 });
     await this.audit.log({
       action: AuditAction.UPDATE,
       entity: 'Admission',
@@ -407,8 +434,8 @@ export class AdmissionsService {
    * What stands between this stay and its discharge, answered before the user
    * fills in a form they may not be allowed to submit.
    */
-  async dischargeCheck(id: string): Promise<Record<string, unknown>> {
-    const a = await this.require(id);
+  async dischargeCheck(id: string, branchId?: string): Promise<Record<string, unknown>> {
+    const a = await this.roomBilling.reconcileAdmission(id, branchId);
     const money = await this.stayMoney(id, a.patientId);
     const blockers: string[] = [];
     if (money.pending.length > 0) blockers.push('UNBILLED');
@@ -451,9 +478,27 @@ export class AdmissionsService {
       );
     }
 
+    const cutoff = dto.dischargedAt ? new Date(dto.dischargedAt) : new Date();
+    const currentStay = await this.require(id);
+    if (user.branchIds.length && !user.branchIds.includes(currentStay.branchId))
+      throw new AppException(ErrorCode.FORBIDDEN, 'Bu filialga kirish huquqi yo‘q', 403);
+    if (cutoff < currentStay.admittedAt || cutoff.getTime() > Date.now())
+      throw new AppException(ErrorCode.VALIDATION_ERROR, 'Chiqarish sanasi yotqizilgan sana va hozirgi vaqt oralig‘ida bo‘lishi kerak', 400);
+    const laterDay = await this.prisma.db.admissionRoomCharge.findFirst({
+      where: { admissionId: id, billingDate: { gt: new Date(roomBillingDate(cutoff)) } }, select: { id: true },
+    });
+    if (laterDay) throw new AppException(ErrorCode.VALIDATION_ERROR, 'Keyingi kunlar uchun palata hisobi mavjud. Chiqarish sanasini tekshiring.', 409);
+    await this.roomBilling.reconcileAdmission(id, currentStay.branchId, cutoff);
+
     const updated = await this.prisma.db.$transaction(async (tx) => {
       const a = await this.lockAdmission(tx, id);
       this.requireActive(a);
+      const finalCutoff = dto.dischargedAt ? cutoff : new Date();
+      const laterRoomDay = await tx.admissionRoomCharge.findFirst({
+        where: { admissionId: id, billingDate: { gt: new Date(roomBillingDate(finalCutoff)) } }, select: { id: true },
+      });
+      if (laterRoomDay) throw new AppException(ErrorCode.VALIDATION_ERROR, 'Keyingi kunlar uchun palata hisobi mavjud. Chiqarish sanasini tekshiring.', 409);
+      await this.roomBilling.accrueInTransaction(tx, id, user, finalCutoff);
       await this.lockStayCharges(tx, id);
       const clinicId = TenantContext.requireClinicId();
       await tx.$queryRaw`
@@ -495,7 +540,7 @@ export class AdmissionsService {
         where: { id },
         data: {
           status: 'DISCHARGED',
-          dischargedAt: dto.dischargedAt ? new Date(dto.dischargedAt) : new Date(),
+          dischargedAt: finalCutoff,
           outcome: dto.outcome,
           finalDiagnosisMain: dto.finalDiagnosisMain,
           finalDiagnosisComplication: dto.finalDiagnosisComplication ?? null,
@@ -559,7 +604,8 @@ export class AdmissionsService {
   }
 
   /** The full 003 history: title page, orders with their sheet, daily notes. */
-  async getById(id: string): Promise<Record<string, unknown>> {
+  async getById(id: string, branchId?: string): Promise<Record<string, unknown>> {
+    await this.roomBilling.reconcileAdmission(id, branchId);
     const a = await this.prisma.db.admission.findFirst({
       where: { id },
       include: {
@@ -601,6 +647,7 @@ export class AdmissionsService {
     return {
       ...this.map(a),
       patient: a.patient,
+      roomBilling: await this.roomBilling.summary(id),
       orders: orders.map((o) => ({
         id: o.id,
         serviceId: o.serviceId,
@@ -706,13 +753,8 @@ export class AdmissionsService {
       },
       admission: {
         ...this.map(a),
-        // Bed-days as the ward counts them: the day of admission counts.
-        bedDays: Math.max(
-          1,
-          Math.ceil(
-            ((a.dischargedAt ?? new Date()).getTime() - a.admittedAt.getTime()) / 86_400_000,
-          ),
-        ),
+        // Admission and discharge calendar dates both count in Asia/Tashkent.
+        bedDays: roomBillingDayCount(a.admittedAt, a.dischargedAt ?? new Date()),
       },
       patient: {
         fullName: a.patient.fullName,

@@ -97,10 +97,12 @@ export interface LabOrderListItem {
   orderNumber: string;
   patientId: string;
   visitId: string | null;
+  referringDoctor: { id: string; fullName: string | null } | null;
   status: LabOrderStatus;
   canWork: boolean;
   billing: LabBilling | null;
   itemCount: number;
+  tests: Array<{ id: string; code: string; name: Record<string, string> }>;
   collectedAt: string | null;
   deliveredAt: string | null;
   createdAt: string | null;
@@ -150,6 +152,7 @@ export interface LabOrderDetail {
   orderNumber: string;
   patientId: string;
   visitId: string | null;
+  referringDoctor: { id: string; fullName: string | null } | null;
   status: LabOrderStatus;
   physiologicalState: PhysiologicalState | null;
   orderedById: string | null;

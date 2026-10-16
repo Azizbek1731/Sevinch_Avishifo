@@ -229,7 +229,7 @@ export class InvoicesService {
   async issueChargesInTransaction(
     tx: TenantTransactionClient,
     chargeIds: string[],
-    user: AuthUser,
+    user: Pick<AuthUser, 'id' | 'branchIds'>,
     branchId: string,
   ): Promise<Invoice & { lines: InvoiceLine[] }> {
     const clinicId = TenantContext.requireClinicId();
@@ -826,7 +826,7 @@ export class InvoicesService {
   }
 
   /** Emit realtime + notification + audit side effects after money is applied. */
-  private async afterPaymentApplied(
+  async afterPaymentApplied(
     invoice: Invoice,
     payment: Payment,
     newPaidTotal: Prisma.Decimal,

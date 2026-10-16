@@ -2,24 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { Banknote, ChevronLeft, ChevronRight, ReceiptText, RefreshCw, Search } from 'lucide-react';
 import { formatPhone, formatUZS } from '@avishifo/shared';
-import { Link } from '@/i18n/routing';
-import { localizedText } from '@/lib/localized';
 import { formatTz } from '@/lib/dates';
 import { useAuthStore } from '@/stores/auth-store';
 import { EmptyState } from '@/components/empty-state';
-import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { billingApi, type InvoiceListItem } from '../api';
+import { billingApi, type PendingPatient } from '../api';
 import { usePermission } from '../hooks';
-import { PayDialog } from './pay-dialog';
+import { PatientPayDialog } from './patient-pay-dialog';
 import { ReceiptPrinter } from './receipt-printer';
-import type { ReceiptPrintRequest } from '../receipt-print';
 
 const PAGE_SIZE = 20;
 
@@ -27,11 +23,10 @@ const PAGE_SIZE = 20;
 export function PendingInvoicesTab() {
   const t = useTranslations('billing');
   const tc = useTranslations('cashier');
-  const locale = useLocale();
   const can = usePermission();
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
-  const [paying, setPaying] = useState<InvoiceListItem | null>(null);
-  const [receipt, setReceipt] = useState<ReceiptPrintRequest | null>(null);
+  const [paying, setPaying] = useState<PendingPatient | null>(null);
+  const [receipt, setReceipt] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -43,15 +38,13 @@ export function PendingInvoicesTab() {
     return () => clearTimeout(timer);
   }, [search]);
   const query = {
-    pending: true,
     search: debouncedSearch || undefined,
-    branchId: activeBranchId ?? undefined,
     page,
     limit: PAGE_SIZE,
   };
   const { data, isLoading, isFetching, isError, refetch } = useQuery({
-    queryKey: ['invoices', 'pending', query],
-    queryFn: () => billingApi.listInvoices(query),
+    queryKey: ['billing', 'patient-pending', activeBranchId, query],
+    queryFn: () => billingApi.pendingPatients(query),
     refetchInterval: 5_000,
   });
   const invoices = data?.data ?? [];
@@ -63,7 +56,7 @@ export function PendingInvoicesTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-semibold">{t('pending.title')}</h2>
-          <p className="text-sm text-muted-foreground">{t('pending.description')}</p>
+          <p className="text-sm text-muted-foreground">{t('checkout.queueDescription')}</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => void refetch()} disabled={isFetching}>
           <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
@@ -109,45 +102,21 @@ export function PendingInvoicesTab() {
                 <div className="flex flex-wrap items-center justify-between gap-4 p-5">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold">{invoice.patient.fullName}</p>
-                      <StatusBadge
-                        status={invoice.status}
-                        label={t(`statuses.${invoice.status}`)}
-                      />
+                      <p className="font-semibold">{invoice.fullName}</p>
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                        {t('checkout.invoiceCount', { count: invoice.invoiceCount })}
+                      </span>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                      <span>{invoice.patient.mrn}</span>
-                      {invoice.patient.phone ? (
-                        <span>{formatPhone(invoice.patient.phone)}</span>
-                      ) : null}
-                      <Link
-                        href={`/invoices/${invoice.id}`}
-                        className="text-primary hover:underline"
-                      >
-                        {invoice.number}
-                      </Link>
-                      <span>{formatTz(invoice.createdAt)}</span>
+                      <span>{invoice.mrn}</span>
+                      {invoice.phone ? <span>{formatPhone(invoice.phone)}</span> : null}
+                      <span>{formatTz(invoice.oldestAt)}</span>
                     </div>
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      {invoice.lines?.length
-                        ? invoice.lines
-                            .map(
-                              (line) =>
-                                `${localizedText(line.title, locale)}${line.quantity > 1 ? ` × ${line.quantity}` : ''}`,
-                            )
-                            .join(' · ')
-                        : t('pending.openDetails')}
-                    </p>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">{t('pay.due')}</p>
                       <p className="text-xl font-bold tabular-nums">{formatUZS(invoice.due)}</p>
-                      {invoice.paidTotal !== '0.00' ? (
-                        <p className="text-xs text-success">
-                          {t('cols.paid')}: {formatUZS(invoice.paidTotal)}
-                        </p>
-                      ) : null}
                     </div>
                     {can('payments.create') ? (
                       <Button size="lg" onClick={() => setPaying(invoice)}>
@@ -188,20 +157,24 @@ export function PendingInvoicesTab() {
         </div>
       ) : null}
       {paying ? (
-        <PayDialog
-          open
-          onOpenChange={(open) => !open && setPaying(null)}
-          onPaid={setReceipt}
-          invoice={{
-            id: paying.id,
-            number: paying.number,
-            due: paying.due,
-            patientName: paying.patient.fullName,
+        <PatientPayDialog
+          key={`${activeBranchId}:${paying.id}`}
+          patientId={paying.id}
+          onClose={() => setPaying(null)}
+          onPaid={(checkoutId) => {
+            setPaying(null);
+            setReceipt(checkoutId);
           }}
         />
       ) : null}
       {receipt ? (
-        <ReceiptPrinter key={receipt.requestId} {...receipt} onPrinted={() => setReceipt(null)} />
+        <ReceiptPrinter
+          key={receipt}
+          invoiceId={receipt}
+          requestId={receipt}
+          checkout
+          onPrinted={() => setReceipt(null)}
+        />
       ) : null}
     </div>
   );

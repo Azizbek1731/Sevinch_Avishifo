@@ -79,6 +79,7 @@ type LabOrderListRow = Prisma.LabOrderGetPayload<{
     patient: true;
     invoice: { include: { refunds: { select: { amount: true } } } };
     _count: { select: { items: true } };
+    items: { select: { labTest: { select: { id: true; code: true; name: true } } } };
   };
 }>;
 
@@ -157,6 +158,9 @@ export class LabService {
       orderNumber: o.orderNumber,
       patientId: o.patientId,
       visitId: o.visitId,
+      referringDoctor: o.referringDoctorUserId
+        ? { id: o.referringDoctorUserId, fullName: o.referringDoctorName }
+        : null,
       status: o.status,
       canWork: isLabInvoicePaid(o.invoice),
       billing: o.invoice
@@ -172,6 +176,7 @@ export class LabService {
           }
         : null,
       itemCount: o._count.items,
+      tests: o.items.map((item) => item.labTest),
       collectedAt: iso(o.collectedAt),
       deliveredAt: iso(o.deliveredAt),
       createdAt: iso(o.createdAt),
@@ -191,6 +196,9 @@ export class LabService {
       orderNumber: o.orderNumber,
       patientId: o.patientId,
       visitId: o.visitId,
+      referringDoctor: o.referringDoctorUserId
+        ? { id: o.referringDoctorUserId, fullName: o.referringDoctorName }
+        : null,
       status: o.status,
       canWork: isLabInvoicePaid(o.invoice),
       billing: o.invoice
@@ -490,6 +498,13 @@ export class LabService {
     }
     const clinicId = TenantContext.requireClinicId();
     const orderNumber = await this.sequence.nextFormatted('lab', 'L');
+    // The bill creator is server-controlled. Never trust a doctor ID from an order payload.
+    const referringDoctor = invoice.createdById
+      ? await tx.user.findFirst({
+          where: { id: invoice.createdById, clinicId, role: 'DOCTOR', deletedAt: null },
+          select: { id: true, fullName: true },
+        })
+      : null;
     return tx.labOrder.create({
       data: {
         clinicId,
@@ -498,6 +513,8 @@ export class LabService {
         branchId: invoice.branchId,
         visitId: invoice.visitId,
         orderedById: invoice.createdById,
+        referringDoctorUserId: referringDoctor?.id ?? null,
+        referringDoctorName: referringDoctor?.fullName ?? null,
         orderNumber,
         items: { create: tests.map((test) => ({ clinicId, labTestId: test.id })) },
       },
@@ -682,8 +699,18 @@ export class LabService {
     await this.emitOrderUpdated(id);
   }
 
-  async listOrders(query: LabOrderQueryDto): Promise<PaginatedResult<unknown>> {
+  async listOrders(
+    query: LabOrderQueryDto,
+    user?: AuthUser,
+    activeBranchId?: string,
+  ): Promise<PaginatedResult<unknown>> {
+    const branchId = query.branchId ?? activeBranchId;
+    if (user && branchId && user.branchIds.length > 0 && !user.branchIds.includes(branchId)) {
+      throw new AppException(ErrorCode.FORBIDDEN, 'No access to this branch', 403);
+    }
     const where: Prisma.LabOrderWhereInput = {};
+    if (query.referringDoctorUserId) where.referringDoctorUserId = query.referringDoctorUserId;
+    if (query.visitId) where.visitId = query.visitId;
     if (!query.includeUnpaid && !query.patientId) {
       // Cashier payments cannot exceed the total: any refund reopens the clinical gate.
       where.AND = [
@@ -696,7 +723,7 @@ export class LabService {
       ];
     }
     if (query.status) where.status = query.status;
-    if (query.branchId) where.branchId = query.branchId;
+    if (branchId) where.branchId = branchId;
     if (query.patientId) where.patientId = query.patientId;
     if (query.from || query.to) {
       where.createdAt = {
@@ -718,6 +745,7 @@ export class LabService {
           patient: true,
           invoice: { include: { refunds: { select: { amount: true } } } },
           _count: { select: { items: true } },
+          items: { select: { labTest: { select: { id: true, code: true, name: true } } } },
         },
         orderBy: { createdAt: 'desc' },
         ...skipTake(query),

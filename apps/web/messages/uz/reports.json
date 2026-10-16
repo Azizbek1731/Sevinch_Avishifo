@@ -27,7 +27,8 @@
     "lab": "Laboratoriya",
     "shifts": "Smenalar",
     "cashflow": "Kassa hisoboti",
-    "consumables": "Dori va materiallar"
+    "consumables": "Dori va materiallar",
+    "lab-referrals": "Shifokorlar bo‘yicha yo‘llanmalar"
   },
   "empty": {
     "title": "Ma'lumot yo'q",
@@ -213,5 +214,23 @@
     "orderedPolicy": "Oldindan hisobga olingan statsionar tayinlovlar alohida ko‘rsatiladi. Ular sarf summasiga qo‘shilmaydi va bemor olganini anglatmaydi. Keyin sarf qayd etilsa ham dastlabki tayinlov miqdori saqlanadi.",
     "datePolicy": "Operatsiya sarfi kiritilgan sana, boshqa sarflar xarajat sanasi, berilgan dorilar berilgan sana bo‘yicha olinadi. Bekor qilingan xarajatlar chiqariladi.",
     "catalogHint": "Operatsiyada qo‘lda kiritilgan material va dorilar ham hisoblanadi. Boshqa bo‘limlarda dori yoki materialni tegishli katalogdan tanlang; turi belgilanmagan erkin matnli xarajatlar bu hisobotga kirmaydi."
+  },
+  "labReferrals": {
+    "title": "Shifokorlarning laboratoriya yo‘llanmalari",
+    "description": "Kim qancha bemorni va qaysi tahlillarga yuborgani, to‘lov hamda natija holati.",
+    "calculation": "Yo‘llanma yaratilgan sana bo‘yicha hisoblanadi. Har bir shifokor va umumiy jamida bemorlar takrorlanmasdan sanaladi; bitta bemor bir nechta tahlilda ko‘rinishi mumkin. Bekor qilingan yo‘llanma va hisoblar kiritilmaydi.",
+    "direct": "Qabulxona / to‘g‘ridan-to‘g‘ri",
+    "patients": "Bemorlar",
+    "orders": "Yo‘llanmalar",
+    "tests": "Tahlillar",
+    "paidOrders": "To‘langan",
+    "pendingPaymentOrders": "To‘lov kutilmoqda",
+    "approvedOrders": "Tasdiqlangan",
+    "testName": "Tahlil",
+    "empty": "Bu davrda yo‘llanmalar yo‘q.",
+    "loadError": "Yo‘llanmalar hisobotini yuklab bo‘lmadi.",
+    "retry": "Qayta yuklash",
+    "doctorSummary": "{patients} bemor · {orders} yo‘llanma · {tests} tahlil",
+    "doctorTotal": "Shifokor bo‘yicha jami"
   }
 }

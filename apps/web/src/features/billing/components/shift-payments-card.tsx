@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { ChevronDown, ChevronUp, ReceiptText } from 'lucide-react';
+import { ChevronDown, ChevronUp, ReceiptText, Printer } from 'lucide-react';
 import { formatUZS } from '@avishifo/shared';
 import { formatTz } from '@/lib/dates';
 import { Link } from '@/i18n/routing';
@@ -14,6 +14,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { billingApi } from '../api';
 import { usePermission } from '../hooks';
 import { VoidPaymentButton } from './void-payment-button';
+import { ReceiptPrinter } from './receipt-printer';
+import { useAuthStore } from '@/stores/auth-store';
 
 const PREVIEW = 5;
 
@@ -30,9 +32,11 @@ export function ShiftPaymentsCard() {
   const tb = useTranslations('billing');
   const can = usePermission();
   const [expanded, setExpanded] = useState(false);
+  const [receiptId, setReceiptId] = useState<string | null>(null);
+  const activeBranchId = useAuthStore((state) => state.activeBranchId);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['shifts', 'current', 'payments'],
+    queryKey: ['shifts', 'current', 'payments', activeBranchId],
     queryFn: async () => (await billingApi.currentShiftPayments()).data,
   });
 
@@ -90,7 +94,21 @@ export function ShiftPaymentsCard() {
                 >
                   {formatUZS(p.amount)}
                 </span>
-                {!voided && can('payments.void') ? <VoidPaymentButton payment={p} /> : <span className="w-9" />}
+                {p.checkoutId && !voided ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={tb('receipt.print')}
+                    onClick={() => setReceiptId(p.checkoutId)}
+                  >
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                ) : null}
+                {!voided && can('payments.void') ? (
+                  <VoidPaymentButton payment={p} />
+                ) : (
+                  <span className="w-9" />
+                )}
               </li>
             );
           })}
@@ -115,6 +133,14 @@ export function ShiftPaymentsCard() {
               </>
             )}
           </Button>
+        ) : null}
+        {receiptId ? (
+          <ReceiptPrinter
+            key={receiptId}
+            invoiceId={receiptId}
+            checkout
+            onPrinted={() => setReceiptId(null)}
+          />
         ) : null}
       </CardContent>
     </Card>

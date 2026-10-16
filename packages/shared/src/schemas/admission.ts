@@ -20,11 +20,14 @@ export type OrderSchedule = z.infer<typeof orderScheduleSchema>;
 
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
 
+export const roomRateSchema = moneySchema.refine((value) => value.split('.')[0]!.replace(/^0+/, '').length <= 12, 'Room rate is too large');
+
 export const admitPatientSchema = z.object({
   patientId: idSchema,
   department: z.string().trim().max(120).optional(),
   ward: z.string().trim().max(40).optional(),
   bed: z.string().trim().max(40).optional(),
+  dailyRoomRate: roomRateSchema.optional(),
   attendingDoctorUserId: idSchema.optional(),
   admittedAt: z.string().datetime().optional(),
   referredBy: z.string().trim().max(200).optional(),
@@ -39,6 +42,7 @@ export const updateAdmissionSchema = z.object({
   department: z.string().trim().max(120).optional(),
   ward: z.string().trim().max(40).optional(),
   bed: z.string().trim().max(40).optional(),
+  dailyRoomRate: roomRateSchema.optional(),
   attendingDoctorUserId: idSchema.nullable().optional(),
   referredBy: z.string().trim().max(200).optional(),
   referralDiagnosis: z.string().trim().max(500).optional(),

@@ -31,8 +31,8 @@ export class AdmissionsController {
 
   @Get(':id')
   @RequirePermissions('admissions.read')
-  get(@Param('id') id: string): Promise<Record<string, unknown>> {
-    return this.admissions.getById(id);
+  get(@Param('id') id: string, @ActiveBranch() branchId: string): Promise<Record<string, unknown>> {
+    return this.admissions.getById(id, branchId);
   }
 
   @Get(':id/print')
@@ -56,15 +56,16 @@ export class AdmissionsController {
   update(
     @Param('id') id: string,
     @Body() dto: UpdateAdmissionDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<Record<string, unknown>> {
-    return this.admissions.update(id, dto);
+    return this.admissions.update(id, dto, user);
   }
 
   /** What stands between this stay and discharge — unbilled services, debt. */
   @Get(':id/discharge-check')
   @RequirePermissions('admissions.read')
-  dischargeCheck(@Param('id') id: string): Promise<Record<string, unknown>> {
-    return this.admissions.dischargeCheck(id);
+  dischargeCheck(@Param('id') id: string, @ActiveBranch() branchId: string): Promise<Record<string, unknown>> {
+    return this.admissions.dischargeCheck(id, branchId);
   }
 
   /** Remove a stay opened by mistake. Billed money is kept — see remove(). */

@@ -147,5 +147,9 @@
   "previousPage": "Oldingi",
   "nextPage": "Keyingi",
   "attachedResult": "Natija alohida faylda: {file}",
-  "incompleteResults": "Barcha ko‘rsatkichlarni kiriting yoki tayyor natija faylini biriktiring."
+  "incompleteResults": "Barcha ko‘rsatkichlarni kiriting yoki tayyor natija faylini biriktiring.",
+  "referringDoctor": "Yo‘llagan shifokor",
+  "directOrder": "Qabulxona / to‘g‘ridan-to‘g‘ri",
+  "referralReportShow": "Shifokorlar bo‘yicha yo‘llanmalar",
+  "referralReportHide": "Yo‘llanmalar hisobotini yopish"
 }

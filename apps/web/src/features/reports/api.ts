@@ -1,6 +1,7 @@
 import { api } from '@/lib/api-client';
 import type {
   CashflowReport,
+  LabReferralReport,
   ConsumablesKind,
   ConsumablesReport,
   ConsumablesSource,
@@ -123,6 +124,13 @@ function rangeQuery(f: ReportFilters): Record<string, string | undefined> {
 }
 
 export const reportsApi = {
+  labReferrals: async (f: ReportFilters, doctorUserId?: string): Promise<LabReferralReport> => {
+    const res = await api.get<LabReferralReport>('/reports/lab-referrals', {
+      ...rangeQuery(f),
+      doctorUserId,
+    });
+    return res.data;
+  },
   consumables: async (
     f: ReportFilters,
     kind?: ConsumablesKind,

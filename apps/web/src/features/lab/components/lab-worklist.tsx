@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowRight, BookOpen, FlaskConical, Play, Plus, Syringe } from 'lucide-react';
 import { LabOrderStatus } from '@avishifo/shared';
@@ -28,11 +28,17 @@ import { CreateOrderDialog } from './create-order-dialog';
 import { hasUnpaidLabWork } from '../lib';
 import { ManageTestsDialog } from './manage-tests-dialog';
 import { CatalogImportDialog } from './catalog-import-dialog';
+import { useReportFilters } from '@/features/reports/hooks';
+import { ReportFilterBar } from '@/features/reports/components/report-filter-bar';
+import { LabReferralsTab } from '@/features/reports/components/lab-referrals-tab';
 
 const PAGE_SIZE = 20;
 
 export function LabWorklist() {
   const t = useTranslations('lab');
+  const locale = useLocale();
+  const [reportOpen, setReportOpen] = useState(false);
+  const reportFilters = useReportFilters();
   const tc = useTranslations('common');
   const canWrite = useHasPermission('lab.orders.write');
   const canPerform = useHasPermission('lab.results.write');
@@ -90,9 +96,24 @@ export function LabWorklist() {
         ),
       },
       {
+        id: 'referringDoctor',
+        header: t('referringDoctor'),
+        cell: ({ row }) => (
+          <span>{row.original.referringDoctor?.fullName ?? t('directOrder')}</span>
+        ),
+      },
+      {
         accessorKey: 'itemCount',
         header: t('colTests'),
-        cell: ({ row }) => <span className="tabular-nums">{row.original.itemCount}</span>,
+        cell: ({ row }) => (
+          <div className="max-w-sm space-y-1">
+            {row.original.tests.map((test) => (
+              <p key={test.id} className="text-sm">
+                {test.name[locale] ?? test.name.uz ?? test.code}
+              </p>
+            ))}
+          </div>
+        ),
       },
       {
         accessorKey: 'createdAt',
@@ -167,7 +188,7 @@ export function LabWorklist() {
         },
       },
     ],
-    [t, tc, canPerform, updateStatus],
+    [t, tc, locale, canPerform, updateStatus],
   );
 
   const meta = ordersQuery.data?.meta;
@@ -194,6 +215,20 @@ export function LabWorklist() {
           </Button>
         ) : null}
       </PageHeader>
+
+      <Button
+        variant="outline"
+        aria-expanded={reportOpen}
+        onClick={() => setReportOpen((value) => !value)}
+      >
+        {t(reportOpen ? 'referralReportHide' : 'referralReportShow')}
+      </Button>
+      {reportOpen ? (
+        <section className="space-y-4 rounded-xl border p-4">
+          <ReportFilterBar state={reportFilters.state} onChange={reportFilters.setState} />
+          <LabReferralsTab filters={reportFilters.filters} />
+        </section>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <button

@@ -6,6 +6,7 @@ import { PrismaService } from '../src/core/prisma/prisma.service';
 import { TenantContext } from '../src/core/prisma/tenant-context';
 import { AuditService } from '../src/core/audit/audit.service';
 import { AdmissionsService } from '../src/modules/admissions/admissions.service';
+import { RoomBillingService } from '../src/modules/billing/room-billing.service';
 import type { InvoicesService } from '../src/modules/billing/invoices.service';
 import { PricingService } from '../src/modules/services/pricing.service';
 import { PayrollService } from '../src/modules/staff/payroll.service';
@@ -35,6 +36,7 @@ describe('legacy ward administration and discharge concurrency', () => {
       new PricingService(prisma),
       new AuditService(prisma),
       {} as InvoicesService,
+      new RoomBillingService(prisma, {} as InvoicesService),
     );
     const clinic = await prisma.unscoped.clinic.create({
       data: { name: `Ward test ${randomUUID()}` },

@@ -35,6 +35,8 @@ export interface LabOrdersQuery {
   status?: LabOrderStatus;
   branchId?: string;
   patientId?: string;
+  visitId?: string;
+  referringDoctorUserId?: string;
   search?: string;
   page?: number;
   limit?: number;
@@ -46,6 +48,8 @@ export const labApi = {
       status: q.status,
       branchId: q.branchId,
       patientId: q.patientId,
+      visitId: q.visitId,
+      referringDoctorUserId: q.referringDoctorUserId,
       includeUnpaid: q.includeUnpaid,
       search: q.search || undefined,
       page: q.page,

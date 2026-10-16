@@ -13,11 +13,21 @@ import { DoctorsTab } from './doctors-tab';
 import { ServicesTab } from './services-tab';
 import { QueueTab } from './queue-tab';
 import { LabTab } from './lab-tab';
+import { LabReferralsTab } from './lab-referrals-tab';
 import { CashflowTab } from './cashflow-tab';
 import { ConsumablesTab } from './consumables-tab';
 import { ShiftsTab } from './shifts-tab';
 
-const TABS = ['revenue', 'flow', 'doctors', 'services', 'queue', 'lab', 'shifts'] as const;
+const TABS = [
+  'revenue',
+  'flow',
+  'doctors',
+  'services',
+  'queue',
+  'lab',
+  'lab-referrals',
+  'shifts',
+] as const;
 
 export function ReportsView({ initialTab }: { initialTab?: string }) {
   const t = useTranslations('reports');
@@ -91,6 +101,9 @@ export function ReportsView({ initialTab }: { initialTab?: string }) {
             </TabsContent>
             <TabsContent value="lab" className="mt-4">
               <LabTab filters={filters} />
+            </TabsContent>
+            <TabsContent value="lab-referrals" className="mt-4">
+              <LabReferralsTab filters={filters} />
             </TabsContent>
             <TabsContent value="shifts" className="mt-4">
               <ShiftsTab filters={filters} />

@@ -80,7 +80,7 @@
   "cancelOperationHint": "Cancel this operation and its uninvoiced fee? Its record will remain in history.",
   "surgeonPayments": "Surgeon payments",
   "paySurgeon": "Pay surgeon",
-  "payoutHint": "Percentage is calculated from the operation fee only. Materials and anesthesia medicines are excluded. The payment is recorded as an expense in the selected account.",
+  "payoutHint": "The percentage uses the operation price only, excluding materials, medicines and extra staff services. This records an actual cash payment to staff as a separate expense.",
   "payoutType": "Calculation",
   "percent": "Percentage",
   "fixed": "Fixed amount",
@@ -136,5 +136,26 @@
       "note": "The note must not exceed 500 characters.",
       "items": "Add between 1 and 50 rows."
     }
+  },
+  "staffFees": {
+    "title": "Staff services",
+    "total": "Staff services",
+    "hint": "Optional patient charges added on top of the operation price.",
+    "add": "Add staff services",
+    "formHint": "Select the staff roles and enter their fees. All selected services are saved together and sent to the cashier for the patient to pay.",
+    "roles": {
+      "SURGEON": "Surgeon service",
+      "ANESTHESIOLOGIST": "Anesthesiologist service",
+      "NURSE": "Nurse service"
+    },
+    "role": "Service",
+    "empty": "No additional staff services. Add surgeon, anesthesiologist or nurse fees if applicable.",
+    "invalidAmount": "Enter a positive amount with up to 12 whole digits and 2 decimal places.",
+    "addedTotal": "Added to the patient bill",
+    "payoutSeparation": "These amounts are owed by the patient. Cash payments to staff are recorded separately; no expense is created automatically.",
+    "save": "Save and send to cashier",
+    "saved": "Staff services added and sent to the cashier",
+    "remove": "Cancel staff service",
+    "removeHint": "Cancel this service that is not included in an invoice? Its history will be retained."
   }
 }

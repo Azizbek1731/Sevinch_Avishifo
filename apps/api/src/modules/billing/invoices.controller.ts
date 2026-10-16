@@ -1,9 +1,10 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '@avishifo/shared';
-import { CurrentUser, RequirePermissions } from '../../common/decorators';
+import { ActiveBranch, CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { PaginatedResult } from '../../common/pagination';
 import { InvoicesService } from './invoices.service';
+import { RoomBillingService } from './room-billing.service';
 import {
   AddPaymentDto,
   AddPaymentsDto,
@@ -17,24 +18,37 @@ import {
 @ApiTags('billing')
 @Controller('invoices')
 export class InvoicesController {
-  constructor(private readonly invoices: InvoicesService) {}
+  constructor(
+    private readonly invoices: InvoicesService,
+    private readonly rooms: RoomBillingService,
+  ) {}
 
   @Post()
   @RequirePermissions('invoices.write')
-  create(@Body() dto: CreateInvoiceDto, @CurrentUser() user: AuthUser): Promise<Record<string, unknown>> {
+  create(
+    @Body() dto: CreateInvoiceDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Record<string, unknown>> {
     return this.invoices.create(dto, user);
   }
 
   /** Front-desk sale: create + issue + (pay now | leave as debt) in one call. */
   @Post('quick')
   @RequirePermissions('invoices.write')
-  quick(@Body() dto: QuickInvoiceDto, @CurrentUser() user: AuthUser): Promise<Record<string, unknown>> {
+  quick(
+    @Body() dto: QuickInvoiceDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Record<string, unknown>> {
     return this.invoices.quick(dto, user);
   }
 
   @Get()
   @RequirePermissions('invoices.read')
-  list(@Query() query: InvoiceQueryDto): Promise<PaginatedResult<Record<string, unknown>>> {
+  async list(
+    @Query() query: InvoiceQueryDto,
+    @ActiveBranch() branchId: string,
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
+    if (query.pending) await this.rooms.reconcileBranch(branchId);
     return this.invoices.list(query);
   }
 

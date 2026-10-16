@@ -42,6 +42,7 @@ export function ClinicalHistoryPanel({ visitId }: { visitId: string }) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const history = useQuery({
     queryKey: ['visits', visitId, 'history'],
+    refetchInterval: 10_000,
     queryFn: async () => (await api.get<ClinicalHistory>(`/visits/${visitId}/history`)).data,
   });
   const downloadLab = async (id: string) => {

@@ -27,7 +27,8 @@
     "lab": "Laboratory",
     "shifts": "Shifts",
     "cashflow": "Cashflow",
-    "consumables": "Medicines & materials"
+    "consumables": "Medicines & materials",
+    "lab-referrals": "Referrals by doctor"
   },
   "empty": {
     "title": "No data",
@@ -213,5 +214,23 @@
     "orderedPolicy": "Inpatient orders billed in advance appear separately. They are excluded from consumption amounts and do not confirm administration. The original ordered quantity remains unchanged after consumption is recorded.",
     "datePolicy": "Surgery consumption uses its entry date, other charges use their accounting date, and administrations use the date given. Cancelled charges are excluded.",
     "catalogHint": "Manually entered surgery medicines and materials are included. In other departments, select the appropriate catalog item; unclassified free-text charges are excluded."
+  },
+  "labReferrals": {
+    "title": "Laboratory referrals by doctor",
+    "description": "Referred patients, requested tests, payment status and result readiness.",
+    "calculation": "Based on the referral creation date. Patients are counted once per doctor and overall; one patient may appear under several tests. Cancelled orders and invoices are excluded.",
+    "direct": "Reception / direct order",
+    "patients": "Patients",
+    "orders": "Referrals",
+    "tests": "Tests",
+    "paidOrders": "Paid",
+    "pendingPaymentOrders": "Awaiting payment",
+    "approvedOrders": "Approved",
+    "testName": "Test",
+    "empty": "No referrals in this period.",
+    "loadError": "Could not load the referral report.",
+    "retry": "Retry",
+    "doctorSummary": "{patients} patients · {orders} referrals · {tests} tests",
+    "doctorTotal": "Doctor total"
   }
 }

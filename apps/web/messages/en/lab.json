@@ -147,5 +147,9 @@
   "previousPage": "Previous",
   "nextPage": "Next",
   "attachedResult": "Result in a separate file: {file}",
-  "incompleteResults": "Complete all values or attach the finished report file."
+  "incompleteResults": "Complete all values or attach the finished report file.",
+  "referringDoctor": "Referring doctor",
+  "directOrder": "Reception / direct order",
+  "referralReportShow": "Referrals by doctor",
+  "referralReportHide": "Hide referral report"
 }

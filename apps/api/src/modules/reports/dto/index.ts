@@ -1,6 +1,12 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
-import { cashflowQuerySchema, consumablesQuerySchema, idSchema, reportRangeQuerySchema } from '@avishifo/shared';
+import {
+  labReferralReportQuerySchema,
+  cashflowQuerySchema,
+  consumablesQuerySchema,
+  idSchema,
+  reportRangeQuerySchema,
+} from '@avishifo/shared';
 
 export class ConsumablesQueryDto extends createZodDto(consumablesQuerySchema) {}
 
@@ -28,3 +34,5 @@ const revenueQuerySchema = exportableRangeSchema.extend({
 });
 export type RevenueQuery = z.infer<typeof revenueQuerySchema>;
 export class RevenueQueryDto extends createZodDto(revenueQuerySchema) {}
+
+export class LabReferralReportQueryDto extends createZodDto(labReferralReportQuerySchema) {}

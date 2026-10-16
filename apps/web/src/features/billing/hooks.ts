@@ -33,6 +33,7 @@ export function usePermission(): (permission: Permission) => boolean {
 export function useInvalidateBilling(): () => void {
   const queryClient = useQueryClient();
   return useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['billing'] });
     void queryClient.invalidateQueries({ queryKey: ['invoices'] });
     void queryClient.invalidateQueries({ queryKey: ['admission'] });
     void queryClient.invalidateQueries({ queryKey: ['admission-discharge-check'] });

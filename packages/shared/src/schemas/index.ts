@@ -22,3 +22,5 @@ export * from './clinical-order';
 export * from './surgery-payout';
 
 export * from './surgery';
+
+export * from './patient-payment';

@@ -692,6 +692,11 @@ model Admission {
   ward                  String? // palata
   bed                   String? // o'rin
   attendingDoctorUserId String?
+  /// Snapshot for each new Asia/Tashkent calendar date; null keeps old stays unbilled.
+  dailyRoomRate         Decimal?  @db.Decimal(14, 2)
+  roomBillingStartsOn   DateTime? @db.Date
+  roomBillingNextDate   DateTime? @db.Date
+  roomRateSetById        String?
 
   admittedAt      DateTime  @db.Timestamptz(6)
   dischargedAt    DateTime? @db.Timestamptz(6)
@@ -731,10 +736,31 @@ model Admission {
   dailyNotes  AdmissionDailyNote[]
   chargeItems ChargeItem[]
   surgeries   SurgeryCase[]
+  roomCharges AdmissionRoomCharge[]
 
   @@unique([clinicId, historyNumber])
   @@index([clinicId, status])
   @@index([clinicId, patientId])
+  @@index([status, roomBillingNextDate])
+}
+
+/// Immutable room-day snapshot. A cancelled invoice never recreates this day.
+model AdmissionRoomCharge {
+  id           String   @id @default(uuid(7))
+  clinicId     String
+  admissionId  String
+  billingDate  DateTime @db.Date
+  dailyRate    Decimal  @db.Decimal(14, 2)
+  ward         String?
+  bed          String?
+  chargeItemId String?  @unique
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+
+  admission Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  chargeItem ChargeItem? @relation("AdmissionRoomDayCharge", fields: [chargeItemId], references: [id], onDelete: Restrict)
+
+  @@unique([admissionId, billingDate])
+  @@index([clinicId, admissionId])
 }
 
 /// Muolajalar varag'i (list naznacheniy): one ordered service on a schedule.
@@ -821,7 +847,9 @@ model ChargeItem {
   surgery        SurgeryCase?             @relation("SurgeryCharges", fields: [surgeryId], references: [id])
   surgeryFee     SurgeryCase?             @relation("SurgeryFee")
   surgeryEntry   SurgeryEntry?            @relation("SurgeryEntryCharge")
+  surgeryStaffFee SurgeryStaffFee?         @relation("SurgeryStaffFeeCharge")
   treatmentOrder TreatmentOrder?          @relation("TreatmentOrderCharge")
+  roomDay        AdmissionRoomCharge?     @relation("AdmissionRoomDayCharge")
 
   @@unique([clinicId, requestKey])
   @@index([clinicId, patientId, status])
@@ -843,6 +871,12 @@ enum SurgeryEntryKind {
 enum SurgeryPayoutType {
   PERCENT
   FIXED
+}
+
+enum SurgeryStaffRole {
+  SURGEON
+  ANESTHESIOLOGIST
+  NURSE
 }
 
 /// One operation during a hospital stay. Fees and usage enter the existing patient ledger.
@@ -872,6 +906,7 @@ model SurgeryCase {
   serviceCharge ChargeItem      @relation("SurgeryFee", fields: [serviceChargeId], references: [id])
   charges       ChargeItem[]    @relation("SurgeryCharges")
   entries       SurgeryEntry[]
+  staffFees     SurgeryStaffFee[]
   payouts       SurgeryPayout[]
 
   @@unique([clinicId, requestKey])
@@ -936,6 +971,28 @@ model SurgeryPayout {
 
   @@unique([clinicId, requestKey])
   @@index([clinicId, branchId, paidAt])
+  @@index([clinicId, surgeryId])
+}
+
+/// Optional staff service fees owed by the patient, separate from employee cash payouts.
+model SurgeryStaffFee {
+  id                 String           @id @default(uuid(7))
+  clinicId           String
+  surgeryId          String
+  role               SurgeryStaffRole
+  amount             Decimal          @db.Decimal(14, 2)
+  chargeItemId       String           @unique
+  note               String?
+  requestKey         String
+  requestFingerprint String
+  lineIndex          Int
+  createdById        String
+  createdAt          DateTime         @default(now()) @db.Timestamptz(6)
+
+  surgery    SurgeryCase @relation(fields: [surgeryId], references: [id])
+  chargeItem ChargeItem  @relation("SurgeryStaffFeeCharge", fields: [chargeItemId], references: [id])
+
+  @@unique([surgeryId, requestKey, lineIndex])
   @@index([clinicId, surgeryId])
 }
 
@@ -1590,14 +1647,38 @@ model Payment {
   voidedById     String?
   voidReason     String?
 
+  checkoutId String?
+  checkout PaymentCheckout? @relation(fields: [checkoutId], references: [id])
+
   invoice Invoice       @relation(fields: [invoiceId], references: [id])
   shift   CashierShift? @relation(fields: [shiftId], references: [id])
 
+  @@index([checkoutId])
   @@unique([clinicId, idempotencyKey])
   @@index([clinicId, branchId, paidAt])
   @@index([clinicId, invoiceId])
   /// Non-cash rows are fetched by shift now too, not just cash ones.
   @@index([shiftId, method, status])
+}
+
+/// One atomic cashier submission across a patient’s selected invoices.
+model PaymentCheckout {
+  id String @id @default(uuid(7))
+  clinicId String
+  branchId String
+  patientId String
+  requestKey String
+  requestFingerprint String
+  total Decimal @db.Decimal(14, 2)
+  /// Invoice lines and amounts as they were when the cashier accepted payment.
+  invoiceSnapshots Json
+  createdById String
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  payments Payment[]
+
+  @@unique([clinicId, requestKey])
+  @@index([clinicId, branchId, createdAt])
+  @@index([clinicId, patientId])
 }
 
 model Refund {
@@ -1848,6 +1929,10 @@ model LabOrder {
   /// reference interval for hormones, haemoglobin and platelets.
   physiologicalState PhysiologicalState?
   orderedById        String?
+  /// Clinical referrer is derived from the authenticated doctor, never request input.
+  referringDoctorUserId String?
+  /// Snapshot keeps historical referrals readable after a staff rename/deactivation.
+  referringDoctorName String?
   collectedAt        DateTime?           @db.Timestamptz(6)
   deliveredAt        DateTime?           @db.Timestamptz(6)
   createdAt          DateTime            @default(now()) @db.Timestamptz(6)
@@ -1861,6 +1946,7 @@ model LabOrder {
   @@unique([clinicId, orderNumber])
   @@index([clinicId, branchId, status])
   @@index([clinicId, patientId])
+  @@index([clinicId, branchId, referringDoctorUserId, createdAt], map: "LabOrder_referring_doctor_date_idx")
 }
 
 model LabOrderItem {

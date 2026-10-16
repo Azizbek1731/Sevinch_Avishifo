@@ -124,10 +124,11 @@ export function useDrugSearch(search: string) {
   });
 }
 
-export function useLabTests(enabled: boolean) {
+export function useLabTests(enabled: boolean, search = '') {
+  const debounced = useDebouncedValue(search.trim());
   return useQuery({
-    queryKey: ['lab-tests', { limit: 100 }],
-    queryFn: () => doctorApi.listLabTests(),
+    queryKey: ['lab-tests', { limit: 100, search: debounced }],
+    queryFn: () => doctorApi.listLabTests(debounced),
     enabled,
     select: (res) => res.data,
   });
@@ -278,11 +279,20 @@ export function useRemovePrescription(visitId: string) {
 }
 
 export function useAddReferral(visitId: string) {
+  const queryClient = useQueryClient();
   const t = useTranslations('visits');
   return useVisitMutation(
     visitId,
     (body: AddReferralInput) => doctorApi.addReferral(visitId, body),
-    { successMessage: t('referralAdded') },
+    {
+      successMessage: t('referralAdded'),
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: ['lab-orders'] });
+        void queryClient.invalidateQueries({ queryKey: ['lab'] });
+        void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+        void queryClient.invalidateQueries({ queryKey: ['reports', 'lab-referrals'] });
+      },
+    },
   );
 }
 

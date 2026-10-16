@@ -77,7 +77,7 @@ export const createLabOrderSchema = z.object({
   patientId: idSchema,
   branchId: idSchema,
   visitId: idSchema.optional(),
-  testIds: z.array(idSchema).min(1),
+  testIds: z.array(idSchema).min(1).max(100),
   physiologicalState: z.nativeEnum(PhysiologicalState).optional(),
 });
 export type CreateLabOrderInput = z.infer<typeof createLabOrderSchema>;
@@ -164,6 +164,8 @@ export type EnterLabResultsInput = z.infer<typeof enterLabResultsSchema>;
 export const labOrderQuerySchema = paginationQuerySchema.extend({
   status: z.nativeEnum(LabOrderStatus).optional(),
   branchId: idSchema.optional(),
+  referringDoctorUserId: idSchema.optional(),
+  visitId: idSchema.optional(),
   /** One patient's orders — the patient card's lab tab. */
   patientId: idSchema.optional(),
   /** Reception/history can inspect orders still waiting for cashier payment. */

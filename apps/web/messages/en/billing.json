@@ -198,5 +198,22 @@
     "pagination": "Page {page} / {pages} · {total} invoices",
     "previous": "Previous page",
     "next": "Next page"
+  },
+  "checkout": {
+    "title": "Patient payment",
+    "description": "Select services to pay for. Their remaining balances are settled together with one receipt.",
+    "queueDescription": "All outstanding bills are grouped by patient. Select individual bills or pay all.",
+    "selectAll": "Select all",
+    "selected": "{count} bills selected",
+    "invoiceCount": "{count} bills",
+    "selectInvoice": "Select invoice {number}",
+    "total": "Amount to pay",
+    "previouslyPaid": "Previously paid",
+    "paidNow": "Paid now",
+    "payAndPrint": "Pay and print receipt",
+    "empty": "No outstanding services.",
+    "limit": "Select up to 100 bills per payment.",
+    "recoveryHint": "The payment response was not received. Retry to check the payment and retrieve its receipt. Repeating this request will not create a duplicate payment.",
+    "recoverReceipt": "Check payment and retrieve receipt"
   }
 }

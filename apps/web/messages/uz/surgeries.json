@@ -80,7 +80,7 @@
   "cancelOperationHint": "Operatsiya va uning hisob chiqarilmagan narxi bekor qilinsinmi? Yozuv tarixda saqlanadi.",
   "surgeonPayments": "Jarrohlarga to‘lovlar",
   "paySurgeon": "Jarrohga to‘lash",
-  "payoutHint": "Foiz faqat operatsiya narxidan hisoblanadi. Materiallar va anesteziya dorilari kirmaydi. To‘lov tanlangan kassada chiqim sifatida qayd etiladi.",
+  "payoutHint": "Foiz faqat operatsiya narxidan hisoblanadi. Materiallar, dorilar va bemorga qo‘shilgan xodim xizmatlari foiz bazasiga kirmaydi. Bu xodimga kassadan haqiqiy pul berish bo‘lib, alohida chiqim qayd etiladi.",
   "payoutType": "Hisoblash usuli",
   "percent": "Foiz",
   "fixed": "Belgilangan summa",
@@ -136,5 +136,26 @@
       "note": "Izoh 500 ta belgidan oshmasin.",
       "items": "1 tadan 50 tagacha qator kiritish mumkin."
     }
+  },
+  "staffFees": {
+    "title": "Xodim xizmatlari",
+    "total": "Xodim xizmatlari",
+    "hint": "Bemor hisobiga operatsiya narxidan tashqari qo‘shiladigan ixtiyoriy xizmatlar.",
+    "add": "Xodim xizmati qo‘shish",
+    "formHint": "Kerakli xodimlarni belgilang va summalarni kiriting. Hammasi bir marta saqlanib, bemor hisobiga qo‘shiladi va kassaga yuboriladi.",
+    "roles": {
+      "SURGEON": "Jarroh xizmati",
+      "ANESTHESIOLOGIST": "Anesteziolog xizmati",
+      "NURSE": "Hamshira xizmati"
+    },
+    "role": "Xizmat",
+    "empty": "Qo‘shimcha xodim xizmatlari kiritilmagan. Zarur bo‘lsa jarroh, anesteziolog yoki hamshira haqini qo‘shing.",
+    "invalidAmount": "Musbat summa kiriting: 12 tagacha butun va 2 tagacha kasr xonasi.",
+    "addedTotal": "Bemor hisobiga qo‘shiladi",
+    "payoutSeparation": "Bu summalar bemorning to‘lovidir. Xodimga kassadan pul berish alohida qayd etiladi; avtomatik chiqim yaratilmaydi.",
+    "save": "Saqlash va kassaga yuborish",
+    "saved": "Xodim xizmatlari qo‘shildi va kassaga yuborildi",
+    "remove": "Xodim xizmatini bekor qilish",
+    "removeHint": "Hisob chiqarilmagan ushbu xodim xizmati bekor qilinsinmi? Yozuv tarixda saqlanadi."
   }
 }

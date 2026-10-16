@@ -388,6 +388,7 @@ export class ShiftsService {
       status: p.status,
       paidAt: p.paidAt.toISOString(),
       invoiceId: p.invoiceId,
+      checkoutId: p.checkoutId,
       invoiceNumber: p.invoice.number,
       patientName: p.invoice.patient?.fullName ?? null,
     }));

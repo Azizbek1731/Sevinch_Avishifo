@@ -44,6 +44,9 @@ export interface AdmissionRow {
   department: string | null;
   ward: string | null;
   bed: string | null;
+  dailyRoomRate: MoneyString | null;
+  roomBillingStartsOn: string | null;
+  roomBillingNextDate: string | null;
   admittedAt: string;
   dischargedAt: string | null;
   patient?: {
@@ -94,6 +97,10 @@ export interface AdmissionOrder {
 }
 
 export interface AdmissionDetail extends AdmissionRow {
+  roomBilling: {
+    timeZone: string; days: number; total: MoneyString;
+    items: Array<{ date: string; rate: MoneyString; ward: string | null; bed: string | null; chargeId: string | null; status: string }>;
+  };
   attendingDoctorUserId: string | null;
   referredBy: string | null;
   referralDiagnosis: string | null;

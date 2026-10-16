@@ -33,6 +33,7 @@ import { SurgeriesPanel } from '@/features/surgeries/components/surgeries-panel'
 import { TreatmentSheet } from './treatment-sheet';
 import { OrderDialog } from './order-dialog';
 import { DischargeDialog } from './discharge-dialog';
+import { RoomBillingCard } from './room-billing-card';
 
 /** One field of the 003 narrative, saved when it loses focus. */
 function NarrativeField({
@@ -201,6 +202,8 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <RoomBillingCard admission={a} canEdit={canWrite} />
 
       <Tabs defaultValue="sheet">
         <TabsList className="flex h-auto w-full flex-wrap justify-start">

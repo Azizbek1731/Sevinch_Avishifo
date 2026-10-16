@@ -198,5 +198,18 @@
       ]
     },
     "combineGroupHint": "All {count} medicines in this group will be added to the previous mixture. Their administration directions will come from that mixture; this group’s own directions will be cleared."
+  },
+  "labReferral": {
+    "workflow": "Select tests and send to the cashier. The laboratory starts after payment; approved results appear in this patient’s history.",
+    "search": "Search test name or code",
+    "loading": "Loading tests…",
+    "loadError": "Could not load tests.",
+    "noTests": "No tests found.",
+    "sendToCashier": "Send to cashier",
+    "cancelled": "Cancelled",
+    "waitingPayment": "Awaiting payment",
+    "ready": "Results ready",
+    "inLab": "At laboratory",
+    "openResults": "Referral and results"
   }
 }

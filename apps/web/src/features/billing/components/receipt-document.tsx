@@ -182,6 +182,11 @@ export function ReceiptDocument({ data, onReady }: { data: ReceiptPayload; onRea
 
         <Rule />
 
+        {data.checkout ? (
+          <div className="mb-2 break-words text-[0.85em]">
+            {data.checkout.invoices.map((invoice) => invoice.number).join(' · ')}
+          </div>
+        ) : null}
         <div className="space-y-1">
           {data.lines.map((l) => (
             <div key={l.id} className="receipt-line">
@@ -210,7 +215,16 @@ export function ReceiptDocument({ data, onReady }: { data: ReceiptPayload; onRea
             <Row label={t('receipt.discount')} value={`− ${money(data.totals.discountTotal)}`} />
           ) : null}
           <Row label={t('receipt.total')} value={formatUZS(data.totals.total)} strong />
-          <Row label={t('receipt.paid')} value={money(data.totals.paidTotal)} />
+          {data.checkout ? (
+            <>
+              {toTiyin(data.checkout.paidBefore) > 0n ? (
+                <Row label={t('checkout.previouslyPaid')} value={money(data.checkout.paidBefore)} />
+              ) : null}
+              <Row label={t('checkout.paidNow')} value={money(data.checkout.amount)} strong />
+            </>
+          ) : (
+            <Row label={t('receipt.paid')} value={money(data.totals.paidTotal)} />
+          )}
           {hasDue ? <Row label={t('receipt.due')} value={money(data.totals.due)} strong /> : null}
         </div>
 
@@ -221,16 +235,18 @@ export function ReceiptDocument({ data, onReady }: { data: ReceiptPayload; onRea
               {/* Which method covered how much — the whole point when a bill is
                   split across cash and a card. The timestamp is dropped: the
                   receipt is already dated at the top. */}
-              {data.payments.map((p) => (
-                <div key={p.id} className="break-inside-avoid">
-                  <Row label={t(`methods.${p.method}`)} value={money(p.amount)} />
-                  {p.note ? (
-                    <p className="mb-1 whitespace-pre-wrap break-words text-[0.9em]">
-                      {t('pay.note')}: {p.note}
-                    </p>
-                  ) : null}
-                </div>
-              ))}
+              {data.payments
+                .filter((p) => p.status === 'COMPLETED')
+                .map((p) => (
+                  <div key={p.id} className="break-inside-avoid">
+                    <Row label={t(`methods.${p.method}`)} value={money(p.amount)} />
+                    {p.note ? (
+                      <p className="mb-1 whitespace-pre-wrap break-words text-[0.9em]">
+                        {t('pay.note')}: {p.note}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
             </div>
           </>
         ) : null}

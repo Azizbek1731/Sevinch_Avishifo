@@ -17,7 +17,7 @@ import { memoryStorage } from 'multer';
 import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { UPLOAD_LIMITS, type AuthUser } from '@avishifo/shared';
-import { CurrentUser, RequirePermissions } from '../../common/decorators';
+import { ActiveBranch, CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { PaginatedResult } from '../../common/pagination';
 import { LabService } from './lab.service';
 import { LabCatalogService } from './catalog.service';
@@ -115,8 +115,12 @@ export class LabOrdersController {
 
   @Get()
   @RequirePermissions('lab.orders.read')
-  listOrders(@Query() query: LabOrderQueryDto): Promise<PaginatedResult<unknown>> {
-    return this.lab.listOrders(query);
+  listOrders(
+    @Query() query: LabOrderQueryDto,
+    @CurrentUser() user: AuthUser,
+    @ActiveBranch() branchId: string,
+  ): Promise<PaginatedResult<unknown>> {
+    return this.lab.listOrders(query, user, branchId);
   }
 
   @Get(':id')

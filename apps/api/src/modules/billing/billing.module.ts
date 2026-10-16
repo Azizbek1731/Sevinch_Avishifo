@@ -3,6 +3,9 @@ import { ServicesModule } from '../services/services.module';
 import { LabModule } from '../lab/lab.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { InvoicesService } from './invoices.service';
+import { RoomBillingService } from './room-billing.service';
+import { PatientPaymentsService } from './patient-payments.service';
+import { PatientPaymentsController } from './patient-payments.controller';
 import { InvoicesController } from './invoices.controller';
 import { ShiftsService } from './shifts.service';
 import { ShiftsController } from './shifts.controller';
@@ -21,6 +24,7 @@ import { FISCALIZATION_SERVICE, NoopFiscalizationService } from './fiscalization
   imports: [ServicesModule, LabModule, NotificationsModule],
   controllers: [
     InvoicesController,
+    PatientPaymentsController,
     ShiftsController,
     BalanceController,
     DebtorsController,
@@ -30,6 +34,8 @@ import { FISCALIZATION_SERVICE, NoopFiscalizationService } from './fiscalization
   ],
   providers: [
     InvoicesService,
+    RoomBillingService,
+    PatientPaymentsService,
     ShiftsService,
     BalanceService,
     ExpensesService,
@@ -38,6 +44,6 @@ import { FISCALIZATION_SERVICE, NoopFiscalizationService } from './fiscalization
     UzumProvider,
     { provide: FISCALIZATION_SERVICE, useClass: NoopFiscalizationService },
   ],
-  exports: [InvoicesService],
+  exports: [InvoicesService, RoomBillingService],
 })
 export class BillingModule {}

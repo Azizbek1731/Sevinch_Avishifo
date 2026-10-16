@@ -40,11 +40,11 @@ export function AdmitDialog({
 
   const form = useForm<AdmitPatientInput>({
     resolver: zodResolver(admitPatientSchema),
-    defaultValues: { patientId, department: '', ward: '', bed: '', referredBy: '', admissionDiagnosis: '' },
+    defaultValues: { patientId, department: '', ward: '', bed: '', dailyRoomRate: '', referredBy: '', admissionDiagnosis: '' },
   });
 
   useEffect(() => {
-    if (open) form.reset({ patientId, department: '', ward: '', bed: '', referredBy: '', admissionDiagnosis: '' });
+    if (open) form.reset({ patientId, department: '', ward: '', bed: '', dailyRoomRate: '', referredBy: '', admissionDiagnosis: '' });
   }, [open, patientId, form]);
 
   const admit = useMutation({
@@ -52,6 +52,8 @@ export function AdmitDialog({
     onSuccess: (res) => {
       void queryClient.invalidateQueries({ queryKey: ['admissions'] });
       void queryClient.invalidateQueries({ queryKey: ['patients'] });
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      void queryClient.invalidateQueries({ queryKey: ['patient-checkout'] });
       onOpenChange(false);
       toast.success(t('admitted', { number: res.data.historyNumber }));
       router.push(`/admissions/${res.data.id}`);
@@ -79,6 +81,13 @@ export function AdmitDialog({
               <Label htmlFor="ad-bed">{t('fields.bed')}</Label>
               <Input id="ad-bed" {...form.register('bed')} />
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ad-room-rate">{t('roomBilling.dailyRate')}</Label>
+            <Input id="ad-room-rate" inputMode="decimal" placeholder="100000" disabled={admit.isPending} {...form.register('dailyRoomRate')} />
+            <p className="text-xs text-muted-foreground">{t('roomBilling.rule')}</p>
+            <p className="text-xs text-muted-foreground">{t('roomBilling.zeroHint')}</p>
+            {form.formState.errors.dailyRoomRate ? <p className="text-xs text-destructive">{t('roomBilling.invalidRate')}</p> : null}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="ad-ref">{t('fields.referredBy')}</Label>

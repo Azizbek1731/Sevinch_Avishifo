@@ -242,6 +242,12 @@ export function LabOrderDetail({ id }: { id: string }) {
             <p className="font-semibold">{order.patient.fullName}</p>
           </div>
           <div>
+            <p className="text-xs text-muted-foreground">{t('referringDoctor')}</p>
+            <p className="text-sm font-medium">
+              {order.referringDoctor?.fullName ?? t('directOrder')}
+            </p>
+          </div>
+          <div>
             <p className="text-xs text-muted-foreground">{t('mrn')}</p>
             <p className="font-mono text-sm">{order.patient.mrn}</p>
           </div>
