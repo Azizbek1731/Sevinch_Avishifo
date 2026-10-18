@@ -71,7 +71,7 @@ import { AiModule } from './modules/ai/ai.module';
             req: (req: { id: string; method: string; url: string }) => ({
               id: req.id,
               method: req.method,
-              url: req.url,
+              url: req.url?.split('?')[0],
             }),
           },
           transport: config.isProd

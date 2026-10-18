@@ -108,6 +108,10 @@ export function resolvePanelBaseUrl(): string {
  * then leads nowhere.
  */
 export function displayBaseUrlFor(protocol: string, hostname: string, origin: string): string {
+  // Clinic LAN: the panel is on port 80 and the TV app is on 3002 of the same name or IP.
+  if (process.env.NEXT_PUBLIC_LAN_MODE === 'true') {
+    return `${protocol}//${hostname}:3002`;
+  }
   if (hostname === 'localhost' || hostname.startsWith('127.')) {
     return `${protocol}//${hostname}:3002`;
   }

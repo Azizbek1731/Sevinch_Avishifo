@@ -9,10 +9,12 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const frontendEnv = {
   ...process.env,
   NODE_ENV: 'production',
-  NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || process.env.API_URL,
-  NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || process.env.API_URL,
-  NEXT_PUBLIC_DISPLAY_URL: process.env.NEXT_PUBLIC_DISPLAY_URL || process.env.DISPLAY_URL,
-  NEXT_PUBLIC_PORTAL_URL: process.env.NEXT_PUBLIC_PORTAL_URL || process.env.PORTAL_URL,
+  // An empty public URL means same-origin. `||` would replace that with localhost
+  // and send every other clinic computer to its own machine.
+  NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? '',
+  NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL ?? '',
+  NEXT_PUBLIC_DISPLAY_URL: process.env.NEXT_PUBLIC_DISPLAY_URL ?? '',
+  NEXT_PUBLIC_PORTAL_URL: process.env.NEXT_PUBLIC_PORTAL_URL ?? '',
 };
 const apps = [
   { name: 'api', url: process.env.API_URL, fallbackPort: '3001' },
@@ -44,6 +46,8 @@ function run(name, args) {
     cwd: root,
     stdio: 'inherit',
     detached: process.platform !== 'win32',
+    // Windows only resolves pnpm.cmd through a shell.
+    shell: process.platform === 'win32',
     // Keep the API's configured cookie/security policy for the local HTTP host.
     env: name === 'api' ? process.env : frontendEnv,
   });

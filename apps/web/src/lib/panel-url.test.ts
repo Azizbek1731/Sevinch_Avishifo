@@ -17,6 +17,7 @@ describe('resolveDisplayBaseUrl', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     delete process.env.NEXT_PUBLIC_DISPLAY_URL;
+    delete process.env.NEXT_PUBLIC_LAN_MODE;
   });
 
   it('swaps the crm subdomain for tv', () => {
@@ -42,6 +43,14 @@ describe('resolveDisplayBaseUrl', () => {
   it('falls back to the same origin when the panel is not on a crm host', () => {
     atOrigin('https://avishifo.uz/settings');
     expect(resolveDisplayBaseUrl()).toBe('https://avishifo.uz');
+  });
+
+  it('keeps the opened hostname and uses the TV port on a clinic LAN', () => {
+    process.env.NEXT_PUBLIC_LAN_MODE = 'true';
+    atOrigin('http://sevinch.local/settings');
+    expect(resolveDisplayBaseUrl()).toBe('http://sevinch.local:3002');
+    atOrigin('http://192.168.1.110/uz/settings');
+    expect(resolveDisplayBaseUrl()).toBe('http://192.168.1.110:3002');
   });
 
   it('lets an explicit env value win, trailing slashes trimmed', () => {

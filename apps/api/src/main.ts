@@ -45,7 +45,7 @@ async function bootstrap(): Promise<void> {
     SwaggerModule.setup('api/docs', app, cleanupOpenApiDoc(SwaggerModule.createDocument(app, doc)));
   }
 
-  await app.listen(config.env.API_PORT);
+  await app.listen(config.env.API_PORT, process.env.API_HOST || '0.0.0.0');
 }
 
 void bootstrap();

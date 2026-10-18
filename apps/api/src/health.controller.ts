@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { Public } from './common/decorators';
 import { PrismaService } from './core/prisma/prisma.service';
 import { RedisService } from './core/redis/redis.service';
@@ -12,7 +13,9 @@ export class HealthController {
 
   @Public()
   @Get()
-  async health(): Promise<{ status: string; db: boolean; redis: boolean }> {
+  async health(
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ status: string; db: boolean; redis: boolean }> {
     const [db, redis] = await Promise.all([
       this.prisma.unscoped.$queryRaw`SELECT 1`.then(
         () => true,
@@ -23,6 +26,8 @@ export class HealthController {
         () => false,
       ),
     ]);
-    return { status: db && redis ? 'ok' : 'degraded', db, redis };
+    const ok = db && redis;
+    if (!ok) res.status(503);
+    return { status: ok ? 'ok' : 'degraded', db, redis };
   }
 }

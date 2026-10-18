@@ -1,7 +1,10 @@
 // Start the clinic apps using the URLs configured in the root .env.
 import { spawn } from 'node:child_process';
 
-const build = spawn('pnpm', ['--filter', '@avishifo/shared', 'build'], { stdio: 'inherit' });
+const build = spawn('pnpm', ['--filter', '@avishifo/shared', 'build'], {
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+});
 const buildCode = await new Promise((resolve) => build.once('exit', resolve));
 if (buildCode !== 0) process.exit(buildCode ?? 1);
 
@@ -15,12 +18,13 @@ const children = apps.map(([name, args]) =>
   spawn('pnpm', ['--filter', `@avishifo/${name}`, ...args], {
     stdio: 'inherit',
     detached: process.platform !== 'win32',
+    shell: process.platform === 'win32',
     env: {
       ...process.env,
-      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || process.env.API_URL,
-      NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || process.env.API_URL,
-      NEXT_PUBLIC_DISPLAY_URL: process.env.NEXT_PUBLIC_DISPLAY_URL || process.env.DISPLAY_URL,
-      NEXT_PUBLIC_PORTAL_URL: process.env.NEXT_PUBLIC_PORTAL_URL || process.env.PORTAL_URL,
+      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? '',
+      NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL ?? '',
+      NEXT_PUBLIC_DISPLAY_URL: process.env.NEXT_PUBLIC_DISPLAY_URL ?? '',
+      NEXT_PUBLIC_PORTAL_URL: process.env.NEXT_PUBLIC_PORTAL_URL ?? '',
     },
   }),
 );

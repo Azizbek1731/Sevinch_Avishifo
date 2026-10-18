@@ -31,6 +31,9 @@ export function resolvePortalBaseUrl(): string {
   if (typeof window === 'undefined') return '';
 
   const { protocol, hostname } = window.location;
+  if (process.env.NEXT_PUBLIC_LAN_MODE === 'true') {
+    return `${protocol}//${hostname}:3003`;
+  }
   if (hostname === 'localhost' || hostname.startsWith('127.')) {
     return `${protocol}//${hostname}:3003`;
   }
