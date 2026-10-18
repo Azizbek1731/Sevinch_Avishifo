@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { createSurgerySchema, formatUZS, type CreateSurgeryInput } from '@avishifo/shared';
+import { createId } from '@/lib/id';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -77,7 +78,7 @@ export function CreateSurgeryDialog({
         surgeonUserId: '',
         scheduledDate: todayTashkent(),
         note: '',
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: createId(),
       });
     }
   }, [open, admissionId, branchId, form]);

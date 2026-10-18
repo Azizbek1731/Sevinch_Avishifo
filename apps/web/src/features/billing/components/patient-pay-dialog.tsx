@@ -12,6 +12,7 @@ import {
   type PaymentPart,
   type PatientCheckoutInput,
 } from '@avishifo/shared';
+import { createId } from '@/lib/id';
 import { useAuthStore } from '@/stores/auth-store';
 import { localizedText } from '@/lib/localized';
 import { ApiError } from '@/lib/api-client';
@@ -175,7 +176,7 @@ function PatientPaymentForm({
     };
     const fingerprint = JSON.stringify(input);
     if (request.current?.fingerprint !== fingerprint)
-      request.current = { fingerprint, key: crypto.randomUUID() };
+      request.current = { fingerprint, key: createId() };
     submitting.current = true;
     setBusy(true);
     mutation.mutate({ ...input, idempotencyKey: request.current.key });

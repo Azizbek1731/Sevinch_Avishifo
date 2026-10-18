@@ -15,6 +15,7 @@ import {
   type AddSurgeryStaffFeesInput,
   type SurgeryStaffRole,
 } from "@avishifo/shared";
+import { createId } from "@/lib/id";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,7 +63,7 @@ function StaffFeesForm({
   const [discard, setDiscard] = useState(false);
   const form = useForm<AddSurgeryStaffFeesInput>({
     resolver: zodResolver(addSurgeryStaffFeesSchema),
-    defaultValues: { idempotencyKey: crypto.randomUUID(), items: [] },
+    defaultValues: { idempotencyKey: createId(), items: [] },
   });
   const { fields, append, remove } = useFieldArray({
     control: form.control,

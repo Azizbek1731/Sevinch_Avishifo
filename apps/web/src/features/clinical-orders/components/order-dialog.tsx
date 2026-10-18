@@ -16,6 +16,7 @@ import {
   type CreateClinicalOrderInput,
   type AddClinicalServicesInput,
 } from '@avishifo/shared';
+import { createId } from '@/lib/id';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -140,7 +141,7 @@ export function ClinicalOrderDialog({
       doctorUserId: '',
       kind,
       serviceIds: [],
-      idempotencyKey: crypto.randomUUID(),
+      idempotencyKey: createId(),
       note: '',
     });
   }, [open, kind, branchId, fixedPatient, form]);
@@ -162,7 +163,7 @@ export function ClinicalOrderDialog({
     };
     const fingerprint = JSON.stringify(payload);
     if (identity.current?.fingerprint !== fingerprint)
-      identity.current = { fingerprint, key: crypto.randomUUID() };
+      identity.current = { fingerprint, key: createId() };
     create.mutate({ ...values, note: payload.note, idempotencyKey: identity.current.key });
   });
   return (
@@ -304,7 +305,7 @@ export function ExtraClinicalServicesDialog({
     const serviceIds = services.map((service) => service.id);
     const fingerprint = JSON.stringify({ orderId, serviceIds });
     if (identity.current?.fingerprint !== fingerprint)
-      identity.current = { fingerprint, key: crypto.randomUUID() };
+      identity.current = { fingerprint, key: createId() };
     const parsed = addClinicalServicesSchema.safeParse({
       serviceIds,
       idempotencyKey: identity.current.key,

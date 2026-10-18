@@ -11,6 +11,7 @@ import {
   formatUZS,
   type CreateSurgeryPayoutInput,
 } from '@avishifo/shared';
+import { createId } from '@/lib/id';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -70,7 +71,7 @@ export function SurgeryPayoutDialog({
         value: '',
         method: 'CASH',
         note: '',
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: createId(),
       });
     }
   }, [open, surgery.id, form]);

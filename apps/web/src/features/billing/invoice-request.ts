@@ -1,4 +1,5 @@
 import type { QuickInvoiceInput } from '@avishifo/shared';
+import { createId } from '@/lib/id';
 
 export interface InvoiceRequestIdentity {
   fingerprint: string;
@@ -13,5 +14,5 @@ export function identifyInvoiceRequest(
   const fingerprint = JSON.stringify(payload);
   return previous?.fingerprint === fingerprint
     ? previous
-    : { fingerprint, key: crypto.randomUUID() };
+    : { fingerprint, key: createId() };
 }

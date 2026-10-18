@@ -1,3 +1,5 @@
+import { createId } from '@/lib/id';
+
 export interface SurgeryRequestKey {
   fingerprint: string;
   key: string;
@@ -9,5 +11,5 @@ export function identifySurgeryRequest(
   const fingerprint = JSON.stringify(payload);
   return previous?.fingerprint === fingerprint
     ? previous
-    : { fingerprint, key: crypto.randomUUID() };
+    : { fingerprint, key: createId() };
 }

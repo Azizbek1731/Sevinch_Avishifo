@@ -12,6 +12,7 @@ import {
   type CreateOrderInput,
 } from '@avishifo/shared';
 import { todayTashkent } from '@/lib/dates';
+import { createId } from '@/lib/id';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -104,7 +105,7 @@ export function OrderDialog({
     if (!parsed.success || create.isPending) return;
     const fingerprint = JSON.stringify(parsed.data);
     if (requestIdentity.current?.fingerprint !== fingerprint)
-      requestIdentity.current = { fingerprint, key: crypto.randomUUID() };
+      requestIdentity.current = { fingerprint, key: createId() };
     create.mutate({ ...parsed.data, idempotencyKey: requestIdentity.current.key });
   };
 

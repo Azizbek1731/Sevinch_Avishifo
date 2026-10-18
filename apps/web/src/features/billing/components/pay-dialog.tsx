@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { createId } from '@/lib/id';
 import { useAuthStore } from '@/stores/auth-store';
 import { inputTiyin, needsOpenShift } from '../payment-methods';
 import { billingApi, sanitizeMoney } from '../api';
@@ -57,7 +58,7 @@ export function PayDialog({ open, onOpenChange, invoice, onPaid }: PayDialogProp
   });
 
   // One idempotency key per dialog opening: retries of the same submission reuse it.
-  const [idempotencyKey, setIdempotencyKey] = useState<string>(() => crypto.randomUUID());
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() => createId());
   const submitting = useRef(false);
   const deliveredReceipts = useRef(new Set<string>());
 
@@ -73,7 +74,7 @@ export function PayDialog({ open, onOpenChange, invoice, onPaid }: PayDialogProp
 
   useEffect(() => {
     if (open) {
-      setIdempotencyKey(crypto.randomUUID());
+      setIdempotencyKey(createId());
       form.reset({ amount: invoice.due });
       setPayments([{ method: PaymentMethod.CASH, amount: invoice.due }]);
     }

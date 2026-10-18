@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { createId } from '@/lib/id';
 import { billingApi } from '../api';
 import { scheduleReceiptPrint } from '../receipt-print';
 import { ReceiptDocument } from './receipt-document';
@@ -36,7 +37,7 @@ export function ReceiptPrinter({
 }: ReceiptPrinterProps) {
   const t = useTranslations('billing');
   const tc = useTranslations('common');
-  const [mountId] = useState(() => crypto.randomUUID());
+  const [mountId] = useState(() => createId());
   const printRequestId = requestId ?? `${mountId}:${invoiceId}`;
   const [printFailed, setPrintFailed] = useState(false);
   const [renderedRequest, setRenderedRequest] = useState<string | null>(null);

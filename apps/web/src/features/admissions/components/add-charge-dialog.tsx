@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { addChargeSchema, fromTiyin, toTiyin, type AddChargeInput } from '@avishifo/shared';
 import { todayTashkent } from '@/lib/dates';
+import { createId } from '@/lib/id';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -83,7 +84,7 @@ export function AddChargeDialog({
     };
     const fingerprint = JSON.stringify(payload);
     if (requestIdentity.current?.fingerprint !== fingerprint)
-      requestIdentity.current = { fingerprint, key: crypto.randomUUID() };
+      requestIdentity.current = { fingerprint, key: createId() };
     add.mutate({ ...payload, idempotencyKey: requestIdentity.current.key });
   };
 
