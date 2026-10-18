@@ -7,6 +7,13 @@ import {
   formatRangeBounds,
   type ReferenceRangeInput,
 } from '@avishifo/shared';
+import {
+  CLINIC_PDF_COLORS,
+  drawClinicLetterhead,
+  drawClinicPageFurniture,
+  preparePdfClinicLogo,
+  type PdfClinicProfile,
+} from '../../common/pdf/clinic-letterhead';
 
 /**
  * The lab result as a PDF — the artefact a patient keeps.
@@ -22,12 +29,7 @@ import {
 
 /** Shape of lab.service printPayload, narrowed to what the PDF draws. */
 export interface ResultPdfData {
-  clinic: {
-    name: string;
-    legalName: string | null;
-    address: string | null;
-    phone: string | null;
-  };
+  clinic: PdfClinicProfile;
   order: {
     orderNumber: string;
     createdAt: string | null;
@@ -165,13 +167,8 @@ const FLAG_MARK: Record<ResultFlag, string> = {
   [ResultFlag.CRITICAL_LOW]: 'L!!',
 };
 
-const INK = '#1a1a1a';
-const MUTED = '#666666';
-const RULE = '#c9c9c9';
-const ZEBRA = '#f5f7fa';
-const BRAND = '#1d64c4';
-const RED = '#c0262b';
-const BLUE = '#1d5fbf';
+const { ink: INK, muted: MUTED, rule: RULE, pale: ZEBRA, blue: BRAND, red: RED } = CLINIC_PDF_COLORS;
+const BLUE = BRAND;
 
 const A4 = { width: 595.28, height: 841.89 };
 const MARGIN = 44;
@@ -194,11 +191,12 @@ function localName(name: Record<string, string>, locale: PdfLocale): string {
 @Injectable()
 export class ResultPdfService {
   /** Renders the whole document and resolves with its bytes. */
-  render(data: ResultPdfData, locale: PdfLocale = 'uz'): Promise<Buffer> {
+  async render(data: ResultPdfData, locale: PdfLocale = 'uz'): Promise<Buffer> {
+    const logo = await preparePdfClinicLogo(data.clinic.logoUrl);
     const L = LABELS[locale] ?? LABELS.uz;
     const doc = new PDFDocument({
       size: 'A4',
-      margins: { top: MARGIN, bottom: MARGIN + 18, left: MARGIN, right: MARGIN },
+      margins: { top: 74, bottom: 62, left: MARGIN, right: MARGIN },
       info: { Title: `${L.title} — ${data.order.orderNumber}` },
       // Pages stay in memory until the end so the footer pass can revisit them.
       bufferPages: true,
@@ -213,6 +211,7 @@ export class ResultPdfService {
       doc.on('error', reject);
     });
 
+    drawClinicLetterhead(doc, data.clinic, logo, MARGIN);
     this.header(doc, data, L);
     this.patientBlock(doc, data, L);
 
@@ -222,7 +221,9 @@ export class ResultPdfService {
     }
     if (critical) this.criticalBanner(doc, L);
     this.signature(doc, data, L);
-    this.pageFooters(doc, data, L);
+    drawClinicPageFurniture(doc, data.clinic, {
+      margin: MARGIN, documentLabel: L.title, documentId: `№ ${data.order.orderNumber}`, pageLabel: L.page,
+    });
 
     doc.end();
     return done;
@@ -231,49 +232,41 @@ export class ResultPdfService {
   // ------------------------------------------------------------ sections
 
   private header(doc: PDFKit.PDFDocument, data: ResultPdfData, L: PdfLabels): void {
-    const { clinic, order } = data;
-    doc.font('bold').fontSize(16).fillColor(BRAND).text(clinic.name, MARGIN, MARGIN);
-    doc.font('body').fontSize(8.5).fillColor(MUTED);
-    const contact = [clinic.address, clinic.phone].filter(Boolean).join('  ·  ');
-    if (contact) doc.text(contact);
-
-    // Right side of the same band: what this paper is, and its number.
-    doc.font('bold').fontSize(11).fillColor(INK);
-    doc.text(L.title, MARGIN, MARGIN, { width: CONTENT_W, align: 'right' });
-    doc.font('body').fontSize(9).fillColor(MUTED);
-    doc.text(`№ ${order.orderNumber}`, MARGIN, MARGIN + 16, { width: CONTENT_W, align: 'right' });
-    doc.text(`${L.date}: ${fmtDate(order.collectedAt ?? order.createdAt)}`, MARGIN, MARGIN + 29, {
-      width: CONTENT_W,
-      align: 'right',
-    });
-
-    const y = Math.max(doc.y, MARGIN + 44);
-    doc
-      .moveTo(MARGIN, y)
-      .lineTo(A4.width - MARGIN, y)
-      .lineWidth(1.2)
-      .strokeColor(BRAND)
-      .stroke();
-    doc.y = y + 12;
+    const { order } = data;
+    doc.font('bold').fontSize(13).fillColor(INK).text(L.title, MARGIN, doc.y, { width: CONTENT_W });
+    const y = doc.y + 6;
+    doc.font('body').fontSize(8.5).fillColor(MUTED)
+      .text(`№ ${order.orderNumber}`, MARGIN, y, { width: CONTENT_W / 2 });
+    doc.text(`${L.date}: ${fmtDate(order.collectedAt ?? order.createdAt)}`,
+      MARGIN + CONTENT_W / 2, y, { width: CONTENT_W / 2, align: 'right' });
+    doc.y += 13;
   }
 
   private patientBlock(doc: PDFKit.PDFDocument, data: ResultPdfData, L: PdfLabels): void {
     const p = data.order.patient;
     const y = doc.y;
+    doc.font('bold').fontSize(10.5);
+    const nameHeight = doc.heightOfString(p.fullName, { width: CONTENT_W - 24 });
+    const height = Math.max(68, nameHeight + 53);
+    doc.roundedRect(MARGIN, y, CONTENT_W, height, 5).fillColor(ZEBRA).fill();
+    doc.font('body').fontSize(7).fillColor(MUTED)
+      .text(L.patient.toUpperCase(), MARGIN + 12, y + 9, { width: CONTENT_W - 24 });
+    doc.font('bold').fontSize(10.5).fillColor(INK)
+      .text(p.fullName, MARGIN + 12, y + 19, { width: CONTENT_W - 24 });
+    const detailY = y + nameHeight + 27;
     const cell = (label: string, value: string, x: number, w: number): void => {
-      doc.font('body').fontSize(7.5).fillColor(MUTED).text(label.toUpperCase(), x, y, { width: w });
+      doc.font('body').fontSize(7).fillColor(MUTED).text(label, x, detailY, { width: w });
       doc
         .font('bold')
-        .fontSize(10)
+        .fontSize(8.5)
         .fillColor(INK)
-        .text(value, x, y + 10, { width: w });
+        .text(value, x, detailY + 10, { width: w });
     };
     const gender = p.gender === 'MALE' ? L.male : p.gender === 'FEMALE' ? L.female : '—';
-    cell(L.patient, p.fullName, MARGIN, CONTENT_W * 0.42);
-    cell(L.card, p.mrn, MARGIN + CONTENT_W * 0.44, CONTENT_W * 0.16);
-    cell(L.dob, fmtDate(p.dob), MARGIN + CONTENT_W * 0.62, CONTENT_W * 0.2);
-    cell(L.gender, gender, MARGIN + CONTENT_W * 0.84, CONTENT_W * 0.16);
-    doc.y = y + 30;
+    cell(L.card, p.mrn, MARGIN + 12, CONTENT_W * 0.34);
+    cell(L.dob, fmtDate(p.dob), MARGIN + CONTENT_W * 0.4, CONTENT_W * 0.32);
+    cell(L.gender, gender, MARGIN + CONTENT_W * 0.77, CONTENT_W * 0.2);
+    doc.y = y + height + 7;
   }
 
   /** One ordered test with its results table. Returns true if a critical flag was drawn. */
@@ -312,19 +305,7 @@ export class ResultPdfService {
       return false;
     }
 
-    // Table head
-    const headY = doc.y;
-    const xs = this.colX();
-    doc
-      .rect(MARGIN, headY - 2, CONTENT_W, 15)
-      .fillColor('#eef2f7')
-      .fill();
-    doc.font('bold').fontSize(8).fillColor(MUTED);
-    const heads = [L.parameter, L.value, L.unit, L.reference, L.flag];
-    heads.forEach((h, i) =>
-      doc.text(h.toUpperCase(), xs[i]! + 3, headY + 1, { width: this.colW(i) - 6 }),
-    );
-    doc.y = headY + 16;
+    this.tableHeader(doc, L);
 
     let zebra = false;
     for (const param of item.labTest.parameters) {
@@ -339,26 +320,6 @@ export class ResultPdfService {
       const range = param.matchedRange ?? null;
       const refText = range ? formatRangeBounds(range) : '—';
 
-      const cells = [param.name, v.value, param.unit ?? '', refText, mark];
-      const rowH =
-        Math.max(
-          ...cells.map((c, i) =>
-            doc
-              .font('body')
-              .fontSize(9)
-              .heightOfString(String(c), { width: this.colW(i) - 6 }),
-          ),
-        ) + 7;
-      this.ensureRoom(doc, rowH);
-      const y = doc.y;
-      if (zebra) {
-        doc
-          .rect(MARGIN, y - 2, CONTENT_W, rowH)
-          .fillColor(ZEBRA)
-          .fill();
-      }
-      zebra = !zebra;
-
       const valueColor = isCritical
         ? RED
         : v.flag === ResultFlag.HIGH || v.flag === ResultFlag.ABNORMAL
@@ -366,25 +327,10 @@ export class ResultPdfService {
           : v.flag === ResultFlag.LOW
             ? BLUE
             : INK;
-      doc
-        .font('body')
-        .fontSize(9)
-        .fillColor(INK)
-        .text(param.name, xs[0]! + 3, y, { width: this.colW(0) - 6 });
-      doc
-        .font(v.flag === ResultFlag.NORMAL ? 'body' : 'bold')
-        .fillColor(valueColor)
-        .text(v.value, xs[1]! + 3, y, { width: this.colW(1) - 6 });
-      doc
-        .font('body')
-        .fillColor(MUTED)
-        .text(param.unit ?? '', xs[2]! + 3, y, { width: this.colW(2) - 6 });
-      doc.fillColor(MUTED).text(refText, xs[3]! + 3, y, { width: this.colW(3) - 6 });
-      doc
-        .font('bold')
-        .fillColor(valueColor)
-        .text(mark, xs[4]! + 3, y, { width: this.colW(4) - 6 });
-      doc.y = y + rowH;
+      this.tableRow(doc, [param.name, v.value, param.unit ?? '', refText, mark], {
+        valueColor, emphasis: v.flag !== ResultFlag.NORMAL, zebra, labels: L,
+      });
+      zebra = !zebra;
     }
     doc
       .moveTo(MARGIN, doc.y)
@@ -443,29 +389,95 @@ export class ResultPdfService {
     }
   }
 
-  /** Footer on every page: brand line left, page number right. */
-  private pageFooters(doc: PDFKit.PDFDocument, data: ResultPdfData, L: PdfLabels): void {
-    const range = doc.bufferedPageRange();
-    for (let i = range.start; i < range.start + range.count; i++) {
-      doc.switchToPage(i);
-      // The footer lives inside the bottom margin; writing there normally makes
-      // pdfkit start a fresh page, so the margin is zeroed for this pass.
-      doc.page.margins.bottom = 0;
-      const y = A4.height - 30;
-      doc.font('body').fontSize(7.5).fillColor(MUTED);
-      doc.text(`${data.clinic.name} · AviShifo`, MARGIN, y, {
-        width: CONTENT_W / 2,
-        lineBreak: false,
-      });
-      doc.text(`${L.page} ${i - range.start + 1}/${range.count}`, MARGIN + CONTENT_W / 2, y, {
-        width: CONTENT_W / 2,
-        align: 'right',
-        lineBreak: false,
-      });
-    }
+  // ------------------------------------------------------------ helpers
+
+  private tableHeader(doc: PDFKit.PDFDocument, labels: PdfLabels): void {
+    const y = doc.y;
+    doc.rect(MARGIN, y, CONTENT_W, 23).fillColor(ZEBRA).fill();
+    doc.font('bold').fontSize(7.5).fillColor(BRAND);
+    const xs = this.colX();
+    [labels.parameter, labels.value, labels.unit, labels.reference, labels.flag]
+      .forEach((title, index) => doc.text(title.toUpperCase(), xs[index]! + 5, y + 6,
+        { width: this.colW(index) - 10, height: 16, lineBreak: false }));
+    doc.y = y + 28;
   }
 
-  // ------------------------------------------------------------ helpers
+  /** Explicit wrapping lets an unusually long result continue safely as a table row. */
+  private cellLines(doc: PDFKit.PDFDocument, text: string, width: number): string[] {
+    const lines: string[] = [];
+    for (const paragraph of text.split('\n')) {
+      let line = '';
+      for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+        const candidate = line ? `${line} ${word}` : word;
+        if (doc.widthOfString(candidate) <= width) {
+          line = candidate;
+          continue;
+        }
+        if (line) lines.push(line);
+        line = '';
+        for (const character of word) {
+          if (line && doc.widthOfString(line + character) > width) {
+            lines.push(line);
+            line = '';
+          }
+          line += character;
+        }
+      }
+      lines.push(line);
+    }
+    return lines;
+  }
+
+  private tableRow(
+    doc: PDFKit.PDFDocument,
+    cells: string[],
+    options: { valueColor: string; emphasis: boolean; zebra: boolean; labels: PdfLabels },
+  ): void {
+    const lineHeight = 12;
+    const padding = 6;
+    const bottom = A4.height - 64;
+    const xs = this.colX();
+    const lines = cells.map((value, index) => {
+      doc.font(index === 4 || (index === 1 && options.emphasis) ? 'bold' : 'body').fontSize(9);
+      return this.cellLines(doc, value, this.colW(index) - 10);
+    });
+    const totalLines = Math.max(...lines.map((cell) => cell.length));
+    const rowHeight = totalLines * lineHeight + padding;
+    // Keep ordinary rows together; oversized rows are split below and each
+    // continuation page repeats the table labels.
+    if (doc.y + Math.min(rowHeight, 80) > bottom ||
+        (rowHeight < bottom - doc.page.margins.top - 28 && doc.y + rowHeight > bottom)) {
+      doc.addPage();
+      this.tableHeader(doc, options.labels);
+    }
+    let offset = 0;
+    while (offset < totalLines) {
+      const count = Math.min(totalLines - offset, Math.floor((bottom - doc.y - padding) / lineHeight));
+      if (count < 1) {
+        doc.addPage();
+        this.tableHeader(doc, options.labels);
+        continue;
+      }
+      const y = doc.y;
+      const height = count * lineHeight + padding;
+      if (options.zebra) doc.rect(MARGIN, y - 3, CONTENT_W, height).fillColor(ZEBRA).fill();
+      lines.forEach((cell, index) => {
+        doc.font(index === 4 || (index === 1 && options.emphasis) ? 'bold' : 'body').fontSize(9)
+          .fillColor(index === 1 || index === 4 ? options.valueColor : index === 0 ? INK : MUTED);
+        cell.slice(offset, offset + count).forEach((line, row) => {
+          doc.text(line, xs[index]! + 5, y + row * lineHeight,
+            { width: this.colW(index) - 10, height: lineHeight, lineBreak: false });
+        });
+      });
+      doc.y = y + height;
+      offset += count;
+      if (offset < totalLines) {
+        doc.addPage();
+        this.tableHeader(doc, options.labels);
+      }
+    }
+    doc.x = MARGIN;
+  }
 
   private colX(): number[] {
     const xs: number[] = [];
@@ -485,7 +497,7 @@ export class ResultPdfService {
   private ensureRoom(doc: PDFKit.PDFDocument, needed: number): void {
     if (doc.y + needed > A4.height - MARGIN - 20) {
       doc.addPage();
-      doc.y = MARGIN;
+      doc.y = doc.page.margins.top;
     }
   }
 }

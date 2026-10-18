@@ -1253,7 +1253,7 @@ export class VisitsService {
     // Clinic is not auto-scoped; this explicit own-clinic lookup supplies the letterhead.
     const clinic = await this.prisma.unscoped.clinic.findUniqueOrThrow({
       where: { id: TenantContext.requireClinicId() },
-      select: { name: true, legalName: true, address: true, phone: true },
+      select: { name: true, legalName: true, logoUrl: true, address: true, phone: true },
     });
     const authorId = visit.amendments[0]?.authorId;
     const author = authorId

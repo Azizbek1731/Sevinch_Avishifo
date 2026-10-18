@@ -7,10 +7,13 @@ import { ArrowLeft, Printer } from 'lucide-react';
 import { formatPrescriptionGroup, groupPrescriptionItems } from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  ClinicDocumentFooter,
+  ClinicLetterhead,
+  useClinicPrintAssets,
+} from '@/components/print/clinic-letterhead';
 import { Link } from '@/i18n/routing';
-import { API_URL } from '@/lib/api-client';
 import { formatDate, formatTz } from '@/lib/dates';
-import type { VisitPrintPayload } from '../api';
 import { useVisitPrint } from '../hooks';
 
 function icd10Name(
@@ -20,29 +23,6 @@ function icd10Name(
   if (locale === 'ru' && item.nameRu) return item.nameRu;
   if (locale === 'en' && item.nameEn) return item.nameEn;
   return item.nameUz;
-}
-
-function Letterhead({ payload }: { payload: VisitPrintPayload }) {
-  const logoSrc = payload.clinic.logoUrl
-    ? payload.clinic.logoUrl.startsWith('http')
-      ? payload.clinic.logoUrl
-      : `${API_URL}${payload.clinic.logoUrl}`
-    : null;
-  return (
-    <header className="mb-6 flex items-center justify-between border-b-2 border-black pb-4">
-      <div className="flex items-center gap-3">
-        {logoSrc ? (
-          /* Plain img: clinic logo comes from the API host and must render for print. */
-          <img src={logoSrc} alt="" className="h-14 w-14 object-contain" />
-        ) : null}
-        <div>
-          <p className="text-xl font-bold">{payload.clinic.name}</p>
-          {payload.clinic.address ? <p className="text-sm">{payload.clinic.address}</p> : null}
-          {payload.clinic.phone ? <p className="text-sm">{payload.clinic.phone}</p> : null}
-        </div>
-      </div>
-    </header>
-  );
 }
 
 export function VisitPrint({ visitId }: { visitId: string }) {
@@ -56,15 +36,17 @@ export function VisitPrint({ visitId }: { visitId: string }) {
 
   const { data: payload, isLoading, isError, refetch } = useVisitPrint(visitId);
   const printedRef = useRef(false);
+  const printAssets = useClinicPrintAssets(payload?.clinic.logoUrl);
 
   useEffect(() => {
-    if (auto && payload?.visit.status === 'COMPLETED' && !printedRef.current) {
-      printedRef.current = true;
-      // Let the letterhead/logo paint before opening the dialog.
-      const timer = setTimeout(() => window.print(), 300);
+    if (auto && payload?.visit.status === 'COMPLETED' && printAssets.ready && !printedRef.current) {
+      const timer = setTimeout(() => {
+        printedRef.current = true;
+        window.print();
+      }, 300);
       return () => clearTimeout(timer);
     }
-  }, [auto, payload]);
+  }, [auto, payload, printAssets.ready]);
 
   if (isLoading) {
     return (
@@ -112,25 +94,16 @@ export function VisitPrint({ visitId }: { visitId: string }) {
             {tCommon('back')}
           </Link>
         </Button>
-        <Button onClick={() => window.print()}>
+        <Button onClick={() => window.print()} disabled={!printAssets.ready}>
           <Printer className="mr-2 h-4 w-4" />
           {tCommon('print')}
         </Button>
       </div>
 
-      <style>{`@media print {
-        @page clinical-report { size: A4; margin: 16mm; }
-        body:has(.clinical-report-print) *:not(:has(.clinical-report-print)):not(.clinical-report-print):not(.clinical-report-print *) { display: none !important; }
-        body:has(.clinical-report-print), body:has(.clinical-report-print) *:has(.clinical-report-print) { display: block !important; position: static !important; overflow: visible !important; height: auto !important; min-height: 0 !important; max-height: none !important; width: auto !important; max-width: none !important; margin: 0 !important; padding: 0 !important; border: 0 !important; transform: none !important; }
-        .clinical-report-print { page: clinical-report; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
-        .clinical-report-print h1, .clinical-report-print h2 { break-after: avoid; }
-        .clinical-report-print footer { break-inside: avoid; }
-        .clinical-report-print .prescription-group { break-inside: avoid; }
-      }`}</style>
-      <div className="print-area print-flow clinical-report-print rounded-md border bg-white p-8 text-black shadow-sm">
-        <Letterhead payload={payload} />
+      <div className="print-area print-flow clinic-document-print clinical-report-print rounded-md border bg-white p-8 text-black shadow-sm">
+        <ClinicLetterhead clinic={payload.clinic} onLogoReady={printAssets.onReady} />
 
-        <h1 className="mb-4 text-center text-lg font-bold uppercase">
+        <h1 className="mb-4 border-b border-[#dce3ed] pb-3 text-center text-lg font-bold uppercase text-[#173f91]">
           {ultrasound
             ? visit.reportTitle || tr('ultrasoundReport')
             : mode === 'prescription'
@@ -138,7 +111,7 @@ export function VisitPrint({ visitId }: { visitId: string }) {
               : t('printSummaryTitle')}
         </h1>
 
-        <section className="mb-5 grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
+        <section className="mb-5 grid grid-cols-2 gap-x-8 gap-y-1 rounded border border-[#dce3ed] px-3 py-2.5 text-sm">
           <p>
             <span className="font-semibold">{tCommon('patient')}:</span> {payload.patient.fullName}
           </p>
@@ -244,6 +217,7 @@ export function VisitPrint({ visitId }: { visitId: string }) {
             <p className="mt-1 text-center text-xs">{t('signature')}</p>
           </div>
         </footer>
+        <ClinicDocumentFooter clinic={payload.clinic} />
       </div>
     </div>
   );

@@ -154,6 +154,47 @@
     margin: 12mm;
   }
 
+  @page clinic-document {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+  body:has(.clinic-document-print) *:not(:has(.clinic-document-print)):not(.clinic-document-print):not(.clinic-document-print *) {
+    display: none !important;
+  }
+  body:has(.clinic-document-print),
+  body:has(.clinic-document-print) *:has(.clinic-document-print) {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    transform: none !important;
+  }
+  .clinic-document-print {
+    page: clinic-document;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  .clinic-document-print h1,
+  .clinic-document-print h2 {
+    break-after: avoid;
+  }
+  .clinic-document-print footer,
+  .clinic-document-print .prescription-group {
+    break-inside: avoid;
+  }
+  .clinic-letterhead {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
   /* The lab pages already include the PDF's margins. Give only this document
      a full A4 sheet; receipt paper continues to come from its printer queue. */
   @page lab-result {
@@ -253,6 +294,13 @@
     padding: 0 !important;
     border: 0 !important;
     border-radius: 0 !important;
+  }
+  /* Preserve the chosen slip width even when a workstation defaults to A4. */
+  .receipt-print[data-paper-width='80'] {
+    max-width: 80mm !important;
+  }
+  .receipt-print[data-paper-width='58'] {
+    max-width: 58mm !important;
   }
   /* Print the glyphs at full weight — thin strokes drop out on a thermal head. */
   .receipt-print .receipt-strong {

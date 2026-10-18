@@ -7,13 +7,20 @@ import {
   groupPrescriptionItems,
   type PrescriptionFormatItem,
 } from '@avishifo/shared';
+import {
+  CLINIC_PDF_COLORS,
+  drawClinicLetterhead,
+  drawClinicPageFurniture,
+  preparePdfClinicLogo,
+  type PdfClinicProfile,
+} from '../../common/pdf/clinic-letterhead';
 
 export interface VisitReportPdfData {
   id: string;
   kind: 'CONSULTATION' | 'ULTRASOUND';
   title: string | null;
   body: string | null;
-  clinic: { name: string; legalName: string | null; address: string | null; phone: string | null };
+  clinic: PdfClinicProfile;
   patient: { fullName: string; mrn: string; dob: string | null };
   doctorName: string;
   confirmedAt: string;
@@ -56,9 +63,12 @@ const PRESCRIPTION_LABELS = {
 @Injectable()
 export class VisitReportPdfService {
   async render(data: VisitReportPdfData, locale: 'uz' | 'ru' | 'en' = 'uz'): Promise<Buffer> {
+    const logo = await preparePdfClinicLogo(data.clinic.logoUrl);
+    const reportTitle = data.title || (data.kind === 'ULTRASOUND'
+      ? 'Ultratovush tekshiruvi xulosasi' : 'Shifokor konsultatsiyasi xulosasi');
     const doc = new PDFDocument({
       size: 'A4',
-      margins: { top: MARGIN, bottom: 54, left: MARGIN, right: MARGIN },
+      margins: { top: 74, bottom: 62, left: MARGIN, right: MARGIN },
       bufferPages: true,
       info: {
         Title: data.title || (data.kind === 'ULTRASOUND' ? 'UZI xulosasi' : 'Shifokor xulosasi'),
@@ -71,33 +81,40 @@ export class VisitReportPdfService {
       doc.on('error', reject);
     });
     doc.registerFont('body', FONT).registerFont('bold', BOLD);
+    drawClinicLetterhead(doc, data.clinic, logo, MARGIN);
     doc
       .font('bold')
-      .fontSize(17)
-      .fillColor('#16334b')
-      .text(data.clinic.name, { width: CONTENT_WIDTH });
-    const details = [data.clinic.address, data.clinic.phone].filter(Boolean).join(' · ');
-    if (details) doc.moveDown(0.3).font('body').fontSize(9).fillColor('#526272').text(details);
-    doc
-      .moveDown(1)
-      .font('bold')
-      .fontSize(15)
-      .fillColor('#111827')
-      .text(
-        data.title ||
-          (data.kind === 'ULTRASOUND'
-            ? 'Ultratovush tekshiruvi xulosasi'
-            : 'Shifokor konsultatsiyasi xulosasi'),
-        { width: CONTENT_WIDTH },
-      );
-    doc.moveDown(0.7).font('body').fontSize(10);
-    doc.text(`Bemor: ${data.patient.fullName}`);
-    doc.text(
+      .fontSize(13)
+      .fillColor(CLINIC_PDF_COLORS.ink)
+      .text(reportTitle, MARGIN, doc.y, { width: CONTENT_WIDTH });
+    doc.y += 12;
+    const patientY = doc.y;
+    const patientWidth = CONTENT_WIDTH - 24;
+    const metadata = [
       `Karta: ${data.patient.mrn}${data.patient.dob ? ` · Tug‘ilgan sana: ${formatInTimeZone(data.patient.dob, TIMEZONE, 'dd.MM.yyyy')}` : ''}`,
-    );
-    doc.text(`Shifokor: ${data.doctorName}`);
-    doc.text(`Tasdiqlangan: ${formatInTimeZone(data.confirmedAt, TIMEZONE, 'dd.MM.yyyy HH:mm')}`);
-    doc.moveDown(0.6);
+      `Shifokor: ${data.doctorName}`,
+      `Tasdiqlangan: ${formatInTimeZone(data.confirmedAt, TIMEZONE, 'dd.MM.yyyy HH:mm')}`,
+    ];
+    doc.font('bold').fontSize(10.5);
+    const patientHeight = doc.heightOfString(data.patient.fullName, { width: patientWidth });
+    doc.font('body').fontSize(8.5);
+    const metadataHeight = metadata.reduce((height, line) =>
+      height + doc.heightOfString(line, { width: patientWidth }) + 4, 0);
+    const boxHeight = patientHeight + metadataHeight + 34;
+    doc.roundedRect(MARGIN, patientY, CONTENT_WIDTH, boxHeight, 5)
+      .fillColor(CLINIC_PDF_COLORS.pale).fill();
+    doc.font('body').fontSize(7).fillColor(CLINIC_PDF_COLORS.muted)
+      .text('BEMOR', MARGIN + 12, patientY + 9, { width: patientWidth });
+    doc.font('bold').fontSize(10.5).fillColor(CLINIC_PDF_COLORS.ink)
+      .text(data.patient.fullName, MARGIN + 12, patientY + 20, { width: patientWidth });
+    doc.y += 7;
+    for (const line of metadata) {
+      doc.font('body').fontSize(8.5).fillColor(CLINIC_PDF_COLORS.muted)
+        .text(line, MARGIN + 12, doc.y, { width: patientWidth });
+      doc.y += 4;
+    }
+    doc.x = MARGIN;
+    doc.y = patientY + boxHeight + 8;
 
     const section = (title: string, body: string | null) => {
       if (!body?.trim()) return;
@@ -106,9 +123,9 @@ export class VisitReportPdfService {
         .moveDown(0.6)
         .font('bold')
         .fontSize(11)
-        .fillColor('#16334b')
-        .text(title, { width: CONTENT_WIDTH });
-      doc.moveDown(0.3).font('body').fontSize(10).fillColor('#111827').text(body.trim(), {
+        .fillColor(CLINIC_PDF_COLORS.blue)
+        .text(title, MARGIN, doc.y, { width: CONTENT_WIDTH });
+      doc.moveDown(0.3).font('body').fontSize(10).fillColor(CLINIC_PDF_COLORS.ink).text(body.trim(), {
         width: CONTENT_WIDTH,
         lineGap: 3,
         paragraphGap: 6,
@@ -154,14 +171,14 @@ export class VisitReportPdfService {
       const pageBottom = doc.page.height - doc.page.margins.bottom;
       // Keep an ordinary Rp. block together. A block longer than a page stays
       // in text flow so PDFKit can wrap and paginate every component and note.
-      const required = Math.min(groupHeight + headingHeight + 12, pageBottom - MARGIN);
+      const required = Math.min(groupHeight + headingHeight + 12, pageBottom - doc.page.margins.top);
       if (doc.y + required > pageBottom) doc.addPage();
       if (index === 0) {
         doc
           .moveDown(0.6)
           .font('bold')
           .fontSize(11)
-          .fillColor('#16334b')
+          .fillColor(CLINIC_PDF_COLORS.blue)
           .text(prescriptionLabels.title, MARGIN, doc.y, { width: CONTENT_WIDTH });
         doc.moveDown(0.3);
       }
@@ -169,7 +186,7 @@ export class VisitReportPdfService {
         doc
           .font(row.bold ? 'bold' : 'body')
           .fontSize(10)
-          .fillColor('#111827')
+          .fillColor(CLINIC_PDF_COLORS.ink)
           .text(row.text, MARGIN + row.indent, doc.y, {
             width: CONTENT_WIDTH - row.indent,
             lineGap: 3,
@@ -185,12 +202,12 @@ export class VisitReportPdfService {
       .moveDown(1.2)
       .font('bold')
       .fontSize(10)
-      .fillColor('#16334b')
+      .fillColor(CLINIC_PDF_COLORS.blue)
       .text(`Tasdiqlagan shifokor: ${data.doctorName}`);
     doc
       .font('body')
       .fontSize(9)
-      .fillColor('#526272')
+      .fillColor(CLINIC_PDF_COLORS.muted)
       .text(formatInTimeZone(data.confirmedAt, TIMEZONE, 'dd.MM.yyyy HH:mm'));
     doc.moveDown(0.4).fontSize(8).text('Hujjat klinika tizimida shifokor tomonidan tasdiqlangan.');
     if (data.latestAmendment) {
@@ -206,25 +223,9 @@ export class VisitReportPdfService {
       );
     }
 
-    const pages = doc.bufferedPageRange();
-    for (let page = pages.start; page < pages.start + pages.count; page += 1) {
-      doc.switchToPage(page);
-      doc.page.margins.bottom = 0;
-      doc
-        .font('body')
-        .fontSize(7)
-        .fillColor('#64748b')
-        .text(`Hujjat ID: ${data.id}`, MARGIN, doc.page.height - 30, {
-          width: CONTENT_WIDTH - 65,
-          lineBreak: false,
-        });
-      doc.text(
-        `${page - pages.start + 1} / ${pages.count}`,
-        MARGIN + CONTENT_WIDTH - 60,
-        doc.page.height - 30,
-        { width: 60, align: 'right', lineBreak: false },
-      );
-    }
+    drawClinicPageFurniture(doc, data.clinic, {
+      margin: MARGIN, documentLabel: reportTitle, documentId: `Hujjat ID: ${data.id}`,
+    });
     doc.end();
     return result;
   }

@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Fragment, useEffect } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { formatUZS, toTiyin } from '@avishifo/shared';
 import { formatTz } from '@/lib/dates';
 import { localizedText } from '@/lib/localized';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
+import { formatClinicPhone } from '@/components/print/clinic-letterhead';
 import type { ReceiptPayload, ReceiptSettings } from '../api';
 import { ThermalLogo } from './thermal-logo';
 
@@ -26,7 +27,7 @@ import { ThermalLogo } from './thermal-logo';
  */
 const FONT_SCALE: Record<'58' | '80', Record<NonNullable<ReceiptSettings['fontScale']>, string>> = {
   '58': { sm: 'text-[12px]', md: 'text-[13px]', lg: 'text-[15px]' },
-  '80': { sm: 'text-[14px]', md: 'text-[16px]', lg: 'text-[18px]' },
+  '80': { sm: 'text-[12px]', md: 'text-[14px]', lg: 'text-[16px]' },
 };
 
 /** A full-width rule made of dashes — a thermal head renders these crisply. */
@@ -85,6 +86,10 @@ export function ReceiptDocument({ data, onReady }: { data: ReceiptPayload; onRea
   const showPatientMrn = rc.showPatientMrn === true;
   const headerText = rc.headerText?.trim();
   const footerText = rc.footerText?.trim() || t('receipt.thanks');
+  const clinicName = data.clinic?.name?.trim() || data.clinic?.legalName?.trim() || '';
+  const branchName = showBranch && data.branch?.name !== clinicName ? data.branch?.name : null;
+  const address = data.clinic?.address?.trim() || (showBranch ? data.branch?.address : null);
+  const phone = data.clinic?.phone?.trim() || (showBranch ? data.branch?.phone : null);
 
   const money = (v: string): string => formatUZS(v, { withCurrency: false });
   // Rows that are zero carry no information on a paper slip; a "Chegirma 0"
@@ -113,39 +118,32 @@ export function ReceiptDocument({ data, onReady }: { data: ReceiptPayload; onRea
 
       <div
         className={cn(
-          'print-area print-flow receipt-print mx-auto w-full bg-card p-3 font-mono leading-snug text-foreground',
+          'print-area print-flow receipt-print mx-auto w-full bg-white p-3 font-mono leading-snug text-black',
           // The card framing is a screen affordance so the preview reads as a
           // slip; print strips it back to bare paper.
           'rounded-md border print:rounded-none print:border-0 print:p-0',
           fontClass,
         )}
+        data-paper-width={paper}
         style={{ maxWidth: paperWidth }}
       >
-        <div className="space-y-0.5 text-center">
+        <div className="space-y-1 text-center">
           {showLogo && data.clinic?.logoUrl ? (
             <ThermalLogo
               src={data.clinic.logoUrl}
-              alt={data.clinic?.name ?? ''}
+              alt={clinicName}
               onReady={onReady}
-              /*
-               * Constrained by WIDTH, not height. Clinic logos are usually wide
-               * — a mark beside a name — and capping the height squeezed one to
-               * about two thirds of the strip, which is where the lettering
-               * inside it stopped being readable. The height cap is only a
-               * guard for the rare tall logo.
-               */
-              className="mx-auto mb-1 h-auto max-h-24 w-full object-contain"
+              dotWidth={paper === '58' ? 384 : 576}
+              className="mx-auto mb-2 h-auto max-h-[23mm] w-[84%] object-contain"
             />
           ) : null}
-          <p className="receipt-strong text-[1.15em] font-bold uppercase leading-tight">
-            {data.clinic?.name ?? ''}
+          <p className="receipt-strong font-sans text-[1.1em] font-bold uppercase leading-tight">
+            {clinicName}
           </p>
           {headerText ? <p className="whitespace-pre-line">{headerText}</p> : null}
-          {showBranch && data.branch ? <p>{data.branch.name}</p> : null}
-          {showBranch && data.branch?.address ? (
-            <p className="leading-tight">{data.branch.address}</p>
-          ) : null}
-          {showBranch && data.branch?.phone ? <p>{data.branch.phone}</p> : null}
+          {branchName ? <p className="text-[0.9em] leading-tight">{branchName}</p> : null}
+          {address ? <p className="text-[0.9em] leading-tight">{address}</p> : null}
+          {phone ? <p className="font-semibold">{formatClinicPhone(phone)}</p> : null}
           {showTaxId && data.clinic?.taxId ? (
             <p>
               {t('receipt.taxId')}: {data.clinic.taxId}
@@ -163,16 +161,16 @@ export function ReceiptDocument({ data, onReady }: { data: ReceiptPayload; onRea
           thing a customer quotes back, so it leads, and the rest reads as
           ordinary sentences that wrap where they need to.
         */}
-        <p className="text-center leading-tight">{t('receipt.receiptNo')}</p>
+        <p className="text-center text-[0.85em] uppercase leading-tight">{t('receipt.receiptNo')}</p>
         {/* Never broken: half an invoice number on each of two lines is not an
             invoice number. */}
         <p className="receipt-strong whitespace-nowrap text-center font-bold">
           {data.invoice.number}
         </p>
-        <p className="text-center">{formatTz(data.printedAt)}</p>
+        <p className="mt-0.5 text-center text-[0.9em]">{formatTz(data.printedAt)}</p>
         <p className="mt-1 leading-tight">
           {t('receipt.patient')}: {data.patient.fullName}
-          {showPatientMrn ? ` · ${data.patient.mrn}` : ''}
+          {showPatientMrn ? <span className="whitespace-nowrap"> · {data.patient.mrn}</span> : null}
         </p>
         {showCashier && user ? (
           <p className="leading-tight">
@@ -184,10 +182,15 @@ export function ReceiptDocument({ data, onReady }: { data: ReceiptPayload; onRea
 
         {data.checkout ? (
           <div className="mb-2 break-words text-[0.85em]">
-            {data.checkout.invoices.map((invoice) => invoice.number).join(' · ')}
+            {data.checkout.invoices.map((invoice, index) => (
+              <Fragment key={invoice.id}>
+                {index > 0 ? ' · ' : null}
+                <span className="inline-block whitespace-nowrap">{invoice.number}</span>
+              </Fragment>
+            ))}
           </div>
         ) : null}
-        <div className="space-y-1">
+        <div className="space-y-2">
           {data.lines.map((l) => (
             <div key={l.id} className="receipt-line">
               {/* The name gets its own line so it can wrap without ever pushing

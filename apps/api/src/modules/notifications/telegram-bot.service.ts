@@ -672,7 +672,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     try {
       const clinic = await this.prisma.unscoped.clinic.findUnique({
         where: { id: order.clinicId },
-        select: { name: true, legalName: true, address: true, phone: true },
+        select: { name: true, legalName: true, logoUrl: true, address: true, phone: true },
       });
       const approvedById =
         order.items.map((it) => it.result?.approvedById).find((v): v is string => Boolean(v)) ??
@@ -688,6 +688,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         {
           name: clinic?.name ?? '',
           legalName: clinic?.legalName ?? null,
+          logoUrl: clinic?.logoUrl ?? null,
           address: clinic?.address ?? null,
           phone: clinic?.phone ?? null,
         },
@@ -908,7 +909,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     try {
       const clinic = await this.prisma.unscoped.clinic.findUnique({
         where: { id: visit.clinicId },
-        select: { name: true, legalName: true, address: true, phone: true },
+        select: { name: true, legalName: true, logoUrl: true, address: true, phone: true },
       });
       if (!clinic) throw new Error('Clinic not found');
       const latestAmendment = visit.amendments[0];

@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { ImageUp, Trash2 } from 'lucide-react';
-import { formatUZS, type ReceiptSettingsInput } from '@avishifo/shared';
+import type { ReceiptSettingsInput } from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ClinicLogo } from '@/components/print/clinic-logo';
+import { ReceiptDocument } from '@/features/billing/components/receipt-document';
+import type { ReceiptPayload } from '@/features/billing/api';
+import { useAuthStore } from '@/stores/auth-store';
 import { settingsApi } from '../api';
 import { useApiErrorToast, useHasPermission } from '../hooks';
 
@@ -89,6 +93,10 @@ export function ReceiptTab() {
   const queryClient = useQueryClient();
   const canWrite = useHasPermission('clinic.settings.write');
   const fileRef = useRef<HTMLInputElement>(null);
+  const activeBranch = useAuthStore((state) =>
+    state.branches.find((branch) => branch.id === state.activeBranchId),
+  );
+  const [previewAt] = useState(() => new Date().toISOString());
 
   const clinicQuery = useQuery({ queryKey: ['clinic'], queryFn: () => settingsApi.getClinic() });
   const settingsQuery = useQuery({
@@ -158,6 +166,77 @@ export function ReceiptTab() {
   }
 
   const logoUrl = clinic?.logoUrl ?? null;
+  // This is a render-only fixture: editing settings never creates an invoice or payment.
+  const preview: ReceiptPayload = {
+    clinic: clinic ?? null,
+    branch: activeBranch ? { name: activeBranch.name, address: null, phone: null } : null,
+    receipt,
+    invoice: {
+      id: 'receipt-preview',
+      number: 'INV-2026-000123',
+      branchId: activeBranch?.id ?? '',
+      patientId: 'preview-patient',
+      visitId: null,
+      status: 'PAID',
+      subtotal: '330000.00',
+      discountTotal: '0.00',
+      total: '330000.00',
+      paidTotal: '330000.00',
+      due: '0.00',
+      note: null,
+      issuedAt: previewAt,
+      createdById: 'preview-user',
+      createdAt: previewAt,
+      updatedAt: previewAt,
+    },
+    patient: { id: 'preview-patient', mrn: 'MRN-000123', fullName: 'Aliyev A.' },
+    lines: [
+      {
+        id: 'preview-line-1',
+        serviceId: null,
+        title: t('receipt.previewService1'),
+        quantity: 1,
+        unitPrice: '150000.00',
+        discount: '0.00',
+        lineTotal: '150000.00',
+        performerUserId: null,
+      },
+      {
+        id: 'preview-line-2',
+        serviceId: null,
+        title: t('receipt.previewService2'),
+        quantity: 2,
+        unitPrice: '90000.00',
+        discount: '0.00',
+        lineTotal: '180000.00',
+        performerUserId: null,
+      },
+    ],
+    payments: [
+      {
+        id: 'preview-payment',
+        invoiceId: 'receipt-preview',
+        branchId: activeBranch?.id ?? '',
+        amount: '330000.00',
+        method: 'CASH',
+        status: 'COMPLETED',
+        note: null,
+        shiftId: null,
+        providerTxId: null,
+        receivedById: null,
+        paidAt: previewAt,
+        createdAt: previewAt,
+      },
+    ],
+    totals: {
+      subtotal: '330000.00',
+      discountTotal: '0.00',
+      total: '330000.00',
+      paidTotal: '330000.00',
+      due: '0.00',
+    },
+    printedAt: previewAt,
+  };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -170,9 +249,13 @@ export function ReceiptTab() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap items-center gap-4">
-              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
+              <div className="flex h-20 w-48 items-center justify-center overflow-hidden rounded-md border bg-white p-2">
                 {logoUrl ? (
-                  <img src={logoUrl} alt="logo" className="max-h-full max-w-full object-contain" />
+                  <ClinicLogo
+                    src={logoUrl}
+                    alt={clinic?.name ?? ''}
+                    className="max-h-full max-w-full object-contain"
+                  />
                 ) : (
                   <ImageUp className="h-6 w-6 text-muted-foreground" />
                 )}
@@ -221,7 +304,10 @@ export function ReceiptTab() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>{t('receipt.paperWidth')}</Label>
-                <Select value={receipt.paperWidth} onValueChange={(v) => set('paperWidth', v as '58' | '80')}>
+                <Select
+                  value={receipt.paperWidth}
+                  onValueChange={(v) => set('paperWidth', v as '58' | '80')}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -313,74 +399,7 @@ export function ReceiptTab() {
       {/* Live preview */}
       <div className="space-y-2">
         <p className="text-sm font-medium text-muted-foreground">{t('receipt.preview')}</p>
-        <div
-          className="mx-auto rounded-md border bg-card p-4 font-mono leading-relaxed shadow-sm"
-          style={{
-            maxWidth: receipt.paperWidth === '58' ? '58mm' : '80mm',
-            fontSize: receipt.fontScale === 'sm' ? 10 : receipt.fontScale === 'lg' ? 14 : 12,
-          }}
-        >
-          <div className="space-y-1 text-center">
-            {receipt.showLogo && logoUrl ? (
-              <img src={logoUrl} alt="logo" className="mx-auto max-h-14 w-auto object-contain" />
-            ) : null}
-            <p className="text-sm font-bold uppercase">{clinic?.name ?? 'Klinika'}</p>
-            {receipt.headerText.trim() ? (
-              <p className="whitespace-pre-line">{receipt.headerText}</p>
-            ) : null}
-            {receipt.showBranch ? <p>{t('receipt.previewBranch')}</p> : null}
-            {receipt.showTaxId && clinic?.taxId ? (
-              <p>
-                {t('receipt.taxIdShort')}: {clinic.taxId}
-              </p>
-            ) : null}
-          </div>
-          <Separator className="my-2" />
-          <div className="space-y-0.5">
-            <div className="flex justify-between">
-              <span>{t('receipt.receiptNoShort')}</span>
-              <span className="font-bold">INV-2026-000123</span>
-            </div>
-            <div className="flex justify-between gap-2">
-              <span>{t('receipt.patientShort')}</span>
-              <span className="text-right">
-                Aliyev A.{receipt.showPatientMrn ? ' · MRN-000123' : ''}
-              </span>
-            </div>
-            {receipt.showCashier ? (
-              <div className="flex justify-between gap-2">
-                <span>{t('receipt.cashierShort')}</span>
-                <span className="text-right">Kassir</span>
-              </div>
-            ) : null}
-          </div>
-          <Separator className="my-2" />
-          <div className="space-y-1">
-            <div>
-              <p>{t('receipt.previewService1')}</p>
-              <div className="flex justify-between">
-                <span>1 x {formatUZS('150000', { withCurrency: false })}</span>
-                <span className="font-semibold">{formatUZS('150000', { withCurrency: false })}</span>
-              </div>
-            </div>
-            <div>
-              <p>{t('receipt.previewService2')}</p>
-              <div className="flex justify-between">
-                <span>2 x {formatUZS('90000', { withCurrency: false })}</span>
-                <span className="font-semibold">{formatUZS('180000', { withCurrency: false })}</span>
-              </div>
-            </div>
-          </div>
-          <Separator className="my-2" />
-          <div className="flex justify-between text-sm font-bold">
-            <span>{t('receipt.totalShort')}</span>
-            <span>{formatUZS('330000')}</span>
-          </div>
-          <Separator className="my-2" />
-          <p className="whitespace-pre-line text-center">
-            {receipt.footerText.trim() || t('receipt.thanksDefault')}
-          </p>
-        </div>
+        <ReceiptDocument data={preview} />
       </div>
     </div>
   );

@@ -677,7 +677,7 @@ export class PortalService {
 
     const clinic = await this.prisma.unscoped.clinic.findUnique({
       where: { id: order.clinicId },
-      select: { name: true, legalName: true, address: true, phone: true },
+      select: { name: true, legalName: true, logoUrl: true, address: true, phone: true },
     });
     const approvedById =
       order.items.map((it) => it.result?.approvedById).find((v): v is string => Boolean(v)) ?? null;
@@ -693,6 +693,7 @@ export class PortalService {
       {
         name: clinic?.name ?? '',
         legalName: clinic?.legalName ?? null,
+        logoUrl: clinic?.logoUrl ?? null,
         address: clinic?.address ?? null,
         phone: clinic?.phone ?? null,
       },
@@ -734,7 +735,7 @@ export class PortalService {
     }) : null;
     if (!visit) throw new AppException(ErrorCode.NOT_FOUND, 'Xulosa topilmadi', 404);
     const clinic = await this.prisma.unscoped.clinic.findUnique({ where: { id: visit.clinicId },
-      select: { name: true, legalName: true, address: true, phone: true } });
+      select: { name: true, legalName: true, logoUrl: true, address: true, phone: true } });
     if (!clinic) throw new AppException(ErrorCode.NOT_FOUND, 'Klinika topilmadi', 404);
     const latestAmendment = visit.amendments[0];
     const amendmentAuthor = latestAmendment ? await this.prisma.unscoped.user.findFirst({

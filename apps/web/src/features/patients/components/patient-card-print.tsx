@@ -4,10 +4,15 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { Link } from '@/i18n/routing';
-import { API_URL, api } from '@/lib/api-client';
+import { api } from '@/lib/api-client';
 import { formatDate, formatTz } from '@/lib/dates';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  ClinicDocumentFooter,
+  ClinicLetterhead,
+  useClinicPrintAssets,
+} from '@/components/print/clinic-letterhead';
 
 interface CardPayload {
   clinic: { name: string; logoUrl: string | null; address: string | null; phone: string | null };
@@ -66,16 +71,12 @@ export function PatientCardPrint({ patientId }: { patientId: string }) {
     queryKey: ['patient', patientId, 'card-print'],
     queryFn: async () => (await api.get<CardPayload>(`/patients/${patientId}/card-print`)).data,
   });
+  const printAssets = useClinicPrintAssets(query.data?.clinic.logoUrl);
 
   if (query.isLoading) return <Skeleton className="h-[60vh] w-full" />;
   const p = query.data;
   if (!p) return null;
 
-  const logoSrc = p.clinic.logoUrl
-    ? p.clinic.logoUrl.startsWith('http')
-      ? p.clinic.logoUrl
-      : `${API_URL}${p.clinic.logoUrl}`
-    : null;
   const allergies = Array.isArray(p.patient.allergies)
     ? (p.patient.allergies as Array<{ name: string }>).map((x) => x.name).join(', ')
     : '';
@@ -92,31 +93,24 @@ export function PatientCardPrint({ patientId }: { patientId: string }) {
             {tCommon('back')}
           </Link>
         </Button>
-        <Button onClick={() => window.print()}>
+        <Button onClick={() => window.print()} disabled={!printAssets.ready}>
           <Printer className="mr-2 h-4 w-4" />
           {tCommon('print')}
         </Button>
       </div>
 
-      <div className="print-area print-flow rounded-md border bg-white p-8 text-black shadow-sm">
-        <header className="mb-4 flex items-start justify-between gap-6 border-b-2 border-black pb-3">
-          <div className="flex items-start gap-3">
-            {logoSrc ? (
-              /* Plain img: the logo comes from the API host and must render for print. */
-              <img src={logoSrc} alt="" className="h-12 w-12 object-contain" />
-            ) : null}
-            <div className="text-[12px] leading-tight">
-              <p className="font-semibold">{t('ministry')}</p>
-              <p className="text-[13px] font-bold">{p.clinic.name}</p>
-              {p.clinic.address ? <p>{p.clinic.address}</p> : null}
-              {p.clinic.phone ? <p>{p.clinic.phone}</p> : null}
-            </div>
-          </div>
-          <div className="shrink-0 border border-black px-2 py-1 text-center text-[11px] leading-tight">
-            <p>{t('docLabel')}</p>
-            <p className="font-bold">{t('formNo')}</p>
-          </div>
-        </header>
+      <div className="print-area print-flow clinic-document-print rounded-md border bg-white p-8 text-black shadow-sm">
+        <ClinicLetterhead
+          clinic={p.clinic}
+          onLogoReady={printAssets.onReady}
+          eyebrow={t('ministry')}
+          documentLabel={
+            <>
+              <p>{t('docLabel')}</p>
+              <p className="mt-1 font-bold">{t('formNo')}</p>
+            </>
+          }
+        />
 
         <h1 className="mb-1 text-center text-[15px] font-bold uppercase">{t('title')}</h1>
         <p className="mb-4 text-center text-[13px]">
@@ -197,6 +191,7 @@ export function PatientCardPrint({ patientId }: { patientId: string }) {
             </table>
           )}
         </div>
+        <ClinicDocumentFooter clinic={p.clinic} />
       </div>
     </div>
   );

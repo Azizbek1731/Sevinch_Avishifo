@@ -28,7 +28,7 @@ const iso = (d: Date | null | undefined): string | null => (d ? d.toISOString() 
  */
 export function buildResultPdfData(
   order: OrderForPdf,
-  clinic: { name: string; legalName: string | null; address: string | null; phone: string | null },
+  clinic: ResultPdfData['clinic'],
   approvedBy: { fullName: string } | null,
 ): ResultPdfData {
   const ctx: PatientContext = {
