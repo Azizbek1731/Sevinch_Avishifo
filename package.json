@@ -19,6 +19,7 @@
     "build:clinic": "node --env-file=.env scripts/start-clinic.mjs --build-only",
     "start:clinic": "node --env-file=.env scripts/start-clinic.mjs",
     "clinic:server": "node --env-file=.env scripts/clinic-server.mjs",
+    "clinic:update": "node scripts/clinic-update.mjs",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
