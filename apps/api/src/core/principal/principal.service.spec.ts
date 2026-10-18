@@ -22,6 +22,13 @@ function principal(role: UserRole, clinicId: string | null) {
           permissionOverrides: {},
         }),
       },
+      authSession: {
+        findUnique: vi.fn().mockResolvedValue({
+          userId: 'user',
+          revokedAt: null,
+          expiresAt: new Date(Date.now() + 60_000),
+        }),
+      },
     },
   } as unknown as PrismaService;
   const config = { env: { SINGLE_CLINIC_MODE: true } } as unknown as AppConfigService;

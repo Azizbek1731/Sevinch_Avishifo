@@ -64,6 +64,20 @@ export class PrincipalService {
     if (user.clinic && user.clinic.status !== 'ACTIVE') {
       throw new AppException(ErrorCode.CLINIC_SUSPENDED, 'Clinic is suspended', 403);
     }
+    if (payload.sid) {
+      const session = await this.prisma.unscoped.authSession.findUnique({
+        where: { id: payload.sid },
+        select: { userId: true, revokedAt: true, expiresAt: true },
+      });
+      if (
+        !session ||
+        session.userId !== user.id ||
+        session.revokedAt ||
+        session.expiresAt <= new Date()
+      ) {
+        throw new AppException(ErrorCode.TOKEN_EXPIRED, 'Session ended', 401);
+      }
+    }
 
     const overrides = (user.permissionOverrides ?? {}) as { grant?: string[]; revoke?: string[] };
     return {
