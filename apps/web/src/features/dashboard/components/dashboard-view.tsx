@@ -4,7 +4,6 @@ import { useTranslations } from 'next-intl';
 import { Banknote, Hourglass, Stethoscope, UserPlus } from 'lucide-react';
 import { formatUZS } from '@avishifo/shared';
 import { PageHeader } from '@/components/page-header';
-import { SetupChecklist } from './setup-checklist';
 import { StatCard } from '@/components/stat-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,8 +28,6 @@ export function DashboardView() {
   return (
     <div className="space-y-6">
       <PageHeader title={t('title')} description={t('description')} />
-
-      <SetupChecklist />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {summary.isPending ? (
