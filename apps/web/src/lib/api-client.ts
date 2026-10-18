@@ -59,24 +59,34 @@ function buildUrl(path: string, query?: Query): string {
 
 let refreshPromise: Promise<string | null> | null = null;
 
-/** Single-flight refresh: many 401s → one refresh call. */
+/**
+ * Single-flight refresh: many 401s → one refresh call. Resolves null only when
+ * the server rejects the refresh cookie. A dropped Wi-Fi or a restarting server
+ * throws instead: it says nothing about the session, so nobody is signed out.
+ */
 async function refreshAccessToken(): Promise<string | null> {
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
-        const res = await fetch(buildUrl('/auth/refresh'), {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: '{}',
-        });
-        const json = (await res.json()) as ApiResponse<{ accessToken: string }>;
-        if (res.ok && json.success) {
+        let res: Response;
+        try {
+          res = await fetch(buildUrl('/auth/refresh'), {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+          });
+        } catch {
+          throw new ApiError('NETWORK_ERROR', 'Network error', 0);
+        }
+        if (res.status >= 500) {
+          throw new ApiError('INTERNAL_ERROR' as ErrorCode, `Request failed (${res.status})`, res.status);
+        }
+        const json = (await res.json().catch(() => null)) as ApiResponse<{ accessToken: string }> | null;
+        if (res.ok && json?.success) {
           useAuthStore.getState().setAccessToken(json.data.accessToken);
           return json.data.accessToken;
         }
-        return null;
-      } catch {
         return null;
       } finally {
         setTimeout(() => {

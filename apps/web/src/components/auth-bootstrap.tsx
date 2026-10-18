@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
-import { api } from '@/lib/api-client';
+import { ApiError, api, apiFetch } from '@/lib/api-client';
 import { useAuthStore, type MeResponse } from '@/stores/auth-store';
 
 /**
@@ -14,8 +14,20 @@ import { useAuthStore, type MeResponse } from '@/stores/auth-store';
 let bootstrapped = false;
 
 /**
+ * Retried while the server cannot answer: a page opened during a Wi-Fi drop or
+ * while the clinic server restarts still has a valid refresh cookie. A plain
+ * 500 is given a few tries so a broken server still ends on the login form.
+ */
+function shouldRetry(error: unknown, attempt: number): boolean {
+  if (!(error instanceof ApiError)) return false;
+  if (error.status === 0 || error.status === 502 || error.status === 503 || error.status === 504)
+    return true;
+  return error.status >= 500 && attempt < 5;
+}
+
+/**
  * On first page load: refresh-cookie → access token → /auth/me restores the
- * session. Failure leaves status='anonymous' (AuthGate redirects to login).
+ * session. Rejection leaves status='anonymous' (AuthGate redirects to login).
  * Skipped entirely once a session already exists in memory.
  */
 export function AuthBootstrap({ children }: { children: ReactNode }) {
@@ -29,13 +41,25 @@ export function AuthBootstrap({ children }: { children: ReactNode }) {
     if (store.status === 'authenticated' && store.accessToken) return;
 
     void (async () => {
-      try {
-        const refresh = await api.post<{ accessToken: string }>('/auth/refresh', {});
-        store.setAccessToken(refresh.data.accessToken);
-        const me = await api.get<MeResponse>('/auth/me');
-        store.setSession({ ...me.data, accessToken: refresh.data.accessToken });
-      } catch {
-        store.clear();
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          // anonymous: a refused cookie must not trigger a second refresh with it.
+          const refresh = await apiFetch<{ accessToken: string }>('/auth/refresh', {
+            method: 'POST',
+            body: {},
+            anonymous: true,
+          });
+          store.setAccessToken(refresh.data.accessToken);
+          const me = await api.get<MeResponse>('/auth/me');
+          store.setSession({ ...me.data, accessToken: refresh.data.accessToken });
+          return;
+        } catch (error) {
+          if (!shouldRetry(error, attempt)) {
+            store.clear();
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, Math.min(1000 * attempt, 10_000)));
+        }
       }
     })();
   }, []);

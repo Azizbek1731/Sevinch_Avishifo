@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import type { JwtPayload } from '@avishifo/shared';
 import { AppConfigService } from '../../core/config/app-config.service';
 
@@ -38,12 +38,17 @@ export function parseTtlMs(ttl: string): number {
 @Injectable()
 export class TokenService {
   readonly refreshTtlMs: number;
+  private readonly rotationKey: Buffer;
 
   constructor(
     private readonly jwt: JwtService,
     private readonly config: AppConfigService,
   ) {
     this.refreshTtlMs = parseTtlMs(this.config.env.JWT_REFRESH_TTL);
+    this.rotationKey = createHash('sha256')
+      .update('avishifo:refresh-rotation:')
+      .update(this.config.jwtPrivateKey)
+      .digest();
   }
 
   signAccessToken(payload: JwtPayload): Promise<string> {
@@ -53,6 +58,16 @@ export class TokenService {
   /** Random 64-byte hex secret — the part that gets argon2-hashed and stored. */
   generateRefreshSecret(): string {
     return randomBytes(64).toString('hex');
+  }
+
+  /**
+   * The secret that replaces `secret` on rotation. Keyed, so it cannot be
+   * computed from a stolen token; deterministic, so refreshes racing with the
+   * same token all receive the same next token, and a browser whose rotation
+   * reply was lost on the network can be handed that token again.
+   */
+  successorSecret(sessionId: string, secret: string): string {
+    return createHmac('sha512', this.rotationKey).update(`${sessionId}.${secret}`).digest('hex');
   }
 
   composeRefreshToken(sessionId: string, secret: string): string {

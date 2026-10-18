@@ -41,6 +41,9 @@ const OTP_PURPOSE_PASSWORD_RESET = 'password_reset';
 
 const ARGON2_OPTS: argon2.Options = { type: argon2.argon2id };
 
+/** How long after a rotation the token just before it is still exchanged. */
+const REFRESH_REPLAY_GRACE_MS = 2 * 60_000;
+
 export interface LoginResult {
   user: AuthUser;
   accessToken: string;
@@ -560,37 +563,50 @@ export class AuthService {
     }
 
     if (session.revokedAt) {
-      // A token for a revoked session is being replayed — treat as reuse.
-      await this.revokeReusedFamily(session.userId, session.user.clinicId);
+      // Signed out, revoked from another device or already caught as reuse: the
+      // token is dead either way. Revoking the user's newer sessions here would
+      // let one stale browser sign the user out everywhere on every reload.
+      throw new AppException(ErrorCode.UNAUTHORIZED, 'Session has been revoked', 401);
     }
 
     if (session.expiresAt < new Date()) {
       throw new AppException(ErrorCode.TOKEN_EXPIRED, 'Refresh token expired', 401);
     }
 
-    const secretOk = await argon2
+    const nextSecret = this.tokens.successorSecret(session.id, parts.secret);
+    const isCurrent = await argon2
       .verify(session.refreshTokenHash, parts.secret)
       .catch(() => false);
-    if (!secretOk) {
-      // Hash holds only the CURRENT secret; a mismatching (i.e. already rotated)
-      // token proves reuse → revoke the whole session family for this user.
-      await this.revokeReusedFamily(session.userId, session.user.clinicId);
+    if (!isCurrent) {
+      // The token right before the current one, shortly after the rotation: a
+      // reply lost to a Wi-Fi drop, or two tabs refreshing at once. It gets the
+      // current token back. Anything older proves reuse → revoke the family.
+      const recentlyRotated =
+        session.rotatedAt !== null &&
+        Date.now() - session.rotatedAt.getTime() <= REFRESH_REPLAY_GRACE_MS;
+      const isPrevious =
+        recentlyRotated &&
+        (await argon2.verify(session.refreshTokenHash, nextSecret).catch(() => false));
+      if (!isPrevious) {
+        await this.revokeReusedFamily(session.userId, session.user.clinicId);
+      }
     }
 
     if (session.user.deletedAt || session.user.status !== UserStatus.ACTIVE) {
       throw new AppException(ErrorCode.ACCOUNT_SUSPENDED, 'Account is not active', 403);
     }
 
-    // Rotate: replace the stored hash, stamp rotatedAt, slide expiry.
-    const newSecret = this.tokens.generateRefreshSecret();
-    await this.prisma.unscoped.authSession.update({
-      where: { id: session.id },
-      data: {
-        refreshTokenHash: await argon2.hash(newSecret, ARGON2_OPTS),
-        rotatedAt: new Date(),
-        expiresAt: new Date(Date.now() + this.tokens.refreshTtlMs),
-      },
-    });
+    if (isCurrent) {
+      // Rotate: replace the stored hash, stamp rotatedAt, slide expiry.
+      await this.prisma.unscoped.authSession.update({
+        where: { id: session.id },
+        data: {
+          refreshTokenHash: await argon2.hash(nextSecret, ARGON2_OPTS),
+          rotatedAt: new Date(),
+          expiresAt: new Date(Date.now() + this.tokens.refreshTtlMs),
+        },
+      });
+    }
 
     const accessToken = await this.tokens.signAccessToken({
       sub: session.user.id,
@@ -601,7 +617,7 @@ export class AuthService {
 
     return {
       accessToken,
-      refreshToken: this.tokens.composeRefreshToken(session.id, newSecret),
+      refreshToken: this.tokens.composeRefreshToken(session.id, nextSecret),
     };
   }
 

@@ -130,22 +130,90 @@ describe('auth (e2e)', () => {
     expect(me.status).toBe(200);
     expect(me.body.data.user.id).toBe(clinic.receptionist.id);
 
-    // Replaying the OLD (already-rotated) token is reuse → whole family revoked.
+    // Right after a rotation the previous token (its reply lost on the network)
+    // is handed the current token instead of being treated as reuse.
     const replay = await request(app.getHttpServer())
       .post(`${API}/auth/refresh`)
       .set('X-Forwarded-For', uniqueIp())
       .set('Cookie', session.refreshCookie)
       .send({});
-    expect(replay.status).toBe(401);
-    expect(replay.body.error.code).toBe('REFRESH_REUSE_DETECTED');
+    expect(replay.status).toBe(200);
+    expect(refreshCookieOf(replay)).toBe(rotatedCookie);
 
-    // The rotated token dies with the family too.
-    const afterRevoke = await request(app.getHttpServer())
+    const rotatedAgain = await request(app.getHttpServer())
       .post(`${API}/auth/refresh`)
       .set('X-Forwarded-For', uniqueIp())
       .set('Cookie', rotatedCookie)
       .send({});
+    expect(rotatedAgain.status).toBe(200);
+    const newestCookie = refreshCookieOf(rotatedAgain);
+    expect(newestCookie).not.toBe(rotatedCookie);
+
+    // A token two rotations old is reuse → whole family revoked.
+    const reuse = await request(app.getHttpServer())
+      .post(`${API}/auth/refresh`)
+      .set('X-Forwarded-For', uniqueIp())
+      .set('Cookie', session.refreshCookie)
+      .send({});
+    expect(reuse.status).toBe(401);
+    expect(reuse.body.error.code).toBe('REFRESH_REUSE_DETECTED');
+
+    // The newest token dies with the family too.
+    const afterRevoke = await request(app.getHttpServer())
+      .post(`${API}/auth/refresh`)
+      .set('X-Forwarded-For', uniqueIp())
+      .set('Cookie', newestCookie)
+      .send({});
     expect(afterRevoke.status).toBe(401);
+  });
+
+  it('concurrent refreshes with one token agree on the next token', async () => {
+    const session = await login(app, clinic.doctor.email);
+
+    const refresh = () =>
+      request(app.getHttpServer())
+        .post(`${API}/auth/refresh`)
+        .set('X-Forwarded-For', uniqueIp())
+        .set('Cookie', session.refreshCookie)
+        .send({});
+    const [first, second] = await Promise.all([refresh(), refresh()]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    const next = refreshCookieOf(first);
+    expect(refreshCookieOf(second)).toBe(next);
+
+    const later = await request(app.getHttpServer())
+      .post(`${API}/auth/refresh`)
+      .set('X-Forwarded-For', uniqueIp())
+      .set('Cookie', next)
+      .send({});
+    expect(later.status).toBe(200);
+  });
+
+  it("a revoked session's token does not sign the user out elsewhere", async () => {
+    const stale = await login(app, clinic.owner.email);
+    const other = await login(app, clinic.owner.email);
+
+    const out = await request(app.getHttpServer())
+      .post(`${API}/auth/logout`)
+      .set('Authorization', `Bearer ${stale.accessToken}`)
+      .send({});
+    expect(out.status).toBe(200);
+
+    const refused = await request(app.getHttpServer())
+      .post(`${API}/auth/refresh`)
+      .set('X-Forwarded-For', uniqueIp())
+      .set('Cookie', stale.refreshCookie)
+      .send({});
+    expect(refused.status).toBe(401);
+    expect(refused.body.error.code).toBe('UNAUTHORIZED');
+
+    const stillSignedIn = await request(app.getHttpServer())
+      .post(`${API}/auth/refresh`)
+      .set('X-Forwarded-For', uniqueIp())
+      .set('Cookie', other.refreshCookie)
+      .send({});
+    expect(stillSignedIn.status).toBe(200);
   });
 
   it('logout revokes the session and clears the cookie', async () => {
