@@ -8,6 +8,7 @@ import { z } from 'zod';
 import {
   formatNationalPhone,
   loginSchema,
+  normalizePhone,
   phoneSchema,
   phoneWireValue,
   type AuthUser,
@@ -72,6 +73,16 @@ const DEMO_ACCOUNTS = [
   { roleKey: 'role.OPERATING_ROOM', identifier: 'operatsiya@shifomed.uz', password: 'Demo123!' },
   { roleKey: 'role.SUPER_ADMIN', identifier: 'admin@avishifo.uz', password: 'Admin123!' },
 ] as const;
+
+/**
+ * Staff type a number the way the placeholder shows it ("+998 90 123-45-67",
+ * "901234567"); the login schema only accepts the normalized "+998901234567".
+ */
+function identifierWireValue(input: unknown): string {
+  const value = String(input ?? '').trim();
+  if (value.includes('@')) return value;
+  return normalizePhone(value) ?? value;
+}
 
 export function LoginForm() {
   const t = useTranslations('auth');
@@ -331,8 +342,11 @@ export function LoginForm() {
               id="identifier"
               autoComplete="username"
               placeholder={t('identifierPlaceholder')}
-              {...form.register('identifier')}
+              {...form.register('identifier', { setValueAs: identifierWireValue })}
             />
+            {form.formState.errors.identifier ? (
+              <p className="text-sm text-destructive">{t('identifierInvalid')}</p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">{t('password')}</Label>
@@ -341,6 +355,9 @@ export function LoginForm() {
               autoComplete="current-password"
               {...form.register('password')}
             />
+            {form.formState.errors.password ? (
+              <p className="text-sm text-destructive">{t('passwordInvalid')}</p>
+            ) : null}
           </div>
           {serverError ? (
             <p className="text-sm font-medium text-destructive" role="alert">
