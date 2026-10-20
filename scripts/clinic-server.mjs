@@ -20,8 +20,10 @@ import {
 import { createServer, request as httpRequest } from 'node:http';
 import { connect as netConnect, createConnection, createServer as createNetServer } from 'node:net';
 import { networkInterfaces, hostname } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { backupFileStamp, backupSlot, msUntilNextBackup } from './backup-schedule.mjs';
+import { backupCaption, sendTelegramDocument, splitBackupFile } from './backup-telegram.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -624,79 +626,206 @@ async function migrateDatabase(prismaCli) {
 }
 
 let backupRunning = false;
+const BACKUP_STATE = join(BACKUP_DIR, 'backup-state.json');
 
-/** One custom-format dump a day, newest BACKUPS_KEPT kept. */
+function isDumpName(name) {
+  return /^avishifo-\d{8}-\d{4}\.dump$/.test(name);
+}
+
+function readBackupState() {
+  try {
+    const parsed = JSON.parse(readFileSync(BACKUP_STATE, 'utf8'));
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeBackupState(state) {
+  mkdirSync(BACKUP_DIR, { recursive: true });
+  const tmp = `${BACKUP_STATE}.part`;
+  writeFileSync(tmp, JSON.stringify(state));
+  renameSync(tmp, BACKUP_STATE);
+}
+
+function removeDump(name) {
+  rmSync(join(BACKUP_DIR, name), { force: true });
+  for (const extra of readdirSync(BACKUP_DIR)) {
+    if (extra.startsWith(`${name}.`)) rmSync(join(BACKUP_DIR, extra), { force: true });
+  }
+}
+
+async function createDump() {
+  mkdirSync(BACKUP_DIR, { recursive: true });
+  for (const name of readdirSync(BACKUP_DIR)) {
+    if (name.endsWith('.dump.part')) rmSync(join(BACKUP_DIR, name), { force: true });
+  }
+  const db = new URL(process.env.DATABASE_URL ?? '');
+  const file = join(BACKUP_DIR, `avishifo-${backupFileStamp()}.dump`);
+  const code = await runProcess(
+    PG_DUMP,
+    [
+      '--format=custom',
+      '--host',
+      db.hostname,
+      '--port',
+      db.port || '5432',
+      '--username',
+      decodeURIComponent(db.username),
+      '--dbname',
+      db.pathname.slice(1),
+      '--file',
+      `${file}.part`,
+    ],
+    {
+      env: { ...process.env, PGPASSWORD: decodeURIComponent(db.password) },
+      name: 'backup',
+      timeoutMs: 30 * 60_000,
+    },
+  );
+  if (code !== 0) {
+    rmSync(`${file}.part`, { force: true });
+    say(`Database backup failed (exit ${code}); trying again soon.`);
+    return null;
+  }
+  renameSync(`${file}.part`, file);
+  say(`Database backup saved: ${file}`);
+  const all = readdirSync(BACKUP_DIR).filter(isDumpName).sort();
+  for (const old of all.slice(0, Math.max(0, all.length - BACKUPS_KEPT))) {
+    if (old === basename(file)) continue;
+    removeDump(old);
+  }
+  const uploads = resolve(root, process.env.STORAGE_LOCAL_DIR || 'uploads');
+  if (process.platform === 'win32' && existsSync(uploads)) {
+    // /E without /MIR never deletes, so a file removed by mistake stays in the backup.
+    const copied = await runProcess(
+      'robocopy',
+      [uploads, join(BACKUP_DIR, 'uploads'), '/E', '/XO', '/R:2', '/W:5', '/NP', '/NFL', '/NDL', '/NJH', '/NJS'],
+      { name: 'backup' },
+    );
+    if (copied >= 8) say(`Uploads backup failed (robocopy exit ${copied}).`);
+  }
+  return file;
+}
+
+function backupEnv(name) {
+  let value = process.env[name]?.trim() ?? '';
+  if (value.length >= 2 && (value[0] === '"' || value[0] === "'") && value.at(-1) === value[0]) {
+    value = value.slice(1, -1).trim();
+  }
+  return value;
+}
+
+async function deliverDump(file, slot, alreadySent, dumpedAt) {
+  const token = backupEnv('TELEGRAM_BOT_TOKEN');
+  const chatId = backupEnv('CLINIC_BACKUP_TELEGRAM_CHAT_ID');
+  const takenAt = dumpedAt ? new Date(dumpedAt) : new Date();
+  if (!token || !chatId) {
+    say(
+      'Telegram backup is not configured (TELEGRAM_BOT_TOKEN or CLINIC_BACKUP_TELEGRAM_CHAT_ID). The dump stays on disk.',
+    );
+    writeBackupState({
+      slot,
+      file,
+      dumpedAt: takenAt.toISOString(),
+      partsSent: alreadySent,
+      telegram: 'unconfigured',
+    });
+    return true;
+  }
+  const parts = await splitBackupFile(file);
+  for (let index = alreadySent; index < parts.length; index += 1) {
+    try {
+      await sendTelegramDocument({
+        token,
+        chatId,
+        filePath: parts[index],
+        caption: backupCaption({
+          slot,
+          takenAt,
+          fileName: basename(file),
+          part: index + 1,
+          parts: parts.length,
+        }),
+      });
+    } catch (error) {
+      say(error instanceof Error ? error.message : String(error));
+      writeBackupState({
+        slot,
+        file,
+        dumpedAt: takenAt.toISOString(),
+        partsSent: index,
+        telegram: false,
+      });
+      return false;
+    }
+    writeBackupState({
+      slot,
+      file,
+      dumpedAt: takenAt.toISOString(),
+      partsSent: index + 1,
+      telegram: false,
+    });
+  }
+  writeBackupState({
+    slot,
+    file,
+    dumpedAt: takenAt.toISOString(),
+    partsSent: parts.length,
+    telegram: true,
+    sentAt: new Date().toISOString(),
+  });
+  say(`Database backup sent to Telegram for ${slot}.`);
+  return true;
+}
+
+/**
+ * One dump for the current 02:00 Asia/Tashkent slot.
+ * If the computer was off at 02:00, the first start afterwards sends that slot.
+ */
 async function backupIfDue() {
-  if (backupRunning || stopping || !existsSync(PG_DUMP)) return;
+  if (backupRunning || stopping || !existsSync(PG_DUMP)) return false;
   backupRunning = true;
   try {
-    mkdirSync(BACKUP_DIR, { recursive: true });
-    const isDump = (name) => /^avishifo-\d{8}-\d{4}\.dump$/.test(name);
-    for (const name of readdirSync(BACKUP_DIR)) {
-      if (name.endsWith('.dump.part')) rmSync(join(BACKUP_DIR, name), { force: true });
+    loadEnvFile();
+    const slot = backupSlot();
+    const state = readBackupState();
+    const token = backupEnv('TELEGRAM_BOT_TOKEN');
+    const chatId = backupEnv('CLINIC_BACKUP_TELEGRAM_CHAT_ID');
+    const configured = Boolean(token && chatId);
+    if (state?.slot === slot && state.telegram === true) return true;
+    if (state?.slot === slot && state.telegram === 'unconfigured' && !configured) return true;
+
+    let file = state?.slot === slot && state.file && existsSync(state.file) ? state.file : null;
+    if (!file) {
+      file = await createDump();
+      if (!file) return false;
+      writeBackupState({
+        slot,
+        file,
+        dumpedAt: new Date().toISOString(),
+        partsSent: 0,
+        telegram: false,
+      });
     }
-    const newest = readdirSync(BACKUP_DIR).filter(isDump).sort().at(-1);
-    if (newest && Date.now() - statSync(join(BACKUP_DIR, newest)).mtimeMs < 23 * 3_600_000) return;
-    const db = new URL(process.env.DATABASE_URL ?? '');
-    const file = join(BACKUP_DIR, `avishifo-${stamp()}.dump`);
-    const code = await runProcess(
-      PG_DUMP,
-      [
-        '--format=custom',
-        '--host',
-        db.hostname,
-        '--port',
-        db.port || '5432',
-        '--username',
-        decodeURIComponent(db.username),
-        '--dbname',
-        db.pathname.slice(1),
-        '--file',
-        `${file}.part`,
-      ],
-      {
-        env: { ...process.env, PGPASSWORD: decodeURIComponent(db.password) },
-        name: 'backup',
-        timeoutMs: 30 * 60_000,
-      },
-    );
-    if (code !== 0) {
-      rmSync(`${file}.part`, { force: true });
-      say(`Database backup failed (exit ${code}); trying again within an hour.`);
-      return;
-    }
-    renameSync(`${file}.part`, file);
-    say(`Database backup saved: ${file}`);
-    const all = readdirSync(BACKUP_DIR).filter(isDump).sort();
-    for (const old of all.slice(0, Math.max(0, all.length - BACKUPS_KEPT))) {
-      rmSync(join(BACKUP_DIR, old), { force: true });
-    }
-    const uploads = resolve(root, process.env.STORAGE_LOCAL_DIR || 'uploads');
-    if (process.platform === 'win32' && existsSync(uploads)) {
-      // /E without /MIR never deletes, so a file removed by mistake stays in the backup.
-      const copied = await runProcess(
-        'robocopy',
-        [
-          uploads,
-          join(BACKUP_DIR, 'uploads'),
-          '/E',
-          '/XO',
-          '/R:2',
-          '/W:5',
-          '/NP',
-          '/NFL',
-          '/NDL',
-          '/NJH',
-          '/NJS',
-        ],
-        { name: 'backup' },
-      );
-      if (copied >= 8) say(`Uploads backup failed (robocopy exit ${copied}).`);
-    }
+    const alreadySent = state?.slot === slot && state.file === file ? Number(state.partsSent) || 0 : 0;
+    const dumpedAt = state?.slot === slot && state.file === file ? state.dumpedAt : null;
+    return await deliverDump(file, slot, alreadySent, dumpedAt);
   } catch (error) {
     say(`Database backup failed: ${error.message}`);
+    return false;
   } finally {
     backupRunning = false;
+  }
+}
+
+async function backupScheduler() {
+  await sleep(20_000);
+  while (!stopping) {
+    const done = await backupIfDue();
+    if (stopping) return;
+    const wait = done ? msUntilNextBackup() : 15 * 60_000;
+    await sleep(Math.min(Math.max(wait, 15_000), 15 * 60_000));
   }
 }
 
@@ -759,8 +888,7 @@ async function main() {
 
   say(`Clinic panel: http://${CLINIC_NAME}/  and  http://${lanAddress()}/`);
   say(`TV: http://${CLINIC_NAME}:3002/   Portal: http://${CLINIC_NAME}:3003/`);
-  setTimeout(() => void backupIfDue(), 2 * 60_000);
-  setInterval(() => void backupIfDue(), 60 * 60_000);
+  void backupScheduler();
 }
 
 async function shutdown() {
