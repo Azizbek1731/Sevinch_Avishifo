@@ -2,18 +2,14 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { localizedText } from '@/lib/localized';
 import { toast } from 'sonner';
 import { Package, Pencil, Plus, Trash2 } from 'lucide-react';
 import { formatUZS } from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EmptyState } from '@/components/empty-state';
@@ -31,6 +27,7 @@ function itemsSum(pkg: PackageRow): number {
 
 export function PackagesTab() {
   const t = useTranslations('services');
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const errorToast = useApiErrorToast();
   const canWrite = useCanWriteServices();
@@ -93,7 +90,9 @@ export function PackagesTab() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <CardTitle className="truncate text-base">{pkg.name.uz}</CardTitle>
+                      <CardTitle className="truncate text-base">
+                        {localizedText(pkg.name, locale)}
+                      </CardTitle>
                       <p className="mt-0.5 font-mono text-xs text-muted-foreground">{pkg.code}</p>
                     </div>
                     {!pkg.isActive ? (
@@ -113,7 +112,7 @@ export function PackagesTab() {
                   <ul className="flex-1 space-y-1 text-sm text-muted-foreground">
                     {pkg.items.map((item) => (
                       <li key={item.id} className="flex justify-between gap-2">
-                        <span className="truncate">{item.service.name.uz}</span>
+                        <span className="truncate">{localizedText(item.service.name, locale)}</span>
                         <span className="shrink-0 tabular-nums">× {item.quantity}</span>
                       </li>
                     ))}
@@ -159,7 +158,9 @@ export function PackagesTab() {
           if (!open) setDeleteTarget(null);
         }}
         title={t('packages.deleteTitle')}
-        description={t('packages.deleteDescription', { name: deleteTarget?.name.uz ?? '' })}
+        description={t('packages.deleteDescription', {
+          name: localizedText(deleteTarget?.name, locale),
+        })}
         confirmLabel={t('actions.delete')}
         cancelLabel={t('actions.cancel')}
         destructive

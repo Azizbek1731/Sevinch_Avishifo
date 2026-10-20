@@ -8,6 +8,7 @@ import { ArrowRight, BookOpen, FlaskConical, Play, Plus, Syringe } from 'lucide-
 import { LabOrderStatus } from '@avishifo/shared';
 import { Link } from '@/i18n/routing';
 import { formatTz } from '@/lib/dates';
+import { localizedText } from '@/lib/localized';
 import { cn } from '@/lib/utils';
 import { useSocketEvent } from '@/hooks/use-socket';
 import { Button } from '@/components/ui/button';
@@ -109,7 +110,7 @@ export function LabWorklist() {
           <div className="max-w-sm space-y-1">
             {row.original.tests.map((test) => (
               <p key={test.id} className="text-sm">
-                {test.name[locale] ?? test.name.uz ?? test.code}
+                {localizedText(test.name, locale) || test.code}
               </p>
             ))}
           </div>

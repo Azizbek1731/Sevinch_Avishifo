@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@/i18n/routing';
 import { labApi } from '@/features/lab/api';
+import { localizedText } from '@/lib/localized';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocale, useTranslations } from 'next-intl';
@@ -28,7 +29,7 @@ import type { LabTestItem, VisitReferral } from '../api';
 import { useAddReferral, useLabTests } from '../hooks';
 
 function labTestName(test: LabTestItem, locale: string): string {
-  return test.name[locale] ?? test.name['uz'] ?? test.code;
+  return localizedText(test.name, locale) || test.code;
 }
 
 export function ReferralsSection({
@@ -253,7 +254,7 @@ export function ReferralsSection({
                             {order ? (
                               <p className="text-sm">
                                 {order.tests
-                                  .map((test) => test.name[locale] ?? test.name.uz ?? test.code)
+                                  .map((test) => localizedText(test.name, locale) || test.code)
                                   .join(', ')}
                               </p>
                             ) : null}

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { localizedText } from '@/lib/localized';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 import { History, MoreHorizontal, Pencil, Plus, Search, Trash2 } from 'lucide-react';
@@ -35,6 +36,7 @@ type ActiveFilter = 'all' | 'active' | 'inactive';
 
 export function ServicesTab() {
   const t = useTranslations('services');
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const errorToast = useApiErrorToast();
   const canWrite = useCanWriteServices();
@@ -107,9 +109,11 @@ export function ServicesTab() {
         header: t('table.name'),
         cell: ({ row }) => (
           <div className="min-w-0">
-            <p className="truncate font-medium">{row.original.name.uz}</p>
+            <p className="truncate font-medium">{localizedText(row.original.name, locale)}</p>
             {row.original.category ? (
-              <p className="text-xs text-muted-foreground">{row.original.category.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {localizedText(row.original.category.name, locale)}
+              </p>
             ) : null}
           </div>
         ),
@@ -192,7 +196,7 @@ export function ServicesTab() {
         ),
       },
     ],
-    [t, canWrite, deactivateMutation.isPending],
+    [t, locale, canWrite, deactivateMutation.isPending],
   );
 
   return (
@@ -274,7 +278,9 @@ export function ServicesTab() {
           if (!open) setDeactivateTarget(null);
         }}
         title={t('deactivateTitle')}
-        description={t('deactivateDescription', { name: deactivateTarget?.name.uz ?? '' })}
+        description={t('deactivateDescription', {
+          name: localizedText(deactivateTarget?.name, locale),
+        })}
         confirmLabel={t('rowActions.deactivate')}
         cancelLabel={t('actions.cancel')}
         destructive

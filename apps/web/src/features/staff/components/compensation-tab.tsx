@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { localizedText } from '@/lib/localized';
 import { toast } from 'sonner';
 import { BadgeDollarSign, Plus, Trash2 } from 'lucide-react';
 import { CompensationType, formatUZS } from '@avishifo/shared';
@@ -38,15 +39,18 @@ export function CompensationTab({ userId }: { userId: string }) {
   const query = useCompensationRules(userId);
   const items = useMemo(() => query.data?.data ?? [], [query.data]);
 
+  const locale = useLocale();
   const categoriesQuery = useServiceCategoryOptions(true);
   const servicesQuery = useServiceOptions(true);
   const categoryName = useMemo(
-    () => new Map((categoriesQuery.data?.data ?? []).map((c) => [c.id, c.name])),
-    [categoriesQuery.data],
+    () =>
+      new Map((categoriesQuery.data?.data ?? []).map((c) => [c.id, localizedText(c.name, locale)])),
+    [categoriesQuery.data, locale],
   );
   const serviceName = useMemo(
-    () => new Map((servicesQuery.data?.data ?? []).map((s) => [s.id, s.name.uz])),
-    [servicesQuery.data],
+    () =>
+      new Map((servicesQuery.data?.data ?? []).map((s) => [s.id, localizedText(s.name, locale)])),
+    [servicesQuery.data, locale],
   );
 
   const deleteMutation = useMutation({
@@ -65,9 +69,7 @@ export function CompensationTab({ userId }: { userId: string }) {
         accessorKey: 'type',
         header: t('compensation.type'),
         cell: ({ row }) => (
-          <Badge variant="secondary">
-            {enumLabel('compensation', row.original.type)}
-          </Badge>
+          <Badge variant="secondary">{enumLabel('compensation', row.original.type)}</Badge>
         ),
       },
       {

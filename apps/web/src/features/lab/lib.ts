@@ -7,6 +7,7 @@ import {
   type PhysiologicalState,
   type ReferenceRangeInput,
 } from '@avishifo/shared';
+import { localizedText, type Localizable } from '@/lib/localized';
 
 export type UiLocale = 'uz' | 'ru' | 'en';
 
@@ -21,10 +22,28 @@ export function hasUnpaidLabWork(order: { status: LabOrderStatus; canWork: boole
 }
 
 /** Pick the localized variant of a {uz, ru?, en?} name (uz is first-class fallback). */
-export function localizedName(name: LocalizedNameInput, locale: UiLocale): string {
-  if (locale === 'ru' && name.ru) return name.ru;
-  if (locale === 'en' && name.en) return name.en;
-  return name.uz;
+export function localizedName(name: LocalizedNameInput, locale: string): string {
+  return localizedText(name, locale);
+}
+
+/** Free-text analytes that were entered by hand and have no catalogue translation. */
+const PLAIN_PARAMETER_NAMES: Record<string, { ru: string; en: string }> = {
+  Natija: { ru: 'Результат', en: 'Result' },
+};
+
+/** Analyte label: catalogue translation when we have one, otherwise the stored name. */
+export function parameterName(
+  param: { name: string; labels?: Localizable },
+  locale: string,
+): string {
+  const known = PLAIN_PARAMETER_NAMES[param.name];
+  const value =
+    param.labels && typeof param.labels === 'object'
+      ? param.labels
+      : known
+        ? { uz: param.name, ru: known.ru, en: known.en }
+        : param.name;
+  return localizedText(value, locale, param.name);
 }
 
 /** Short marker beside a value: H/L for out of range, !! for a panic value. */

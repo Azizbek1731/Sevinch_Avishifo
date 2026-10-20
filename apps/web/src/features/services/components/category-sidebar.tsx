@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { localizedText } from '@/lib/localized';
 import { toast } from 'sonner';
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { ServiceKind } from '@avishifo/shared';
@@ -88,6 +89,7 @@ export interface CategorySidebarProps {
 
 export function CategorySidebar({ selectedId, onSelect }: CategorySidebarProps) {
   const t = useTranslations('services');
+  const locale = useLocale();
   const enumLabel = useEnumLabel();
   const queryClient = useQueryClient();
   const errorToast = useApiErrorToast();
@@ -205,10 +207,8 @@ export function CategorySidebar({ selectedId, onSelect }: CategorySidebarProps) 
                   onClick={() => onSelect(cat.id)}
                   className="flex min-w-0 flex-1 flex-col items-start text-left"
                 >
-                  <span
-                    className={cn('truncate', selectedId === cat.id && 'font-medium')}
-                  >
-                    {cat.name}
+                  <span className={cn('truncate', selectedId === cat.id && 'font-medium')}>
+                    {localizedText(cat.name, locale)}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {enumLabel('serviceKind', cat.kind)}
@@ -265,7 +265,9 @@ export function CategorySidebar({ selectedId, onSelect }: CategorySidebarProps) 
           if (!open) setDeleteTarget(null);
         }}
         title={t('categories.deleteTitle')}
-        description={t('categories.deleteDescription', { name: deleteTarget?.name ?? '' })}
+        description={t('categories.deleteDescription', {
+          name: localizedText(deleteTarget?.name, locale),
+        })}
         confirmLabel={t('actions.delete')}
         cancelLabel={t('actions.cancel')}
         destructive

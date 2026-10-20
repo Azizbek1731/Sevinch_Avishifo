@@ -13,6 +13,8 @@ import type {
 export interface LabTestParameter {
   id: string;
   name: string;
+  /** Catalogue translations. The stored `name` stays the result-matching key. */
+  labels?: { uz?: string | null; ru?: string | null; en?: string | null } | null;
   code: string | null;
   unit: string | null;
   valueType: LabValueType;

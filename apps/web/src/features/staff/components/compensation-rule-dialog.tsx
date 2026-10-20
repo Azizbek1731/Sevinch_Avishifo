@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { localizedText } from '@/lib/localized';
 import { toast } from 'sonner';
 import {
   CompensationType,
@@ -31,11 +32,7 @@ import {
 import { useEnumLabel } from '@/hooks/use-enum-label';
 import { tashkentToUtcIso, todayTashkent } from '@/lib/dates';
 import { sanitizeMoney, staffApi } from '../api';
-import {
-  useApiErrorToast,
-  useServiceCategoryOptions,
-  useServiceOptions,
-} from '../hooks';
+import { useApiErrorToast, useServiceCategoryOptions, useServiceOptions } from '../hooks';
 
 const COMPENSATION_TYPES: CompensationType[] = [
   CompensationType.FIXED_SALARY,
@@ -57,6 +54,7 @@ export function CompensationRuleDialog({
   onOpenChange,
 }: CompensationRuleDialogProps) {
   const t = useTranslations('staff');
+  const locale = useLocale();
   const enumLabel = useEnumLabel();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
@@ -183,7 +181,7 @@ export function CompensationRuleDialog({
                 <SelectContent>
                   {(servicesQuery.data?.data ?? []).map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.code} · {s.name.uz}
+                      {s.code} · {localizedText(s.name, locale)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -206,7 +204,7 @@ export function CompensationRuleDialog({
                 <SelectContent>
                   {(categoriesQuery.data?.data ?? []).map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.name}
+                      {localizedText(c.name, locale)}
                     </SelectItem>
                   ))}
                 </SelectContent>

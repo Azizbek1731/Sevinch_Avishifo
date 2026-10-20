@@ -4,18 +4,14 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { localizedText } from '@/lib/localized';
 import { toast } from 'sonner';
 import { formatUZS, setServicePriceSchema, type SetServicePriceInput } from '@avishifo/shared';
 import { formatDate, tashkentToUtcIso, todayTashkent } from '@/lib/dates';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -48,6 +44,7 @@ export interface PriceHistoryDialogProps {
 
 export function PriceHistoryDialog({ open, onOpenChange, service }: PriceHistoryDialogProps) {
   const t = useTranslations('services');
+  const locale = useLocale();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
   const canWrite = useCanWriteServices();
@@ -111,7 +108,7 @@ export function PriceHistoryDialog({ open, onOpenChange, service }: PriceHistory
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {t('prices.title', { name: service?.name.uz ?? '' })}
+            {t('prices.title', { name: localizedText(service?.name, locale) })}
           </DialogTitle>
         </DialogHeader>
 

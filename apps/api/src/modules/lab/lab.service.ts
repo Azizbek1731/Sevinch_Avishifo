@@ -74,6 +74,8 @@ type LabOrderDetailRow = Prisma.LabOrderGetPayload<{
   };
 }>;
 
+type CatalogLabel = { uz: string; ru: string; en: string | null };
+
 type LabOrderListRow = Prisma.LabOrderGetPayload<{
   include: {
     patient: true;
@@ -100,11 +102,84 @@ export class LabService {
     private readonly pricing: PricingService,
   ) {}
 
+  // Catalogue analyte names (ru/en). The stored LabTestParameter.name stays the
+  // result-matching key, so translations are attached only for display.
+  private catalogLabelMap: Map<string, CatalogLabel> | null = null;
+  private catalogLabelLoading: Promise<Map<string, CatalogLabel>> | null = null;
+
+  private async catalogLabels(): Promise<Map<string, CatalogLabel>> {
+    if (this.catalogLabelMap) return this.catalogLabelMap;
+    this.catalogLabelLoading ??= this.loadCatalogLabels()
+      .then((map) => {
+        this.catalogLabelMap = map;
+        return map;
+      })
+      .catch((err: unknown) => {
+        this.catalogLabelLoading = null;
+        throw err;
+      });
+    return this.catalogLabelLoading;
+  }
+
+  private async loadCatalogLabels(): Promise<Map<string, CatalogLabel>> {
+    // Shared dictionary — justified unscoped read of a table with no clinicId.
+    const rows = await this.prisma.unscoped.labCatalogParameter.findMany({
+      select: {
+        code: true,
+        nameUz: true,
+        nameRu: true,
+        nameEn: true,
+        test: { select: { code: true } },
+      },
+    });
+    const map = new Map<string, CatalogLabel>();
+    const bare = new Map<string, CatalogLabel>();
+    const ambiguous = new Set<string>();
+    const byName = new Map<string, CatalogLabel>();
+    const ambiguousNames = new Set<string>();
+    for (const row of rows) {
+      const label: CatalogLabel = { uz: row.nameUz, ru: row.nameRu, en: row.nameEn };
+      map.set(`${row.test.code}:${row.code}`, label);
+      const prev = bare.get(row.code);
+      if (!prev) bare.set(row.code, label);
+      else if (prev.uz !== label.uz || prev.ru !== label.ru || prev.en !== label.en) {
+        ambiguous.add(row.code);
+      }
+      const nameKey = `${row.code}:${row.nameUz}`;
+      const prevName = byName.get(nameKey);
+      if (!prevName) byName.set(nameKey, label);
+      else if (prevName.ru !== label.ru || prevName.en !== label.en) ambiguousNames.add(nameKey);
+    }
+    for (const [code, label] of bare) {
+      if (!ambiguous.has(code)) map.set(`*:${code}`, label);
+    }
+    for (const [key, label] of byName) {
+      if (!ambiguousNames.has(key)) map.set(`name:${key}`, label);
+    }
+    return map;
+  }
+
+  private labelFor(
+    code: string | null,
+    catalogCode: string | null | undefined,
+    storedName: string,
+    labels: Map<string, CatalogLabel>,
+  ): CatalogLabel | null {
+    if (!code) return null;
+    if (catalogCode) {
+      const exact = labels.get(`${catalogCode}:${code}`);
+      if (exact) return exact;
+    }
+    return labels.get(`*:${code}`) ?? labels.get(`name:${code}:${storedName}`) ?? null;
+  }
+
   // ------------------------------------------------------------ mapping
 
   private toParameter(
     p: LabTestRow['parameters'][number],
     ctx?: PatientContext,
+    labels?: Map<string, CatalogLabel>,
+    catalogCode?: string | null,
   ): Record<string, unknown> {
     const ranges = parseReferenceRanges(p.referenceRanges);
     // The interval that applies to THIS patient, resolved once on the server so the entry
@@ -113,6 +188,7 @@ export class LabService {
     return {
       id: p.id,
       name: p.name,
+      labels: labels ? this.labelFor(p.code, catalogCode, p.name, labels) : null,
       code: p.code,
       unit: p.unit,
       valueType: p.valueType,
@@ -134,7 +210,7 @@ export class LabService {
     };
   }
 
-  private toTest(t: LabTestRow): Record<string, unknown> {
+  private toTest(t: LabTestRow, labels: Map<string, CatalogLabel>): Record<string, unknown> {
     return {
       id: t.id,
       code: t.code,
@@ -147,7 +223,7 @@ export class LabService {
       isActive: t.isActive,
       parameters: [...t.parameters]
         .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((p) => this.toParameter(p)),
+        .map((p) => this.toParameter(p, undefined, labels, t.catalogCode)),
     };
   }
 
@@ -184,7 +260,8 @@ export class LabService {
     };
   }
 
-  private toOrderDetail(o: LabOrderDetailRow): Record<string, unknown> {
+  private async toOrderDetail(o: LabOrderDetailRow): Promise<Record<string, unknown>> {
+    const labels = await this.catalogLabels();
     const ctx: PatientContext = {
       gender: o.patient.gender,
       ageDays: ageInDays(o.patient.dob, o.collectedAt ?? o.createdAt),
@@ -240,7 +317,7 @@ export class LabService {
           category: it.labTest.category,
           parameters: [...it.labTest.parameters]
             .sort((a, b) => a.sortOrder - b.sortOrder)
-            .map((p) => this.toParameter(p, ctx)),
+            .map((p) => this.toParameter(p, ctx, labels, it.labTest.catalogCode)),
         },
         result: it.result
           ? {
@@ -335,7 +412,7 @@ export class LabService {
         },
         include: { parameters: true },
       });
-      return this.toTest(created);
+      return this.toTest(created, await this.catalogLabels());
     } catch (err: unknown) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw new AppException(
@@ -366,8 +443,9 @@ export class LabService {
       }),
       this.prisma.db.labTest.count({ where }),
     ]);
+    const labels = await this.catalogLabels();
     return paginated(
-      rows.map((t) => this.toTest(t)),
+      rows.map((t) => this.toTest(t, labels)),
       { page: query.page, limit: query.limit, total },
     );
   }
@@ -455,7 +533,7 @@ export class LabService {
       include: { parameters: true },
     });
     if (!updated) throw new AppException(ErrorCode.NOT_FOUND, 'Lab test not found', 404);
-    return this.toTest(updated);
+    return this.toTest(updated, await this.catalogLabels());
   }
 
   // ------------------------------------------------------------ orders
@@ -1017,7 +1095,7 @@ export class LabService {
         address: clinic?.address ?? null,
         phone: clinic?.phone ?? null,
       },
-      order: this.toOrderDetail(order),
+      order: await this.toOrderDetail(order),
       approvedBy,
     };
   }

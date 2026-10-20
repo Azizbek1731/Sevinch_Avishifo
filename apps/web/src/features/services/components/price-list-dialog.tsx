@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { localizedText } from '@/lib/localized';
 import { toast } from 'sonner';
 import { formatUZS, fromTiyin, toTiyin } from '@avishifo/shared';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,7 @@ function moneyOrEmpty(value: string): string {
 
 export function PriceListDialog({ open, onOpenChange, list }: PriceListDialogProps) {
   const t = useTranslations('services');
+  const locale = useLocale();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
   const isEdit = list !== null;
@@ -90,10 +92,12 @@ export function PriceListDialog({ open, onOpenChange, list }: PriceListDialogPro
     return services.filter(
       (s) =>
         s.code.toLowerCase().includes(q) ||
+        localizedText(s.name, locale).toLowerCase().includes(q) ||
         s.name.uz.toLowerCase().includes(q) ||
-        (s.name.ru ?? '').toLowerCase().includes(q),
+        (s.name.ru ?? '').toLowerCase().includes(q) ||
+        (s.name.en ?? '').toLowerCase().includes(q),
     );
-  }, [services, search]);
+  }, [services, search, locale]);
 
   const filledCount = Object.values(prices).filter((v) => v !== '').length;
 
@@ -178,7 +182,7 @@ export function PriceListDialog({ open, onOpenChange, list }: PriceListDialogPro
                 return (
                   <TableRow key={s.id}>
                     <TableCell className="font-mono text-xs">{s.code}</TableCell>
-                    <TableCell className="font-medium">{s.name.uz}</TableCell>
+                    <TableCell className="font-medium">{localizedText(s.name, locale)}</TableCell>
                     <TableCell className="text-right tabular-nums">
                       {s.currentPrice ? formatUZS(s.currentPrice) : '—'}
                     </TableCell>

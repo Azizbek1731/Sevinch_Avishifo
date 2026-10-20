@@ -48,6 +48,7 @@ export interface ResultPdfData {
         parameters: Array<{
           id: string;
           name: string;
+          labels?: { uz?: string | null; ru?: string | null; en?: string | null } | null;
           unit: string | null;
           matchedRange?: ReferenceRangeInput | null;
           referenceRanges: ReferenceRangeInput[];
@@ -167,7 +168,14 @@ const FLAG_MARK: Record<ResultFlag, string> = {
   [ResultFlag.CRITICAL_LOW]: 'L!!',
 };
 
-const { ink: INK, muted: MUTED, rule: RULE, pale: ZEBRA, blue: BRAND, red: RED } = CLINIC_PDF_COLORS;
+const {
+  ink: INK,
+  muted: MUTED,
+  rule: RULE,
+  pale: ZEBRA,
+  blue: BRAND,
+  red: RED,
+} = CLINIC_PDF_COLORS;
 const BLUE = BRAND;
 
 const A4 = { width: 595.28, height: 841.89 };
@@ -186,6 +194,24 @@ function fmtDate(iso: string | null): string {
 
 function localName(name: Record<string, string>, locale: PdfLocale): string {
   return name[locale] ?? name.uz ?? Object.values(name)[0] ?? '—';
+}
+
+const PLAIN_PARAMETER_NAMES: Record<string, { ru: string; en: string }> = {
+  Natija: { ru: 'Результат', en: 'Result' },
+};
+
+function parameterLabel(
+  param: {
+    name: string;
+    labels?: { uz?: string | null; ru?: string | null; en?: string | null } | null;
+  },
+  locale: PdfLocale,
+): string {
+  const known = PLAIN_PARAMETER_NAMES[param.name];
+  const labels = param.labels ?? (known ? { uz: param.name, ...known } : null);
+  if (locale === 'ru') return labels?.ru || param.name;
+  if (locale === 'en') return labels?.en || labels?.uz || param.name;
+  return labels?.uz || param.name;
 }
 
 @Injectable()
@@ -222,7 +248,10 @@ export class ResultPdfService {
     if (critical) this.criticalBanner(doc, L);
     this.signature(doc, data, L);
     drawClinicPageFurniture(doc, data.clinic, {
-      margin: MARGIN, documentLabel: L.title, documentId: `№ ${data.order.orderNumber}`, pageLabel: L.page,
+      margin: MARGIN,
+      documentLabel: L.title,
+      documentId: `№ ${data.order.orderNumber}`,
+      pageLabel: L.page,
     });
 
     doc.end();
@@ -235,10 +264,17 @@ export class ResultPdfService {
     const { order } = data;
     doc.font('bold').fontSize(13).fillColor(INK).text(L.title, MARGIN, doc.y, { width: CONTENT_W });
     const y = doc.y + 6;
-    doc.font('body').fontSize(8.5).fillColor(MUTED)
+    doc
+      .font('body')
+      .fontSize(8.5)
+      .fillColor(MUTED)
       .text(`№ ${order.orderNumber}`, MARGIN, y, { width: CONTENT_W / 2 });
-    doc.text(`${L.date}: ${fmtDate(order.collectedAt ?? order.createdAt)}`,
-      MARGIN + CONTENT_W / 2, y, { width: CONTENT_W / 2, align: 'right' });
+    doc.text(
+      `${L.date}: ${fmtDate(order.collectedAt ?? order.createdAt)}`,
+      MARGIN + CONTENT_W / 2,
+      y,
+      { width: CONTENT_W / 2, align: 'right' },
+    );
     doc.y += 13;
   }
 
@@ -249,9 +285,15 @@ export class ResultPdfService {
     const nameHeight = doc.heightOfString(p.fullName, { width: CONTENT_W - 24 });
     const height = Math.max(68, nameHeight + 53);
     doc.roundedRect(MARGIN, y, CONTENT_W, height, 5).fillColor(ZEBRA).fill();
-    doc.font('body').fontSize(7).fillColor(MUTED)
+    doc
+      .font('body')
+      .fontSize(7)
+      .fillColor(MUTED)
       .text(L.patient.toUpperCase(), MARGIN + 12, y + 9, { width: CONTENT_W - 24 });
-    doc.font('bold').fontSize(10.5).fillColor(INK)
+    doc
+      .font('bold')
+      .fontSize(10.5)
+      .fillColor(INK)
       .text(p.fullName, MARGIN + 12, y + 19, { width: CONTENT_W - 24 });
     const detailY = y + nameHeight + 27;
     const cell = (label: string, value: string, x: number, w: number): void => {
@@ -327,9 +369,16 @@ export class ResultPdfService {
           : v.flag === ResultFlag.LOW
             ? BLUE
             : INK;
-      this.tableRow(doc, [param.name, v.value, param.unit ?? '', refText, mark], {
-        valueColor, emphasis: v.flag !== ResultFlag.NORMAL, zebra, labels: L,
-      });
+      this.tableRow(
+        doc,
+        [parameterLabel(param, locale), v.value, param.unit ?? '', refText, mark],
+        {
+          valueColor,
+          emphasis: v.flag !== ResultFlag.NORMAL,
+          zebra,
+          labels: L,
+        },
+      );
       zebra = !zebra;
     }
     doc
@@ -396,9 +445,14 @@ export class ResultPdfService {
     doc.rect(MARGIN, y, CONTENT_W, 23).fillColor(ZEBRA).fill();
     doc.font('bold').fontSize(7.5).fillColor(BRAND);
     const xs = this.colX();
-    [labels.parameter, labels.value, labels.unit, labels.reference, labels.flag]
-      .forEach((title, index) => doc.text(title.toUpperCase(), xs[index]! + 5, y + 6,
-        { width: this.colW(index) - 10, height: 16, lineBreak: false }));
+    [labels.parameter, labels.value, labels.unit, labels.reference, labels.flag].forEach(
+      (title, index) =>
+        doc.text(title.toUpperCase(), xs[index]! + 5, y + 6, {
+          width: this.colW(index) - 10,
+          height: 16,
+          lineBreak: false,
+        }),
+    );
     doc.y = y + 28;
   }
 
@@ -445,14 +499,19 @@ export class ResultPdfService {
     const rowHeight = totalLines * lineHeight + padding;
     // Keep ordinary rows together; oversized rows are split below and each
     // continuation page repeats the table labels.
-    if (doc.y + Math.min(rowHeight, 80) > bottom ||
-        (rowHeight < bottom - doc.page.margins.top - 28 && doc.y + rowHeight > bottom)) {
+    if (
+      doc.y + Math.min(rowHeight, 80) > bottom ||
+      (rowHeight < bottom - doc.page.margins.top - 28 && doc.y + rowHeight > bottom)
+    ) {
       doc.addPage();
       this.tableHeader(doc, options.labels);
     }
     let offset = 0;
     while (offset < totalLines) {
-      const count = Math.min(totalLines - offset, Math.floor((bottom - doc.y - padding) / lineHeight));
+      const count = Math.min(
+        totalLines - offset,
+        Math.floor((bottom - doc.y - padding) / lineHeight),
+      );
       if (count < 1) {
         doc.addPage();
         this.tableHeader(doc, options.labels);
@@ -460,13 +519,22 @@ export class ResultPdfService {
       }
       const y = doc.y;
       const height = count * lineHeight + padding;
-      if (options.zebra) doc.rect(MARGIN, y - 3, CONTENT_W, height).fillColor(ZEBRA).fill();
+      if (options.zebra)
+        doc
+          .rect(MARGIN, y - 3, CONTENT_W, height)
+          .fillColor(ZEBRA)
+          .fill();
       lines.forEach((cell, index) => {
-        doc.font(index === 4 || (index === 1 && options.emphasis) ? 'bold' : 'body').fontSize(9)
+        doc
+          .font(index === 4 || (index === 1 && options.emphasis) ? 'bold' : 'body')
+          .fontSize(9)
           .fillColor(index === 1 || index === 4 ? options.valueColor : index === 0 ? INK : MUTED);
         cell.slice(offset, offset + count).forEach((line, row) => {
-          doc.text(line, xs[index]! + 5, y + row * lineHeight,
-            { width: this.colW(index) - 10, height: lineHeight, lineBreak: false });
+          doc.text(line, xs[index]! + 5, y + row * lineHeight, {
+            width: this.colW(index) - 10,
+            height: lineHeight,
+            lineBreak: false,
+          });
         });
       });
       doc.y = y + height;

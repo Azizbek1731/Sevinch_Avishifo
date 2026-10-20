@@ -33,6 +33,7 @@ import {
   flagMark,
   isCriticalFlag,
   localizedName,
+  parameterName,
   rangeText,
   referenceText,
   type ReferenceTextLabels,
@@ -80,7 +81,7 @@ export function OrderItemCard({
       const f = savedFlags.get(p.id);
       return f === ResultFlag.CRITICAL_LOW || f === ResultFlag.CRITICAL_HIGH;
     })
-    .map((p) => p.name);
+    .map((p) => parameterName(p, locale));
 
   const save = () => {
     if (mode === 'file') {
@@ -193,7 +194,9 @@ export function OrderItemCard({
                         key={param.id}
                         className={critical ? 'bg-destructive/5' : undefined}
                       >
-                        <TableCell className="font-medium">{param.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {parameterName(param, locale)}
+                        </TableCell>
                         <TableCell>
                           <Input
                             className="h-8"

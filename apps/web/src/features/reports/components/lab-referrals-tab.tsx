@@ -1,6 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
+import { localizedText } from '@/lib/localized';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -99,7 +100,7 @@ export function LabReferralsTab({ filters }: { filters: ReportFilters }) {
                         {doctor.testsBreakdown.map((test) => (
                           <tr key={test.labTestId} className="border-t">
                             <td className="px-4 py-3">
-                              <p>{test.name[locale] ?? test.name.uz ?? test.code}</p>
+                              <p>{localizedText(test.name, locale) || test.code}</p>
                               <p className="text-xs text-muted-foreground">{test.code}</p>
                             </td>
                             {metrics.map((key) => (

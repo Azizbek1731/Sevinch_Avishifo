@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { localizedText } from '@/lib/localized';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { Search, X } from 'lucide-react';
@@ -55,6 +56,7 @@ export function ServiceDialog({
   defaultCategoryId,
 }: ServiceDialogProps) {
   const t = useTranslations('services');
+  const locale = useLocale();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
   const isEdit = service !== null;
@@ -170,7 +172,7 @@ export function ServiceDialog({
               <SelectContent>
                 {categories.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.name}
+                    {localizedText(c.name, locale)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -234,7 +236,7 @@ export function ServiceDialog({
                             if (c.name.ru) form.setValue('name.ru', c.name.ru);
                           }}
                         >
-                          <span className="truncate">{c.name.uz}</span>
+                          <span className="truncate">{localizedText(c.name, locale)}</span>
                           <span className="flex shrink-0 items-center gap-1.5">
                             {c.imported ? (
                               <Badge variant="secondary" className="text-[10px]">

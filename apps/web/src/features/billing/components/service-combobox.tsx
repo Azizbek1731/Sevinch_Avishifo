@@ -16,13 +16,12 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import { localizedText } from '@/lib/localized';
 import { billingApi, type ServiceOption } from '../api';
 import { searchServiceCatalogue } from '../service-catalogue';
 
 export function serviceName(s: ServiceOption, locale: string): string {
-  if (locale === 'ru' && s.name.ru) return s.name.ru;
-  if (locale === 'en' && s.name.en) return s.name.en;
-  return s.name.uz;
+  return localizedText(s.name, locale);
 }
 
 export interface ServiceComboboxProps {

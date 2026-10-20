@@ -1,4 +1,5 @@
 import { api } from '@/lib/api-client';
+import { localizedText } from '@/lib/localized';
 import type {
   AppointmentStatus,
   ChangeAppointmentStatusInput,
@@ -119,7 +120,5 @@ export const appointmentsApi = {
 /** Pick the best translation of a localized name for the current locale. */
 export function localizedName(name: LocalizedName | null | undefined, locale: string): string {
   if (!name) return '';
-  if (locale === 'ru' && name.ru) return name.ru;
-  if (locale === 'en' && name.en) return name.en;
-  return name.uz;
+  return localizedText(name, locale);
 }

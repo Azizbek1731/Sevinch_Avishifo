@@ -59,7 +59,10 @@ export function CreateOrderDialog({
     const q = testQuery.trim().toLowerCase();
     return (
       test.code.toLowerCase().includes(q) ||
-      localizedName(test.name, locale).toLowerCase().includes(q)
+      localizedName(test.name, locale).toLowerCase().includes(q) ||
+      test.name.uz.toLowerCase().includes(q) ||
+      (test.name.ru ?? '').toLowerCase().includes(q) ||
+      (test.name.en ?? '').toLowerCase().includes(q)
     );
   });
 

@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { localizedText } from '@/lib/localized';
 import { toast } from 'sonner';
 import { Plus, Trash2 } from 'lucide-react';
 import { createPackageSchema, formatUZS, type CreatePackageInput } from '@avishifo/shared';
@@ -37,6 +38,7 @@ export interface PackageDialogProps {
 
 export function PackageDialog({ open, onOpenChange, pkg }: PackageDialogProps) {
   const t = useTranslations('services');
+  const locale = useLocale();
   const errorToast = useApiErrorToast();
   const queryClient = useQueryClient();
   const isEdit = pkg !== null;
@@ -176,7 +178,7 @@ export function PackageDialog({ open, onOpenChange, pkg }: PackageDialogProps) {
                       <SelectContent>
                         {services.map((s) => (
                           <SelectItem key={s.id} value={s.id}>
-                            {s.name.uz}
+                            {localizedText(s.name, locale)}
                             {s.currentPrice !== null ? ` — ${formatUZS(s.currentPrice)}` : ''}
                           </SelectItem>
                         ))}
