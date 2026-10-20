@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '../../common/decorators';
 import type { PaginatedResult } from '../../common/pagination';
@@ -7,10 +7,12 @@ import {
   type CategoryResponse,
   type DiscountRuleResponse,
   type PackageResponse,
+  type PriceListDetailResponse,
+  type PriceListResponse,
   type ServicePriceResponse,
   type ServiceResponse,
 } from './services.service';
-import { CreatePackageDto, CreateServiceCategoryDto, CreateServiceDto, DiscountRuleUpsertDto, ListQueryDto, ServiceQueryDto, SetServicePriceDto, UpdatePackageDto, UpdateServiceCategoryDto, UpdateServiceDto } from './dto';
+import { CreatePackageDto, CreatePriceListDto, CreateServiceCategoryDto, CreateServiceDto, DiscountRuleUpsertDto, ListQueryDto, PriceListQueryDto, ServiceQueryDto, SetPriceListItemsDto, SetServicePriceDto, UpdatePackageDto, UpdatePriceListDto, UpdateServiceCategoryDto, UpdateServiceDto } from './dto';
 
 /**
  * M7 — service catalog, effective-dated pricing, packages, discount rules.
@@ -182,5 +184,49 @@ export class ServicesController {
   @RequirePermissions('services.write')
   deleteDiscountRule(@Param('id') id: string): Promise<DiscountRuleResponse> {
     return this.services.deleteDiscountRule(id);
+  }
+
+  // ------------------------------------------------------------ price lists
+
+  @Get('price-lists')
+  @RequirePermissions('services.read')
+  listPriceLists(@Query() query: PriceListQueryDto): Promise<PaginatedResult<PriceListResponse>> {
+    return this.services.listPriceLists(query);
+  }
+
+  @Post('price-lists')
+  @RequirePermissions('services.write')
+  createPriceList(@Body() dto: CreatePriceListDto): Promise<PriceListDetailResponse> {
+    return this.services.createPriceList(dto);
+  }
+
+  @Get('price-lists/:id')
+  @RequirePermissions('services.read')
+  getPriceList(@Param('id') id: string): Promise<PriceListDetailResponse> {
+    return this.services.getPriceList(id);
+  }
+
+  @Patch('price-lists/:id')
+  @RequirePermissions('services.write')
+  updatePriceList(
+    @Param('id') id: string,
+    @Body() dto: UpdatePriceListDto,
+  ): Promise<PriceListDetailResponse> {
+    return this.services.updatePriceList(id, dto);
+  }
+
+  @Delete('price-lists/:id')
+  @RequirePermissions('services.write')
+  deletePriceList(@Param('id') id: string): Promise<PriceListResponse> {
+    return this.services.deletePriceList(id);
+  }
+
+  @Put('price-lists/:id/items')
+  @RequirePermissions('services.write')
+  setPriceListItems(
+    @Param('id') id: string,
+    @Body() dto: SetPriceListItemsDto,
+  ): Promise<PriceListDetailResponse> {
+    return this.services.setPriceListItems(id, dto);
   }
 }

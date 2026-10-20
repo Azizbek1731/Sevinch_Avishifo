@@ -353,8 +353,8 @@ export class LabService {
     if (query.search) {
       where.OR = [
         { code: { contains: query.search, mode: 'insensitive' } },
-        { name: { path: ['uz'], string_contains: query.search } },
-        { name: { path: ['ru'], string_contains: query.search } },
+        { name: { path: ['uz'], string_contains: query.search, mode: 'insensitive' } },
+        { name: { path: ['ru'], string_contains: query.search, mode: 'insensitive' } },
       ];
     }
     const [rows, total] = await Promise.all([

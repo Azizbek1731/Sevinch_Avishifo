@@ -78,7 +78,7 @@ export const labApi = {
     api.get<LabPrintPayload>(`/lab-orders/${id}/print`),
 
   listTests: (search?: string): Promise<ApiResult<LabTest[]>> =>
-    api.get<LabTest[]>('/lab-tests', { search: search || undefined, limit: 100 }),
+    api.getAll<LabTest>('/lab-tests', { search: search || undefined }),
 
   createTest: (body: CreateLabTestInput): Promise<ApiResult<LabTest>> =>
     api.post<LabTest>('/lab-tests', body),

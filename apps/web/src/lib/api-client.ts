@@ -1,6 +1,6 @@
 'use client';
 
-import type { ApiMeta, ApiResponse, ErrorCode } from '@avishifo/shared';
+import { PAGINATION, type ApiMeta, type ApiResponse, type ErrorCode } from '@avishifo/shared';
 import { useAuthStore } from '@/stores/auth-store';
 
 /**
@@ -152,8 +152,24 @@ export function apiFetch<T>(path: string, opts: FetchOptions = {}): Promise<ApiR
   return doFetch<T>(path, opts, false);
 }
 
+/**
+ * Every row of a paginated list. The server caps a page at PAGINATION.MAX_LIMIT,
+ * so a picker that must offer the whole catalogue walks the pages.
+ */
+async function getAll<T>(path: string, query?: Query): Promise<ApiResult<T[]>> {
+  const limit = PAGINATION.MAX_LIMIT;
+  const data: T[] = [];
+  for (let page = 1; page <= 100; page += 1) {
+    const res = await apiFetch<T[]>(path, { query: { ...query, page, limit } });
+    data.push(...res.data);
+    if (res.data.length < limit || data.length >= (res.meta?.total ?? 0)) break;
+  }
+  return { data, meta: { page: 1, limit: data.length, total: data.length } };
+}
+
 export const api = {
   get: <T>(path: string, query?: Query) => apiFetch<T>(path, { query }),
+  getAll,
   post: <T>(path: string, body?: unknown, query?: Query) =>
     apiFetch<T>(path, { method: 'POST', body, query }),
   put: <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: 'PUT', body }),

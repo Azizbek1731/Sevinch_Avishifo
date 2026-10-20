@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import type {
   DiscountRule,
   PackageItem,
+  PriceList,
   Service,
   ServiceCategory,
   ServicePackage,
@@ -18,16 +19,23 @@ import { PricingService } from './pricing.service';
 import { LabCatalogService } from '../lab/catalog.service';
 import {
   CreatePackageDto,
+  CreatePriceListDto,
   CreateServiceCategoryDto,
   CreateServiceDto,
   DiscountRuleUpsertDto,
   ListQueryDto,
+  PriceListQueryDto,
   ServiceQueryDto,
+  SetPriceListItemsDto,
   SetServicePriceDto,
   UpdatePackageDto,
+  UpdatePriceListDto,
   UpdateServiceCategoryDto,
   UpdateServiceDto,
 } from './dto';
+
+const PRICE_LIST_NOT_FOUND = 'Narx ro‘yxati topilmadi';
+const PRICE_LIST_NAME_TAKEN = 'Bu nomdagi narx ro‘yxati allaqachon bor';
 
 // ---------------------------------------------------------------- responses
 
@@ -92,6 +100,19 @@ export interface DiscountRuleResponse {
   createdAt: string;
 }
 
+export interface PriceListResponse {
+  id: string;
+  name: string;
+  isActive: boolean;
+  itemCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PriceListDetailResponse extends PriceListResponse {
+  items: Array<{ serviceId: string; price: string }>;
+}
+
 function mapCategory(c: ServiceCategory): CategoryResponse {
   return { id: c.id, name: c.name, kind: c.kind, sortOrder: c.sortOrder, isActive: c.isActive };
 }
@@ -140,6 +161,17 @@ function mapDiscountRule(r: DiscountRule): DiscountRuleResponse {
     maxForRole: r.maxForRole,
     isActive: r.isActive,
     createdAt: r.createdAt.toISOString(),
+  };
+}
+
+function mapPriceList(list: PriceList, itemCount: number): PriceListResponse {
+  return {
+    id: list.id,
+    name: list.name,
+    isActive: list.isActive,
+    itemCount,
+    createdAt: list.createdAt.toISOString(),
+    updatedAt: list.updatedAt.toISOString(),
   };
 }
 
@@ -219,9 +251,9 @@ export class ServicesService {
             OR: [
               { code: { contains: search, mode: 'insensitive' } },
               // Multilingual name is Json { uz, ru, en } — filter compiles to name ->> locale.
-              { name: { path: ['uz'], string_contains: search } },
-              { name: { path: ['ru'], string_contains: search } },
-              { name: { path: ['en'], string_contains: search } },
+              { name: { path: ['uz'], string_contains: search, mode: 'insensitive' } },
+              { name: { path: ['ru'], string_contains: search, mode: 'insensitive' } },
+              { name: { path: ['en'], string_contains: search, mode: 'insensitive' } },
             ],
           }
         : {}),
@@ -644,6 +676,142 @@ export class ServicesService {
     return mapDiscountRule(rule);
   }
 
+  // ------------------------------------------------------------ price lists
+
+  async listPriceLists(query: PriceListQueryDto): Promise<PaginatedResult<PriceListResponse>> {
+    const where: Prisma.PriceListWhereInput =
+      query.isActive !== undefined ? { isActive: query.isActive } : {};
+    const [rows, total] = await Promise.all([
+      this.prisma.db.priceList.findMany({
+        where,
+        include: { _count: { select: { items: true } } },
+        orderBy: { name: 'asc' },
+        ...skipTake(query),
+      }),
+      this.prisma.db.priceList.count({ where }),
+    ]);
+    return paginated(
+      rows.map((row) => mapPriceList(row, row._count.items)),
+      { page: query.page, limit: query.limit, total },
+    );
+  }
+
+  async getPriceList(id: string): Promise<PriceListDetailResponse> {
+    const list = await this.prisma.db.priceList.findFirst({
+      where: { id },
+      include: { items: { orderBy: { serviceId: 'asc' } } },
+    });
+    if (!list) throw new AppException(ErrorCode.NOT_FOUND, PRICE_LIST_NOT_FOUND, 404);
+    return {
+      ...mapPriceList(list, list.items.length),
+      items: list.items.map((item) => ({ serviceId: item.serviceId, price: item.price.toFixed(2) })),
+    };
+  }
+
+  async createPriceList(dto: CreatePriceListDto): Promise<PriceListDetailResponse> {
+    let list: PriceList;
+    try {
+      list = await this.prisma.db.priceList.create({
+        // clinicId is stamped by the tenant extension at runtime; set explicitly for typing.
+        data: {
+          clinicId: TenantContext.requireClinicId(),
+          name: dto.name,
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        },
+      });
+    } catch (err) {
+      throw this.mapUniqueError(err, PRICE_LIST_NAME_TAKEN);
+    }
+    await this.audit.log({
+      action: AuditAction.CREATE,
+      entity: 'PriceList',
+      entityId: list.id,
+      after: { name: list.name, isActive: list.isActive },
+    });
+    return { ...mapPriceList(list, 0), items: [] };
+  }
+
+  async updatePriceList(id: string, dto: UpdatePriceListDto): Promise<PriceListDetailResponse> {
+    const before = await this.requirePriceList(id);
+    try {
+      await this.prisma.db.priceList.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        },
+      });
+    } catch (err) {
+      throw this.mapUniqueError(err, PRICE_LIST_NAME_TAKEN);
+    }
+    const after = await this.getPriceList(id);
+    await this.audit.log({
+      action: AuditAction.UPDATE,
+      entity: 'PriceList',
+      entityId: id,
+      before: { name: before.name, isActive: before.isActive },
+      after: { name: after.name, isActive: after.isActive },
+    });
+    return after;
+  }
+
+  /** Hard delete: an invoice keeps the discount it was billed with, not a link to the list. */
+  async deletePriceList(id: string): Promise<PriceListResponse> {
+    const list = await this.requirePriceList(id);
+    const itemCount = await this.prisma.db.priceListItem.count({ where: { priceListId: id } });
+    await this.prisma.db.priceList.delete({ where: { id } });
+    await this.audit.log({
+      action: AuditAction.DELETE,
+      entity: 'PriceList',
+      entityId: id,
+      before: { name: list.name, isActive: list.isActive, itemCount },
+    });
+    return mapPriceList(list, itemCount);
+  }
+
+  async setPriceListItems(
+    id: string,
+    dto: SetPriceListItemsDto,
+  ): Promise<PriceListDetailResponse> {
+    await this.requirePriceList(id);
+    const serviceIds = dto.items.map((item) => item.serviceId);
+    await this.requireServicesExist(serviceIds);
+    const before = await this.prisma.db.priceListItem.findMany({
+      where: { priceListId: id, serviceId: { in: serviceIds } },
+      select: { serviceId: true, price: true },
+    });
+    const priced = dto.items.flatMap((item) =>
+      item.price === null ? [] : [{ serviceId: item.serviceId, price: item.price }],
+    );
+    const clinicId = TenantContext.requireClinicId();
+    await this.prisma.db.$transaction(async (tx) => {
+      await tx.priceListItem.deleteMany({
+        where: { priceListId: id, serviceId: { in: serviceIds } },
+      });
+      if (priced.length > 0) {
+        await tx.priceListItem.createMany({
+          data: priced.map((item) => ({
+            clinicId,
+            priceListId: id,
+            serviceId: item.serviceId,
+            price: new Prisma.Decimal(item.price),
+          })),
+        });
+      }
+      await tx.priceList.update({ where: { id }, data: { updatedAt: new Date() } });
+    });
+    await this.audit.log({
+      action: AuditAction.UPDATE,
+      entity: 'PriceList',
+      entityId: id,
+      before: {
+        prices: Object.fromEntries(before.map((row) => [row.serviceId, row.price.toFixed(2)])),
+      },
+      after: { prices: Object.fromEntries(dto.items.map((item) => [item.serviceId, item.price])) },
+    });
+    return this.getPriceList(id);
+  }
+
   // ------------------------------------------------------------ helpers
 
   private mapPackage(pkg: PackageWithItems, priceMap: Map<string, string>): PackageResponse {
@@ -667,6 +835,12 @@ export class ServicesService {
     const category = await this.prisma.db.serviceCategory.findFirst({ where: { id } });
     if (!category) throw new AppException(ErrorCode.NOT_FOUND, 'Service category not found', 404);
     return category;
+  }
+
+  private async requirePriceList(id: string): Promise<PriceList> {
+    const list = await this.prisma.db.priceList.findFirst({ where: { id } });
+    if (!list) throw new AppException(ErrorCode.NOT_FOUND, PRICE_LIST_NOT_FOUND, 404);
+    return list;
   }
 
   private async requireServicesExist(serviceIds: string[]): Promise<void> {

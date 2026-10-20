@@ -51,6 +51,8 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'ServicePackage',
   'PackageItem',
   'DiscountRule',
+  'PriceList',
+  'PriceListItem',
   'Invoice',
   'InvoiceLine',
   'Payment',

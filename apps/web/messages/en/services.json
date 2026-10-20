@@ -1,6 +1,6 @@
 {
   "title": "Services & prices",
-  "subtitle": "Service catalog, packages and discount rules",
+  "subtitle": "Service catalog, packages, price lists and discount rules",
   "newService": "Service",
   "searchPlaceholder": "Search by code or name...",
   "deactivated": "Service removed",
@@ -9,6 +9,7 @@
   "tabs": {
     "services": "Services",
     "packages": "Packages",
+    "priceLists": "Price lists",
     "discounts": "Discounts"
   },
   "filter": {
@@ -121,6 +122,33 @@
       "selectService": "Select a service",
       "itemsRequired": "Select at least one service",
       "itemsSum": "Items total: {sum}"
+    }
+  },
+  "priceLists": {
+    "new": "Price list",
+    "created": "Price list created",
+    "updated": "Price list saved",
+    "deleted": "Price list deleted",
+    "active": "Active",
+    "inactive": "Inactive",
+    "itemCount": "{count} services",
+    "deleteTitle": "Delete this price list?",
+    "deleteDescription": "Price list \"{name}\" will be deleted. Existing invoices are not changed.",
+    "empty": {
+      "title": "No price lists yet",
+      "description": "Store partner or special tariffs here. The cashier can pick a list at sale time."
+    },
+    "form": {
+      "createTitle": "New price list",
+      "editTitle": "Edit price list",
+      "name": "Name",
+      "isActive": "Active",
+      "hint": "Services left blank keep the catalogue price. The difference is billed as a line discount.",
+      "catalogPrice": "Catalogue",
+      "listPrice": "List price",
+      "listPriceEmpty": "Catalogue",
+      "saving": "Saving",
+      "filled": "{count} special prices"
     }
   },
   "discounts": {

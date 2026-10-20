@@ -239,5 +239,5 @@ export const staffApi = {
   listServiceCategories: (): Promise<ApiResult<ServiceCategoryOption[]>> =>
     api.get<ServiceCategoryOption[]>('/service-categories', { limit: 100 }),
   listServices: (): Promise<ApiResult<ServiceOption[]>> =>
-    api.get<ServiceOption[]>('/services', { limit: 100 }),
+    api.getAll<ServiceOption>('/services'),
 };

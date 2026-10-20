@@ -1488,6 +1488,7 @@ model Service {
 
   category            ServiceCategory      @relation(fields: [categoryId], references: [id])
   prices              ServicePrice[]
+  priceListItems      PriceListItem[]
   packageItems        PackageItem[]
   invoiceLines        InvoiceLine[]
   appointmentServices AppointmentService[]
@@ -1560,6 +1561,37 @@ model DiscountRule {
   createdAt  DateTime     @default(now()) @db.Timestamptz(6)
 
   @@index([clinicId, promoCode])
+}
+
+/// A named tariff, e.g. a partner organisation's lab prices. At the desk the
+/// gap to the service's own price is billed as a line discount; services not
+/// in the list keep their own price.
+model PriceList {
+  id        String   @id @default(uuid(7))
+  clinicId  String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  items PriceListItem[]
+
+  @@unique([clinicId, name])
+}
+
+model PriceListItem {
+  id          String   @id @default(uuid(7))
+  clinicId    String
+  priceListId String
+  serviceId   String
+  price       Decimal  @db.Decimal(14, 2)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  priceList PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  service   Service   @relation(fields: [serviceId], references: [id])
+
+  @@unique([priceListId, serviceId])
+  @@index([clinicId, serviceId])
 }
 
 // ============================================================ BILLING (M8)

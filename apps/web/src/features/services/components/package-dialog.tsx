@@ -42,8 +42,8 @@ export function PackageDialog({ open, onOpenChange, pkg }: PackageDialogProps) {
   const isEdit = pkg !== null;
 
   const { data: servicesData } = useQuery({
-    queryKey: ['services', { limit: 100, isActive: true }],
-    queryFn: () => servicesApi.listServices({ page: 1, limit: 100, isActive: true }),
+    queryKey: ['services', 'all', { isActive: true }],
+    queryFn: () => servicesApi.listAllServices({ isActive: true }),
     enabled: open,
   });
   const services = servicesData?.data ?? [];

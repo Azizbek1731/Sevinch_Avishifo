@@ -110,7 +110,7 @@ export const appointmentsApi = {
     (await api.get<DoctorOption[]>('/users', { role: 'DOCTOR', limit: 100 })).data,
 
   services: async (): Promise<ServiceOption[]> =>
-    (await api.get<ServiceOption[]>('/services', { isActive: true, limit: 100 })).data,
+    (await api.getAll<ServiceOption>('/services', { isActive: true })).data,
 
   searchPatients: async (search: string): Promise<PatientHit[]> =>
     (await api.get<PatientHit[]>('/patients', { search, limit: 8 })).data,

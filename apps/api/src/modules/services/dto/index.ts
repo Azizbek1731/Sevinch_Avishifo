@@ -5,7 +5,10 @@ import {
   createServiceSchema,
   discountRuleUpsertSchema,
   paginationQuerySchema,
+  priceListQuerySchema,
+  priceListUpsertSchema,
   serviceQuerySchema,
+  setPriceListItemsSchema,
   setServicePriceSchema,
   updateServiceSchema,
 } from '@avishifo/shared';
@@ -29,3 +32,9 @@ export class UpdatePackageDto extends createZodDto(createPackageSchema.partial()
 
 // ---- Discount rules
 export class DiscountRuleUpsertDto extends createZodDto(discountRuleUpsertSchema) {}
+
+// ---- Price lists
+export class PriceListQueryDto extends createZodDto(priceListQuerySchema) {}
+export class CreatePriceListDto extends createZodDto(priceListUpsertSchema) {}
+export class UpdatePriceListDto extends createZodDto(priceListUpsertSchema.partial()) {}
+export class SetPriceListItemsDto extends createZodDto(setPriceListItemsSchema) {}

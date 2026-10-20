@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DiscountsTab } from './discounts-tab';
 import { PackagesTab } from './packages-tab';
+import { PriceListsTab } from './price-lists-tab';
 import { ServicesTab } from './services-tab';
 
 export function ServicesPage() {
@@ -18,6 +19,7 @@ export function ServicesPage() {
         <TabsList>
           <TabsTrigger value="services">{t('tabs.services')}</TabsTrigger>
           <TabsTrigger value="packages">{t('tabs.packages')}</TabsTrigger>
+          <TabsTrigger value="priceLists">{t('tabs.priceLists')}</TabsTrigger>
           <TabsTrigger value="discounts">{t('tabs.discounts')}</TabsTrigger>
         </TabsList>
         <TabsContent value="services" className="mt-4">
@@ -25,6 +27,9 @@ export function ServicesPage() {
         </TabsContent>
         <TabsContent value="packages" className="mt-4">
           <PackagesTab />
+        </TabsContent>
+        <TabsContent value="priceLists" className="mt-4">
+          <PriceListsTab />
         </TabsContent>
         <TabsContent value="discounts" className="mt-4">
           <DiscountsTab />

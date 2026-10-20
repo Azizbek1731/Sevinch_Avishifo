@@ -298,7 +298,7 @@ export const doctorApi = {
   searchIcd10: (search: string) => api.get<Icd10Item[]>('/icd10', { search, limit: 20 }),
   searchDrugs: (search: string) => api.get<DrugItem[]>('/drugs', { search, limit: 20 }),
   listLabTests: (search?: string) =>
-    api.get<LabTestItem[]>('/lab-tests', { limit: 100, search: search || undefined }),
+    api.getAll<LabTestItem>('/lab-tests', { search: search || undefined }),
   listTemplates: () => api.get<VisitTemplate[]>('/visit-templates', { limit: 100 }),
   createTemplate: (body: VisitTemplateUpsertInput) =>
     api.post<VisitTemplate>('/visit-templates', body),

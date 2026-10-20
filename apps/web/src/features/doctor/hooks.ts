@@ -127,7 +127,7 @@ export function useDrugSearch(search: string) {
 export function useLabTests(enabled: boolean, search = '') {
   const debounced = useDebouncedValue(search.trim());
   return useQuery({
-    queryKey: ['lab-tests', { limit: 100, search: debounced }],
+    queryKey: ['lab-tests', { search: debounced }],
     queryFn: () => doctorApi.listLabTests(debounced),
     enabled,
     select: (res) => res.data,

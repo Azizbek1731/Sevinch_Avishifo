@@ -7,7 +7,9 @@ import type {
   DiscountRuleUpsertInput,
   DiscountType,
   MoneyString,
+  PriceListUpsertInput,
   ServiceKind,
+  SetPriceListItemsInput,
   SetServicePriceInput,
   UpdateServiceInput,
 } from '@avishifo/shared';
@@ -82,6 +84,19 @@ export interface DiscountRuleRow {
   createdAt: string;
 }
 
+export interface PriceListRow {
+  id: string;
+  name: string;
+  isActive: boolean;
+  itemCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PriceListDetail extends PriceListRow {
+  items: Array<{ serviceId: string; price: MoneyString }>;
+}
+
 export interface ServiceListQuery {
   page?: number;
   limit?: number;
@@ -106,6 +121,9 @@ export const servicesApi = {
   // services
   listServices: (q: ServiceListQuery): Promise<ApiResult<ServiceRow[]>> =>
     api.get<ServiceRow[]>('/services', { ...q }),
+  listAllServices: (
+    q: Omit<ServiceListQuery, 'page' | 'limit'> = {},
+  ): Promise<ApiResult<ServiceRow[]>> => api.getAll<ServiceRow>('/services', { ...q }),
   createService: (body: CreateServiceInput) => api.post<ServiceRow>('/services', body),
   updateService: (id: string, body: UpdateServiceInput) =>
     api.patch<ServiceRow>(`/services/${id}`, body),
@@ -137,6 +155,18 @@ export const servicesApi = {
   updateDiscountRule: (id: string, body: DiscountRuleUpsertInput) =>
     api.patch<DiscountRuleRow>(`/discount-rules/${id}`, body),
   deleteDiscountRule: (id: string) => api.delete<DiscountRuleRow>(`/discount-rules/${id}`),
+
+  // price lists
+  listPriceLists: (q: { isActive?: boolean } = {}): Promise<ApiResult<PriceListRow[]>> =>
+    api.getAll<PriceListRow>('/price-lists', { ...q }),
+  getPriceList: (id: string) => api.get<PriceListDetail>(`/price-lists/${id}`),
+  createPriceList: (body: PriceListUpsertInput) =>
+    api.post<PriceListDetail>('/price-lists', body),
+  updatePriceList: (id: string, body: Partial<PriceListUpsertInput>) =>
+    api.patch<PriceListDetail>(`/price-lists/${id}`, body),
+  deletePriceList: (id: string) => api.delete<PriceListRow>(`/price-lists/${id}`),
+  setPriceListItems: (id: string, body: SetPriceListItemsInput) =>
+    api.put<PriceListDetail>(`/price-lists/${id}/items`, body),
 };
 
 /** "1 500 000,5" → "1500000.5" (UI convenience before zod money validation). */

@@ -53,7 +53,10 @@
     "create": "Yaratish",
     "creating": "Yaratilmoqda...",
     "created": "Hisob {number} yaratildi",
-    "invalidAmount": "Summa noto'g'ri kiritilgan"
+    "invalidAmount": "Summa noto'g'ri kiritilgan",
+    "priceList": "Narx ro‘yxati",
+    "priceListNone": "Oddiy narxlar",
+    "priceListHint": "Hamkor tarifi tanlansa, farq chegirma sifatida yoziladi. Keyin sozlamalardan o‘zgartirish mumkin."
   },
   "pay": {
     "title": "To'lov — {number}",

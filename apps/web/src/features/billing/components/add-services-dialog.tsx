@@ -35,11 +35,14 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { billingApi, sanitizeMoney, type PatientBrief, type ServiceOption } from '../api';
 import { useApiErrorToast, useInvalidateBilling, usePermission } from '../hooks';
+import type { PriceListDetail } from '@/features/services/api';
 import { PatientCombobox } from './patient-combobox';
+import { PriceListSelect } from './price-list-select';
 import { ReceiptPrinter } from './receipt-printer';
 import { PaymentSplit, splitTotalTiyin } from './payment-split';
 import { inputTiyin, needsOpenShift } from '../payment-methods';
 import { identifyInvoiceRequest, type InvoiceRequestIdentity } from '../invoice-request';
+import { listedLine } from '../price-list';
 import { ServiceCombobox } from './service-combobox';
 
 const EMPTY_LINE = { quantity: 1, unitPrice: '0' as MoneyString, discount: '0' as MoneyString };
@@ -101,6 +104,7 @@ export function AddServicesDialog({
       : 'quick.subtitle';
 
   const [patient, setPatient] = useState<PatientBrief | null>(fixedPatient ?? null);
+  const [priceList, setPriceList] = useState<PriceListDetail | null>(null);
   /** Selected service per field-array row, keyed by RHF field id. */
   const [rowServices, setRowServices] = useState<Record<string, ServiceOption | null>>({});
   /**
@@ -128,6 +132,7 @@ export function AddServicesDialog({
   useEffect(() => {
     if (!open) return;
     setPatient(fixedPatient ?? null);
+    setPriceList(null);
     setRowServices({});
     setPayments([{ method: PaymentMethod.CASH, amount: '0' }]);
     requestIdentity.current = null;
@@ -204,6 +209,13 @@ export function AddServicesDialog({
   const submit = (settle: InvoiceSettlement) =>
     form.handleSubmit((values) => mutation.mutate({ values, settle }))();
 
+  const applyListed = (idx: number, service: ServiceOption, quantity: number) => {
+    const listed = priceList?.items.find((item) => item.serviceId === service.id)?.price;
+    const next = listedLine(service.currentPrice, listed, quantity);
+    form.setValue(`lines.${idx}.unitPrice`, next.unitPrice, { shouldValidate: true });
+    form.setValue(`lines.${idx}.discount`, next.discount, { shouldValidate: true });
+  };
+
   const watchedLines = form.watch('lines') ?? [];
   const totalTiyin = watchedLines.reduce<bigint>((acc, line) => {
     const lt = lineTotalTiyin(line.quantity, line.unitPrice, line.discount ?? '0');
@@ -250,6 +262,30 @@ export function AddServicesDialog({
               </div>
             )}
 
+            <PriceListSelect
+              value={priceList}
+              onChange={(next) => {
+                setPriceList(next);
+                fields.forEach((field, idx) => {
+                  const service = rowServices[field.id];
+                  if (service) {
+                    const listed = next?.items.find((item) => item.serviceId === service.id)?.price;
+                    const priced = listedLine(
+                      service.currentPrice,
+                      listed,
+                      form.getValues(`lines.${idx}.quantity`) ?? 1,
+                    );
+                    form.setValue(`lines.${idx}.unitPrice`, priced.unitPrice, {
+                      shouldValidate: true,
+                    });
+                    form.setValue(`lines.${idx}.discount`, priced.discount, {
+                      shouldValidate: true,
+                    });
+                  }
+                });
+              }}
+            />
+
             <div className="space-y-2">
               <Label>{t(isLab ? 'quick.tests' : 'form.lines')}</Label>
               {isProcedureOrder ? (
@@ -278,9 +314,7 @@ export function AddServicesDialog({
                           onChange={(s) => {
                             setRowServices((prev) => ({ ...prev, [field.id]: s }));
                             form.setValue(`lines.${idx}.serviceId`, s.id, { shouldValidate: true });
-                            form.setValue(`lines.${idx}.unitPrice`, s.currentPrice ?? '0', {
-                              shouldValidate: true,
-                            });
+                            applyListed(idx, s, form.getValues(`lines.${idx}.quantity`) ?? 1);
                           }}
                         />
                       </div>
@@ -290,7 +324,13 @@ export function AddServicesDialog({
                           type="number"
                           min={1}
                           step={1}
-                          {...form.register(`lines.${idx}.quantity`, { valueAsNumber: true })}
+                          {...form.register(`lines.${idx}.quantity`, {
+                          valueAsNumber: true,
+                          onChange: (event) => {
+                            const service = rowServices[field.id];
+                            if (service) applyListed(idx, service, Number(event.target.value) || 1);
+                          },
+                        })}
                         />
                       </div>
                       <div className="space-y-1">

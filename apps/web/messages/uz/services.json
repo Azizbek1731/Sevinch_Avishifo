@@ -1,6 +1,6 @@
 {
   "title": "Xizmatlar va narxlar",
-  "subtitle": "Xizmatlar katalogi, paketlar va chegirma qoidalari",
+  "subtitle": "Xizmatlar katalogi, paketlar, narx ro‘yxatlari va chegirma qoidalari",
   "newService": "Xizmat",
   "searchPlaceholder": "Kod yoki nom bo'yicha qidirish...",
   "deactivated": "Xizmat o'chirildi",
@@ -9,6 +9,7 @@
   "tabs": {
     "services": "Xizmatlar",
     "packages": "Paketlar",
+    "priceLists": "Narx ro‘yxatlari",
     "discounts": "Chegirmalar"
   },
   "filter": {
@@ -121,6 +122,33 @@
       "selectService": "Xizmatni tanlang",
       "itemsRequired": "Kamida bitta xizmat tanlang",
       "itemsSum": "Xizmatlar jami: {sum}"
+    }
+  },
+  "priceLists": {
+    "new": "Narx ro‘yxati",
+    "created": "Narx ro‘yxati yaratildi",
+    "updated": "Narx ro‘yxati saqlandi",
+    "deleted": "Narx ro‘yxati o‘chirildi",
+    "active": "Faol",
+    "inactive": "Nofaol",
+    "itemCount": "{count} ta xizmat",
+    "deleteTitle": "Narx ro‘yxatini o‘chirishni tasdiqlaysizmi?",
+    "deleteDescription": "\"{name}\" ro‘yxati o‘chiriladi. Avvalgi hisob-fakturalar o‘zgarishsiz qoladi.",
+    "empty": {
+      "title": "Hozircha narx ro‘yxatlari yo‘q",
+      "description": "Hamkor tashkilot yoki maxsus tarif uchun alohida narxlarni shu yerda saqlang. Kassada ro‘yxatni tanlashingiz mumkin."
+    },
+    "form": {
+      "createTitle": "Yangi narx ro‘yxati",
+      "editTitle": "Narx ro‘yxatini tahrirlash",
+      "name": "Nomi",
+      "isActive": "Faol",
+      "hint": "Bo‘sh qoldirilgan xizmatlar katalogdagi oddiy narxda qoladi. Farq hisobda chegirma sifatida yoziladi.",
+      "catalogPrice": "Katalog",
+      "listPrice": "Ro‘yxat narxi",
+      "listPriceEmpty": "Katalogdagi",
+      "saving": "Chegirma",
+      "filled": "{count} ta maxsus narx"
     }
   },
   "discounts": {

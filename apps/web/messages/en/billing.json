@@ -53,7 +53,10 @@
     "create": "Create",
     "creating": "Creating...",
     "created": "Invoice {number} created",
-    "invalidAmount": "Invalid amount"
+    "invalidAmount": "Invalid amount",
+    "priceList": "Price list",
+    "priceListNone": "Standard prices",
+    "priceListHint": "A partner tariff writes the difference as a discount. You can change the list later in settings."
   },
   "pay": {
     "title": "Payment — {number}",

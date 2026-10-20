@@ -91,3 +91,32 @@ export const serviceQuerySchema = paginationQuerySchema.extend({
   isActive: queryBooleanSchema.optional(),
 });
 export type ServiceQueryInput = z.infer<typeof serviceQuerySchema>;
+
+export const priceListUpsertSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  isActive: z.boolean().optional(),
+});
+export type PriceListUpsertInput = z.infer<typeof priceListUpsertSchema>;
+
+export const priceListQuerySchema = paginationQuerySchema.extend({
+  isActive: queryBooleanSchema.optional(),
+});
+export type PriceListQueryInput = z.infer<typeof priceListQuerySchema>;
+
+/** DECIMAL(14,2) holds at most 12 whole digits. */
+const priceListPriceSchema = moneySchema.refine(
+  (value) => value.split('.')[0]!.replace(/^0+/, '').length <= 12,
+  { message: 'Price is too large' },
+);
+
+/** Sets the listed services' prices; `price: null` takes a service out of the list. */
+export const setPriceListItemsSchema = z.object({
+  items: z
+    .array(z.object({ serviceId: idSchema, price: priceListPriceSchema.nullable() }))
+    .min(1)
+    .max(2000)
+    .refine((items) => new Set(items.map((item) => item.serviceId)).size === items.length, {
+      message: 'Each service may appear only once',
+    }),
+});
+export type SetPriceListItemsInput = z.infer<typeof setPriceListItemsSchema>;
