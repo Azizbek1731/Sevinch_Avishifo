@@ -114,12 +114,14 @@ export function LabOrderDetail({ id }: { id: string }) {
     );
   }
 
-  const allResulted = order.items.length > 0 && order.items.every((it) => it.complete);
+  const readyToSign = order.items.some((it) => it.complete);
   const signed =
     order.status === LabOrderStatus.APPROVED || order.status === LabOrderStatus.DELIVERED;
   const locked = LOCKED_STATUSES.includes(order.status) || !order.canWork;
   const resultEntryLocked = locked || order.status === LabOrderStatus.ORDERED;
   const signedAt = order.items.find((item) => item.result?.approvedAt)?.result?.approvedAt;
+  const canSignResults =
+    order.status === LabOrderStatus.RESULTED || order.status === LabOrderStatus.IN_PROGRESS;
 
   return (
     <div className="space-y-4">
@@ -153,7 +155,7 @@ export function LabOrderDetail({ id }: { id: string }) {
             {t('actionStart')}
           </Button>
         ) : null}
-        {canApprove && order.canWork && order.status === LabOrderStatus.RESULTED && allResulted ? (
+        {canApprove && order.canWork && canSignResults && readyToSign ? (
           <Button disabled={approve.isPending} onClick={() => setApproveOpen(true)}>
             <CheckCircle2 className="h-4 w-4" />
             {t('approve')}

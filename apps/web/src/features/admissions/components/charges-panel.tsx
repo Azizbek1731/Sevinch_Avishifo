@@ -130,7 +130,9 @@ export function ChargesPanel({
                 <p className="mt-1 text-xs text-muted-foreground">{ta('directBilling.hint')}</p>
               </div>
               {finance.data ? (
-                <strong className="tabular-nums">{formatUZS(finance.data.stayDebt)}</strong>
+                <strong className="tabular-nums">
+                  {formatUZS(finance.data.accountDue ?? finance.data.stayDebt)}
+                </strong>
               ) : null}
             </div>
             {finance.isLoading ? (

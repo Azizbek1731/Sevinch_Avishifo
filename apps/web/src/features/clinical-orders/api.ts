@@ -4,6 +4,15 @@ import { api } from '@/lib/api-client';
 export type ClinicalKind = 'CONSULTATION' | 'ULTRASOUND';
 export type ClinicalStatus =
   'WAITING_PAYMENT' | 'READY' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export interface ClinicalAttachment {
+  id: string;
+  title: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
 export interface ClinicalOrder {
   id: string;
   kind: ClinicalKind;
@@ -21,7 +30,16 @@ export interface ClinicalOrder {
   };
   additionalDue: string;
   services: Array<{ id: string; title: string | Record<string, string>; quantity: number }>;
+  note?: string | null;
   createdAt: string;
+  attachments?: ClinicalAttachment[];
+}
+
+export interface ClinicalStatusCounts {
+  waitingPayment: number;
+  ready: number;
+  inProgress: number;
+  completed: number;
 }
 export interface ClinicalOrderQuery {
   kind?: ClinicalKind;
@@ -40,6 +58,8 @@ export interface ClinicalDoctorOption {
 export const clinicalOrdersApi = {
   doctors: () => api.get<ClinicalDoctorOption[]>('/clinical-orders/doctors'),
   list: (query: ClinicalOrderQuery) => api.get<ClinicalOrder[]>('/clinical-orders', { ...query }),
+  statusCounts: (kind: ClinicalKind = 'ULTRASOUND') =>
+    api.get<ClinicalStatusCounts>('/clinical-orders/status-counts', { kind }),
   get: (id: string) => api.get<ClinicalOrder>(`/clinical-orders/${id}`),
   create: (body: CreateClinicalOrderInput) => api.post<ClinicalOrder>('/clinical-orders', body),
   start: (id: string) => api.post<{ visitId: string }>(`/clinical-orders/${id}/start`),
@@ -48,4 +68,8 @@ export const clinicalOrdersApi = {
       `/clinical-orders/${id}/services`,
       body,
     ),
+  uploadAttachment: (id: string, form: FormData) =>
+    api.upload<ClinicalAttachment>(`/clinical-orders/${id}/attachments`, form),
+  downloadAttachment: (orderId: string, documentId: string) =>
+    api.get<Blob>(`/clinical-orders/${orderId}/attachments/${documentId}/download`),
 };

@@ -67,10 +67,16 @@ CommandInput.displayName = CommandPrimitive.Input.displayName;
 const CommandList = React.forwardRef<
   React.ComponentRef<typeof CommandPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.List>
->(({ className, ...props }, ref) => (
+>(({ className, onWheel, ...props }, ref) => (
   <CommandPrimitive.List
     ref={ref}
-    className={cn('max-h-[300px] overflow-y-auto overflow-x-hidden', className)}
+    // Dialog/Popover ichida g‘ildirak skrolli odatda parentga “yutiladi” —
+    // stopPropagation bilan ro‘yxatning o‘zi aylanadi (xizmatlar, tekshiruvlar…).
+    onWheel={(event) => {
+      event.stopPropagation();
+      onWheel?.(event);
+    }}
+    className={cn('max-h-[300px] overflow-y-auto overflow-x-hidden overscroll-contain', className)}
     {...props}
   />
 ));

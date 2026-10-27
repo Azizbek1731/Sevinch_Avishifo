@@ -84,11 +84,19 @@ export function PatientOverviewTab({ patient }: { patient: PatientCard }) {
           />
           <Field
             label={t('overview.gender')}
-            value={patient.gender ? t(`gender.${patient.gender}` as never) : '—'}
+            value={
+              patient.gender && t.has(`gender.${patient.gender}` as never)
+                ? t(`gender.${patient.gender}` as never)
+                : (patient.gender ?? '—')
+            }
           />
           <Field
             label={t('overview.bloodGroup')}
-            value={t(`blood.${patient.bloodGroup}` as never)}
+            value={
+              patient.bloodGroup && t.has(`blood.${patient.bloodGroup}` as never)
+                ? t(`blood.${patient.bloodGroup}` as never)
+                : (patient.bloodGroup || '—')
+            }
           />
           <Field
             label={t('overview.phoneAlt')}
@@ -98,7 +106,11 @@ export function PatientOverviewTab({ patient }: { patient: PatientCard }) {
           <Field label={t('overview.passport')} value={patient.passportId ?? '—'} />
           <Field
             label={t('overview.source')}
-            value={patient.source ? t(`sources.${patient.source}` as never) : '—'}
+            value={
+              patient.source && t.has(`sources.${patient.source}` as never)
+                ? t(`sources.${patient.source}` as never)
+                : (patient.source ?? '—')
+            }
           />
           <Field label={t('overview.registeredAt')} value={formatDate(patient.createdAt)} />
         </CardContent>

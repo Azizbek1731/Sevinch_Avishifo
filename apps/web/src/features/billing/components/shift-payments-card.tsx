@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { createId } from '@/lib/id';
 import { billingApi } from '../api';
 import { usePermission } from '../hooks';
 import { VoidPaymentButton } from './void-payment-button';
@@ -32,7 +33,7 @@ export function ShiftPaymentsCard() {
   const tb = useTranslations('billing');
   const can = usePermission();
   const [expanded, setExpanded] = useState(false);
-  const [receiptId, setReceiptId] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<{ checkoutId: string; requestId: string } | null>(null);
   const activeBranchId = useAuthStore((state) => state.activeBranchId);
 
   const { data, isLoading } = useQuery({
@@ -99,7 +100,10 @@ export function ShiftPaymentsCard() {
                     variant="ghost"
                     size="icon"
                     aria-label={tb('receipt.print')}
-                    onClick={() => setReceiptId(p.checkoutId)}
+                    onClick={() => {
+                      if (!p.checkoutId) return;
+                      setReceipt({ checkoutId: p.checkoutId, requestId: createId() });
+                    }}
                   >
                     <Printer className="h-4 w-4" />
                   </Button>
@@ -134,12 +138,13 @@ export function ShiftPaymentsCard() {
             )}
           </Button>
         ) : null}
-        {receiptId ? (
+        {receipt ? (
           <ReceiptPrinter
-            key={receiptId}
-            invoiceId={receiptId}
+            key={receipt.requestId}
+            invoiceId={receipt.checkoutId}
+            requestId={receipt.requestId}
             checkout
-            onPrinted={() => setReceiptId(null)}
+            onPrinted={() => setReceipt(null)}
           />
         ) : null}
       </CardContent>

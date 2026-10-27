@@ -19,13 +19,22 @@ import { sanitizeMoney } from '../api';
 import { inputTiyin, INVOICE_PAYMENT_METHODS, needsOpenShift } from '../payment-methods';
 
 export interface PaymentSplitProps {
-  /** What the parts must add up to — the invoice total, or its outstanding due. */
+  /**
+   * Target the parts should add up to.
+   * - full settlement: invoice due
+   * - partial: the amount the cashier is collecting now
+   */
   total: string;
   value: PaymentPart[];
   onChange: (parts: PaymentPart[]) => void;
   /** Warn next to any external account that needs an open shift. */
   cashBlocked?: boolean;
   disabled?: boolean;
+  /**
+   * Always show amount fields (even for one method) so the cashier can pay
+   * less than the outstanding balance and leave the rest as debt.
+   */
+  allowPartial?: boolean;
 }
 
 /** Sum of the parts, in tiyin, so rounding never drifts. */
@@ -37,8 +46,8 @@ export function splitTotalTiyin(parts: PaymentPart[]): bigint {
  * Splits one bill across payment methods — 100 000 by Click and 30 000 in cash
  * against the same 130 000 sale, which is how a front desk actually takes money.
  *
- * A single row is the ordinary case and looks exactly like the old single-method
- * picker; the split only appears when someone asks for it.
+ * A single row is the ordinary case; with `allowPartial` the amount stays editable
+ * so a patient can pay what they have now.
  */
 export function PaymentSplit({
   total,
@@ -46,6 +55,7 @@ export function PaymentSplit({
   onChange,
   cashBlocked = false,
   disabled = false,
+  allowPartial = false,
 }: PaymentSplitProps) {
   const t = useTranslations('billing');
   const noteId = useId();
@@ -53,26 +63,28 @@ export function PaymentSplit({
   const totalTiyin = inputTiyin(total) ?? 0n;
   const paidTiyin = splitTotalTiyin(value);
   const remainingTiyin = totalTiyin - paidTiyin;
+  const showAmounts = allowPartial || value.length > 1;
 
   const setPart = (index: number, patch: Partial<PaymentPart>): void => {
     onChange(value.map((p, i) => (i === index ? { ...p, ...patch } : p)));
   };
 
   const addPart = (): void => {
-    // The new row picks up whatever is still unpaid, which is almost always
-    // what the cashier is about to type anyway.
     const rest = remainingTiyin > 0n ? fromTiyin(remainingTiyin) : '0';
     const used = new Set(value.map((p) => p.method));
     const nextMethod = INVOICE_PAYMENT_METHODS.find((m) => !used.has(m)) ?? PaymentMethod.CASH;
+    if (allowPartial) {
+      // Qisman to‘lovda usullar jami — kassir yig‘ayotgan summa; yangi qator 0 dan to‘ldiriladi.
+      onChange([...value, { method: nextMethod, amount: '0' }]);
+      return;
+    }
     const existing = value.length === 1 ? [{ ...value[0]!, amount: fromTiyin(totalTiyin) }] : value;
     onChange([...existing, { method: nextMethod, amount: value.length === 1 ? '0' : rest }]);
   };
 
   const removePart = (index: number): void => {
     const rest = value.filter((_, i) => i !== index);
-    // Removing a row hands its amount back to the first one, so the split stays
-    // balanced instead of silently going short.
-    if (rest.length > 0) {
+    if (rest.length > 0 && !allowPartial) {
       const back = totalTiyin - splitTotalTiyin(rest.slice(1));
       rest[0] = { ...rest[0]!, amount: back > 0n ? fromTiyin(back) : '0' };
     }
@@ -125,8 +137,7 @@ export function PaymentSplit({
                 </SelectContent>
               </Select>
 
-              {/* One row means one method for the whole bill — no amount to edit. */}
-              {value.length > 1 ? (
+              {showAmounts ? (
                 <>
                   <Input
                     inputMode="decimal"
@@ -136,16 +147,18 @@ export function PaymentSplit({
                     disabled={disabled}
                     aria-label={t('split.amountFor', { method: t(`methods.${part.method}`) })}
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removePart(index)}
-                    disabled={disabled}
-                    aria-label={t('split.remove')}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  {value.length > 1 ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removePart(index)}
+                      disabled={disabled}
+                      aria-label={t('split.remove')}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  ) : null}
                 </>
               ) : null}
             </div>
@@ -168,7 +181,7 @@ export function PaymentSplit({
         ))}
       </div>
 
-      {value.length > 1 ? (
+      {showAmounts && value.length > 1 && !allowPartial ? (
         <p
           className={`text-sm ${
             remainingTiyin === 0n ? 'text-muted-foreground' : 'font-medium text-destructive'

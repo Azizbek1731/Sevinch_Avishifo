@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { FileDown, History } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api-client';
@@ -61,17 +60,23 @@ export function ClinicalHistoryPanel({ visitId }: { visitId: string }) {
       setDownloading(null);
     }
   };
+  const count =
+    (history.data?.visits.length ?? 0) + (history.data?.labOrders.length ?? 0);
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <History className="h-5 w-5" />
-          {t('history')}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <details className="rounded-xl border bg-card">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium">
+        <History className="h-4 w-4" />
+        {t('history')}
+        {count > 0 ? (
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+            {count}
+          </span>
+        ) : null}
+      </summary>
+      <div className="space-y-3 border-t px-4 py-3">
         {history.isLoading ? (
-          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-24 w-full" />
         ) : history.isError ? (
           <div role="alert" className="text-sm text-destructive">
             {t('loadError')}{' '}
@@ -157,7 +162,7 @@ export function ClinicalHistoryPanel({ visitId }: { visitId: string }) {
             ))}
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </details>
   );
 }

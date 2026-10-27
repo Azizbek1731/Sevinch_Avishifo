@@ -16,7 +16,7 @@ import { TenantContext } from '../../core/prisma/tenant-context';
 import { AuditService } from '../../core/audit/audit.service';
 import { LabService } from './lab.service';
 import { EnterLabResultsDto } from './dto';
-import { FINAL_LAB_STATUSES, isLabResultComplete, lockLabOrder } from './lab-workflow';
+import { FINAL_LAB_STATUSES, isLabOrderReadyToSign, lockLabOrder } from './lab-workflow';
 
 @Injectable()
 export class ResultsService {
@@ -135,12 +135,12 @@ export class ResultsService {
           result: { include: { values: true } },
         },
       });
-      const complete = items.length > 0 && items.every(isLabResultComplete);
+      const ready = isLabOrderReadyToSign(items);
       await tx.labOrder.update({
         where: { id: order.id },
-        data: { status: complete ? LabOrderStatus.RESULTED : LabOrderStatus.IN_PROGRESS },
+        data: { status: ready ? LabOrderStatus.RESULTED : LabOrderStatus.IN_PROGRESS },
       });
-      return { resultId: result.id, orderId: order.id, complete };
+      return { resultId: result.id, orderId: order.id, complete: ready };
     });
     await this.audit.log({
       action: AuditAction.UPDATE,

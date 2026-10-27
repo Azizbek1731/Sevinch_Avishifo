@@ -103,7 +103,8 @@
     "wardHint": "Manage stays, treatments and additional services.",
     "handoff": "Reception prepares services. Issued invoices appear at the cash desk for the cashier to collect payment.",
     "invoices": "Issued invoices",
-    "labPaidHint": "Select tests and send the invoice to the cashier. The order enters the laboratory queue after full payment."
+    "labPaidHint": "Select tests and send the invoice to the cashier. The order enters the laboratory queue after full payment.",
+    "uziHint": "Ultrasound orders, payment status and reports — a dedicated module like the laboratory."
   },
   "singleClinicSubtitle": "Patient registration, care orders and payment tracking"
 }

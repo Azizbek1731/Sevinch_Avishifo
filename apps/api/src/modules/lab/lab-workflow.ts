@@ -10,6 +10,7 @@ export const FINAL_LAB_STATUSES: readonly LabOrderStatus[] = [
   LabOrderStatus.CANCELLED,
 ];
 
+/** Item is ready to sign when a report is attached or at least one value is filled. */
 export function isLabResultComplete(item: {
   labTest: { parameters: readonly { id: string }[] };
   result: {
@@ -19,13 +20,20 @@ export function isLabResultComplete(item: {
 }): boolean {
   if (!item.result) return false;
   if (item.result.reportDocumentId) return true;
-  const values = new Map(
-    item.result.values.map((value) => [value.parameterId, value.value.trim()]),
-  );
-  return (
-    item.labTest.parameters.length > 0 &&
-    item.labTest.parameters.every((parameter) => Boolean(values.get(parameter.id)))
-  );
+  return item.result.values.some((value) => value.value.trim() !== '');
+}
+
+/** Order can be signed when any item has enough data (partial orders allowed). */
+export function isLabOrderReadyToSign(
+  items: readonly {
+    labTest: { parameters: readonly { id: string }[] };
+    result: {
+      reportDocumentId?: string | null;
+      values: readonly { parameterId: string; value: string }[];
+    } | null;
+  }[],
+): boolean {
+  return items.length > 0 && items.some(isLabResultComplete);
 }
 
 type LabInvoicePayment = {

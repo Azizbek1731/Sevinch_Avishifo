@@ -94,23 +94,24 @@ export function ReceptionDashboard() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {canSell ? (
           <>
-            {(['CONSULTATION', 'ULTRASOUND'] as const).map((kind) => {
-              const Icon = kind === 'ULTRASOUND' ? Activity : Stethoscope;
-              return (
-                <button
-                  key={kind}
-                  type="button"
-                  className="rounded-xl border bg-card p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
-                  onClick={() => setClinicalKind(kind)}
-                >
-                  <Icon className="mb-4 h-6 w-6 text-primary" />
-                  <p className="font-semibold">
-                    {tClinical(kind === 'ULTRASOUND' ? 'newUltrasound' : 'newConsultation')}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">{tClinical('handoff')}</p>
-                </button>
-              );
-            })}
+            <button
+              type="button"
+              className="rounded-xl border bg-card p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
+              onClick={() => setClinicalKind('CONSULTATION')}
+            >
+              <Stethoscope className="mb-4 h-6 w-6 text-primary" />
+              <p className="font-semibold">{tClinical('newConsultation')}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{tClinical('handoff')}</p>
+            </button>
+            <button
+              type="button"
+              className="rounded-xl border bg-card p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
+              onClick={() => setClinicalKind('ULTRASOUND')}
+            >
+              <Activity className="mb-4 h-6 w-6 text-primary" />
+              <p className="font-semibold">{tClinical('newUltrasound')}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t('workflow.uziHint')}</p>
+            </button>
             <button
               type="button"
               className="rounded-xl border bg-card p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"

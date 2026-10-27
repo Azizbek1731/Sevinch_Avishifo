@@ -114,6 +114,7 @@ enum VisitStatus {
 enum ReferralType {
   SPECIALIST
   LAB
+  ULTRASOUND
 }
 
 enum ScheduleExceptionType {
@@ -430,10 +431,35 @@ model Branch {
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @db.Timestamptz(6)
 
-  clinic Clinic @relation(fields: [clinicId], references: [id])
-  rooms  Room[]
+  clinic         Clinic          @relation(fields: [clinicId], references: [id])
+  rooms          Room[]
+  inpatientRooms InpatientRoom[]
 
   @@index([clinicId])
+}
+
+/// Statsionar palata: etaj, sig‘im va 24 soatlik bitta o‘rin narxi.
+model InpatientRoom {
+  id          String   @id @default(uuid(7))
+  clinicId    String
+  branchId    String
+  floor       Int
+  number      String
+  name        String?
+  /// Legacy field — sig‘im cheklanmaydi (yotqizishda ishlatilmaydi).
+  capacity    Int      @default(9999)
+  /// Bitta o‘rin uchun 24 soatlik narx (yotqizilgan vaqtdan).
+  pricePerDay Decimal  @db.Decimal(14, 2)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  branch     Branch      @relation(fields: [branchId], references: [id])
+  admissions Admission[]
+
+  @@unique([branchId, floor, number])
+  @@index([clinicId, branchId, isActive])
+  @@index([clinicId, floor])
 }
 
 model Room {
@@ -691,11 +717,14 @@ model Admission {
   department            String?
   ward                  String? // palata
   bed                   String? // o'rin
+  inpatientRoomId       String?
   attendingDoctorUserId String?
-  /// Snapshot for each new Asia/Tashkent calendar date; null keeps old stays unbilled.
+  /// Snapshot of the active 24h bed price; null keeps old stays unbilled.
   dailyRoomRate         Decimal?  @db.Decimal(14, 2)
   roomBillingStartsOn   DateTime? @db.Date
   roomBillingNextDate   DateTime? @db.Date
+  /// Next unpaid 24h period start (admission clock, not calendar midnight).
+  roomBillingNextAt     DateTime? @db.Timestamptz(6)
   roomRateSetById        String?
 
   admittedAt      DateTime  @db.Timestamptz(6)
@@ -731,36 +760,42 @@ model Admission {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
-  patient     Patient              @relation(fields: [patientId], references: [id])
-  orders      TreatmentOrder[]
-  dailyNotes  AdmissionDailyNote[]
-  chargeItems ChargeItem[]
-  surgeries   SurgeryCase[]
-  roomCharges AdmissionRoomCharge[]
+  patient       Patient              @relation(fields: [patientId], references: [id])
+  inpatientRoom InpatientRoom?       @relation(fields: [inpatientRoomId], references: [id], onDelete: SetNull)
+  orders        TreatmentOrder[]
+  dailyNotes    AdmissionDailyNote[]
+  chargeItems   ChargeItem[]
+  surgeries     SurgeryCase[]
+  roomCharges   AdmissionRoomCharge[]
 
   @@unique([clinicId, historyNumber])
   @@index([clinicId, status])
   @@index([clinicId, patientId])
   @@index([status, roomBillingNextDate])
+  @@index([status, roomBillingNextAt])
+  @@index([inpatientRoomId, status])
 }
 
-/// Immutable room-day snapshot. A cancelled invoice never recreates this day.
+/// Immutable 24h room-period snapshot. A cancelled invoice never recreates it.
 model AdmissionRoomCharge {
-  id           String   @id @default(uuid(7))
-  clinicId     String
-  admissionId  String
-  billingDate  DateTime @db.Date
-  dailyRate    Decimal  @db.Decimal(14, 2)
-  ward         String?
-  bed          String?
-  chargeItemId String?  @unique
-  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  id              String    @id @default(uuid(7))
+  clinicId        String
+  admissionId     String
+  billingDate     DateTime  @db.Date
+  /// Exact instant this 24h period started (admission clock).
+  periodStartedAt DateTime? @db.Timestamptz(6)
+  dailyRate       Decimal   @db.Decimal(14, 2)
+  ward            String?
+  bed             String?
+  chargeItemId    String?   @unique
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
 
-  admission Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  admission  Admission   @relation(fields: [admissionId], references: [id], onDelete: Cascade)
   chargeItem ChargeItem? @relation("AdmissionRoomDayCharge", fields: [chargeItemId], references: [id], onDelete: Restrict)
 
   @@unique([admissionId, billingDate])
   @@index([clinicId, admissionId])
+  @@index([admissionId, periodStartedAt])
 }
 
 /// Muolajalar varag'i (list naznacheniy): one ordered service on a schedule.
@@ -1089,14 +1124,18 @@ model PatientDocument {
   /// Set when the file is a lab attachment (an analyser printout, a scan) so the
   /// order shows its own files; the document still lives in the patient's folder.
   labOrderId   String?
+  /// UZI / clinical-order attachment (scan, captured image, exported PDF).
+  clinicalOrderId String?
   createdAt    DateTime         @default(now()) @db.Timestamptz(6)
 
-  patient    Patient     @relation(fields: [patientId], references: [id])
-  labOrder   LabOrder?   @relation(fields: [labOrderId], references: [id])
-  labResults LabResult[]
+  patient         Patient         @relation(fields: [patientId], references: [id])
+  labOrder        LabOrder?       @relation(fields: [labOrderId], references: [id])
+  clinicalOrder   ClinicalOrder?  @relation(fields: [clinicalOrderId], references: [id])
+  labResults      LabResult[]
 
   @@index([clinicId, patientId])
   @@index([labOrderId])
+  @@index([clinicalOrderId])
 }
 
 enum RecordAccessStatus {
@@ -1417,12 +1456,15 @@ model Referral {
   targetDoctorUserId String?
   /// LAB: created lab order
   labOrderId         String?      @unique
+  /// ULTRASOUND: created clinical order (visitId stays null until UZI doctor starts)
+  clinicalOrderId    String?      @unique
   /// draft appointment created from referral
   appointmentId      String?
   note               String?
   createdAt          DateTime     @default(now()) @db.Timestamptz(6)
 
-  visit Visit @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  visit         Visit          @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  clinicalOrder ClinicalOrder? @relation(fields: [clinicalOrderId], references: [id])
 
   @@index([clinicId, visitId])
 }
@@ -2259,6 +2301,8 @@ model ClinicalOrder {
   initialInvoice     Invoice     @relation("InitialClinicalInvoice", fields: [initialInvoiceId], references: [id])
   invoices           Invoice[]   @relation("ClinicalOrderInvoices")
   visit              Visit?      @relation(fields: [visitId], references: [id])
+  attachments        PatientDocument[]
+  referral           Referral?
 
   @@unique([clinicId, requestKey])
   @@index([clinicId, branchId, createdAt])

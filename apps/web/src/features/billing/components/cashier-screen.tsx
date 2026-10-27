@@ -70,7 +70,6 @@ export function CashierScreen() {
           ) : null}
         </div>
       </PageHeader>
-      <ShiftPanel />
       <Tabs defaultValue="pending">
         <TabsList>
           <TabsTrigger value="pending">{t('tabs.pending')}</TabsTrigger>
@@ -95,6 +94,7 @@ export function CashierScreen() {
           </TabsContent>
         ) : null}
       </Tabs>
+      <ShiftPanel />
     </div>
   );
 }

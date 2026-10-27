@@ -73,7 +73,7 @@
   position: fixed;
   top: 0;
   left: -200vw;
-  width: 80mm;
+  width: 72mm;
 }
 
 /* Print styles: hide app chrome, show only .print-area (prescription, receipt, ...) */
@@ -102,6 +102,13 @@
      and flatten its ancestor layout (including the centered preview dialog). */
   body:has(.receipt-print) *:not(:has(.receipt-print)):not(.receipt-print):not(.receipt-print *) {
     display: none !important;
+  }
+  /* Flatten chrome so a long roll does not inherit 100vh and cut a blank page. */
+  html:has(.receipt-print),
+  body:has(.receipt-print) {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
   }
   body:has(.receipt-print),
   body:has(.receipt-print) *:has(.receipt-print) {
@@ -288,19 +295,25 @@
     text-shadow: none !important;
   }
   .receipt-print {
+    box-sizing: border-box !important;
     width: 100% !important;
     max-width: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    margin: 0 auto !important;
+    /* Keep a little inset from the thermal head's unprintable edges. */
+    padding: 0 2mm !important;
     border: 0 !important;
     border-radius: 0 !important;
+    overflow: hidden !important;
   }
-  /* Preserve the chosen slip width even when a workstation defaults to A4. */
+  /*
+   * Roll width ≠ printable width. 80mm paper burns ~72mm (576 dots @ 203 dpi);
+   * 58mm paper burns ~48mm (384 dots). Filling the full roll clips both sides.
+   */
   .receipt-print[data-paper-width='80'] {
-    max-width: 80mm !important;
+    max-width: 72mm !important;
   }
   .receipt-print[data-paper-width='58'] {
-    max-width: 58mm !important;
+    max-width: 48mm !important;
   }
   /* Print the glyphs at full weight — thin strokes drop out on a thermal head. */
   .receipt-print .receipt-strong {

@@ -1,8 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { scheduleReceiptPrint } from './receipt-print';
+import { allowReceiptReprint, scheduleReceiptPrint } from './receipt-print';
 
 describe('receipt print lifecycle', () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    allowReceiptReprint('payment-1');
+    allowReceiptReprint('partial-1');
+    allowReceiptReprint('partial-2-split');
+  });
 
   it('still prints when an effect is cleaned up before the receipt paints', () => {
     vi.useFakeTimers();
@@ -60,5 +65,26 @@ describe('receipt print lifecycle', () => {
     vi.runAllTimers();
     expect(print).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks a remount from firing a second automatic print for the same request', () => {
+    vi.useFakeTimers();
+    const print = vi.fn();
+    scheduleReceiptPrint({
+      requestId: 'payment-1',
+      attempted: new Set(),
+      print,
+      onError: vi.fn(),
+    });
+    vi.runAllTimers();
+    // Remount brings a fresh local Set — module lock must still suppress.
+    scheduleReceiptPrint({
+      requestId: 'payment-1',
+      attempted: new Set(),
+      print,
+      onError: vi.fn(),
+    });
+    vi.runAllTimers();
+    expect(print).toHaveBeenCalledTimes(1);
   });
 });

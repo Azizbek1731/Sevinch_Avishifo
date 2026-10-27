@@ -256,7 +256,7 @@ export function DoctorCockpit() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t('title')} description={t('subtitle')} />
+      <PageHeader title={t('title')} description={SINGLE_CLINIC_MODE ? undefined : t('subtitle')} />
 
       <ClinicalWorklist />
 

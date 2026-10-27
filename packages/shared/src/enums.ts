@@ -115,6 +115,7 @@ export type VisitStatus = (typeof VisitStatus)[keyof typeof VisitStatus];
 export const ReferralType = {
   SPECIALIST: 'SPECIALIST',
   LAB: 'LAB',
+  ULTRASOUND: 'ULTRASOUND',
 } as const;
 export type ReferralType = (typeof ReferralType)[keyof typeof ReferralType];
 

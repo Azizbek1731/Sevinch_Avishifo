@@ -99,8 +99,11 @@ export function PatientCardView({ patientId }: { patientId: string }) {
     );
   }
 
-  const negative = patient.balance.startsWith('-');
-  const hasDebt = Number.parseFloat(patient.debt) > 0;
+  const balance = patient.balance ?? '0';
+  const debt = patient.debt ?? '0';
+  const counts = patient.counts ?? { visits: 0, invoices: 0, documents: 0 };
+  const negative = balance.startsWith('-');
+  const hasDebt = Number.parseFloat(debt) > 0;
 
   return (
     <div className="space-y-4">
@@ -115,9 +118,9 @@ export function PatientCardView({ patientId }: { patientId: string }) {
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">{patient.fullName}</h1>
-              {patient.tags.map((tag) => (
+              {(patient.tags ?? []).map((tag) => (
                 <Badge key={tag} variant="secondary">
-                  {t(`tags.${tag}` as never)}
+                  {t.has(`tags.${tag}` as never) ? t(`tags.${tag}` as never) : tag}
                 </Badge>
               ))}
             </div>
@@ -126,12 +129,12 @@ export function PatientCardView({ patientId }: { patientId: string }) {
               {patient.age !== null ? <span>{t('card.ageYears', { age: patient.age })}</span> : null}
               {patient.phone ? <span>{formatPhone(patient.phone)}</span> : null}
               <span className={cn('font-medium', negative ? 'text-destructive' : 'text-success')}>
-                {formatUZS(patient.balance)}
+                {formatUZS(balance)}
                 {negative ? ` · ${t('card.debt')}` : ''}
               </span>
               {hasDebt ? (
                 <span className="font-medium text-destructive">
-                  {t('card.debt')}: {formatUZS(patient.debt)}
+                  {t('card.debt')}: {formatUZS(debt)}
                 </span>
               ) : null}
             </div>
@@ -192,18 +195,18 @@ export function PatientCardView({ patientId }: { patientId: string }) {
           ) : null}
           {can('visits.read') ? (
             <TabsTrigger value="visits">
-              {t('tabs.visits')} ({patient.counts.visits})
+              {t('tabs.visits')} ({counts.visits})
             </TabsTrigger>
           ) : null}
           {can('lab.orders.read') ? (
             <TabsTrigger value="lab">{t('tabs.lab')}</TabsTrigger>
           ) : null}
           <TabsTrigger value="documents">
-            {t('tabs.documents')} ({patient.counts.documents})
+            {t('tabs.documents')} ({counts.documents})
           </TabsTrigger>
           {can('invoices.read') || can('invoices.write') || can('payments.create') ? (
             <TabsTrigger value="invoices">
-              {t('tabs.invoices')} ({patient.counts.invoices})
+              {t('tabs.invoices')} ({counts.invoices})
             </TabsTrigger>
           ) : null}
         </TabsList>

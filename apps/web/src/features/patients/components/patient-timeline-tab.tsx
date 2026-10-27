@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   ClipboardList,
   CreditCard,
@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatTz } from '@/lib/dates';
+import { localizedText, type Localizable } from '@/lib/localized';
 import { TIMELINE_TYPES, type TimelineItem, type TimelineType } from '../api';
 import { usePatientTimeline } from '../hooks';
 
@@ -38,15 +39,22 @@ const str = (d: Record<string, unknown>, k: string): string | null =>
 
 function ItemDetails({ item }: { item: TimelineItem }) {
   const t = useTranslations('patients');
+  const locale = useLocale();
   const enumLabel = useEnumLabel();
   const d = item.data;
 
   if (item.type === 'visit') {
     const visitId = str(d, 'visitId');
     const status = str(d, 'status');
+    const statusKey = status ? (`visitStatus.${status}` as const) : null;
     return (
       <div className="flex flex-wrap items-center gap-2">
-        {status ? <StatusBadge status={status} label={t(`visitStatus.${status}` as never)} /> : null}
+        {status ? (
+          <StatusBadge
+            status={status}
+            label={statusKey && t.has(statusKey) ? t(statusKey) : status}
+          />
+        ) : null}
         {visitId ? (
           <Button asChild variant="link" size="sm" className="h-auto p-0">
             <Link href={`/doctor/visits/${visitId}`}>{t('timeline.openVisit')}</Link>
@@ -67,17 +75,20 @@ function ItemDetails({ item }: { item: TimelineItem }) {
   }
   if (item.type === 'lab') {
     const status = str(d, 'status');
-    const tests = Array.isArray(d['tests']) ? (d['tests'] as Array<{ name?: string }>) : [];
+    const tests = Array.isArray(d['tests'])
+      ? (d['tests'] as Array<{ name?: Localizable; code?: string }>)
+      : [];
     return (
       <div className="flex flex-wrap items-center gap-1.5">
         {status ? <StatusBadge status={status} /> : null}
-        {tests.slice(0, 4).map((x, i) =>
-          x.name ? (
+        {tests.slice(0, 4).map((x, i) => {
+          const label = localizedText(x.name, locale, x.code ?? '');
+          return label ? (
             <Badge key={i} variant="secondary" className="text-xs">
-              {x.name}
+              {label}
             </Badge>
-          ) : null,
-        )}
+          ) : null;
+        })}
       </div>
     );
   }
@@ -152,7 +163,10 @@ export function PatientTimelineTab({ patientId }: { patientId: string }) {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-medium">{item.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatTz(item.at)} · {t(`timeline.${item.type}` as never)}
+                      {formatTz(item.at)} ·{' '}
+                      {t.has(`timeline.${item.type}` as never)
+                        ? t(`timeline.${item.type}` as never)
+                        : item.type}
                     </p>
                   </div>
                   <div className="mt-1">

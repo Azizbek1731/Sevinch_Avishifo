@@ -28,6 +28,55 @@ describe('confirmed clinical report PDF', () => {
     expect(result.toString('latin1')).toContain('/FontFile2');
   });
 
+  it('puts Made with AviShifo.uz in the page footer, not a document id', async () => {
+    const text = vi.spyOn(PDFDocument.prototype, 'text');
+    try {
+      await new VisitReportPdfService().render(report);
+      const rendered = text.mock.calls.map(([value]) => String(value)).join('\n');
+      expect(rendered).toContain('Made with AviShifo.uz');
+      expect(rendered).not.toContain('Hujjat ID');
+      expect(rendered).not.toMatch(/· AviShifo(?!\.uz)/);
+    } finally {
+      text.mockRestore();
+    }
+  });
+
+  it('renders a prescription-only PDF without SOAP sections', async () => {
+    const text = vi.spyOn(PDFDocument.prototype, 'text');
+    try {
+      await new VisitReportPdfService().render(
+        {
+          ...report,
+          kind: 'CONSULTATION',
+          title: null,
+          body: null,
+          subjective: 'SHOULD NOT PRINT SUBJECTIVE',
+          plan: 'SHOULD NOT PRINT PLAN',
+          prescriptions: [
+            {
+              drugName: 'Tab. Paracetamol',
+              strength: '500 mg',
+              quantity: 'N. 10',
+              dosage: '1 tabletka',
+              frequency: 'kuniga 2 marta',
+              durationDays: 3,
+            },
+          ],
+        },
+        'uz',
+        'prescription',
+      );
+      const rendered = text.mock.calls.map(([value]) => String(value)).join('\n');
+      expect(rendered).toContain('Retsept');
+      expect(rendered).toContain('Rp.: Tab. Paracetamol 500 mg');
+      expect(rendered).toContain('Made with AviShifo.uz');
+      expect(rendered).not.toContain('SHOULD NOT PRINT SUBJECTIVE');
+      expect(rendered).not.toContain('SHOULD NOT PRINT PLAN');
+    } finally {
+      text.mockRestore();
+    }
+  });
+
   it('paginates a long consultation without dropping its later paragraphs', async () => {
     const result = await new VisitReportPdfService().render({
       ...report,

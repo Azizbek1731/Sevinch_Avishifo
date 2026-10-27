@@ -103,7 +103,8 @@
     "wardHint": "Yotgan bemorlar, muolajalar va qo‘shimcha xizmatlar.",
     "handoff": "Qabulxona xizmatlarni rasmiylashtiradi. Tayyor hisob kassada ko‘rinadi; to‘lovni kassir qabul qiladi.",
     "invoices": "Yuborilgan hisoblar",
-    "labPaidHint": "Tahlillarni tanlang va hisobni kassaga yuboring. To‘liq to‘lovdan so‘ng buyurtma laboratoriya navbatiga tushadi."
+    "labPaidHint": "Tahlillarni tanlang va hisobni kassaga yuboring. To‘liq to‘lovdan so‘ng buyurtma laboratoriya navbatiga tushadi.",
+    "uziHint": "UZI buyurtmasi, to‘lov holati va natijalar — laboratoriya kabi alohida bo‘lim."
   },
   "singleClinicSubtitle": "Bemorlarni ro‘yxatga olish, yo‘llanmalar va to‘lov holatini kuzatish"
 }

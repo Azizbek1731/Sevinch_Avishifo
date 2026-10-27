@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
@@ -27,6 +28,7 @@ import { ReferralsSection } from './referrals-section';
 import { SoapForm } from './soap-form';
 import { VitalsForm } from './vitals-form';
 import { ClinicalHistoryPanel } from './clinical-history';
+import { UziAttachments } from '@/features/uzi/components/uzi-attachments';
 import { UltrasoundReport } from './ultrasound-report';
 
 export function VisitForm({ visitId }: { visitId: string }) {
@@ -35,7 +37,7 @@ export function VisitForm({ visitId }: { visitId: string }) {
   const locale = useLocale();
   const tr = useTranslations('doctor.clinical');
   const user = useAuthStore((s) => s.user);
-  const query = useVisit(visitId);
+  const query = useVisit(visitId, { refetchInterval: 10_000 });
   const visit = query.data;
   const ownsVisit = user?.role !== 'DOCTOR' || visit?.doctorUserId === user.id;
   const canWrite = ownsVisit && (user?.permissions.includes('visits.write') ?? false);
@@ -240,63 +242,83 @@ export function VisitForm({ visitId }: { visitId: string }) {
       ) : null}
       <ClinicalHistoryPanel visitId={visit.id} />
       {ultrasound ? (
-        <UltrasoundReport
-          key={visit.id}
-          visit={visit}
-          disabled={sectionsDisabled}
-          onUnsavedChange={setReportDirty}
-        />
-      ) : (
         <>
-          <VitalsForm
-            key={`vitals-${visit.id}`}
-            visitId={visit.id}
-            vitals={visit.vitals}
+          <UltrasoundReport
+            key={visit.id}
+            visit={visit}
             disabled={sectionsDisabled}
-            onUnsavedChange={setVitalsDirty}
+            onUnsavedChange={setReportDirty}
           />
-          {!cancelled && ((!locked && canWrite) || (locked && canAmend)) ? (
-            <SoapForm
-              key={`soap-${visit.id}`}
-              visit={visit}
-              locked={locked}
-              onUnsavedChange={setSoapDirty}
+          {visit.clinicalOrderId ? (
+            <UziAttachments
+              orderId={visit.clinicalOrderId}
+              attachments={order.data?.attachments ?? []}
+              canUpload={!sectionsDisabled}
             />
-          ) : (
-            <Card>
-              <CardContent className="space-y-4 p-4">
-                {(['subjective', 'objective', 'assessmentNote', 'plan'] as const).map((field) =>
-                  visit[field] ? (
-                    <section key={field}>
-                      <h3 className="font-semibold">{t(`soapFields.${field}`)}</h3>
-                      <p className="whitespace-pre-wrap text-sm">{visit[field]}</p>
-                    </section>
-                  ) : null,
-                )}
-              </CardContent>
-            </Card>
-          )}
-          <DiagnosesSection
-            visitId={visit.id}
-            diagnoses={visit.diagnoses}
-            disabled={sectionsDisabled}
-            onUnsavedChange={setDxDirty}
-          />
-          <PrescriptionsSection
-            visitId={visit.id}
-            prescriptions={visit.prescriptions}
-            prescriptionRevision={visit.prescriptionRevision}
-            physiotherapy={visit.physiotherapy}
-            disabled={sectionsDisabled}
-            onUnsavedChange={setRxDirty}
-          />
-          <ReferralsSection
-            visitId={visit.id}
-            referrals={visit.referrals}
-            disabled={sectionsDisabled}
-            onUnsavedChange={setReferralDirty}
-          />
+          ) : null}
         </>
+      ) : (
+        <Tabs defaultValue="exam" className="space-y-4">
+          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+            <TabsTrigger value="exam">{t('tabs.exam')}</TabsTrigger>
+            <TabsTrigger value="rx">{t('tabs.rx')}</TabsTrigger>
+            <TabsTrigger value="referrals">{t('tabs.referrals')}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="exam" className="mt-0 space-y-4">
+            <VitalsForm
+              key={`vitals-${visit.id}`}
+              visitId={visit.id}
+              vitals={visit.vitals}
+              disabled={sectionsDisabled}
+              onUnsavedChange={setVitalsDirty}
+            />
+            {!cancelled && ((!locked && canWrite) || (locked && canAmend)) ? (
+              <SoapForm
+                key={`soap-${visit.id}`}
+                visit={visit}
+                locked={locked}
+                onUnsavedChange={setSoapDirty}
+              />
+            ) : (
+              <Card>
+                <CardContent className="space-y-4 p-4">
+                  {(['subjective', 'objective', 'assessmentNote', 'plan'] as const).map((field) =>
+                    visit[field] ? (
+                      <section key={field}>
+                        <h3 className="font-semibold">{t(`soapFields.${field}`)}</h3>
+                        <p className="whitespace-pre-wrap text-sm">{visit[field]}</p>
+                      </section>
+                    ) : null,
+                  )}
+                </CardContent>
+              </Card>
+            )}
+            <DiagnosesSection
+              visitId={visit.id}
+              diagnoses={visit.diagnoses}
+              disabled={sectionsDisabled}
+              onUnsavedChange={setDxDirty}
+            />
+          </TabsContent>
+          <TabsContent value="rx" className="mt-0">
+            <PrescriptionsSection
+              visitId={visit.id}
+              prescriptions={visit.prescriptions}
+              prescriptionRevision={visit.prescriptionRevision}
+              physiotherapy={visit.physiotherapy}
+              disabled={sectionsDisabled}
+              onUnsavedChange={setRxDirty}
+            />
+          </TabsContent>
+          <TabsContent value="referrals" className="mt-0">
+            <ReferralsSection
+              visitId={visit.id}
+              referrals={visit.referrals}
+              disabled={sectionsDisabled}
+              onUnsavedChange={setReferralDirty}
+            />
+          </TabsContent>
+        </Tabs>
       )}
       {visit.clinicalOrderId ? (
         <ExtraClinicalServicesDialog

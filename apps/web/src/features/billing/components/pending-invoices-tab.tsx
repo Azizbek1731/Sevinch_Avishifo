@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { createId } from '@/lib/id';
 import { billingApi, type PendingPatient } from '../api';
 import { usePermission } from '../hooks';
 import { PatientPayDialog } from './patient-pay-dialog';
@@ -26,7 +27,7 @@ export function PendingInvoicesTab() {
   const can = usePermission();
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
   const [paying, setPaying] = useState<PendingPatient | null>(null);
-  const [receipt, setReceipt] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<{ checkoutId: string; requestId: string } | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -163,15 +164,15 @@ export function PendingInvoicesTab() {
           onClose={() => setPaying(null)}
           onPaid={(checkoutId) => {
             setPaying(null);
-            setReceipt(checkoutId);
+            setReceipt({ checkoutId, requestId: createId() });
           }}
         />
       ) : null}
       {receipt ? (
         <ReceiptPrinter
-          key={receipt}
-          invoiceId={receipt}
-          requestId={receipt}
+          key={receipt.requestId}
+          invoiceId={receipt.checkoutId}
+          requestId={receipt.requestId}
           checkout
           onPrinted={() => setReceipt(null)}
         />

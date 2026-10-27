@@ -2,27 +2,28 @@
 
 ## Qabulxona uchun
 
-Bemorni statsionarga yotqizishda palata, o‘rin va **bir kunlik palata narxi** kiritiladi. Bepul joy uchun `0` yoziladi. Saqlash bilan palata haqi kassadagi bemor qarziga qo‘shiladi; qo‘shimcha tasdiqlash talab qilinmaydi.
+Sozlamalar → **Statsionar palatalar** da 2–4-etaj xonalari kiritiladi: raqam va **bitta o‘rin uchun 24 soatlik narx**.
 
-Kunlar **Toshkent vaqti bo‘yicha kalendar sana** bilan hisoblanadi. Yotqizilgan kun ham, chiqarilgan kun ham kiradi. Masalan, 15-oktabr soat 23:50 da yotqizilib, 16-oktabr soat 00:10 da chiqarilsa, 2 kun hisoblanadi. Shu kunning o‘zida chiqarilsa, 1 kun hisoblanadi.
+Bemorni statsionarga yotqizishda katalogdan **xona** tanlanadi. Narx avtomatik olinadi, lekin **kunlik haq avtomatik yozilmaydi**.
 
-Kasallik tarixidagi **Palata haqi** kartasida amaldagi kunlik narx, hisoblangan kunlar, jami summa va sanalar bo‘yicha tafsilotlar ko‘rinadi. Narx o‘zgartirilganda avval hisoblangan kunlar o‘z narxini saqlaydi; yangi narx keyingi hisoblanmagan kundan ishlaydi. Palata yoki o‘rin o‘zgarsa ham oldingi kunlardagi joy ma’lumoti saqlanadi.
+Kasallik tarixidagi **Palata hisobi** bo‘limida:
 
-Avval ochilgan va kunlik narxi belgilanmagan statsionar tarixlar uchun narx ilk bor kiritilganda hisoblash bugundan boshlanadi. Noma’lum eski narx bo‘yicha o‘tgan kunlarga avtomatik qarz yozilmaydi.
+1. **Kun soni** maydoniga 1–31 yoziladi va **Kunlik haq qo‘shish** bosiladi (masalan, birdaniga 3–4 kun).
+2. **Qo‘shilgan kunlar** ro‘yxatidan xato qo‘shilgan **oxirgi to‘lanmagan** kunni **Qaytarish** bilan olib tashlash mumkin (ketma-ket, oxiridan).
+3. To‘langan kun qaytarilmaydi.
+
+Keyin kassada to‘lov qilinadi (qisman to‘lov ham mumkin).
 
 ## Kassa va chiqarish
 
-Har yangi kalendar kunning haqi bemorning kassadagi to‘lov kutilayotgan hisobiga qo‘shiladi. Bemor avvalgi hisobni qisman yoki to‘liq to‘lagan bo‘lsa, uning to‘lovi o‘zgarmaydi; yangi kun uchun yangi hisob chiqadi. Kassada tanlangan hisoblarni birga to‘lash mumkin.
+Qo‘shilgan kunlar to‘lov kutilayotgan hisobda ko‘rinadi.
 
-Bemor chiqarilayotganda chiqarish kunigacha palata haqi tekshiriladi. Yangi qarz aniqlansa, u kassada saqlanadi va to‘lovdan keyin chiqarish yakunlanadi. Mavjud qarz bilan chiqarish huquqi berilgan xodim avvalgi majburiy chiqarish tartibidan foydalanishi mumkin. Chiqarilgan bemorga keyingi kunlar uchun haq yozilmaydi.
-
-Hisoblangan keyingi kunlar mavjud bo‘lsa, chiqarish sanasini ular oldiga qaytarish mumkin emas. Moliyaviy hujjatni tuzatish yoki bekor qilish mavjud kassa tartibi orqali bajariladi; kun hisobini qayta tekshirish bekor qilingan yoki to‘langan kunni takror yaratmaydi.
+Chiqarishda avtomatik yangi kun yozilmaydi — faqat oldin qo‘lda qo‘shilgan kunlar hisobga olinadi. Qarz bo‘lsa, avval to‘lov (yoki `admissions.force` bilan majburiy chiqarish).
 
 ## Texnik ishlash
 
-- `Admission.dailyRoomRate` kunlik amaldagi narx; `AdmissionRoomCharge` har sananing narxi va joyini alohida saqlaydi. `(admissionId, billingDate)` takrorlanmaydi.
-- Yangi yotqizish, kun haqi va chiqarilgan hisob bitta tranzaksiyada yaratiladi. Hisob chiqarish bajarilmasa, ular birga bekor bo‘ladi.
-- Server ishga tushganda va har 60 soniyada muddati kelgan statsionarlar tekshiriladi. Bemor tarixi va kassa hisobini ochish ham yangi kunlarni hisoblaydi. Server vaqtincha o‘chiq bo‘lsa, keyingi tekshiruv o‘tgan sanalarni to‘ldiradi.
-- Narx va joy o‘zgarishi oldidan eski narx bilan muddati kelgan sanalar hisoblanadi. Kunlar moliyaviy yozuvlar; klinik tayinlovni olingan deb belgilamaydi.
-- `20261015090000_admission_calendar_room_fees` migratsiyasi talab qilinadi. Eski yozuvlarga narx yoki qarz avtomatik ko‘chirilmaydi.
-- Tekshiruvlar: `room-billing-calendar.spec.ts`, `test/admission-room-fees.e2e-spec.ts` va statsionar regressiya testlari. Integratsion testlar faqat ajratilgan sinov bazasida, Telegram o‘chirilgan holatda ishlatiladi.
+- `InpatientRoom` — etaj, raqam, `pricePerDay` (24 soat).
+- `Admission.dailyRoomRate` + `roomBillingNextAt` — keyingi qo‘lda qo‘shiladigan davr.
+- `POST /admissions/:id/room-charges` — `{ days: 1..31 }` (`admissions.write`).
+- `DELETE /admissions/:id/room-charges/:date` — oxirgi to‘lanmagan kunni qaytarish.
+- Avtomatik scheduler / reconcile o‘chirilgan.

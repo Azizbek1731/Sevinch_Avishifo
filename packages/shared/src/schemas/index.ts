@@ -6,6 +6,7 @@ export * from './patient';
 export * from './appointment';
 export * from './queue';
 export * from './admission';
+export * from './inpatient-room';
 export * from './visit';
 export * from './service';
 export * from './billing';

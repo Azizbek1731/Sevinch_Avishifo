@@ -63,6 +63,8 @@ export class DocumentsService {
     uploadedById: string,
     /** Set when the file is a lab attachment, so the order lists its own files. */
     labOrderId?: string,
+    /** UZI / clinical-order attachment link. */
+    clinicalOrderId?: string,
   ): Promise<DocumentResponse> {
     await this.patients.requirePatient(patientId);
 
@@ -102,6 +104,26 @@ export class DocumentsService {
             );
           }
         }
+        if (clinicalOrderId) {
+          await tx.$queryRaw`SELECT "id" FROM "ClinicalOrder" WHERE "id" = ${clinicalOrderId} AND "clinicId" = ${clinicId} FOR UPDATE`;
+          const order = await tx.clinicalOrder.findFirst({
+            where: { id: clinicalOrderId },
+            include: { visit: { select: { status: true } } },
+          });
+          if (!order || order.patientId !== patientId) {
+            throw new AppException(ErrorCode.NOT_FOUND, 'Clinical order not found', 404);
+          }
+          if (
+            order.visit?.status === 'COMPLETED' ||
+            order.visit?.status === 'CANCELLED'
+          ) {
+            throw new AppException(
+              ErrorCode.VALIDATION_ERROR,
+              'Yopilgan UZI buyurtmasiga fayl yuklab bo‘lmaydi',
+              409,
+            );
+          }
+        }
         return tx.patientDocument.create({
           data: {
             // Required by Prisma's checked input type; the tenant extension re-stamps the same value.
@@ -115,6 +137,7 @@ export class DocumentsService {
             sizeBytes: buffer.length,
             uploadedById,
             labOrderId: labOrderId ?? null,
+            clinicalOrderId: clinicalOrderId ?? null,
           },
         });
       });

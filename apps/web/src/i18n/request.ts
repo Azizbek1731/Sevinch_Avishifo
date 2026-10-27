@@ -19,6 +19,7 @@ export const MESSAGE_NAMESPACES = [
   'billing',
   'cashier',
   'lab',
+  'uzi',
   'reports',
   'staff',
   'notifications',

@@ -9,6 +9,7 @@ import { api } from "@/lib/api-client";
 import type { Localizable } from "@/lib/localized";
 
 export type SurgeryStatus = "PLANNED" | "COMPLETED" | "CANCELLED";
+export type SurgeryBucket = "active" | "archive";
 export interface SurgeryAdmission {
   id: string;
   historyNumber: string;
@@ -73,6 +74,8 @@ export interface Surgery {
     createdAt: string;
   }>;
   payouts: SurgeryPayout[];
+  /** True when every live charge is on a PAID invoice. */
+  billingSettled?: boolean;
 }
 export interface SurgeryQuery {
   page?: number;
@@ -80,6 +83,7 @@ export interface SurgeryQuery {
   admissionId?: string;
   patientId?: string;
   status?: SurgeryStatus;
+  bucket?: SurgeryBucket;
   search?: string;
   from?: string;
   to?: string;

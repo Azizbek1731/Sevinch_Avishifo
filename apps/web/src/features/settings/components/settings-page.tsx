@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/page-header';
 import { BranchesTab } from './branches-tab';
 import { ClinicTab } from './clinic-tab';
+import { InpatientRoomsTab } from './inpatient-rooms-tab';
 import { LogsTab } from './logs-tab';
 import { ReceiptTab } from './receipt-tab';
 import { TemplatesTab } from './templates-tab';
@@ -20,6 +21,7 @@ export function SettingsPage() {
         <TabsList className="flex-wrap">
           <TabsTrigger value="clinic">{t('tabs.clinic')}</TabsTrigger>
           <TabsTrigger value="branches">{t('tabs.branches')}</TabsTrigger>
+          <TabsTrigger value="inpatientRooms">{t('tabs.inpatientRooms')}</TabsTrigger>
           <TabsTrigger value="receipt">{t('tabs.receipt')}</TabsTrigger>
           <TabsTrigger value="users">{t('tabs.users')}</TabsTrigger>
           <TabsTrigger value="templates">{t('tabs.templates')}</TabsTrigger>
@@ -33,6 +35,9 @@ export function SettingsPage() {
         </TabsContent>
         <TabsContent value="branches" className="mt-4">
           <BranchesTab />
+        </TabsContent>
+        <TabsContent value="inpatientRooms" className="mt-4">
+          <InpatientRoomsTab />
         </TabsContent>
         <TabsContent value="users" className="mt-4">
           <UsersTab />

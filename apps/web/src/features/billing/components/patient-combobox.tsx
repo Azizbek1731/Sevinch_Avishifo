@@ -71,6 +71,7 @@ export function PatientCombobox({
         <PopoverContent
           className="w-[320px] max-w-[calc(100vw-2rem)] p-0"
           align="start"
+          onWheel={(event) => event.stopPropagation()}
           onCloseAutoFocus={(event) => {
             if (newPatientOpen) event.preventDefault();
           }}

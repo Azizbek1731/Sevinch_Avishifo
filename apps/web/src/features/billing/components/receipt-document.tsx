@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { formatUZS, toTiyin } from '@avishifo/shared';
+import { formatUZS, fromTiyin, toTiyin } from '@avishifo/shared';
 import { formatTz } from '@/lib/dates';
 import { localizedText } from '@/lib/localized';
 import { cn } from '@/lib/utils';
@@ -14,9 +14,9 @@ import { ThermalLogo } from './thermal-logo';
 /**
  * Receipt-body font size, per paper width and the clinic's fontScale setting.
  *
- * Font size and paper width are one decision, not two. A 58mm roll prints 48mm
- * wide and a monospace glyph advances about 0.6em, so the size directly sets
- * how many characters fit: 11px gives 27 per line, 15px gives 20.
+ * Font size and printable width are one decision. An 80mm roll burns ~72mm;
+ * a 58mm roll burns ~48mm. A monospace glyph advances about 0.6em, so the size
+ * directly sets how many characters fit on the printable strip.
  *
  * These tiers are deliberately larger than the ~32 characters a thermal printer
  * lays down natively: a receipt is read at arm's length across a counter, often
@@ -27,16 +27,18 @@ import { ThermalLogo } from './thermal-logo';
  */
 const FONT_SCALE: Record<'58' | '80', Record<NonNullable<ReceiptSettings['fontScale']>, string>> = {
   '58': { sm: 'text-[12px]', md: 'text-[13px]', lg: 'text-[15px]' },
-  '80': { sm: 'text-[12px]', md: 'text-[14px]', lg: 'text-[16px]' },
+  '80': { sm: 'text-[12px]', md: 'text-[14px]', lg: 'text-[15px]' },
 };
 
-/** A full-width rule made of dashes — a thermal head renders these crisply. */
+/** Printable content width (thermal head), not the roll's physical width. */
+const PRINTABLE_WIDTH_MM: Record<'58' | '80', number> = {
+  '58': 48,
+  '80': 72,
+};
+
+/** Full-width rule — CSS border stays inside the printable strip (dash glyphs do not). */
 function Rule() {
-  return (
-    <div aria-hidden className="my-1 overflow-hidden whitespace-nowrap leading-none">
-      ------------------------------------------------------------
-    </div>
-  );
+  return <div aria-hidden className="my-1.5 w-full border-t border-dashed border-black" />;
 }
 
 /**
@@ -77,7 +79,7 @@ export function ReceiptDocument({ data, onReady }: { data: ReceiptPayload; onRea
   // Receipt customization (clinic settings) with sensible defaults.
   const rc: ReceiptSettings = data.receipt ?? {};
   const paper = rc.paperWidth === '58' ? '58' : '80';
-  const paperWidth = `${paper}mm`;
+  const contentWidth = `${PRINTABLE_WIDTH_MM[paper]}mm`;
   const fontClass = FONT_SCALE[paper][rc.fontScale ?? 'md'];
   const showLogo = rc.showLogo !== false && Boolean(data.clinic?.logoUrl);
   const showBranch = rc.showBranch !== false;
@@ -97,6 +99,29 @@ export function ReceiptDocument({ data, onReady }: { data: ReceiptPayload; onRea
   const hasDiscount = toTiyin(data.totals.discountTotal) > 0n;
   const hasDue = toTiyin(data.totals.due) > 0n;
 
+  // Bir necha hisobga bo‘lingan bir xil usul (masalan, 3× Naqd) chekda bitta
+  // qator bo‘lib chiqsin — aks holda pastki blok takrorlanadi.
+  const paymentsByMethod = (() => {
+    const map = new Map<string, { method: string; amountTiyin: bigint; notes: string[] }>();
+    for (const payment of data.payments) {
+      if (payment.status !== 'COMPLETED') continue;
+      const amount = toTiyin(payment.amount);
+      const prev = map.get(payment.method);
+      const note = payment.note?.trim();
+      if (prev) {
+        prev.amountTiyin += amount;
+        if (note && !prev.notes.includes(note)) prev.notes.push(note);
+      } else {
+        map.set(payment.method, {
+          method: payment.method,
+          amountTiyin: amount,
+          notes: note ? [note] : [],
+        });
+      }
+    }
+    return [...map.values()];
+  })();
+
   useEffect(() => {
     if (!showLogo) onReady?.();
   }, [showLogo, onReady]);
@@ -104,28 +129,30 @@ export function ReceiptDocument({ data, onReady }: { data: ReceiptPayload; onRea
   return (
     <>
       {/*
-        Zero page margin, overriding the 12mm the A4 documents need: a 58mm roll
-        prints 48mm wide, and giving 12mm of that back to margins left barely
-        half the strip and wrapped every amount onto its own line.
-
-        The page SIZE is deliberately not set here. `size: 48mm auto` is invalid
-        CSS — a length cannot be paired with `auto` — and any fixed height would
-        paginate a long receipt onto a second sheet. The roll width and length
-        come from the printer queue instead, which is the only place that knows
-        the actual paper.
+        Zero page margin (A4 docs use 12mm). Size matches the roll so Windows /
+        Chromium do not letterbox an A4 page and clip the slip. Height is a
+        long sheet — continuous roll drivers ignore unused length.
+        Content width is the printable head width (72mm / 48mm), not the roll.
       */}
-      <style>{`@media print { @page { margin: 0 } }`}</style>
+      <style>{`
+        @media print {
+          @page {
+            size: ${paper}mm 297mm;
+            margin: 0;
+          }
+        }
+      `}</style>
 
       <div
         className={cn(
-          'print-area print-flow receipt-print mx-auto w-full bg-white p-3 font-mono leading-snug text-black',
+          'print-area print-flow receipt-print mx-auto w-full bg-white px-2 py-3 font-mono leading-snug text-black',
           // The card framing is a screen affordance so the preview reads as a
-          // slip; print strips it back to bare paper.
-          'rounded-md border print:rounded-none print:border-0 print:p-0',
+          // slip; print keeps a small inset so glyphs stay off the head edges.
+          'rounded-md border print:rounded-none print:border-0',
           fontClass,
         )}
         data-paper-width={paper}
-        style={{ maxWidth: paperWidth }}
+        style={{ maxWidth: contentWidth, boxSizing: 'border-box' }}
       >
         <div className="space-y-1 text-center">
           {showLogo && data.clinic?.logoUrl ? (
@@ -231,25 +258,28 @@ export function ReceiptDocument({ data, onReady }: { data: ReceiptPayload; onRea
           {hasDue ? <Row label={t('receipt.due')} value={money(data.totals.due)} strong /> : null}
         </div>
 
-        {data.payments.length > 0 ? (
+        {paymentsByMethod.length > 0 ? (
           <>
             <Rule />
             <div>
-              {/* Which method covered how much — the whole point when a bill is
-                  split across cash and a card. The timestamp is dropped: the
-                  receipt is already dated at the top. */}
-              {data.payments
-                .filter((p) => p.status === 'COMPLETED')
-                .map((p) => (
-                  <div key={p.id} className="break-inside-avoid">
-                    <Row label={t(`methods.${p.method}`)} value={money(p.amount)} />
-                    {p.note ? (
-                      <p className="mb-1 whitespace-pre-wrap break-words text-[0.9em]">
-                        {t('pay.note')}: {p.note}
-                      </p>
-                    ) : null}
-                  </div>
-                ))}
+              {/* Usul bo‘yicha jami: naqd/karta ajratiladi, lekin bir xil usul
+                  bir necha payment qatoriga bo‘linsa ham chekda bitta chiqadi. */}
+              {paymentsByMethod.map((row) => (
+                <div key={row.method} className="break-inside-avoid">
+                  <Row
+                    label={t(`methods.${row.method}`)}
+                    value={money(fromTiyin(row.amountTiyin))}
+                  />
+                  {row.notes.map((note) => (
+                    <p
+                      key={note}
+                      className="mb-1 whitespace-pre-wrap break-words text-[0.9em]"
+                    >
+                      {t('pay.note')}: {note}
+                    </p>
+                  ))}
+                </div>
+              ))}
             </div>
           </>
         ) : null}

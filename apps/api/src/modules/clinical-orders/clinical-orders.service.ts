@@ -25,7 +25,12 @@ const INCLUDE = {
   invoices: { include: { lines: true, refunds: true }, orderBy: { createdAt: 'asc' as const } },
   visit: { select: { status: true } },
 } satisfies Prisma.ClinicalOrderInclude;
+const DETAIL_INCLUDE = {
+  ...INCLUDE,
+  attachments: { orderBy: { createdAt: 'desc' as const } },
+} satisfies Prisma.ClinicalOrderInclude;
 type Order = Prisma.ClinicalOrderGetPayload<{ include: typeof INCLUDE }>;
+type DetailOrder = Prisma.ClinicalOrderGetPayload<{ include: typeof DETAIL_INCLUDE }>;
 type Bill = Order['initialInvoice'];
 type ServicePlan = { serviceId: string; title: Prisma.InputJsonValue; unitPrice: Prisma.Decimal };
 const zero = () => new Prisma.Decimal(0);
@@ -101,7 +106,24 @@ export class ClinicalOrdersService {
     }));
   }
 
-  private map(order: Order) {
+  /** Inpatients settle at discharge — clinical work must not wait on the cashier. */
+  private async inpatientPatientIds(
+    patientIds: string[],
+    branchId: string,
+  ): Promise<Set<string>> {
+    if (patientIds.length === 0) return new Set();
+    const stays = await this.prisma.db.admission.findMany({
+      where: {
+        patientId: { in: [...new Set(patientIds)] },
+        branchId,
+        status: 'ACTIVE',
+      },
+      select: { patientId: true },
+    });
+    return new Set(stays.map((stay) => stay.patientId));
+  }
+
+  private map(order: Order | DetailOrder, inpatient = false) {
     let status: 'WAITING_PAYMENT' | 'READY' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' =
       'WAITING_PAYMENT';
     if (order.visit?.status === 'COMPLETED') status = 'COMPLETED';
@@ -112,10 +134,15 @@ export class ClinicalOrdersService {
     )
       status = 'CANCELLED';
     else if (order.visitId) status = 'IN_PROGRESS';
-    else if (paid(order.initialInvoice)) status = 'READY';
+    else if (
+      paid(order.initialInvoice) ||
+      (inpatient && ['ISSUED', 'PARTIALLY_PAID', 'DRAFT'].includes(order.initialInvoice.status))
+    )
+      status = 'READY';
     const additionalDue = order.invoices
       .filter((i) => i.id !== order.initialInvoiceId && i.status !== 'CANCELLED')
       .reduce((sum, i) => sum.add(Prisma.Decimal.max(0, i.total.sub(netPaid(i)))), zero());
+    const detail = order as DetailOrder;
     return {
       id: order.id,
       kind: order.kind,
@@ -137,6 +164,16 @@ export class ClinicalOrdersService {
         ),
       note: order.note,
       createdAt: order.createdAt.toISOString(),
+      attachments: Array.isArray(detail.attachments)
+        ? detail.attachments.map((file) => ({
+            id: file.id,
+            title: file.title,
+            fileName: file.fileName,
+            mimeType: file.mimeType,
+            sizeBytes: file.sizeBytes,
+            createdAt: file.createdAt.toISOString(),
+          }))
+        : undefined,
     };
   }
 
@@ -155,18 +192,26 @@ export class ClinicalOrdersService {
         { patient: { mrn: { contains: query.search, mode: 'insensitive' } } },
         { initialInvoice: { number: { contains: query.search, mode: 'insensitive' } } },
       ];
+    const unpaidInvoice = {
+      status: { in: ['DRAFT', 'ISSUED', 'PARTIALLY_PAID'] as const },
+      refunds: { none: {} },
+    };
+    const onWardPatient = {
+      admissions: { some: { status: 'ACTIVE' as const, branchId } },
+    };
     if (query.status === 'READY')
       Object.assign(where, {
         visitId: null,
-        initialInvoice: { status: 'PAID', refunds: { none: {} } },
+        OR: [
+          { initialInvoice: { status: 'PAID', refunds: { none: {} } } },
+          { patient: onWardPatient, initialInvoice: unpaidInvoice },
+        ],
       });
     if (query.status === 'WAITING_PAYMENT')
       Object.assign(where, {
         visitId: null,
-        initialInvoice: {
-          status: { in: ['DRAFT', 'ISSUED', 'PARTIALLY_PAID'] },
-          refunds: { none: {} },
-        },
+        initialInvoice: unpaidInvoice,
+        patient: { admissions: { none: { status: 'ACTIVE', branchId } } },
       });
     if (query.status === 'IN_PROGRESS')
       Object.assign(where, {
@@ -195,22 +240,84 @@ export class ClinicalOrdersService {
       }),
       this.prisma.db.clinicalOrder.count({ where }),
     ]);
+    const onWard = await this.inpatientPatientIds(
+      rows.map((row) => row.patientId),
+      branchId,
+    );
     return paginated(
-      rows.map((o) => this.map(o)),
+      rows.map((o) => this.map(o, onWard.has(o.patientId))),
       { page: query.page, limit: query.limit, total },
     );
   }
 
-  private async require(id: string, user: AuthUser, branchId: string) {
+  private async require(id: string, user: AuthUser, branchId: string, detail = false) {
     const order = await this.prisma.db.clinicalOrder.findFirst({
       where: { id, ...this.scope(user, branchId) },
-      include: INCLUDE,
+      include: detail ? DETAIL_INCLUDE : INCLUDE,
     });
     if (!order) throw new AppException(ErrorCode.NOT_FOUND, 'Clinical order not found', 404);
     return order;
   }
   async get(id: string, user: AuthUser, branchId: string) {
-    return this.map(await this.require(id, user, branchId));
+    const order = await this.require(id, user, branchId, true);
+    const onWard = await this.inpatientPatientIds([order.patientId], branchId);
+    return this.map(order, onWard.has(order.patientId));
+  }
+
+  async requireAttachment(orderId: string, documentId: string, user: AuthUser, branchId: string) {
+    const order = await this.require(orderId, user, branchId, true);
+    const file = (order as DetailOrder).attachments.find((row) => row.id === documentId);
+    if (!file) throw new AppException(ErrorCode.NOT_FOUND, 'Attachment not found', 404);
+    const onWard = await this.inpatientPatientIds([order.patientId], branchId);
+    return { order: this.map(order, onWard.has(order.patientId)), patientId: order.patientId };
+  }
+
+  /** Status counts for the UZI worklist (ULTRASOUND only unless kind overridden). */
+  async statusCounts(
+    user: AuthUser,
+    branchId: string,
+    kind: ClinicalOrderKind = 'ULTRASOUND',
+  ) {
+    const base = { ...this.scope(user, branchId), kind };
+    const unpaid = {
+      status: { in: ['DRAFT', 'ISSUED', 'PARTIALLY_PAID'] as const },
+      refunds: { none: {} },
+    };
+    const onWardPatient = {
+      admissions: { some: { status: 'ACTIVE' as const, branchId } },
+    };
+    const [waitingPayment, ready, inProgress, completed] = await Promise.all([
+      this.prisma.db.clinicalOrder.count({
+        where: {
+          ...base,
+          visitId: null,
+          initialInvoice: unpaid,
+          patient: { admissions: { none: { status: 'ACTIVE', branchId } } },
+        },
+      }),
+      this.prisma.db.clinicalOrder.count({
+        where: {
+          ...base,
+          visitId: null,
+          OR: [
+            { initialInvoice: { status: 'PAID', refunds: { none: {} } } },
+            { patient: onWardPatient, initialInvoice: unpaid },
+          ],
+        },
+      }),
+      this.prisma.db.clinicalOrder.count({
+        where: {
+          ...base,
+          visit: { status: 'IN_PROGRESS' },
+          initialInvoice: { status: { notIn: ['CANCELLED', 'REFUNDED'] } },
+          invoices: { none: { refunds: { some: {} } } },
+        },
+      }),
+      this.prisma.db.clinicalOrder.count({
+        where: { ...base, visit: { status: 'COMPLETED' } },
+      }),
+    ]);
+    return { waitingPayment, ready, inProgress, completed };
   }
 
   private async plans(
@@ -302,6 +409,171 @@ export class ClinicalOrdersService {
           })),
         },
       },
+      include: { lines: true },
+    });
+  }
+
+  /** Tie UZI/consult lines to the ACTIVE stay so discharge collects them. */
+  private async linkInvoiceToStay(
+    tx: TenantTransactionClient,
+    invoice: { id: string; lines: Array<{ id: string; serviceId: string | null; title: Prisma.JsonValue; quantity: number; unitPrice: Prisma.Decimal }> },
+    stayId: string,
+    patientId: string,
+    branchId: string,
+    userId: string,
+  ) {
+    const clinicId = TenantContext.requireClinicId();
+    for (const line of invoice.lines) {
+      await tx.chargeItem.create({
+        data: {
+          clinicId,
+          branchId,
+          patientId,
+          admissionId: stayId,
+          serviceId: line.serviceId,
+          title: line.title as Prisma.InputJsonValue,
+          date: new Date(),
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          status: 'INVOICED',
+          invoiceLineId: line.id,
+          createdById: userId,
+        },
+      });
+    }
+  }
+
+  /**
+   * Doctor visit referral → unpaid clinical order + invoice (UZI or specialist consult).
+   * Mirrors lab createOrderFromReferral: runs inside the visit edit transaction.
+   */
+  async createFromReferral(
+    input: {
+      patientId: string;
+      branchId: string;
+      doctorUserId: string;
+      serviceIds: string[];
+      kind?: ClinicalOrderKind;
+      note?: string;
+      orderedById: string;
+      requestKey: string;
+    },
+    tx: TenantTransactionClient,
+  ): Promise<{ id: string }> {
+    const clinicId = TenantContext.requireClinicId();
+    const kind = input.kind ?? 'ULTRASOUND';
+    const doctor = await this.prisma.unscoped.user.findFirst({
+      where: {
+        id: input.doctorUserId,
+        clinicId,
+        role: 'DOCTOR',
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    const membership = await tx.userBranch.findFirst({
+      where: { userId: input.doctorUserId, branchId: input.branchId },
+    });
+    if (!doctor || !membership)
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'An active doctor in this branch is required',
+        400,
+      );
+    const plans = await this.plans(input.serviceIds, kind, input.branchId);
+    const number = await this.number();
+    const hash = fingerprint({
+      patientId: input.patientId,
+      branchId: input.branchId,
+      doctorUserId: input.doctorUserId,
+      kind,
+      serviceIds: [...input.serviceIds].sort(),
+      note: input.note ?? '',
+      source: 'VISIT_REFERRAL',
+    });
+    const existing = await tx.clinicalOrder.findFirst({ where: { requestKey: input.requestKey } });
+    if (existing) {
+      if (existing.requestFingerprint !== hash)
+        throw new AppException(
+          ErrorCode.VALIDATION_ERROR,
+          'Request key belongs to another order',
+          409,
+        );
+      return { id: existing.id };
+    }
+    const invoice = await this.invoice(tx, plans, {
+      patientId: input.patientId,
+      branchId: input.branchId,
+      doctorUserId: input.doctorUserId,
+      number,
+      requestKey: input.requestKey,
+      requestFingerprint: hash,
+      userId: input.orderedById,
+    });
+    const stay = await tx.admission.findFirst({
+      where: {
+        patientId: input.patientId,
+        branchId: input.branchId,
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+      orderBy: { admittedAt: 'desc' },
+    });
+    if (stay) {
+      await this.linkInvoiceToStay(
+        tx,
+        invoice,
+        stay.id,
+        input.patientId,
+        input.branchId,
+        input.orderedById,
+      );
+    }
+    const order = await tx.clinicalOrder.create({
+      data: {
+        clinicId,
+        patientId: input.patientId,
+        branchId: input.branchId,
+        doctorUserId: input.doctorUserId,
+        kind,
+        initialInvoiceId: invoice.id,
+        note: input.note,
+        requestKey: input.requestKey,
+        requestFingerprint: hash,
+      },
+    });
+    await tx.invoice.update({ where: { id: invoice.id }, data: { clinicalOrderId: order.id } });
+    return { id: order.id };
+  }
+
+  async announceReferralOrder(id: string): Promise<void> {
+    const order = await this.prisma.db.clinicalOrder.findFirst({
+      where: { id },
+      include: { initialInvoice: true },
+    });
+    if (!order) return;
+    await this.audit.log({
+      action: AuditAction.CREATE,
+      entity: 'Invoice',
+      entityId: order.initialInvoiceId,
+      after: {
+        number: order.initialInvoice.number,
+        patientId: order.patientId,
+        total: order.initialInvoice.total.toFixed(2),
+        source: 'UZI_REFERRAL',
+      },
+    });
+    await this.audit.log({
+      action: AuditAction.CREATE,
+      entity: 'ClinicalOrder',
+      entityId: id,
+      after: {
+        kind: order.kind,
+        patientId: order.patientId,
+        doctorUserId: order.doctorUserId,
+        source: 'UZI_REFERRAL',
+      },
     });
   }
 
@@ -363,6 +635,14 @@ export class ClinicalOrdersService {
         requestFingerprint: hash,
         userId: user.id,
       });
+      const stay = await tx.admission.findFirst({
+        where: { patientId: dto.patientId, branchId, status: 'ACTIVE' },
+        select: { id: true },
+        orderBy: { admittedAt: 'desc' },
+      });
+      if (stay) {
+        await this.linkInvoiceToStay(tx, invoice, stay.id, dto.patientId, branchId, user.id);
+      }
       const order = await tx.clinicalOrder.create({
         data: {
           clinicId,
@@ -402,12 +682,18 @@ export class ClinicalOrdersService {
         where: { id: order.initialInvoiceId },
         include: { refunds: true },
       });
-      if (!paid(invoice))
-        throw new AppException(
-          ErrorCode.INVOICE_INVALID_STATE,
-          'Full payment is required before care starts',
-          409,
-        );
+      if (!paid(invoice)) {
+        const stay = await tx.admission.findFirst({
+          where: { patientId: order.patientId, branchId, status: 'ACTIVE' },
+          select: { id: true },
+        });
+        if (!stay)
+          throw new AppException(
+            ErrorCode.INVOICE_INVALID_STATE,
+            'Full payment is required before care starts',
+            409,
+          );
+      }
       const visit = await tx.visit.create({
         data: {
           clinicId,
@@ -511,6 +797,14 @@ export class ClinicalOrdersService {
         requestKey: dto.idempotencyKey,
         requestFingerprint: hash,
       });
+      const stay = await tx.admission.findFirst({
+        where: { patientId: order.patientId, branchId, status: 'ACTIVE' },
+        select: { id: true },
+        orderBy: { admittedAt: 'desc' },
+      });
+      if (stay) {
+        await this.linkInvoiceToStay(tx, invoice, stay.id, order.patientId, branchId, user.id);
+      }
       return { invoice, created: true };
     });
     if (result.created)

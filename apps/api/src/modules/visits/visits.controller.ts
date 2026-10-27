@@ -61,10 +61,18 @@ export class VisitsController {
 
   @Get(':id/pdf')
   @RequirePermissions('visits.read')
-  async pdf(@Param('id') id: string, @CurrentUser() user: AuthUser, @Res() res: Response) {
-    const buffer = await this.visits.pdf(id, user);
+  async pdf(
+    @Param('id') id: string,
+    @Query('mode') mode: string | undefined,
+    @CurrentUser() user: AuthUser,
+    @Res() res: Response,
+  ) {
+    const reportMode = mode === 'prescription' ? 'prescription' : 'summary';
+    const buffer = await this.visits.pdf(id, user, reportMode);
+    const filename =
+      reportMode === 'prescription' ? 'prescription.pdf' : 'clinical-report.pdf';
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="clinical-report.pdf"');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store');
     res.send(buffer);
   }

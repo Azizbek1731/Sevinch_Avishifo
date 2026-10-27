@@ -27,6 +27,7 @@ export const admitPatientSchema = z.object({
   department: z.string().trim().max(120).optional(),
   ward: z.string().trim().max(40).optional(),
   bed: z.string().trim().max(40).optional(),
+  inpatientRoomId: idSchema.optional(),
   dailyRoomRate: roomRateSchema.optional(),
   attendingDoctorUserId: idSchema.optional(),
   admittedAt: z.string().datetime().optional(),
@@ -42,6 +43,7 @@ export const updateAdmissionSchema = z.object({
   department: z.string().trim().max(120).optional(),
   ward: z.string().trim().max(40).optional(),
   bed: z.string().trim().max(40).optional(),
+  inpatientRoomId: idSchema.nullable().optional(),
   dailyRoomRate: roomRateSchema.optional(),
   attendingDoctorUserId: idSchema.nullable().optional(),
   referredBy: z.string().trim().max(200).optional(),
@@ -161,3 +163,9 @@ export const chargeQuerySchema = z.object({
   status: z.enum(['PENDING', 'INVOICED', 'CANCELLED']).optional(),
 });
 export type ChargeQueryInput = z.infer<typeof chargeQuerySchema>;
+
+/** Qabulxona bir yoki bir necha 24 soatlik palata kunini qo‘lda qo‘shadi. */
+export const addRoomChargesSchema = z.object({
+  days: z.coerce.number().int().min(1).max(31).default(1),
+});
+export type AddRoomChargesInput = z.infer<typeof addRoomChargesSchema>;

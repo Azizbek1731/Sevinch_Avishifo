@@ -111,9 +111,11 @@ export function DischargeDialog({
   const c = check.data;
   const hasUnbilled = (c?.unbilled.count ?? 0) > 0;
   const debt = Number(c?.stayDebt ?? '0');
-  const hasDebt = debt > 0;
+  const accountDue = Number(c?.accountDue ?? c?.stayDebt ?? '0');
+  const hasDebt = accountDue > 0;
   const canForce = can('admissions.force');
-  const blocked = hasUnbilled || hasDebt;
+  // Pending lines auto-invoice on discharge; together with open invoices they block pay.
+  const blocked = hasDebt;
   // Settled, or being closed over on purpose by someone allowed to do that.
   const moneyCleared = !blocked || (acknowledged && canForce);
 
@@ -160,8 +162,8 @@ export function DischargeDialog({
               </div>
             ) : null}
 
-            {/* ---- blocker 2: this stay still owes money ---- */}
-            {hasDebt ? (
+            {/* ---- blocker 2: open invoices already on this stay ---- */}
+            {debt > 0 ? (
               <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3">
                 <p className="flex items-center gap-2 text-sm font-medium">
                   <Wallet className="h-4 w-4" />

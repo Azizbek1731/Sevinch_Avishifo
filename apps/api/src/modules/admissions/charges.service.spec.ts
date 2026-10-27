@@ -34,36 +34,40 @@ function setup() {
     create: vi.fn().mockResolvedValue({ id: 'invoice', status: 'ISSUED' }),
     issueChargesInTransaction: vi.fn().mockResolvedValue({ id: 'invoice', status: 'ISSUED' }),
   };
+  const lab = {
+    prepareInpatientOrderForCharge: vi.fn().mockResolvedValue(null),
+  };
   const service = new ChargesService(
     { db } as unknown as PrismaService,
     invoices as unknown as InvoicesService,
     {} as PricingService,
     { log: vi.fn() } as unknown as AuditService,
+    lab as never,
   );
-  return { db, invoices, service };
+  return { db, invoices, lab, service };
 }
 
 describe('reception charge handoff', () => {
-  it('issues a new inpatient charge in its creation transaction and returns the billed state', async () => {
+  it('keeps a new inpatient charge PENDING on the stay account until discharge', async () => {
     const { db, invoices, service } = setup();
-    const billed = {
+    const pending = {
       ...row, branchId: 'branch', admissionId: 'stay', visitId: null,
       date: new Date('2026-10-13'), createdAt: new Date('2026-10-13'),
-      status: 'INVOICED', invoiceLineId: 'line',
+      status: 'PENDING', invoiceLineId: null,
     };
     db.admission.findFirst.mockResolvedValue({ id: 'stay', status: 'ACTIVE' });
     db.chargeItem.create.mockResolvedValue(row);
-    db.chargeItem.findFirstOrThrow.mockResolvedValue(billed);
+    db.chargeItem.findFirstOrThrow.mockResolvedValue(pending);
     const result = await TenantContext.run({ clinicId: 'clinic' }, () => service.add({
       patientId: 'patient', admissionId: 'stay', title: 'Palata',
       unitPrice: '123.45', quantity: 3, date: '2026-10-13',
     }, user, 'branch'));
-    expect(invoices.issueChargesInTransaction).toHaveBeenCalledWith(db, ['charge'], user, 'branch');
-    expect(result).toMatchObject({ id: 'charge', status: 'INVOICED', lineTotal: '370.35' });
+    expect(invoices.issueChargesInTransaction).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ id: 'charge', status: 'PENDING', lineTotal: '370.35' });
     expect(invoices.create).not.toHaveBeenCalled();
   });
 
-  it('propagates invoice failure from the same transaction so the new cost cannot be orphaned', async () => {
+  it('issues a walk-in charge immediately so failure cannot orphan the cost', async () => {
     const { db, invoices, service } = setup();
     db.chargeItem.create.mockResolvedValue(row);
     invoices.issueChargesInTransaction.mockRejectedValue(new Error('invoice failed'));
@@ -73,12 +77,12 @@ describe('reception charge handoff', () => {
     expect(db.chargeItem.findFirstOrThrow).not.toHaveBeenCalled();
   });
 
-  it('replays a recorded cost without validating later stay changes or creating another invoice', async () => {
+  it('replays a recorded inpatient cost without creating another charge or invoice', async () => {
     const { db, invoices, service } = setup();
-    const billed = {
+    const pending = {
       ...row, branchId: 'branch', admissionId: 'stay', visitId: null,
       date: new Date('2026-10-13'), createdAt: new Date('2026-10-13'),
-      status: 'INVOICED', invoiceLineId: 'line',
+      status: 'PENDING', invoiceLineId: null,
     };
     const input = {
       patientId: 'patient', admissionId: 'stay', title: 'Palata',
@@ -87,19 +91,19 @@ describe('reception charge handoff', () => {
     };
     db.admission.findFirst.mockResolvedValue({ id: 'stay', status: 'ACTIVE' });
     db.chargeItem.create.mockResolvedValue(row);
-    db.chargeItem.findFirstOrThrow.mockResolvedValue(billed);
+    db.chargeItem.findFirstOrThrow.mockResolvedValue(pending);
     await TenantContext.run({ clinicId: 'clinic' }, () => service.add(input, user, 'branch'));
     const savedData = db.chargeItem.create.mock.calls[0]![0].data;
-    db.chargeItem.findFirst.mockResolvedValue({ ...billed, ...savedData, status: 'INVOICED' });
+    db.chargeItem.findFirst.mockResolvedValue({ ...pending, ...savedData, status: 'PENDING' });
     db.admission.findFirst.mockRejectedValue(new Error('stay no longer active'));
     const replay = await TenantContext.run({ clinicId: 'clinic' }, () => service.add(input, user, 'branch'));
-    expect(replay).toMatchObject({ id: 'charge', status: 'INVOICED', lineTotal: '370.35' });
+    expect(replay).toMatchObject({ id: 'charge', status: 'PENDING', lineTotal: '370.35' });
     expect(db.chargeItem.create).toHaveBeenCalledTimes(1);
-    expect(invoices.issueChargesInTransaction).toHaveBeenCalledTimes(1);
+    expect(invoices.issueChargesInTransaction).not.toHaveBeenCalled();
     await expect(TenantContext.run({ clinicId: 'clinic' }, () => service.add({
       ...input, patientId: 'other-patient',
     }, user, 'branch'))).rejects.toThrow('boshqa xarajat');
-    expect(invoices.issueChargesInTransaction).toHaveBeenCalledTimes(1);
+    expect(invoices.issueChargesInTransaction).not.toHaveBeenCalled();
   });
 
   it('rejects a partially available selection rather than billing the remaining subset', async () => {

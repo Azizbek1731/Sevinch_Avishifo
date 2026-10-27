@@ -181,7 +181,19 @@ export class TimelineService {
             orderNumber: o.orderNumber,
             status: o.status,
             approvedAt,
-            tests: o.items.map((i) => ({ code: i.labTest.code, name: i.labTest.name })),
+            tests: o.items.map((i) => {
+              const raw = i.labTest.name as
+                | string
+                | { uz?: string | null; ru?: string | null; en?: string | null }
+                | null;
+              const name =
+                typeof raw === 'string'
+                  ? raw
+                  : raw && typeof raw === 'object'
+                    ? raw.uz || raw.ru || raw.en || i.labTest.code
+                    : i.labTest.code;
+              return { code: i.labTest.code, name };
+            }),
           },
         });
       }

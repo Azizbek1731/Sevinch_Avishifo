@@ -15,11 +15,12 @@ import { TenantContext } from '../../core/prisma/tenant-context';
 import { AuditService } from '../../core/audit/audit.service';
 import { PricingService } from '../services/pricing.service';
 import { InvoicesService } from '../billing/invoices.service';
+import { LabService } from '../lab/lab.service';
 
 /**
- * Patient charge ledger. Newly recorded costs are issued to the cashier in the
- * same transaction; pending legacy/cancelled invoice charges can still be
- * selected and reissued explicitly.
+ * Patient charge ledger. Walk-in costs are issued to the cashier immediately.
+ * Costs on an ACTIVE admission stay PENDING on the inpatient account and are
+ * invoiced at discharge (or when the desk raises a bill explicitly).
  */
 @Injectable()
 export class ChargesService {
@@ -28,6 +29,7 @@ export class ChargesService {
     private readonly invoices: InvoicesService,
     private readonly pricing: PricingService,
     private readonly audit: AuditService,
+    private readonly lab: LabService,
   ) {}
 
   private map(c: {
@@ -138,6 +140,7 @@ export class ChargesService {
 
       let title: Prisma.InputJsonValue = { uz: dto.title ?? '' };
       let unitPrice = dto.unitPrice ? new Prisma.Decimal(dto.unitPrice) : new Prisma.Decimal(0);
+      let serviceKind: string | null = null;
 
       if (dto.serviceId) {
         const service = await tx.service.findFirst({
@@ -146,6 +149,7 @@ export class ChargesService {
         });
         if (!service) throw new AppException(ErrorCode.NOT_FOUND, 'Xizmat topilmadi', 404);
         if (service.category.kind === 'SURGERY') throw new AppException(ErrorCode.VALIDATION_ERROR, 'Operatsiyani statsionar kartasining Operatsiyalar bo‘limidan kiriting', 400);
+        serviceKind = service.category.kind;
         title = service.name as Prisma.InputJsonValue;
         if (!dto.unitPrice) {
           const price = await this.pricing.getCurrentPrice(dto.serviceId, branchId);
@@ -175,7 +179,18 @@ export class ChargesService {
           requestFingerprint: dto.idempotencyKey ? requestFingerprint : null,
         },
       });
-      await this.invoices.issueChargesInTransaction(tx, [charge.id], user, branchId);
+      // Inpatient: leave on the stay account until discharge. Walk-in: bill now.
+      if (!dto.admissionId) {
+        await this.invoices.issueChargesInTransaction(tx, [charge.id], user, branchId);
+      } else if (serviceKind === 'LAB' && dto.serviceId) {
+        await this.lab.prepareInpatientOrderForCharge(tx, {
+          patientId: dto.patientId,
+          branchId,
+          serviceId: dto.serviceId,
+          visitId: dto.visitId ?? null,
+          orderedById: user.id,
+        });
+      }
       return { charge: await tx.chargeItem.findFirstOrThrow({ where: { id: charge.id } }), created: true };
     });
     if (result.created) await this.audit.log({

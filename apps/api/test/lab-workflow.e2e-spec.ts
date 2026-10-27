@@ -237,13 +237,12 @@ describe('paid laboratory workflow and signed file results', () => {
     ).toBe(201);
   });
 
-  it('keeps partial parameter entry unsigned and rejects a report owned by another order', async () => {
+  it('marks partial parameter entry as RESULTED and rejects a report owned by another order', async () => {
     const partial = await post(`/lab-orders/items/${structuredItemId}/results`).send({
       values: [{ parameterId: parameterIds[0], value: '1' }],
     });
     expect(partial.status).toBe(201);
-    expect(partial.body.data.status).toBe('IN_PROGRESS');
-    expect((await post(`/lab-orders/${orderId}/approve`).send({})).status).toBe(409);
+    expect(partial.body.data.status).toBe('RESULTED');
     expect(
       (
         await post(`/lab-orders/items/${structuredItemId}/results`).send({

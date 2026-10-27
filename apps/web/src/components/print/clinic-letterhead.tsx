@@ -81,12 +81,11 @@ export function ClinicLetterhead({
   );
 }
 
-/** An end-of-document contact line, never a fixed footer over clinical content. */
-export function ClinicDocumentFooter({ clinic }: { clinic: ClinicPrintIdentity }) {
+/** An end-of-document credit line, never a fixed footer over clinical content. */
+export function ClinicDocumentFooter({ clinic: _clinic }: { clinic: ClinicPrintIdentity }) {
   return (
-    <div className="mt-6 flex break-inside-avoid flex-wrap justify-between gap-x-4 gap-y-1 border-t border-[#bcc7d7] pt-2 text-[10px] leading-snug text-[#526174]">
-      <span className="font-semibold">{clinic.name}</span>
-      <span>{[clinic.address, formatClinicPhone(clinic.phone)].filter(Boolean).join(' · ')}</span>
+    <div className="mt-6 break-inside-avoid border-t border-[#bcc7d7] pt-2 text-[10px] leading-snug text-[#526174]">
+      <span>Made with AviShifo.uz</span>
     </div>
   );
 }

@@ -96,10 +96,16 @@ export function drawClinicLetterhead(
 export function drawClinicPageFurniture(
   doc: PDFKit.PDFDocument,
   clinic: PdfClinicProfile,
-  options: { margin: number; documentLabel: string; documentId: string; pageLabel?: string },
+  options: {
+    margin: number;
+    documentLabel: string;
+    /** @deprecated Ignored — footer shows product credit only. */
+    documentId?: string;
+    pageLabel?: string;
+  },
 ): void {
   const pages = doc.bufferedPageRange();
-  const { margin, documentLabel, documentId, pageLabel = 'Sahifa' } = options;
+  const { margin, documentLabel, pageLabel = 'Sahifa' } = options;
   const name = formalClinicName(clinic);
   for (let page = pages.start; page < pages.start + pages.count; page += 1) {
     doc.switchToPage(page);
@@ -108,6 +114,7 @@ export function drawClinicPageFurniture(
     // pagination only during this final, bounded decoration pass.
     doc.page.margins.bottom = 0;
     if (page > pages.start) {
+      // Faqat klinika nomi — dastur brendi (AviShifo) sahifa tepasida chiqmasin.
       doc.font('bold').fontSize(8).fillColor(CLINIC_PDF_COLORS.blue)
         .text(name, margin, 32, { width: width * 0.54, height: 13, ellipsis: true, lineBreak: false });
       doc.font('body').fontSize(7.5).fillColor(CLINIC_PDF_COLORS.muted)
@@ -120,7 +127,7 @@ export function drawClinicPageFurniture(
     doc.moveTo(margin, footerY - 8).lineTo(margin + width, footerY - 8)
       .lineWidth(0.6).strokeColor(CLINIC_PDF_COLORS.rule).stroke();
     doc.font('body').fontSize(7).fillColor(CLINIC_PDF_COLORS.muted)
-      .text(`${documentId} · AviShifo`, margin, footerY,
+      .text('Made with AviShifo.uz', margin, footerY,
         { width: width - 90, height: 13, ellipsis: true, lineBreak: false });
     doc.text(`${pageLabel} ${page - pages.start + 1} / ${pages.count}`,
       margin + width - 90, footerY,

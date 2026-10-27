@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { formatUZS } from '@avishifo/shared';
-import { ArrowRight, Plus, Search, Scissors } from 'lucide-react';
+import { Archive, ArrowRight, Plus, Search, Scissors } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import { usePermissions } from '@/hooks/use-permissions';
 import { localizedText } from '@/lib/localized';
@@ -23,22 +23,25 @@ import {
 } from '@/components/ui/select';
 import { useDebouncedValue } from '@/features/doctor/hooks';
 import { useSurgeries } from '../hooks';
-import type { SurgeryStatus } from '../api';
+import type { SurgeryBucket, SurgeryStatus } from '../api';
 import { CreateSurgeryDialog } from './create-dialog';
 
 export function SurgeriesPanel({
   admissionId,
   allowSchedule = true,
   initialStatus = 'ALL',
+  initialBucket = 'active',
 }: {
   admissionId?: string;
   allowSchedule?: boolean;
   initialStatus?: SurgeryStatus | 'ALL';
+  initialBucket?: SurgeryBucket;
 }) {
   const t = useTranslations('surgeries');
   const locale = useLocale();
   const can = usePermissions();
   const [createOpen, setCreateOpen] = useState(false);
+  const [bucket, setBucket] = useState<SurgeryBucket>(initialBucket);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<SurgeryStatus | 'ALL'>(initialStatus);
   const [from, setFrom] = useState('');
@@ -52,6 +55,7 @@ export function SurgeriesPanel({
       page,
       limit: 15,
       search: debouncedSearch || undefined,
+      bucket,
       status: status === 'ALL' ? undefined : status,
       from: from || undefined,
       to: to || undefined,
@@ -60,19 +64,49 @@ export function SurgeriesPanel({
   );
   if (!can('surgery.read')) return <EmptyState icon={Scissors} title={t('forbidden')} />;
   const rows = query.data?.data ?? [];
+  const statusOptions =
+    bucket === 'active'
+      ? (['PLANNED', 'COMPLETED'] as const)
+      : (['COMPLETED', 'CANCELLED'] as const);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-3xl text-sm text-muted-foreground">
-          {t(admissionId ? 'admissionHint' : 'listHint')}
+          {t(admissionId ? 'admissionHint' : bucket === 'active' ? 'activeHint' : 'archiveHint')}
         </p>
-        {can('surgery.schedule') && allowSchedule ? (
+        {can('surgery.schedule') && allowSchedule && bucket === 'active' ? (
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             {t('schedule')}
           </Button>
         ) : null}
       </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            ['active', t('bucketActive'), Scissors],
+            ['archive', t('bucketArchive'), Archive],
+          ] as const
+        ).map(([value, label, Icon]) => (
+          <Button
+            key={value}
+            type="button"
+            size="sm"
+            variant={bucket === value ? 'default' : 'outline'}
+            onClick={() => {
+              setBucket(value);
+              setStatus('ALL');
+              setPage(1);
+            }}
+          >
+            <Icon className="mr-2 h-4 w-4" />
+            {label}
+          </Button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-52 flex-1 space-y-2">
           <Label htmlFor="surgery-search">{t('search')}</Label>
@@ -104,7 +138,7 @@ export function SurgeriesPanel({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">{t('all')}</SelectItem>
-              {(['PLANNED', 'COMPLETED', 'CANCELLED'] as const).map((value) => (
+              {statusOptions.map((value) => (
                 <SelectItem key={value} value={value}>
                   {t(`status.${value}`)}
                 </SelectItem>
@@ -153,7 +187,11 @@ export function SurgeriesPanel({
       ) : query.isLoading ? (
         <Skeleton className="h-48" />
       ) : rows.length === 0 ? (
-        <EmptyState icon={Scissors} title={t('empty')} description={t('emptyHint')} />
+        <EmptyState
+          icon={bucket === 'archive' ? Archive : Scissors}
+          title={t(bucket === 'archive' ? 'emptyArchive' : 'empty')}
+          description={t(bucket === 'archive' ? 'emptyArchiveHint' : 'emptyHint')}
+        />
       ) : (
         <div className="space-y-3">
           {rows.map((surgery) => (
@@ -165,6 +203,11 @@ export function SurgeriesPanel({
                     <Badge variant={surgery.status === 'COMPLETED' ? 'default' : 'outline'}>
                       {t(`status.${surgery.status}`)}
                     </Badge>
+                    {surgery.status !== 'CANCELLED' ? (
+                      <Badge variant={surgery.billingSettled ? 'secondary' : 'destructive'}>
+                        {t(surgery.billingSettled ? 'billingPaid' : 'billingDue')}
+                      </Badge>
+                    ) : null}
                   </div>
                   <p className="mt-1 text-sm font-medium">
                     {localizedText(surgery.service.name, locale)}

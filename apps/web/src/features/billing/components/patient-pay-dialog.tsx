@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -122,31 +122,40 @@ function PatientPaymentForm({
     queryKey: ['shifts', 'current', branchId],
     queryFn: async () => (await billingApi.currentShift()).data,
   });
+
   const chosen = data.invoices.filter((invoice) => selected.has(invoice.id));
-  const total = fromTiyin(chosen.reduce((value, invoice) => value + toTiyin(invoice.due), 0n));
+  const due = fromTiyin(chosen.reduce((value, invoice) => value + toTiyin(invoice.due), 0n));
+  const payingTiyin = splitTotalTiyin(payments);
+  const paying = fromTiyin(payingTiyin > 0n ? payingTiyin : 0n);
+  const dueTiyin = toTiyin(due);
+  const remainingDebtTiyin = dueTiyin - payingTiyin;
+  const isPartial = payingTiyin > 0n && payingTiyin < dueTiyin;
+  const exceedsDue = payingTiyin > dueTiyin;
   const shiftBlocked = payments.some((part) => needsOpenShift(part.method)) && !shift.data?.open;
-  const unbalanced =
-    payments.length > 1 &&
-    (splitTotalTiyin(payments) !== toTiyin(total) ||
-      payments.some((part) => (inputTiyin(part.amount) ?? 0n) <= 0n));
+
+  // Hisob tanlovi o‘zgaganda default — to‘liq qarz; kassir keyin kamaytirishi mumkin.
+  useEffect(() => {
+    if (recoveryInput) return;
+    setPayments([{ method: PaymentMethod.CASH, amount: due }]);
+  }, [due, recoveryInput]);
+
   const mutation = useMutation({
     mutationFn: async (input: PatientCheckoutInput) => {
       try {
         return await billingApi.checkout(input);
       } catch (error) {
-        // A lost response may follow a committed payment. Keep the same request
-        // until its idempotency key returns the original receipt.
         if (hasUncertainCheckoutResult(error)) uncertainRequest.current = input;
         throw error;
       }
     },
     retry: (failureCount, error) => failureCount < 1 && hasUncertainCheckoutResult(error),
     retryDelay: 500,
-    onSuccess: (response) => {
+    onSuccess: (response, variables) => {
       uncertainRequest.current = null;
       setRecoveryInput(null);
       invalidate();
-      toast.success(t('pay.success'));
+      const paidPartial = toTiyin(variables.expectedTotal) < dueTiyin;
+      toast.success(paidPartial ? t('checkout.partialSuccess') : t('pay.success'));
       onPaid(response.data.checkoutId);
     },
     onError: (error) => {
@@ -159,6 +168,14 @@ function PatientPaymentForm({
       setBusy(false);
     },
   });
+
+  const canSubmit =
+    chosen.length > 0 &&
+    payingTiyin > 0n &&
+    !exceedsDue &&
+    !shiftBlocked &&
+    payments.every((part) => (inputTiyin(part.amount) ?? 0n) > 0n);
+
   const submit = () => {
     if (submitting.current) return;
     if (recoveryInput) {
@@ -167,12 +184,12 @@ function PatientPaymentForm({
       mutation.mutate(recoveryInput);
       return;
     }
-    if (!chosen.length || shiftBlocked || unbalanced || toTiyin(total) <= 0n) return;
+    if (!canSubmit) return;
     const input = {
       patientId: data.patient.id,
       invoiceIds: chosen.map((invoice) => invoice.id).sort(),
-      expectedTotal: total,
-      payments: payments.length === 1 ? [{ ...payments[0]!, amount: total }] : payments,
+      expectedTotal: paying,
+      payments,
     };
     const fingerprint = JSON.stringify(input);
     if (request.current?.fingerprint !== fingerprint)
@@ -181,6 +198,7 @@ function PatientPaymentForm({
     setBusy(true);
     mutation.mutate({ ...input, idempotencyKey: request.current.key });
   };
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">{t('checkout.description')}</p>
@@ -272,35 +290,58 @@ function PatientPaymentForm({
           </div>
         ))}
       </div>
-      <div className="flex items-center justify-between rounded-lg bg-muted p-4">
-        <span>{t('checkout.total')}</span>
-        <strong className="text-xl tabular-nums">
-          {formatUZS(recoveryInput?.expectedTotal ?? total)}
-        </strong>
+
+      <div className="space-y-2 rounded-lg border bg-muted/40 p-4">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">{t('checkout.dueTotal')}</span>
+          <span className="tabular-nums font-medium">
+            {formatUZS(recoveryInput ? recoveryInput.expectedTotal : due)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>{t('checkout.payingNow')}</span>
+          <strong className="text-xl tabular-nums">
+            {formatUZS(recoveryInput?.expectedTotal ?? paying)}
+          </strong>
+        </div>
+        {!recoveryInput && remainingDebtTiyin > 0n && payingTiyin > 0n ? (
+          <div className="flex items-center justify-between text-sm text-amber-800 dark:text-amber-200">
+            <span>{t('checkout.remainingDebt')}</span>
+            <span className="tabular-nums font-semibold">
+              {formatUZS(fromTiyin(remainingDebtTiyin))}
+            </span>
+          </div>
+        ) : null}
+        {exceedsDue ? (
+          <p className="text-sm font-medium text-destructive">{t('pay.exceedsDue')}</p>
+        ) : null}
+        {isPartial && !exceedsDue ? (
+          <p className="text-xs text-muted-foreground">{t('checkout.partialHint')}</p>
+        ) : null}
       </div>
+
       <PaymentSplit
-        total={total}
+        total={due}
         value={payments}
         onChange={setPayments}
         cashBlocked={shiftBlocked}
         disabled={mutation.isPending || !!recoveryInput || !chosen.length}
+        allowPartial
       />
       <DialogFooter>
         <Button
           size="lg"
           className="w-full"
           onClick={submit}
-          disabled={
-            mutation.isPending ||
-            (!recoveryInput &&
-              (!chosen.length || unbalanced || shiftBlocked || toTiyin(total) <= 0n))
-          }
+          disabled={mutation.isPending || (!recoveryInput && !canSubmit)}
         >
           {mutation.isPending
             ? t('pay.paying')
             : recoveryInput
               ? t('checkout.recoverReceipt')
-              : t('checkout.payAndPrint')}
+              : isPartial
+                ? t('checkout.payPartial')
+                : t('checkout.payAndPrint')}
         </Button>
       </DialogFooter>
     </div>

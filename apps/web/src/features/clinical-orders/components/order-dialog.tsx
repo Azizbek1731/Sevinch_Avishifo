@@ -37,10 +37,16 @@ import {
 } from '@/components/ui/select';
 import { PatientCombobox } from '@/features/billing/components/patient-combobox';
 import { ServiceCombobox, serviceName } from '@/features/billing/components/service-combobox';
-import type { PatientBrief, ServiceOption } from '@/features/billing/api';
+import { billingApi, type PatientBrief, type ServiceOption } from '@/features/billing/api';
+import { searchServiceCatalogue } from '@/features/billing/service-catalogue';
 import { useApiErrorToast } from '@/features/reception/hooks';
 import { useAuthStore } from '@/stores/auth-store';
 import { clinicalOrdersApi, type ClinicalKind } from '../api';
+import {
+  findDoctorConsultationService,
+  isUziSpecialty,
+  type DoctorOption,
+} from '../doctor-matching';
 import { useInvalidateClinicalOrders } from '../hooks';
 
 function ServiceSelection({
@@ -48,11 +54,16 @@ function ServiceSelection({
   services,
   onChange,
   excludeIds = [],
+  locked = false,
+  emptyHint,
 }: {
   kind: ClinicalKind;
   services: ServiceOption[];
   excludeIds?: string[];
   onChange: (services: ServiceOption[]) => void;
+  /** When true, doctor already owns the matched consultation row — no extra picker. */
+  locked?: boolean;
+  emptyHint?: string;
 }) {
   const t = useTranslations('doctor.clinical');
   const locale = useLocale();
@@ -60,14 +71,16 @@ function ServiceSelection({
   return (
     <div className="space-y-3">
       <Label>{t('services')}</Label>
-      <ServiceCombobox
-        value={null}
-        kind={kind}
-        excludeIds={[...excludeIds, ...services.map((service) => service.id)]}
-        onChange={(service) => {
-          if (!services.some((item) => item.id === service.id)) onChange([...services, service]);
-        }}
-      />
+      {!locked ? (
+        <ServiceCombobox
+          value={null}
+          kind={kind}
+          excludeIds={[...excludeIds, ...services.map((service) => service.id)]}
+          onChange={(service) => {
+            if (!services.some((item) => item.id === service.id)) onChange([...services, service]);
+          }}
+        />
+      ) : null}
       <ul className="divide-y rounded-lg border">
         {services.map((service) => (
           <li key={service.id} className="flex items-center justify-between gap-3 p-3 text-sm">
@@ -77,20 +90,24 @@ function ServiceSelection({
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <span>{service.currentPrice ? formatUZS(service.currentPrice) : '—'}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={t('removeService')}
-                onClick={() => onChange(services.filter((item) => item.id !== service.id))}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {!locked ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t('removeService')}
+                  onClick={() => onChange(services.filter((item) => item.id !== service.id))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              ) : null}
             </div>
           </li>
         ))}
         {!services.length ? (
-          <li className="p-4 text-sm text-muted-foreground">{t('chooseServices')}</li>
+          <li className="p-4 text-sm text-muted-foreground">
+            {emptyHint ?? t('chooseServices')}
+          </li>
         ) : null}
       </ul>
       <div className="flex justify-between rounded-lg bg-muted/40 p-3">
@@ -120,16 +137,48 @@ export function ClinicalOrderDialog({
   const [patient, setPatient] = useState<PatientBrief | null>(fixedPatient ?? null);
   const [services, setServices] = useState<ServiceOption[]>([]);
   const identity = useRef<{ fingerprint: string; key: string } | null>(null);
+  const locale = useLocale();
   const doctors = useQuery({
     queryKey: ['clinical-orders', 'doctors', branchId, userId],
     queryFn: async () => (await clinicalOrdersApi.doctors()).data,
     enabled: open && Boolean(branchId),
   });
+  const doctorOptions = (doctors.data ?? []).filter((doctor) =>
+    kind === 'ULTRASOUND' ? isUziSpecialty(doctor.specialty) : true,
+  );
   const invalidate = useInvalidateClinicalOrders();
   const onError = useApiErrorToast();
   const form = useForm<CreateClinicalOrderInput>({
     resolver: zodResolver(createClinicalOrderSchema),
   });
+  const applyServices = (next: ServiceOption[]) => {
+    setServices(next);
+    form.setValue(
+      'serviceIds',
+      next.map((service) => service.id),
+      { shouldValidate: true },
+    );
+  };
+  const selectDoctor = async (doctorId: string) => {
+    form.setValue('doctorUserId', doctorId, { shouldValidate: true });
+    if (kind !== 'CONSULTATION') return;
+    const doctor = doctorOptions.find((item) => item.id === doctorId) as DoctorOption | undefined;
+    if (!doctor) {
+      applyServices([]);
+      return;
+    }
+    try {
+      const catalogue = await searchServiceCatalogue(billingApi.searchServices, doctor.fullName, {
+        kind: 'CONSULTATION',
+      });
+      const match = findDoctorConsultationService(catalogue, doctor, locale);
+      applyServices(match ? [match] : []);
+      if (!match) toast.error(t('doctorServiceMissing'));
+    } catch {
+      applyServices([]);
+      toast.error(t('doctorServiceMissing'));
+    }
+  };
   useEffect(() => {
     if (!open) return;
     setPatient(fixedPatient ?? null);
@@ -166,6 +215,7 @@ export function ClinicalOrderDialog({
       identity.current = { fingerprint, key: createId() };
     create.mutate({ ...values, note: payload.note, idempotencyKey: identity.current.key });
   });
+  const consultationLocked = kind === 'CONSULTATION';
   return (
     <Dialog
       open={open}
@@ -178,7 +228,9 @@ export function ClinicalOrderDialog({
           <DialogTitle>
             {t(kind === 'ULTRASOUND' ? 'newUltrasound' : 'newConsultation')}
           </DialogTitle>
-          <DialogDescription>{t('handoff')}</DialogDescription>
+          <DialogDescription>
+            {t(kind === 'CONSULTATION' ? 'consultationHandoff' : 'handoff')}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-5">
           <fieldset disabled={create.isPending} className="space-y-5">
@@ -197,14 +249,14 @@ export function ClinicalOrderDialog({
               <Label>{t('doctor')}</Label>
               <Select
                 value={form.watch('doctorUserId') || ''}
-                disabled={doctors.isLoading || doctors.isError || !doctors.data?.length}
-                onValueChange={(id) => form.setValue('doctorUserId', id, { shouldValidate: true })}
+                disabled={doctors.isLoading || doctors.isError || !doctorOptions.length}
+                onValueChange={(id) => void selectDoctor(id)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={doctors.isLoading ? tc('loading') : tc('select')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {(doctors.data ?? []).map((doctor) => (
+                  {doctorOptions.map((doctor) => (
                     <SelectItem key={doctor.id} value={doctor.id}>
                       {doctor.fullName}
                       {doctor.specialty ? ` · ${doctor.specialty}` : ''}
@@ -220,23 +272,24 @@ export function ClinicalOrderDialog({
                   </Button>
                 </div>
               ) : null}
-              {doctors.isSuccess && !doctors.data.length ? (
+              {doctors.isSuccess && !doctorOptions.length ? (
                 <p role="status" className="text-sm text-muted-foreground">
-                  {t('noDoctors')}
+                  {t(kind === 'ULTRASOUND' ? 'noUziDoctors' : 'noDoctors')}
                 </p>
               ) : null}
             </div>
             <ServiceSelection
               kind={kind}
               services={services}
-              onChange={(next) => {
-                setServices(next);
-                form.setValue(
-                  'serviceIds',
-                  next.map((service) => service.id),
-                  { shouldValidate: true },
-                );
-              }}
+              locked={consultationLocked}
+              emptyHint={
+                consultationLocked
+                  ? form.watch('doctorUserId')
+                    ? t('doctorServiceMissing')
+                    : t('pickDoctorFirst')
+                  : undefined
+              }
+              onChange={applyServices}
             />
             <div className="space-y-2">
               <Label htmlFor="clinical-note">{t('note')}</Label>

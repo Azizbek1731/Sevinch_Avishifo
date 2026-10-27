@@ -7,6 +7,7 @@ import { AdmissionsService } from './admissions.service';
 import { ChargesService } from './charges.service';
 import {
   AddChargeDto,
+  AddRoomChargesDto,
   ChargeQueryDto,
   AdmissionQueryDto,
   AdmitPatientDto,
@@ -122,6 +123,28 @@ export class AdmissionsController {
     @CurrentUser() user: AuthUser,
   ): Promise<Record<string, unknown>> {
     return this.admissions.addDailyNote(id, dto, user);
+  }
+
+  /** Qo‘lda bir yoki bir necha 24 soatlik palata (ko‘yka) haqini bemor hisobiga qo‘shish. */
+  @Post(':id/room-charges')
+  @RequirePermissions('admissions.write')
+  addRoomCharge(
+    @Param('id') id: string,
+    @Body() dto: AddRoomChargesDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Record<string, unknown>> {
+    return this.admissions.addRoomCharge(id, dto.days ?? 1, user);
+  }
+
+  /** Oxirgi qo‘shilgan (to‘lanmagan) kunlik haqni qaytarish. */
+  @Delete(':id/room-charges/:date')
+  @RequirePermissions('admissions.write')
+  reverseRoomCharge(
+    @Param('id') id: string,
+    @Param('date') date: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Record<string, unknown>> {
+    return this.admissions.reverseRoomCharge(id, date, user);
   }
 }
 

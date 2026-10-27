@@ -44,9 +44,11 @@ export interface AdmissionRow {
   department: string | null;
   ward: string | null;
   bed: string | null;
+  inpatientRoomId: string | null;
   dailyRoomRate: MoneyString | null;
   roomBillingStartsOn: string | null;
   roomBillingNextDate: string | null;
+  roomBillingNextAt: string | null;
   admittedAt: string;
   dischargedAt: string | null;
   patient?: {
@@ -98,8 +100,22 @@ export interface AdmissionOrder {
 
 export interface AdmissionDetail extends AdmissionRow {
   roomBilling: {
-    timeZone: string; days: number; total: MoneyString;
-    items: Array<{ date: string; rate: MoneyString; ward: string | null; bed: string | null; chargeId: string | null; status: string }>;
+    timeZone: string;
+    days: number;
+    total: MoneyString;
+    nextPeriodAt?: string | null;
+    nextPeriodDate?: string | null;
+    canAddManual?: boolean;
+    items: Array<{
+      date: string;
+      rate: MoneyString;
+      ward: string | null;
+      bed: string | null;
+      chargeId: string | null;
+      status: string;
+      paid?: boolean;
+      canReverse?: boolean;
+    }>;
   };
   attendingDoctorUserId: string | null;
   referredBy: string | null;
@@ -152,6 +168,8 @@ export interface DischargeCheck {
     }>;
   };
   stayDebt: MoneyString;
+  /** stayDebt + unbilled — what must be settled at discharge. */
+  accountDue?: MoneyString;
   stayInvoices: Array<{
     id: string;
     number: string;
@@ -183,6 +201,10 @@ export const admissionsApi = {
     api.post<{ id: string; status: string }>(`/admissions/${id}/administrations`, body),
   addNote: (id: string, body: DailyNoteInput) =>
     api.post<{ id: string }>(`/admissions/${id}/notes`, body),
+  addRoomCharge: (id: string, days = 1) =>
+    api.post<AdmissionDetail>(`/admissions/${id}/room-charges`, { days }),
+  reverseRoomCharge: (id: string, date: string) =>
+    api.delete<AdmissionDetail>(`/admissions/${id}/room-charges/${date}`),
 };
 
 export const chargesApi = {

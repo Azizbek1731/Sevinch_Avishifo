@@ -1,12 +1,15 @@
 // This computer is the clinic server.
-// Staff panel:  http://sevinch.local/
+// Staff panel:  http://sevinch.local/   and   http://sevinch/   and   http://<LAN-IP>/
 // TV screen:    http://sevinch.local:3002/
 // Patient portal: http://sevinch.local:3003/
-// The same names work with the LAN IP. Postgres and Redis stay on this machine.
+// sevinch.local is advertised with mDNS. The short name sevinch is advertised
+// with LLMNR, which other Windows computers resolve without a hosts file.
+// Postgres and Redis stay on this machine.
 // The "Sevinch Avishifo" scheduled task starts this at boot and re-runs it every
 // minute; a second copy exits at once, so the re-run only revives a dead server.
 import { spawn, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
+import { setDefaultResultOrder } from 'node:dns';
 import {
   existsSync,
   mkdirSync,
@@ -22,12 +25,38 @@ import { connect as netConnect, createConnection, createServer as createNetServe
 import { networkInterfaces, hostname } from 'node:os';
 import { dirname, join, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { backupFileStamp, backupSlot, msUntilNextBackup } from './backup-schedule.mjs';
+import {
+  backupFileStamp,
+  backupSlot,
+  formatTashkent,
+  msUntilNextBackup,
+} from './backup-schedule.mjs';
 import { backupCaption, sendTelegramDocument, splitBackupFile } from './backup-telegram.mjs';
+import {
+  adminKeyboard,
+  runAdminBot,
+  sendTelegramText,
+  serverStartedMessage,
+  serverStoppedMessage,
+} from './clinic-admin-bot.mjs';
+import { announceA, answerA } from './lan-names.mjs';
+
+// This clinic PC often resolves api.telegram.org to unreachable IPv6 first.
+try {
+  setDefaultResultOrder('ipv4first');
+} catch {
+  // Older Node builds ignore the hint.
+}
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-function loadEnvFile() {
+const REFRESH_ENV_KEYS = new Set([
+  'TELEGRAM_BOT_TOKEN',
+  'TELEGRAM_ADMIN_CHAT_ID',
+  'CLINIC_BACKUP_TELEGRAM_CHAT_ID',
+]);
+
+function loadEnvFile({ refresh = false } = {}) {
   let text = '';
   try {
     text = readFileSync(join(root, '.env'), 'utf8');
@@ -40,8 +69,13 @@ function loadEnvFile() {
     const eq = trimmed.indexOf('=');
     if (eq < 1) continue;
     const key = trimmed.slice(0, eq).trim();
+    const value = trimmed.slice(eq + 1).trim();
+    if (refresh && REFRESH_ENV_KEYS.has(key)) {
+      process.env[key] = value;
+      continue;
+    }
     if (process.env[key] !== undefined) continue;
-    process.env[key] = trimmed.slice(eq + 1).trim();
+    process.env[key] = value;
   }
 }
 loadEnvFile();
@@ -136,7 +170,7 @@ function publishHosts() {
   );
   const marker = '# sevinch-avishifo';
   // Loopback keeps the name working on this computer even while the LAN is down.
-  const wanted = `127.0.0.1 ${CLINIC_NAME} ${marker}`;
+  const wanted = `127.0.0.1 ${CLINIC_NAME} sevinch ${marker}`;
   try {
     const current = existsSync(hostsPath) ? readFileSync(hostsPath, 'utf8') : '';
     const lines = current.split(/\r?\n/);
@@ -146,78 +180,17 @@ function publishHosts() {
       .filter((line) => line.trim().length > 0);
     kept.push(wanted);
     writeFileSync(hostsPath, `${kept.join('\r\n')}\r\n`);
-    say(`hosts: 127.0.0.1 ${CLINIC_NAME}`);
+    say(`hosts: 127.0.0.1 ${CLINIC_NAME} sevinch`);
   } catch (error) {
     say(`hosts update skipped: ${error.message}`);
   }
 }
 
-function encodeDnsName(name) {
-  return Buffer.concat([
-    ...name
-      .split('.')
-      .map((part) => Buffer.concat([Buffer.from([part.length]), Buffer.from(part)])),
-    Buffer.from([0]),
-  ]);
-}
-
-function decodeDnsName(buf, offset) {
-  const labels = [];
-  let pos = offset;
-  let jumped = false;
-  let end = offset;
-  for (let guard = 0; guard < 20 && pos < buf.length; guard += 1) {
-    const len = buf[pos];
-    if (len === 0) {
-      if (!jumped) end = pos + 1;
-      break;
-    }
-    if ((len & 0xc0) === 0xc0) {
-      if (!jumped) end = pos + 2;
-      jumped = true;
-      pos = ((len & 0x3f) << 8) | buf[pos + 1];
-      continue;
-    }
-    labels.push(buf.subarray(pos + 1, pos + 1 + len).toString('utf8'));
-    pos += 1 + len;
-    if (!jumped) end = pos;
-  }
-  return { name: labels.join('.').toLowerCase(), end };
-}
-
-function answersClinicName(message) {
-  if (message.length < 12 || (message[2] & 0x80) !== 0) return false;
-  const questions = message.readUInt16BE(4);
-  let offset = 12;
-  for (let i = 0; i < questions; i += 1) {
-    const decoded = decodeDnsName(message, offset);
-    if (decoded.name === CLINIC_NAME) return true;
-    offset = decoded.end + 4;
-  }
-  return false;
-}
-
-function mdnsAnswer(query, ip) {
-  const encoded = encodeDnsName(CLINIC_NAME);
-  const header = Buffer.alloc(12);
-  header.writeUInt16BE(query.readUInt16BE(0), 0);
-  header.writeUInt16BE(0x8400, 2);
-  header.writeUInt16BE(1, 4);
-  header.writeUInt16BE(1, 6);
-  const question = Buffer.concat([encoded, Buffer.from([0x00, 0x01, 0x00, 0x01])]);
-  const answer = Buffer.alloc(16);
-  answer.writeUInt16BE(0xc00c, 0);
-  answer.writeUInt16BE(1, 2);
-  answer.writeUInt16BE(1, 4);
-  answer.writeUInt32BE(120, 6);
-  answer.writeUInt16BE(4, 10);
-  ip.split('.').forEach((part, index) => {
-    answer[12 + index] = Number(part);
-  });
-  return Buffer.concat([header, question, answer]);
-}
+const MDNS_NAMES = [CLINIC_NAME, `${CLINIC_NAME}.local`];
+const LLMNR_NAME = 'sevinch';
 
 let mdns = null;
+let llmnr = null;
 let announcedIp = '';
 
 function joinMulticast(socket) {
@@ -243,30 +216,149 @@ function joinMulticast(socket) {
 }
 
 function publishMdns() {
-  const socket = createSocket({ type: 'udp4', reuseAddr: true });
+  const sockets = [];
   let timer = null;
-  socket.on('error', (error) => {
-    say(`mDNS error: ${error.message}. Retrying in 10s.`);
+  const closeAll = () => {
     clearInterval(timer);
+    for (const socket of sockets) {
+      try {
+        socket.close();
+      } catch {
+        // Already closed.
+      }
+    }
+  };
+  const onQuery = (socket, multicast) => (message, remote) => {
+    const ip = addressFor(remote.address);
+    const packet = answerA(message, MDNS_NAMES, ip, { flags: 0x8400, ttl: 120, cacheFlush: true });
+    if (!packet) return;
+    // Callbacks keep "network unreachable" during a link drop from killing the socket.
+    socket.send(packet, remote.port, remote.address, () => {});
+    socket.send(packet, 5353, multicast, () => {});
+  };
+  let retried = false;
+  const onError = (error) => {
+    if (retried) return;
+    retried = true;
+    say(`mDNS error: ${error.message}. Retrying in 10s.`);
+    closeAll();
+    if (!stopping) setTimeout(() => (mdns = publishMdns()), 10_000);
+  };
+  const ipv4 = createSocket({ type: 'udp4', reuseAddr: true });
+  sockets.push(ipv4);
+  ipv4.on('error', onError);
+  ipv4.on('message', onQuery(ipv4, '224.0.0.251'));
+  ipv4.bind(5353, () => {
+    try {
+      ipv4.setMulticastTTL(255);
+    } catch {
+      // TTL is a hint; queries are still answered.
+    }
+    joinMulticast(ipv4);
+    const ip = lanAddress();
+    const announcement =
+      ip === '127.0.0.1'
+        ? null
+        : announceA(CLINIC_NAME, ip, { flags: 0x8400, ttl: 120, cacheFlush: true });
+    if (announcement) ipv4.send(announcement, 5353, '224.0.0.251', () => {});
+    timer = setInterval(() => {
+      joinMulticast(ipv4);
+      const ip = lanAddress();
+      if (ip === '127.0.0.1') return;
+      const announcement = announceA(CLINIC_NAME, ip, { flags: 0x8400, ttl: 120, cacheFlush: true });
+      if (announcement) ipv4.send(announcement, 5353, '224.0.0.251', () => {});
+    }, 30_000);
+  });
+  // Windows often asks for .local over IPv6 only. The DNS client already holds
+  // this port, so the socket shares it.
+  try {
+    const ipv6 = createSocket({ type: 'udp6', reuseAddr: true });
+    sockets.push(ipv6);
+    ipv6.on('error', (error) => say(`mDNS IPv6 skipped: ${error.message}`));
+    ipv6.on('message', onQuery(ipv6, 'ff02::fb'));
+    ipv6.bind(5353, () => {
+      try {
+        ipv6.addMembership('ff02::fb');
+      } catch {
+        // No IPv6 link; IPv4 answers still cover the LAN.
+      }
+    });
+  } catch (error) {
+    say(`mDNS IPv6 skipped: ${error.message}`);
+  }
+  return { close: closeAll };
+}
+
+let llmnrLogged = false;
+
+function publishLlmnr() {
+  const socket = createSocket({ type: 'udp4', reuseAddr: true });
+  socket.on('error', (error) => {
+    say(`LLMNR error: ${error.message}. Retrying in 10s.`);
     try {
       socket.close();
     } catch {
       // Already closed.
     }
-    if (!stopping) setTimeout(() => (mdns = publishMdns()), 10_000);
+    if (!stopping) setTimeout(() => (llmnr = publishLlmnr()), 10_000);
   });
   socket.on('message', (message, remote) => {
-    if (!answersClinicName(message)) return;
-    const packet = mdnsAnswer(message, addressFor(remote.address));
-    // Callbacks keep "network unreachable" during a link drop from killing the socket.
+    const ip = addressFor(remote.address);
+    const packet = answerA(message, [LLMNR_NAME], ip, { flags: 0x8000, ttl: 30, cacheFlush: false });
+    if (!packet) return;
     socket.send(packet, remote.port, remote.address, () => {});
-    socket.send(packet, 5353, '224.0.0.251', () => {});
+    if (!llmnrLogged && ip !== '127.0.0.1') {
+      llmnrLogged = true;
+      say(`LLMNR: ${LLMNR_NAME} -> ${ip}`);
+    }
   });
-  socket.bind(5353, () => {
-    joinMulticast(socket);
-    timer = setInterval(() => joinMulticast(socket), 30_000);
+  socket.bind(5355, () => {
+    try {
+      socket.addMembership('224.0.0.252');
+    } catch {
+      // Joining can fail before the link is up; the next retry joins it.
+    }
+    say(`LLMNR: ${LLMNR_NAME} on UDP 5355`);
   });
   return socket;
+}
+
+function ensureLanFirewall() {
+  if (process.platform !== 'win32') return;
+  const rules = [
+    ['Sevinch Avishifo', 'TCP', '80,3002,3003'],
+    ['Sevinch Avishifo mDNS', 'UDP', '5353'],
+    ['Sevinch Avishifo LLMNR', 'UDP', '5355'],
+  ];
+  for (const [name, protocol, ports] of rules) {
+    const shown = spawnSync('netsh', ['advfirewall', 'firewall', 'show', 'rule', `name=${name}`], {
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+    if (shown.status === 0) continue;
+    const added = spawnSync(
+      'netsh',
+      [
+        'advfirewall',
+        'firewall',
+        'add',
+        'rule',
+        `name=${name}`,
+        'dir=in',
+        'action=allow',
+        `protocol=${protocol}`,
+        `localport=${ports}`,
+        'profile=any',
+        'remoteip=any',
+      ],
+      { encoding: 'utf8', windowsHide: true },
+    );
+    if (added.status === 0) {
+      say(`Firewall: ${name} ${protocol} ${ports}`);
+      continue;
+    }
+    say(`Firewall rule ${name} was not added.`);
+  }
 }
 
 function corsOrigins(ip) {
@@ -716,6 +808,55 @@ function backupEnv(name) {
   return value;
 }
 
+function adminIds() {
+  return backupEnv('TELEGRAM_ADMIN_CHAT_ID')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+const LIFECYCLE_PATH = join(runDir, 'server-lifecycle.json');
+
+function readLifecycle() {
+  try {
+    return JSON.parse(readFileSync(LIFECYCLE_PATH, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function writeLifecycle(state) {
+  try {
+    writeFileSync(LIFECYCLE_PATH, `${JSON.stringify(state, null, 2)}\n`);
+  } catch (error) {
+    say(`Lifecycle state not saved: ${error.message}`);
+  }
+}
+
+async function notifyAdmins(text) {
+  loadEnvFile({ refresh: true });
+  const token = backupEnv('TELEGRAM_BOT_TOKEN');
+  const admins = adminIds();
+  if (!token || !admins.length) return false;
+  let sent = 0;
+  for (const adminId of admins) {
+    try {
+      await sendTelegramText({
+        token,
+        chatId: adminId,
+        text,
+        replyMarkup: adminKeyboard(),
+      });
+      sent += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      say(`Admin notify failed: ${message}`);
+    }
+  }
+  return sent > 0;
+}
+
+
 async function deliverDump(file, slot, alreadySent, dumpedAt) {
   const token = backupEnv('TELEGRAM_BOT_TOKEN');
   const chatId = backupEnv('CLINIC_BACKUP_TELEGRAM_CHAT_ID');
@@ -787,7 +928,7 @@ async function backupIfDue() {
   if (backupRunning || stopping || !existsSync(PG_DUMP)) return false;
   backupRunning = true;
   try {
-    loadEnvFile();
+    loadEnvFile({ refresh: true });
     const slot = backupSlot();
     const state = readBackupState();
     const token = backupEnv('TELEGRAM_BOT_TOKEN');
@@ -829,6 +970,35 @@ async function backupScheduler() {
   }
 }
 
+async function adminBotScheduler() {
+  await sleep(8_000);
+  while (!stopping) {
+    loadEnvFile({ refresh: true });
+    const token = backupEnv('TELEGRAM_BOT_TOKEN');
+    const admins = adminIds();
+    if (!token || !admins.length) {
+      say('Admin Telegram bot is not configured (TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID).');
+      await sleep(15 * 60_000);
+      continue;
+    }
+    try {
+      await runAdminBot({
+        token,
+        adminIds: admins,
+        backupDir: BACKUP_DIR,
+        shouldStop: () => stopping,
+        log: say,
+        onReady: async () => {
+          say(`Admin Telegram bot ready for ${admins.join(',')}.`);
+        },
+      });
+    } catch (error) {
+      say(error instanceof Error ? error.message : String(error));
+    }
+    if (!stopping) await sleep(5_000);
+  }
+}
+
 process.env.CORS_ORIGINS = corsOrigins(lanAddress());
 process.env.API_HOST = '127.0.0.1';
 process.env.API_PORT = String(INTERNAL.api);
@@ -843,7 +1013,9 @@ async function main() {
   }
   await stopLeftoverProcesses();
   publishHosts();
+  ensureLanFirewall();
   mdns = publishMdns();
+  llmnr = publishLlmnr();
   // Gateways first: while the rest starts, browsers get a page that reloads itself.
   servers = [
     listenGateway(80, INTERNAL.web),
@@ -886,18 +1058,60 @@ async function main() {
     );
   }
 
-  say(`Clinic panel: http://${CLINIC_NAME}/  and  http://${lanAddress()}/`);
+  const ip = lanAddress();
+  say(`Clinic panel: http://${CLINIC_NAME}/  and  http://${ip}/`);
   say(`TV: http://${CLINIC_NAME}:3002/   Portal: http://${CLINIC_NAME}:3003/`);
+
+  const previous = readLifecycle();
+  const unexpected = Boolean(previous?.running && previous.cleanShutdown === false);
+  const startedAt = new Date();
+  writeLifecycle({
+    running: true,
+    cleanShutdown: false,
+    startedAt: startedAt.toISOString(),
+    ip,
+  });
+  void notifyAdmins(
+    serverStartedMessage({
+      when: formatTashkent(startedAt),
+      ip,
+      unexpected,
+    }),
+  ).then((ok) => {
+    if (ok) say(unexpected ? 'Admin notified: unexpected restart.' : 'Admin notified: server started.');
+  });
+
   void backupScheduler();
+  void adminBotScheduler();
 }
 
 async function shutdown() {
   if (stopping) return;
   stopping = true;
   say('Stopping clinic server...');
+  const stoppedAt = new Date();
+  try {
+    await Promise.race([
+      notifyAdmins(serverStoppedMessage({ when: formatTashkent(stoppedAt) })),
+      sleep(12_000),
+    ]);
+    writeLifecycle({
+      running: false,
+      cleanShutdown: true,
+      stoppedAt: stoppedAt.toISOString(),
+      ip: lanAddress(),
+    });
+  } catch (error) {
+    say(`Shutdown notify failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
   for (const server of servers) server.close();
   try {
     mdns?.close();
+  } catch {
+    // Already closed.
+  }
+  try {
+    llmnr?.close();
   } catch {
     // Already closed.
   }

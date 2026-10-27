@@ -41,37 +41,55 @@ const CONTENT_WIDTH = 595.28 - MARGIN * 2;
 const PRESCRIPTION_LABELS = {
   uz: {
     title: 'Tayinlangan dori vositalari',
+    documentTitle: 'Retsept',
     physiotherapy: 'Fizioterapiya',
+    empty: 'Retsept yozilmagan.',
     days: (count: number) => `${count} kun`,
     dripUnit: 'tomchi/daqiqa',
   },
   ru: {
     title: 'Назначенные препараты',
+    documentTitle: 'Рецепт',
     physiotherapy: 'Физиотерапия',
+    empty: 'Рецепт не назначен.',
     days: (count: number) => `${count} дн.`,
     dripUnit: 'капель/мин',
   },
   en: {
     title: 'Prescribed medicines',
+    documentTitle: 'Prescription',
     physiotherapy: 'Physiotherapy',
+    empty: 'No prescriptions recorded.',
     days: (count: number) => `${count} ${count === 1 ? 'day' : 'days'}`,
     dripUnit: 'drops/min',
   },
 };
 
+export type VisitReportPdfMode = 'summary' | 'prescription';
+
 /** Server-rendered A4 report; doctor/time identify the clinical confirmation. */
 @Injectable()
 export class VisitReportPdfService {
-  async render(data: VisitReportPdfData, locale: 'uz' | 'ru' | 'en' = 'uz'): Promise<Buffer> {
+  async render(
+    data: VisitReportPdfData,
+    locale: 'uz' | 'ru' | 'en' = 'uz',
+    mode: VisitReportPdfMode = 'summary',
+  ): Promise<Buffer> {
     const logo = await preparePdfClinicLogo(data.clinic.logoUrl);
-    const reportTitle = data.title || (data.kind === 'ULTRASOUND'
-      ? 'Ultratovush tekshiruvi xulosasi' : 'Shifokor konsultatsiyasi xulosasi');
+    const prescriptionLabels = PRESCRIPTION_LABELS[locale];
+    const prescriptionOnly = mode === 'prescription' && data.kind !== 'ULTRASOUND';
+    const reportTitle = prescriptionOnly
+      ? prescriptionLabels.documentTitle
+      : data.title ||
+        (data.kind === 'ULTRASOUND'
+          ? 'Ultratovush tekshiruvi xulosasi'
+          : 'Shifokor konsultatsiyasi xulosasi');
     const doc = new PDFDocument({
       size: 'A4',
       margins: { top: 74, bottom: 62, left: MARGIN, right: MARGIN },
       bufferPages: true,
       info: {
-        Title: data.title || (data.kind === 'ULTRASOUND' ? 'UZI xulosasi' : 'Shifokor xulosasi'),
+        Title: reportTitle,
       },
     });
     const chunks: Buffer[] = [];
@@ -131,22 +149,33 @@ export class VisitReportPdfService {
         paragraphGap: 6,
       });
     };
-    section('Xulosa', data.body);
-    section('Shikoyatlar va anamnez', data.subjective);
-    section('Ko‘rik va tekshiruv', data.objective);
-    section('Baholash', data.assessmentNote);
-    section(
-      'Tashxis',
-      data.diagnoses
-        .map(
-          (item) =>
-            `${item.primary ? 'Asosiy: ' : ''}${item.code} — ${item.name}${item.note ? `\n${item.note}` : ''}`,
-        )
-        .join('\n'),
-    );
-    section('Davolash va tavsiyalar', data.plan);
-    const prescriptionLabels = PRESCRIPTION_LABELS[locale];
+
+    if (!prescriptionOnly) {
+      section('Xulosa', data.body);
+      section('Shikoyatlar va anamnez', data.subjective);
+      section('Ko‘rik va tekshiruv', data.objective);
+      section('Baholash', data.assessmentNote);
+      section(
+        'Tashxis',
+        data.diagnoses
+          .map(
+            (item) =>
+              `${item.primary ? 'Asosiy: ' : ''}${item.code} — ${item.name}${item.note ? `\n${item.note}` : ''}`,
+          )
+          .join('\n'),
+      );
+      section('Davolash va tavsiyalar', data.plan);
+    }
+
     const groups = groupPrescriptionItems(data.prescriptions);
+    if (groups.length === 0 && prescriptionOnly) {
+      doc
+        .moveDown(0.6)
+        .font('body')
+        .fontSize(10)
+        .fillColor(CLINIC_PDF_COLORS.muted)
+        .text(prescriptionLabels.empty, MARGIN, doc.y, { width: CONTENT_WIDTH });
+    }
     for (const [index, group] of groups.entries()) {
       const lines = formatPrescriptionGroup(group, prescriptionLabels);
       const rows = [
@@ -167,13 +196,13 @@ export class VisitReportPdfService {
             .heightOfString(row.text, { width: CONTENT_WIDTH - row.indent, lineGap: 3 }),
         0,
       );
-      const headingHeight = index === 0 ? 32 : 0;
+      const headingHeight = index === 0 && !prescriptionOnly ? 32 : 0;
       const pageBottom = doc.page.height - doc.page.margins.bottom;
       // Keep an ordinary Rp. block together. A block longer than a page stays
       // in text flow so PDFKit can wrap and paginate every component and note.
       const required = Math.min(groupHeight + headingHeight + 12, pageBottom - doc.page.margins.top);
       if (doc.y + required > pageBottom) doc.addPage();
-      if (index === 0) {
+      if (index === 0 && !prescriptionOnly) {
         doc
           .moveDown(0.6)
           .font('bold')
@@ -210,7 +239,7 @@ export class VisitReportPdfService {
       .fillColor(CLINIC_PDF_COLORS.muted)
       .text(formatInTimeZone(data.confirmedAt, TIMEZONE, 'dd.MM.yyyy HH:mm'));
     doc.moveDown(0.4).fontSize(8).text('Hujjat klinika tizimida shifokor tomonidan tasdiqlangan.');
-    if (data.latestAmendment) {
+    if (!prescriptionOnly && data.latestAmendment) {
       section(
         'Oxirgi tuzatish',
         [
@@ -224,7 +253,8 @@ export class VisitReportPdfService {
     }
 
     drawClinicPageFurniture(doc, data.clinic, {
-      margin: MARGIN, documentLabel: reportTitle, documentId: `Hujjat ID: ${data.id}`,
+      margin: MARGIN,
+      documentLabel: reportTitle,
     });
     doc.end();
     return result;

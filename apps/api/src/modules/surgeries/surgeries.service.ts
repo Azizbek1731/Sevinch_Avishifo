@@ -19,8 +19,6 @@ import { AuditService } from "../../core/audit/audit.service";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { TenantContext } from "../../core/prisma/tenant-context";
 import type { TenantTransactionClient } from "../../core/prisma/tenant-extension";
-import { InvoicesService } from "../billing/invoices.service";
-
 const INCLUDE = {
   patient: { select: { id: true, mrn: true, fullName: true } },
   admission: {
@@ -80,7 +78,6 @@ export class SurgeriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly invoices: InvoicesService,
   ) {}
 
   private scope(user: AuthUser, branchId: string) {
@@ -193,8 +190,65 @@ export class SurgeriesService {
     };
   }
 
-  async list(query: SurgeryQueryInput, user: AuthUser, branchId: string) {
-    const where: Prisma.SurgeryCaseWhereInput = {
+  /** Live (non-cancelled) charges tied to a surgery case. */
+  private liveCharges(surgery: {
+    serviceCharge: { status: string; invoiceLineId: string | null };
+    entries: Array<{ chargeItem: { status: string; invoiceLineId: string | null } }>;
+    staffFees: Array<{ chargeItem: { status: string; invoiceLineId: string | null } }>;
+  }) {
+    return [
+      surgery.serviceCharge,
+      ...surgery.entries.map((entry) => entry.chargeItem),
+      ...surgery.staffFees.map((fee) => fee.chargeItem),
+    ].filter((charge) => charge.status !== "CANCELLED");
+  }
+
+  /** True when every live charge sits on a PAID invoice. */
+  private async settlementBySurgeryId(
+    rows: Array<{
+      id: string;
+      serviceCharge: { status: string; invoiceLineId: string | null };
+      entries: Array<{ chargeItem: { status: string; invoiceLineId: string | null } }>;
+      staffFees: Array<{ chargeItem: { status: string; invoiceLineId: string | null } }>;
+    }>,
+  ): Promise<Map<string, boolean>> {
+    const lineIds = [
+      ...new Set(
+        rows.flatMap((row) =>
+          this.liveCharges(row)
+            .map((charge) => charge.invoiceLineId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ),
+    ];
+    const lines = lineIds.length
+      ? await this.prisma.db.invoiceLine.findMany({
+          where: { id: { in: lineIds } },
+          select: { id: true, invoice: { select: { status: true } } },
+        })
+      : [];
+    const paidLines = new Set(
+      lines.filter((line) => line.invoice.status === "PAID").map((line) => line.id),
+    );
+    const result = new Map<string, boolean>();
+    for (const row of rows) {
+      const charges = this.liveCharges(row);
+      result.set(
+        row.id,
+        charges.length > 0 &&
+          charges.every(
+            (charge) =>
+              charge.status === "INVOICED" &&
+              Boolean(charge.invoiceLineId) &&
+              paidLines.has(charge.invoiceLineId!),
+          ),
+      );
+    }
+    return result;
+  }
+
+  private listWhere(query: SurgeryQueryInput, user: AuthUser, branchId: string) {
+    return {
       ...this.scope(user, branchId),
       ...(user.role === "DOCTOR" ? { surgeonUserId: user.id } : {}),
       ...(query.admissionId ? { admissionId: query.admissionId } : {}),
@@ -243,18 +297,78 @@ export class SurgeriesService {
             ],
           }
         : {}),
-    };
-    const [rows, total] = await Promise.all([
-      this.prisma.db.surgeryCase.findMany({
-        where,
-        include: INCLUDE,
-        ...skipTake(query),
-        orderBy: [{ scheduledDate: "desc" }, { createdAt: "desc" }],
-      }),
-      this.prisma.db.surgeryCase.count({ where }),
-    ]);
+    } satisfies Prisma.SurgeryCaseWhereInput;
+  }
+
+  async list(query: SurgeryQueryInput, user: AuthUser, branchId: string) {
+    const where = this.listWhere(query, user, branchId);
+    const { skip, take } = skipTake(query);
+
+    if (!query.bucket) {
+      const [rows, total] = await Promise.all([
+        this.prisma.db.surgeryCase.findMany({
+          where,
+          include: INCLUDE,
+          skip,
+          take,
+          orderBy: [{ scheduledDate: "desc" }, { createdAt: "desc" }],
+        }),
+        this.prisma.db.surgeryCase.count({ where }),
+      ]);
+      const settled = await this.settlementBySurgeryId(rows);
+      return paginated(
+        rows.map((row) => ({
+          ...this.map(row, user),
+          billingSettled: settled.get(row.id) ?? false,
+        })),
+        { page: query.page, limit: query.limit, total },
+      );
+    }
+
+    // Bucket filter needs payment state — load lite rows, settle, then page.
+    const candidates = await this.prisma.db.surgeryCase.findMany({
+      where,
+      select: {
+        id: true,
+        status: true,
+        scheduledDate: true,
+        createdAt: true,
+        serviceCharge: { select: { status: true, invoiceLineId: true } },
+        entries: {
+          select: { chargeItem: { select: { status: true, invoiceLineId: true } } },
+        },
+        staffFees: {
+          select: { chargeItem: { select: { status: true, invoiceLineId: true } } },
+        },
+      },
+      orderBy: [{ scheduledDate: "desc" }, { createdAt: "desc" }],
+    });
+    const settled = await this.settlementBySurgeryId(candidates);
+    const filtered = candidates.filter((row) => {
+      const paid = settled.get(row.id) ?? false;
+      if (query.bucket === "archive") {
+        return row.status === "CANCELLED" || (row.status === "COMPLETED" && paid);
+      }
+      // active: jarayonda — bekor emas; yakunlangan bo‘lsa hali to‘liq to‘lanmagan
+      return row.status !== "CANCELLED" && !(row.status === "COMPLETED" && paid);
+    });
+    const total = filtered.length;
+    const pageIds = filtered.slice(skip, skip + take).map((row) => row.id);
+    const rows = pageIds.length
+      ? await this.prisma.db.surgeryCase.findMany({
+          where: { id: { in: pageIds } },
+          include: INCLUDE,
+        })
+      : [];
+    const byId = new Map(rows.map((row) => [row.id, row]));
     return paginated(
-      rows.map((row) => this.map(row, user)),
+      pageIds
+        .map((id) => byId.get(id))
+        .filter((row): row is Surgery => Boolean(row))
+        .map((row) => ({
+          ...this.map(row, user),
+          billingSettled: settled.get(row.id) ?? false,
+        })),
       { page: query.page, limit: query.limit, total },
     );
   }
@@ -270,7 +384,11 @@ export class SurgeriesService {
     });
     if (!surgery)
       throw new AppException(ErrorCode.NOT_FOUND, "Operatsiya topilmadi", 404);
-    return this.map(surgery, user);
+    const settled = await this.settlementBySurgeryId([surgery]);
+    return {
+      ...this.map(surgery, user),
+      billingSettled: settled.get(surgery.id) ?? false,
+    };
   }
 
   async doctors(
@@ -571,12 +689,7 @@ export class SurgeriesService {
         where: { id: fee.id },
         data: { surgeryId: surgery.id },
       });
-      await this.invoices.issueChargesInTransaction(
-        tx,
-        [fee.id],
-        user,
-        branchId,
-      );
+      // Surgery fee stays on the inpatient account until discharge.
       return { id: surgery.id, created: true };
     });
     if (result.created)
@@ -661,7 +774,6 @@ export class SurgeriesService {
       }
       this.assertActive(admission, surgery);
       const ids: string[] = [];
-      const chargeIds: string[] = [];
       for (const [lineIndex, item] of dto.items.entries()) {
         const quantity = new Prisma.Decimal(item.quantity);
         if (quantity.lte(0) || quantity.gt("999999999.999"))
@@ -755,14 +867,8 @@ export class SurgeriesService {
           },
         });
         ids.push(entry.id);
-        chargeIds.push(charge.id);
       }
-      await this.invoices.issueChargesInTransaction(
-        tx,
-        chargeIds,
-        user,
-        branchId,
-      );
+      // Entry costs stay PENDING on the stay until discharge settlement.
       return { created: true, ids };
     });
     if (result.created)
@@ -847,7 +953,6 @@ export class SurgeriesService {
         day: "2-digit",
       }).format(new Date());
       const ids: string[] = [];
-      const chargeIds: string[] = [];
       for (const [lineIndex, item] of dto.items.entries()) {
         const amount = new Prisma.Decimal(item.amount);
         if (!amount.isFinite() || amount.lte(0) || amount.gt(maxMoney))
@@ -887,14 +992,8 @@ export class SurgeriesService {
           },
         });
         ids.push(fee.id);
-        chargeIds.push(charge.id);
       }
-      await this.invoices.issueChargesInTransaction(
-        tx,
-        chargeIds,
-        user,
-        branchId,
-      );
+      // Staff fees stay PENDING on the stay until discharge settlement.
       await tx.auditLog.create({
         data: {
           clinicId,

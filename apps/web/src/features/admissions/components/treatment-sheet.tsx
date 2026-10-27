@@ -123,6 +123,8 @@ export function TreatmentSheet({
                           </Link>
                         ) : null}
                       </div>
+                    ) : order.billing?.status === 'PENDING' ? (
+                      <Badge variant="outline">{t('directBilling.awaitingPayment')}</Badge>
                     ) : (
                       <span className="text-xs text-muted-foreground">
                         {t(

@@ -1,7 +1,14 @@
+import { setDefaultResultOrder } from 'node:dns';
 import { openAsBlob, statSync, writeFileSync } from 'node:fs';
 import { open as openFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { BACKUP_HOUR, formatTashkent } from './backup-schedule.mjs';
+
+try {
+  setDefaultResultOrder('ipv4first');
+} catch {
+  // ignore
+}
 
 /** Stay under Telegram's 50 MB bot upload limit. */
 export const TELEGRAM_DOCUMENT_LIMIT = 45 * 1024 * 1024;

@@ -1,0 +1,24 @@
+Sevinch Avishifo — klient dasturi
+=================================
+
+Bu dastur klinika tarmog‘idagi kompyuterlarga o‘rnatiladi.
+U serverdagi panelni (http://sevinch.local yoki http://192.168.1.110) ochadi.
+
+QANDAY O‘RNATISH
+1. SevinchAvishifo.exe ni oching.
+2. «Ish stoliga o‘rnatish» tugmasini bosing.
+3. Ish stolida «Sevinch Avishifo» yorlig‘i paydo bo‘ladi — keyin shu orqali kiring.
+
+YOKI
+- SevinchAvishifo.exe ni ikki marta bosib «Klinikaga kirish».
+
+SOZLAMALAR
+- SevinchAvishifo.ini — server IP (standart: 192.168.1.110)
+- Agar IP o‘zgarsa, dasturni ochib yangi IP ni yozing va Saqlash.
+
+TALAB
+- Kompyuter klinika Wi‑Fi / LAN tarmog‘ida bo‘lishi kerak.
+- Server (klinika kompyuteri) yoqilgan bo‘lishi kerak.
+- Chrome yoki Edge tavsiya etiladi.
+
+Maxfiy emas — faqat qulay kirish uchun yorliq/dastur.

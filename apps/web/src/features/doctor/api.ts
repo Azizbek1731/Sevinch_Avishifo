@@ -137,12 +137,24 @@ export interface VisitPrescription {
   drug: { id: string; name: string; form: string | null; strength: string | null } | null;
 }
 
+export interface VisitReferralClinicalOrder {
+  id: string;
+  kind?: 'CONSULTATION' | 'ULTRASOUND';
+  status: 'WAITING_PAYMENT' | 'READY' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  visitId: string | null;
+  doctorUserId: string;
+  services: Array<{ id: string; title: string | Record<string, string> }>;
+  invoice: { id: string; number: string; status: string; due: string };
+}
+
 export interface VisitReferral {
   id: string;
   type: ReferralType;
   targetSpecialty: string | null;
   targetDoctorUserId: string | null;
   labOrderId: string | null;
+  clinicalOrderId: string | null;
+  clinicalOrder: VisitReferralClinicalOrder | null;
   appointmentId: string | null;
   note: string | null;
   createdAt: string | null;

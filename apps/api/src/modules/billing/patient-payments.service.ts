@@ -148,6 +148,8 @@ export class PatientPaymentsService {
         throw new AppException(ErrorCode.VALIDATION_ERROR, 'Amount must be positive', 400);
     }
     const sum = input.payments.reduce((value, part) => value.add(part.amount), zero());
+    if (sum.lte(0))
+      throw new AppException(ErrorCode.VALIDATION_ERROR, 'Amount must be positive', 400);
     if (sum.gt('999999999999.99'))
       throw new AppException(
         ErrorCode.VALIDATION_ERROR,
@@ -220,10 +222,11 @@ export class PatientPaymentsService {
           (value, invoice) => value.add(invoice.total.sub(invoice.paidTotal)),
           zero(),
         );
-        if (!sum.eq(due))
+        // Qisman to‘lov: to‘lanayotgan summa qarzdan oshmasin; to‘liq bo‘lishi shart emas.
+        if (sum.gt(due))
           throw new AppException(
             ErrorCode.PAYMENT_EXCEEDS_DUE,
-            'Selected balance changed; refresh before paying',
+            'To‘lov summasi tanlangan qarzdan oshib ketdi; sahifani yangilang',
             409,
             [{ due: due.toFixed(2) }],
           );
@@ -286,9 +289,11 @@ export class PatientPaymentsService {
         });
         const remaining = input.payments.map((part) => new Prisma.Decimal(part.amount));
         const applied = [];
+        const paidPerInvoice = new Map<string, Prisma.Decimal>();
         for (const invoice of invoices) {
           let invoiceDue = invoice.total.sub(invoice.paidTotal);
           let paidTotal = invoice.paidTotal;
+          let received = zero();
           for (let index = 0; index < input.payments.length && invoiceDue.gt(0); index++) {
             const part = input.payments[index]!;
             const amount = Prisma.Decimal.min(invoiceDue, remaining[index]!);
@@ -320,15 +325,30 @@ export class PatientPaymentsService {
                 },
               });
             paidTotal = paidTotal.add(amount);
+            received = received.add(amount);
             applied.push({ invoice, payment, paidTotal });
             invoiceDue = invoiceDue.sub(amount);
             remaining[index] = remaining[index]!.sub(amount);
           }
+          if (received.lte(0)) continue;
+          paidPerInvoice.set(invoice.id, received);
           await tx.invoice.update({
             where: { id: invoice.id },
-            data: { paidTotal, status: 'PAID' },
+            data: {
+              paidTotal,
+              status: paidTotal.gte(invoice.total) ? 'PAID' : 'PARTIALLY_PAID',
+            },
           });
         }
+        // Snapshotdagi amount — shu to‘lovda hisobga tushgan summa (qisman bo‘lishi mumkin).
+        const paidSnapshots: InvoiceSnapshot[] = snapshots.map((row) => ({
+          ...row,
+          amount: (paidPerInvoice.get(row.id) ?? zero()).toFixed(2),
+        }));
+        await tx.paymentCheckout.update({
+          where: { id: checkout.id },
+          data: { invoiceSnapshots: paidSnapshots as unknown as Prisma.InputJsonValue },
+        });
         return { checkoutId: checkout.id, applied };
       },
       { timeout: 20000 },
@@ -384,7 +404,14 @@ export class PatientPaymentsService {
           .toFixed(2),
         total: total.toFixed(2),
         paidTotal: priorPaid.add(completed).toFixed(2),
-        due: checkout.total.sub(completed).toFixed(2),
+        // Tanlangan hisoblar bo‘yicha shu to‘lovdan keyin qolgan qarz.
+        due: snapshots
+          .reduce((value, row) => {
+            const before = new Prisma.Decimal(row.paidBefore);
+            const now = new Prisma.Decimal(row.amount);
+            return value.add(new Prisma.Decimal(row.total).sub(before).sub(now));
+          }, zero())
+          .toFixed(2),
       },
       printedAt: checkout.createdAt.toISOString(),
     };

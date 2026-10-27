@@ -100,6 +100,11 @@ export const surgeryQuerySchema = paginationQuerySchema
     admissionId: idSchema.optional(),
     patientId: idSchema.optional(),
     status: z.enum(["PLANNED", "COMPLETED", "CANCELLED"]).optional(),
+    /**
+     * active — jarayonda (rejalashtirilgan yoki yakunlangan lekin to‘liq to‘lanmagan)
+     * archive — yakunlangan + to‘liq to‘langan, yoki bekor qilingan
+     */
+    bucket: z.enum(["active", "archive"]).optional(),
     search: z.string().trim().max(120).optional(),
     from: surgeryDateSchema.optional(),
     to: surgeryDateSchema.optional(),

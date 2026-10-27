@@ -90,7 +90,11 @@ export function ServiceCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[340px] p-0" align="start">
+      <PopoverContent
+        className="w-[340px] p-0"
+        align="start"
+        onWheel={(event) => event.stopPropagation()}
+      >
         <Command shouldFilter={false}>
           <CommandInput
             disabled={disabled}

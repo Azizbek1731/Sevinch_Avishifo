@@ -1,224 +1,165 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
-import { ArrowLeft, Printer } from 'lucide-react';
-import { formatPrescriptionGroup, groupPrescriptionItems } from '@avishifo/shared';
+import { useQuery } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
+import { ArrowLeft, ExternalLink, FileText, Printer, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  ClinicDocumentFooter,
-  ClinicLetterhead,
-  useClinicPrintAssets,
-} from '@/components/print/clinic-letterhead';
+import { EmptyState } from '@/components/empty-state';
+import { PdfDocument } from '@/components/print/pdf-document';
 import { Link } from '@/i18n/routing';
-import { formatDate, formatTz } from '@/lib/dates';
-import { useVisitPrint } from '../hooks';
+import { api } from '@/lib/api-client';
+import { useAuthStore } from '@/stores/auth-store';
 
-function icd10Name(
-  item: { nameUz: string; nameRu: string | null; nameEn: string | null },
-  locale: string,
-): string {
-  if (locale === 'ru' && item.nameRu) return item.nameRu;
-  if (locale === 'en' && item.nameEn) return item.nameEn;
-  return item.nameUz;
-}
-
+/** Same A4 PDF the lab uses — letterhead + Made with AviShifo.uz footer. */
 export function VisitPrint({ visitId }: { visitId: string }) {
   const t = useTranslations('visits');
   const tCommon = useTranslations('common');
   const tr = useTranslations('doctor.clinical');
-  const locale = useLocale();
   const searchParams = useSearchParams();
   const mode = searchParams.get('mode') === 'prescription' ? 'prescription' : 'summary';
   const auto = searchParams.get('auto') === '1';
+  const branchId = useAuthStore((state) => state.activeBranchId);
+  const [preview, setPreview] = useState<{ blob: Blob; url: string } | null>(null);
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const [previewErrorUrl, setPreviewErrorUrl] = useState<string | null>(null);
+  const [printFailed, setPrintFailed] = useState(false);
+  const [autoPrinted, setAutoPrinted] = useState(false);
 
-  const { data: payload, isLoading, isError, refetch } = useVisitPrint(visitId);
-  const printedRef = useRef(false);
-  const printAssets = useClinicPrintAssets(payload?.clinic.logoUrl);
+  const pdfQuery = useQuery({
+    queryKey: ['visits', visitId, 'pdf', mode, branchId],
+    queryFn: async () =>
+      (
+        await api.get<Blob>(`/visits/${visitId}/pdf`, {
+          mode: mode === 'prescription' ? 'prescription' : undefined,
+        })
+      ).data,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
+  });
 
   useEffect(() => {
-    if (auto && payload?.visit.status === 'COMPLETED' && printAssets.ready && !printedRef.current) {
-      const timer = setTimeout(() => {
-        printedRef.current = true;
-        window.print();
-      }, 300);
-      return () => clearTimeout(timer);
+    if (!pdfQuery.data || pdfQuery.isFetching || pdfQuery.isError) return;
+    const url = URL.createObjectURL(pdfQuery.data);
+    setPreview({ blob: pdfQuery.data, url });
+    setPrintFailed(false);
+    return () => URL.revokeObjectURL(url);
+  }, [pdfQuery.data, pdfQuery.isFetching, pdfQuery.isError]);
+
+  const pdfUrl =
+    !pdfQuery.isFetching && !pdfQuery.isError && preview?.blob === pdfQuery.data
+      ? preview?.url
+      : undefined;
+  const ready = Boolean(pdfUrl && loadedUrl === pdfUrl && previewErrorUrl !== pdfUrl);
+  const previewFailed = Boolean(pdfUrl && previewErrorUrl === pdfUrl);
+
+  const onDocumentReady = useCallback(() => {
+    setLoadedUrl(pdfUrl ?? null);
+    setPreviewErrorUrl(null);
+  }, [pdfUrl]);
+  const onDocumentError = useCallback(() => setPreviewErrorUrl(pdfUrl ?? null), [pdfUrl]);
+
+  const print = (): void => {
+    if (!ready) return;
+    try {
+      setPrintFailed(false);
+      window.print();
+    } catch {
+      setPrintFailed(true);
     }
-  }, [auto, payload, printAssets.ready]);
+  };
 
-  if (isLoading) {
-    return (
-      <div className="mx-auto max-w-3xl space-y-4">
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!auto || !ready || autoPrinted) return;
+    const timer = window.setTimeout(() => {
+      setAutoPrinted(true);
+      print();
+    }, 300);
+    return () => window.clearTimeout(timer);
+    // print closes over ready; auto-print once when the PDF pages decode.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto, ready, autoPrinted]);
 
-  if (isError || !payload)
-    return (
-      <div role="alert" className="space-y-3 rounded-xl border p-8">
-        <p>{tr('loadError')}</p>
-        <Button variant="outline" onClick={() => void refetch()}>
-          {tr('refresh')}
-        </Button>
-      </div>
-    );
-  const { visit } = payload;
-  if (visit.status !== 'COMPLETED')
-    return (
-      <div className="space-y-3 rounded-xl border p-8">
-        <p>{tr('confirmBeforePrint')}</p>
-        <Button variant="outline" asChild>
-          <Link href={`/doctor/visits/${visitId}`}>{tCommon('back')}</Link>
-        </Button>
-      </div>
-    );
-  const ultrasound = visit.kind === 'ULTRASOUND';
-
-  const soapBlocks: Array<{ label: string; value: string | null }> = [
-    { label: t('soapFields.subjective'), value: visit.subjective },
-    { label: t('soapFields.objective'), value: visit.objective },
-    { label: t('soapFields.assessmentNote'), value: visit.assessmentNote },
-    { label: t('soapFields.plan'), value: visit.plan },
-  ];
+  const title = mode === 'prescription' ? t('printPrescriptionTitle') : t('printSummaryTitle');
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <div className="flex items-center justify-between gap-2 print:hidden">
-        <Button variant="outline" asChild>
+    <div className="mx-auto max-w-4xl space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <Button variant="ghost" asChild>
           <Link href={`/doctor/visits/${visitId}`}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             {tCommon('back')}
           </Link>
         </Button>
-        <Button onClick={() => window.print()} disabled={!printAssets.ready}>
-          <Printer className="mr-2 h-4 w-4" />
-          {tCommon('print')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {pdfUrl ? (
+            <Button variant="outline" asChild>
+              <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="mr-2 h-4 w-4" />
+                {t('printOpenPdf')}
+              </a>
+            </Button>
+          ) : null}
+          <Button disabled={!ready} onClick={print}>
+            <Printer className="mr-2 h-4 w-4" />
+            {tCommon('print')}
+          </Button>
+        </div>
       </div>
 
-      <div className="print-area print-flow clinic-document-print clinical-report-print rounded-md border bg-white p-8 text-black shadow-sm">
-        <ClinicLetterhead clinic={payload.clinic} onLogoReady={printAssets.onReady} />
+      <p className="text-sm text-muted-foreground print:hidden">{t('printPdfHint')}</p>
 
-        <h1 className="mb-4 border-b border-[#dce3ed] pb-3 text-center text-lg font-bold uppercase text-[#173f91]">
-          {ultrasound
-            ? visit.reportTitle || tr('ultrasoundReport')
-            : mode === 'prescription'
-              ? t('printPrescriptionTitle')
-              : t('printSummaryTitle')}
-        </h1>
-
-        <section className="mb-5 grid grid-cols-2 gap-x-8 gap-y-1 rounded border border-[#dce3ed] px-3 py-2.5 text-sm">
-          <p>
-            <span className="font-semibold">{tCommon('patient')}:</span> {payload.patient.fullName}
-          </p>
-          <p>
-            <span className="font-semibold">{t('mrn')}:</span> {payload.patient.mrn}
-          </p>
-          {payload.patient.dob ? (
-            <p>
-              <span className="font-semibold">{t('dob')}:</span> {formatDate(payload.patient.dob)}
+      {pdfQuery.isError ? (
+        <EmptyState
+          icon={FileText}
+          title={t('pdfFailed')}
+          description={tr('confirmBeforePrint')}
+          action={
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => void pdfQuery.refetch()}>
+                <RotateCw className="mr-2 h-4 w-4" />
+                {t('printRetry')}
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href={`/doctor/visits/${visitId}`}>{tCommon('back')}</Link>
+              </Button>
+            </div>
+          }
+        />
+      ) : !pdfUrl ? (
+        <div className="space-y-3" role="status">
+          <p className="text-sm text-muted-foreground">{t('printPreparing')}</p>
+          <Skeleton className="h-[70vh] w-full" />
+        </div>
+      ) : (
+        <>
+          {previewFailed || printFailed ? (
+            <p
+              role="alert"
+              className="rounded-md border border-warning/50 bg-warning/5 p-3 text-sm print:hidden"
+            >
+              {t(previewFailed ? 'printPreviewFailed' : 'printFailed')}
+            </p>
+          ) : !ready ? (
+            <p role="status" className="text-sm text-muted-foreground print:hidden">
+              {t('printPreparing')}
             </p>
           ) : null}
-          <p>
-            <span className="font-semibold">{tCommon('date')}:</span>{' '}
-            {visit.startedAt ? formatTz(visit.startedAt) : '—'}
-          </p>
-        </section>
-
-        {ultrasound ? (
-          <div className="mb-6 whitespace-pre-wrap break-words font-serif text-base leading-7">
-            {visit.reportBody}
-          </div>
-        ) : null}
-
-        {mode === 'summary' && !ultrasound ? (
-          <>
-            {soapBlocks.map((block) =>
-              block.value ? (
-                <section key={block.label} className="mb-4">
-                  <h2 className="mb-1 text-sm font-bold">{block.label}</h2>
-                  <p className="whitespace-pre-wrap text-sm">{block.value}</p>
-                </section>
-              ) : null,
-            )}
-
-            {visit.diagnoses.length > 0 ? (
-              <section className="mb-4">
-                <h2 className="mb-1 text-sm font-bold">{t('diagnoses')}</h2>
-                <ul className="space-y-0.5 text-sm">
-                  {visit.diagnoses.map((dx) => (
-                    <li key={dx.id}>
-                      <span className="font-mono font-semibold">{dx.icd10.code}</span> —{' '}
-                      {icd10Name(dx.icd10, locale)}
-                      {dx.isPrimary ? ` (${t('primary')})` : ''}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-          </>
-        ) : null}
-
-        {!ultrasound && visit.prescriptions.length > 0 ? (
-          <section className="mb-4">
-            <h2 className="mb-1 text-sm font-bold">{t('prescriptions')}</h2>
-            <div className="space-y-4 text-sm">
-              {groupPrescriptionItems(visit.prescriptions).map((group) => {
-                const lines = formatPrescriptionGroup(group, {
-                  days: (count) => t('days', { count }),
-                  dripUnit: t('rx.dripUnit'),
-                });
-                return (
-                  <div
-                    key={group[0]!.id}
-                    className="prescription-group whitespace-pre-wrap break-words"
-                  >
-                    {lines.components.map((component, index) => (
-                      <p key={group[index]!.id} className={index === 0 ? 'font-semibold' : 'pl-7'}>
-                        {index === 0 ? 'Rp.: ' : ''}
-                        {component}
-                      </p>
-                    ))}
-                    {lines.dtd ? <p className="pl-7">{lines.dtd}</p> : null}
-                    {lines.signature ? <p className="pl-7">S.: {lines.signature}</p> : null}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        ) : mode === 'prescription' && !ultrasound ? (
-          <p className="mb-4 text-sm text-muted-foreground">{t('noPrescriptions')}</p>
-        ) : null}
-
-        {!ultrasound && visit.physiotherapy ? (
-          <section className="mb-4">
-            <h2 className="mb-1 text-sm font-bold">{t('rx.physiotherapy')}</h2>
-            <p className="whitespace-pre-wrap break-words text-sm">{visit.physiotherapy}</p>
-          </section>
-        ) : null}
-
-        {mode === 'summary' && visit.nextVisitAt ? (
-          <p className="mb-4 text-sm">
-            <span className="font-semibold">{t('nextVisit')}:</span> {formatDate(visit.nextVisitAt)}
-          </p>
-        ) : null}
-
-        <footer className="mt-10 flex items-end justify-between text-sm">
-          <div>
-            <p className="font-semibold">{payload.doctor.fullName}</p>
-            {payload.doctor.specialty ? <p>{payload.doctor.specialty}</p> : null}
-          </div>
-          <div className="w-56">
-            <div className="border-b border-black" />
-            <p className="mt-1 text-center text-xs">{t('signature')}</p>
-          </div>
-        </footer>
-        <ClinicDocumentFooter clinic={payload.clinic} />
-      </div>
+          <PdfDocument
+            key={pdfUrl}
+            blob={pdfQuery.data!}
+            title={title}
+            onReady={onDocumentReady}
+            onError={onDocumentError}
+          />
+        </>
+      )}
     </div>
   );
 }

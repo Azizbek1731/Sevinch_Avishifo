@@ -27,6 +27,7 @@ import {
   FINAL_LAB_STATUSES,
   isLabInvoicePaid,
   labInvoiceNetPaid,
+  isLabOrderReadyToSign,
   isLabResultComplete,
   lockLabOrder,
 } from './lab-workflow';
@@ -538,6 +539,80 @@ export class LabService {
 
   // ------------------------------------------------------------ orders
 
+  /**
+   * Inpatient lab from the stay charge ledger: open work without a cashier
+   * invoice — payment happens at discharge with the rest of the account.
+   * Multiple stay lines share one open order so discharge can reattach it.
+   */
+  async prepareInpatientOrderForCharge(
+    tx: TenantTransactionClient,
+    input: {
+      patientId: string;
+      branchId: string;
+      serviceId: string;
+      visitId?: string | null;
+      orderedById?: string | null;
+    },
+  ): Promise<{ id: string; orderNumber: string } | null> {
+    const clinicId = TenantContext.requireClinicId();
+    const labService = await tx.service.findFirst({
+      where: { id: input.serviceId, isActive: true, category: { kind: 'LAB' } },
+      select: { id: true },
+    });
+    if (!labService) return null;
+    const test = await tx.labTest.findFirst({
+      where: { serviceId: input.serviceId, isActive: true },
+      select: { id: true },
+    });
+    if (!test) {
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'Every active laboratory service must have an active test before it can be billed',
+        400,
+      );
+    }
+    const open = await tx.labOrder.findFirst({
+      where: {
+        patientId: input.patientId,
+        branchId: input.branchId,
+        invoiceId: null,
+        status: { in: ['ORDERED', 'SPECIMEN_COLLECTED', 'IN_PROGRESS'] },
+      },
+      include: { items: { select: { labTestId: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (open) {
+      if (!open.items.some((item) => item.labTestId === test.id)) {
+        await tx.labOrderItem.create({
+          data: { clinicId, orderId: open.id, labTestId: test.id },
+        });
+      }
+      return { id: open.id, orderNumber: open.orderNumber };
+    }
+    const referringDoctor = input.orderedById
+      ? await tx.user.findFirst({
+          where: { id: input.orderedById, clinicId, role: 'DOCTOR', deletedAt: null },
+          select: { id: true, fullName: true },
+        })
+      : null;
+    const orderNumber = await this.sequence.nextFormatted('lab', 'L');
+    return tx.labOrder.create({
+      data: {
+        clinicId,
+        invoiceId: null,
+        patientId: input.patientId,
+        branchId: input.branchId,
+        visitId: input.visitId ?? null,
+        orderedById: input.orderedById ?? null,
+        referringDoctorUserId: referringDoctor?.id ?? null,
+        referringDoctorName: referringDoctor?.fullName ?? null,
+        orderNumber,
+        items: { create: [{ clinicId, labTestId: test.id }] },
+      },
+      select: { id: true, orderNumber: true },
+    });
+  }
+
   /** Idempotent invoice-to-laboratory handoff, inside the cashier invoice transaction. */
   async prepareOrderForInvoice(
     tx: TenantTransactionClient,
@@ -575,6 +650,40 @@ export class LabService {
       );
     }
     const clinicId = TenantContext.requireClinicId();
+    const testIds = new Set(tests.map((test) => test.id));
+    // Reattach inpatient lab work opened before the cashier invoice existed.
+    const orphans = await tx.labOrder.findMany({
+      where: {
+        patientId: invoice.patientId,
+        branchId: invoice.branchId,
+        invoiceId: null,
+      },
+      include: { items: { select: { labTestId: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+    const orphan = orphans.find(
+      (order) =>
+        tests.every((test) => order.items.some((item) => item.labTestId === test.id)) ||
+        order.items.every((item) => testIds.has(item.labTestId)),
+    );
+    if (orphan) {
+      for (const test of tests) {
+        if (!orphan.items.some((item) => item.labTestId === test.id)) {
+          await tx.labOrderItem.create({
+            data: { clinicId, orderId: orphan.id, labTestId: test.id },
+          });
+        }
+      }
+      return tx.labOrder.update({
+        where: { id: orphan.id },
+        data: {
+          invoiceId: invoice.id,
+          visitId: invoice.visitId ?? orphan.visitId,
+        },
+        select: { id: true, orderNumber: true },
+      });
+    }
     const orderNumber = await this.sequence.nextFormatted('lab', 'L');
     // The bill creator is server-controlled. Never trust a doctor ID from an order payload.
     const referringDoctor = invoice.createdById
@@ -653,6 +762,109 @@ export class LabService {
         'Laboratory service has no current price',
         400,
       );
+    const activeStay = await this.prisma.db.admission.findFirst({
+      where: {
+        patientId: input.patientId,
+        branchId: input.branchId,
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+      orderBy: { admittedAt: 'desc' },
+    });
+    // Inpatient: write to the stay account (PENDING) and open lab work without
+    // a cashier invoice — settled together at discharge.
+    if (activeStay) {
+      const createInpatient = async (tx: TenantTransactionClient) => {
+        await tx.$queryRaw`SELECT "id" FROM "Admission" WHERE "id" = ${activeStay.id} AND "clinicId" = ${clinicId} FOR UPDATE`;
+        for (const test of tests) {
+          await tx.chargeItem.create({
+            data: {
+              clinicId,
+              branchId: input.branchId,
+              patientId: input.patientId,
+              admissionId: activeStay.id,
+              visitId: input.visitId ?? null,
+              serviceId: test.serviceId!,
+              title: test.service!.name as Prisma.InputJsonValue,
+              date: new Date(),
+              quantity: 1,
+              unitPrice: new Prisma.Decimal(prices.get(test.serviceId!)!),
+              createdById: input.orderedById ?? null,
+            },
+          });
+        }
+        const open = await tx.labOrder.findFirst({
+          where: {
+            patientId: input.patientId,
+            branchId: input.branchId,
+            invoiceId: null,
+            status: { in: ['ORDERED', 'SPECIMEN_COLLECTED', 'IN_PROGRESS'] },
+          },
+          include: { items: { select: { labTestId: true } } },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (open) {
+          for (const test of tests) {
+            if (!open.items.some((item) => item.labTestId === test.id)) {
+              await tx.labOrderItem.create({
+                data: { clinicId, orderId: open.id, labTestId: test.id },
+              });
+            }
+          }
+          if (input.physiologicalState)
+            await tx.labOrder.update({
+              where: { id: open.id },
+              data: { physiologicalState: input.physiologicalState },
+            });
+          return {
+            order: { id: open.id, orderNumber: open.orderNumber },
+            invoiceId: null as string | null,
+          };
+        }
+        const referringDoctor = input.orderedById
+          ? await tx.user.findFirst({
+              where: { id: input.orderedById, clinicId, role: 'DOCTOR', deletedAt: null },
+              select: { id: true, fullName: true },
+            })
+          : null;
+        const orderNumber = await this.sequence.nextFormatted('lab', 'L');
+        const order = await tx.labOrder.create({
+          data: {
+            clinicId,
+            invoiceId: null,
+            patientId: input.patientId,
+            branchId: input.branchId,
+            visitId: input.visitId ?? null,
+            orderedById: input.orderedById ?? null,
+            referringDoctorUserId: referringDoctor?.id ?? null,
+            referringDoctorName: referringDoctor?.fullName ?? null,
+            orderNumber,
+            physiologicalState: input.physiologicalState ?? null,
+            items: { create: tests.map((test) => ({ clinicId, labTestId: test.id })) },
+          },
+          select: { id: true, orderNumber: true },
+        });
+        return { order, invoiceId: null as string | null };
+      };
+      const created = outerTx
+        ? await createInpatient(outerTx)
+        : await this.prisma.db.$transaction(createInpatient);
+      if (outerTx) return created.order;
+      await this.audit.log({
+        action: AuditAction.CREATE,
+        entity: 'LabOrder',
+        entityId: created.order.id,
+        after: {
+          invoiceId: null,
+          admissionId: activeStay.id,
+          patientId: input.patientId,
+          testIds: input.testIds,
+          source: 'INPATIENT_LAB',
+        },
+      });
+      await this.emitOrderUpdated(created.order.id);
+      return created.order;
+    }
     // This is the same clinic-controlled invoice number format as cashier invoices.
     const clinic = await this.prisma.unscoped.clinic.findUnique({
       where: { id: clinicId },
@@ -915,13 +1127,13 @@ export class LabService {
       await lockLabOrder(tx, id);
       const current = await this.requireOrder(id, tx);
       if (
-        current.status !== LabOrderStatus.RESULTED ||
-        current.items.length === 0 ||
-        !current.items.every(isLabResultComplete)
+        (current.status !== LabOrderStatus.RESULTED &&
+          current.status !== LabOrderStatus.IN_PROGRESS) ||
+        !isLabOrderReadyToSign(current.items)
       ) {
         throw new AppException(
           ErrorCode.LAB_INVALID_TRANSITION,
-          'Complete every test or select its uploaded report before signing',
+          'Enter at least one result or attach a report before signing',
           409,
         );
       }

@@ -19,6 +19,8 @@ import { paginated, skipTake, type PaginatedResult } from '../../common/paginati
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { AuditService } from '../../core/audit/audit.service';
+import { randomUUID } from 'node:crypto';
+import { ClinicalOrdersService } from '../clinical-orders/clinical-orders.service';
 import { LabService } from '../lab/lab.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -71,7 +73,16 @@ type VisitDetailRow = Prisma.VisitGetPayload<{
     vitals: true;
     diagnoses: { include: { icd10: true } };
     prescriptions: { include: { drug: true } };
-    referrals: true;
+    referrals: {
+      include: {
+        clinicalOrder: {
+          include: {
+            initialInvoice: { include: { refunds: true; lines: true } };
+            visit: { select: { status: true } };
+          };
+        };
+      };
+    };
     patient: true;
     doctor: { include: { staffProfile: true } };
   };
@@ -88,6 +99,7 @@ export class VisitsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly labService: LabService,
+    private readonly clinicalOrders: ClinicalOrdersService,
     private readonly notifications: NotificationsService,
     private readonly config: AppConfigService,
     private readonly reportPdf: VisitReportPdfService,
@@ -214,7 +226,17 @@ export class VisitsService {
         vitals: true,
         diagnoses: { include: { icd10: true }, orderBy: { createdAt: 'asc' } },
         prescriptions: { include: { drug: true }, orderBy: PRESCRIPTION_ORDER },
-        referrals: { orderBy: { createdAt: 'asc' } },
+        referrals: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            clinicalOrder: {
+              include: {
+                initialInvoice: { include: { refunds: true, lines: true } },
+                visit: { select: { status: true } },
+              },
+            },
+          },
+        },
         patient: true,
         doctor: { include: { staffProfile: true } },
       },
@@ -285,12 +307,51 @@ export class VisitsService {
   }
 
   private toReferral(r: VisitDetailRow['referrals'][number]): Record<string, unknown> {
+    const order = r.clinicalOrder;
+    let clinicalOrder: Record<string, unknown> | null = null;
+    if (order) {
+      const invoice = order.initialInvoice;
+      const refunds = invoice.refunds.reduce(
+        (sum, refund) => sum.add(refund.amount),
+        new Prisma.Decimal(0),
+      );
+      const paidTotal = invoice.paidTotal.sub(refunds);
+      const fullyPaid = invoice.status === 'PAID' && paidTotal.gte(invoice.total);
+      let status: string = 'WAITING_PAYMENT';
+      if (order.visit?.status === 'COMPLETED') status = 'COMPLETED';
+      else if (
+        order.visit?.status === 'CANCELLED' ||
+        ['CANCELLED', 'REFUNDED'].includes(invoice.status)
+      )
+        status = 'CANCELLED';
+      else if (order.visitId) status = 'IN_PROGRESS';
+      else if (fullyPaid) status = 'READY';
+      clinicalOrder = {
+        id: order.id,
+        kind: order.kind,
+        status,
+        visitId: order.visitId,
+        doctorUserId: order.doctorUserId,
+        services: invoice.lines.map((line) => ({
+          id: line.serviceId ?? line.id,
+          title: line.title,
+        })),
+        invoice: {
+          id: invoice.id,
+          number: invoice.number,
+          status: invoice.status,
+          due: Prisma.Decimal.max(0, invoice.total.sub(paidTotal)).toFixed(2),
+        },
+      };
+    }
     return {
       id: r.id,
       type: r.type,
       targetSpecialty: r.targetSpecialty,
       targetDoctorUserId: r.targetDoctorUserId,
       labOrderId: r.labOrderId,
+      clinicalOrderId: r.clinicalOrderId,
+      clinicalOrder,
       appointmentId: r.appointmentId,
       note: r.note,
       createdAt: iso(r.createdAt),
@@ -1099,6 +1160,7 @@ export class VisitsService {
 
     const created = await this.edit(id, async (tx) => {
       let labOrderId: string | undefined;
+      let clinicalOrderId: string | undefined;
       if (dto.type === ReferralType.LAB) {
         if (!dto.labTestIds?.length)
           throw new AppException(
@@ -1118,26 +1180,75 @@ export class VisitsService {
         );
         labOrderId = order.id;
       }
+      if (dto.type === ReferralType.ULTRASOUND || dto.type === ReferralType.SPECIALIST) {
+        if (!dto.serviceIds?.length || !dto.targetDoctorUserId)
+          throw new AppException(
+            ErrorCode.VALIDATION_ERROR,
+            'serviceIds and targetDoctorUserId are required for this referral',
+            400,
+          );
+        const kind = dto.type === ReferralType.ULTRASOUND ? 'ULTRASOUND' : 'CONSULTATION';
+        const order = await this.clinicalOrders.createFromReferral(
+          {
+            patientId: visit.patientId,
+            branchId: visit.branchId,
+            doctorUserId: dto.targetDoctorUserId,
+            serviceIds: dto.serviceIds,
+            kind,
+            note: dto.note,
+            orderedById: user.id,
+            requestKey: `${kind === 'ULTRASOUND' ? 'uzi' : 'doc'}-ref:${visit.id}:${randomUUID()}`,
+          },
+          tx,
+        );
+        clinicalOrderId = order.id;
+      }
+      let targetSpecialty = dto.type === ReferralType.SPECIALIST ? dto.targetSpecialty : undefined;
+      if (dto.type === ReferralType.SPECIALIST && dto.targetDoctorUserId && !targetSpecialty?.trim()) {
+        const target = await this.prisma.unscoped.user.findFirst({
+          where: { id: dto.targetDoctorUserId },
+          select: { staffProfile: { select: { specialty: true } }, fullName: true },
+        });
+        targetSpecialty = target?.staffProfile?.specialty ?? target?.fullName ?? undefined;
+      }
       return tx.referral.create({
         data: {
           clinicId: TenantContext.requireClinicId(),
           visitId: id,
           type: dto.type,
-          targetSpecialty: dto.type === ReferralType.SPECIALIST ? dto.targetSpecialty : undefined,
+          targetSpecialty,
           targetDoctorUserId:
-            dto.type === ReferralType.SPECIALIST ? dto.targetDoctorUserId : undefined,
+            dto.type === ReferralType.SPECIALIST || dto.type === ReferralType.ULTRASOUND
+              ? dto.targetDoctorUserId
+              : undefined,
           labOrderId,
+          clinicalOrderId,
           note: dto.note,
+        },
+        include: {
+          clinicalOrder: {
+            include: {
+              initialInvoice: { include: { refunds: true, lines: true } },
+              visit: { select: { status: true } },
+            },
+          },
         },
       });
     });
     if (created.labOrderId) await this.labService.announceReferralOrder(created.labOrderId);
+    if (created.clinicalOrderId)
+      await this.clinicalOrders.announceReferralOrder(created.clinicalOrderId);
 
     await this.audit.log({
       action: AuditAction.CREATE,
       entity: 'Referral',
       entityId: created.id,
-      after: { visitId: id, type: dto.type, labOrderId: created.labOrderId ?? null },
+      after: {
+        visitId: id,
+        type: dto.type,
+        labOrderId: created.labOrderId ?? null,
+        clinicalOrderId: created.clinicalOrderId ?? null,
+      },
     });
 
     return this.toReferral(created);
@@ -1242,7 +1353,11 @@ export class VisitsService {
     };
   }
 
-  async pdf(id: string, user: AuthUser): Promise<Buffer> {
+  async pdf(
+    id: string,
+    user: AuthUser,
+    mode: 'summary' | 'prescription' = 'summary',
+  ): Promise<Buffer> {
     const visit = await this.requireVisit(id, user);
     if (visit.status !== 'COMPLETED')
       throw new AppException(
@@ -1262,7 +1377,7 @@ export class VisitsService {
           select: { fullName: true },
         })
       : null;
-    return this.reportPdf.render(buildVisitReportPdfData(visit, clinic, author), 'uz');
+    return this.reportPdf.render(buildVisitReportPdfData(visit, clinic, author), 'uz', mode);
   }
 
   // ------------------------------------------------------------ visit templates

@@ -13,6 +13,16 @@ export function useClinicalOrders(query: ClinicalOrderQuery) {
     refetchInterval: 15_000,
   });
 }
+
+export function useClinicalStatusCounts(kind: 'CONSULTATION' | 'ULTRASOUND' = 'ULTRASOUND') {
+  const branchId = useAuthStore((s) => s.activeBranchId);
+  return useQuery({
+    queryKey: ['clinical-orders', 'status-counts', branchId, kind],
+    queryFn: async () => (await clinicalOrdersApi.statusCounts(kind)).data,
+    enabled: Boolean(branchId),
+    refetchInterval: 15_000,
+  });
+}
 export function useClinicalOrder(id: string | null | undefined) {
   return useQuery({
     queryKey: ['clinical-orders', id],

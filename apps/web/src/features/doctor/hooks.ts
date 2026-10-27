@@ -86,11 +86,12 @@ export function useMyVisits(doctorUserId: string | null, page: number) {
   });
 }
 
-export function useVisit(visitId: string) {
+export function useVisit(visitId: string, opts?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: ['visits', visitId],
     queryFn: () => doctorApi.getVisit(visitId),
     select: (res) => res.data,
+    refetchInterval: opts?.refetchInterval,
   });
 }
 
@@ -289,6 +290,7 @@ export function useAddReferral(visitId: string) {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: ['lab-orders'] });
         void queryClient.invalidateQueries({ queryKey: ['lab'] });
+        void queryClient.invalidateQueries({ queryKey: ['clinical-orders'] });
         void queryClient.invalidateQueries({ queryKey: ['invoices'] });
         void queryClient.invalidateQueries({ queryKey: ['reports', 'lab-referrals'] });
       },

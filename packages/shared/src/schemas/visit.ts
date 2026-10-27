@@ -91,13 +91,56 @@ export const replacePrescriptionsSchema = z
   });
 export type ReplacePrescriptionsInput = z.infer<typeof replacePrescriptionsSchema>;
 
-export const addReferralSchema = z.object({
-  type: z.nativeEnum(ReferralType),
-  targetSpecialty: z.string().min(1).optional(),
-  targetDoctorUserId: idSchema.optional(),
-  labTestIds: z.array(idSchema).optional(),
-  note: z.string().optional(),
-});
+export const addReferralSchema = z
+  .object({
+    type: z.nativeEnum(ReferralType),
+    targetSpecialty: z.string().min(1).optional(),
+    targetDoctorUserId: idSchema.optional(),
+    labTestIds: z.array(idSchema).min(1).optional(),
+    serviceIds: z.array(idSchema).min(1).optional(),
+    note: z.string().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.type === ReferralType.LAB && !value.labTestIds?.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['labTestIds'],
+        message: 'labTestIds are required for a LAB referral',
+      });
+    }
+    if (value.type === ReferralType.ULTRASOUND) {
+      if (!value.serviceIds?.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['serviceIds'],
+          message: 'serviceIds are required for an ULTRASOUND referral',
+        });
+      }
+      if (!value.targetDoctorUserId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['targetDoctorUserId'],
+          message: 'targetDoctorUserId is required for an ULTRASOUND referral',
+        });
+      }
+    }
+    if (value.type === ReferralType.SPECIALIST) {
+      if (!value.serviceIds?.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['serviceIds'],
+          message: 'serviceIds are required for a SPECIALIST referral',
+        });
+      }
+      if (!value.targetDoctorUserId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['targetDoctorUserId'],
+          message: 'targetDoctorUserId is required for a SPECIALIST referral',
+        });
+      }
+    }
+  });
 export type AddReferralInput = z.infer<typeof addReferralSchema>;
 
 /** Audited edit of a locked visit — appends a VisitAmendment. */

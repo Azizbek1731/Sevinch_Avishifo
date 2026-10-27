@@ -9,6 +9,7 @@ import {
   Building2,
   ClipboardList,
   CreditCard,
+  Activity,
   FlaskConical,
   LayoutDashboard,
   Menu,
@@ -68,6 +69,12 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'invoices', href: '/invoices', icon: Receipt, permissions: ['invoices.read'] },
   { key: 'expenses', href: '/expenses', icon: Banknote, permissions: ['expenses.read'] },
   { key: 'lab', href: '/lab', icon: FlaskConical, permissions: ['lab.orders.read'] },
+  {
+    key: 'uzi',
+    href: '/uzi',
+    icon: Activity,
+    permissions: ['visits.write', 'invoices.write'],
+  },
   { key: 'services', href: '/services', icon: Tags, permissions: ['services.write'] },
   { key: 'staff', href: '/staff', icon: UserRound, permissions: ['staff.read'] },
   {
