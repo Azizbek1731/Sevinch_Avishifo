@@ -31,6 +31,8 @@
     "db:seed": "pnpm --filter @avishifo/api db:seed",
     "db:seed-surgery-demo": "pnpm --filter @avishifo/api exec tsx prisma/seed-surgery-demo.ts",
     "db:seed-prescription-directory": "pnpm --filter @avishifo/api exec tsx prisma/seed-prescription-directory.ts",
+    "db:clean-go-live": "pnpm --filter @avishifo/api db:clean-go-live",
+    "db:wipe-usage": "pnpm --filter @avishifo/api db:wipe-usage",
     "db:studio": "pnpm --filter @avishifo/api db:studio",
     "keys:generate": "node scripts/generate-keys.mjs",
     "logo:export": "node scripts/export-logo.mjs .",

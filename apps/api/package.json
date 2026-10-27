@@ -17,6 +17,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "demo:seed": "tsx prisma/seed-demo-clinic.ts",
     "db:reset-platform": "tsx prisma/reset.ts",
+    "db:clean-go-live": "tsx prisma/clean-for-go-live.ts",
+    "db:wipe-usage": "tsx prisma/wipe-operational-data.ts",
     "db:studio": "prisma studio"
   },
   "prisma": {
