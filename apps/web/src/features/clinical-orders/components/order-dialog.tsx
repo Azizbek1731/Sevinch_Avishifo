@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocale, useTranslations } from 'next-intl';
@@ -15,8 +15,10 @@ import {
   toTiyin,
   type CreateClinicalOrderInput,
   type AddClinicalServicesInput,
+  type MoneyString,
 } from '@avishifo/shared';
 import { createId } from '@/lib/id';
+import { useRouter } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -26,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -37,14 +40,22 @@ import {
 } from '@/components/ui/select';
 import { PatientCombobox } from '@/features/billing/components/patient-combobox';
 import { ServiceCombobox, serviceName } from '@/features/billing/components/service-combobox';
-import { billingApi, type PatientBrief, type ServiceOption } from '@/features/billing/api';
+import {
+  billingApi,
+  sanitizeMoney,
+  type PatientBrief,
+  type ServiceOption,
+} from '@/features/billing/api';
+import { identifyInvoiceRequest, type InvoiceRequestIdentity } from '@/features/billing/invoice-request';
 import { searchServiceCatalogue } from '@/features/billing/service-catalogue';
 import { useApiErrorToast } from '@/features/reception/hooks';
 import { useAuthStore } from '@/stores/auth-store';
 import { clinicalOrdersApi, type ClinicalKind } from '../api';
 import {
+  consultationSearchQueries,
   findDoctorConsultationService,
   isUziSpecialty,
+  manualConsultationTitle,
   type DoctorOption,
 } from '../doctor-matching';
 import { useInvalidateClinicalOrders } from '../hooks';
@@ -56,6 +67,8 @@ function ServiceSelection({
   excludeIds = [],
   locked = false,
   emptyHint,
+  doctor = null,
+  requireDoctor = false,
 }: {
   kind: ClinicalKind;
   services: ServiceOption[];
@@ -64,10 +77,14 @@ function ServiceSelection({
   /** When true, doctor already owns the matched consultation row — no extra picker. */
   locked?: boolean;
   emptyHint?: string;
+  doctor?: DoctorOption | null;
+  /** Ultrasound catalogues are scoped to the selected doctor. */
+  requireDoctor?: boolean;
 }) {
   const t = useTranslations('doctor.clinical');
   const locale = useLocale();
   const total = services.reduce((sum, service) => sum + toTiyin(service.currentPrice ?? '0'), 0n);
+  const pickerDisabled = requireDoctor && !doctor;
   return (
     <div className="space-y-3">
       <Label>{t('services')}</Label>
@@ -75,6 +92,8 @@ function ServiceSelection({
         <ServiceCombobox
           value={null}
           kind={kind}
+          doctor={kind === 'ULTRASOUND' ? doctor : null}
+          disabled={pickerDisabled}
           excludeIds={[...excludeIds, ...services.map((service) => service.id)]}
           onChange={(service) => {
             if (!services.some((item) => item.id === service.id)) onChange([...services, service]);
@@ -132,11 +151,18 @@ export function ClinicalOrderDialog({
 }) {
   const t = useTranslations('doctor.clinical');
   const tc = useTranslations('common');
+  const tb = useTranslations('billing');
+  const queryClient = useQueryClient();
+  const router = useRouter();
   const branchId = useAuthStore((s) => s.activeBranchId);
   const userId = useAuthStore((s) => s.user?.id);
   const [patient, setPatient] = useState<PatientBrief | null>(fixedPatient ?? null);
   const [services, setServices] = useState<ServiceOption[]>([]);
+  const [manualTitle, setManualTitle] = useState('');
+  const [manualPrice, setManualPrice] = useState('');
+  const [manualOpen, setManualOpen] = useState(false);
   const identity = useRef<{ fingerprint: string; key: string } | null>(null);
+  const manualIdentity = useRef<InvoiceRequestIdentity | null>(null);
   const locale = useLocale();
   const doctors = useQuery({
     queryKey: ['clinical-orders', 'doctors', branchId, userId],
@@ -159,30 +185,69 @@ export function ClinicalOrderDialog({
       { shouldValidate: true },
     );
   };
+  const clearManual = () => {
+    setManualOpen(false);
+    setManualTitle('');
+    setManualPrice('');
+    manualIdentity.current = null;
+  };
+  const selectedDoctor =
+    (doctorOptions.find((item) => item.id === form.watch('doctorUserId')) as
+      | DoctorOption
+      | undefined) ?? null;
+
   const selectDoctor = async (doctorId: string) => {
     form.setValue('doctorUserId', doctorId, { shouldValidate: true });
+    // Switching UZI doctor must drop the previous doctor's examinations.
+    if (kind === 'ULTRASOUND') {
+      applyServices([]);
+      clearManual();
+      return;
+    }
     if (kind !== 'CONSULTATION') return;
     const doctor = doctorOptions.find((item) => item.id === doctorId) as DoctorOption | undefined;
     if (!doctor) {
       applyServices([]);
+      clearManual();
       return;
     }
     try {
-      const catalogue = await searchServiceCatalogue(billingApi.searchServices, doctor.fullName, {
-        kind: 'CONSULTATION',
-      });
+      const seen = new Set<string>();
+      const catalogue: ServiceOption[] = [];
+      for (const query of consultationSearchQueries(doctor)) {
+        const page = await searchServiceCatalogue(billingApi.searchServices, query, {
+          kind: 'CONSULTATION',
+        });
+        for (const service of page) {
+          if (seen.has(service.id)) continue;
+          seen.add(service.id);
+          catalogue.push(service);
+        }
+      }
       const match = findDoctorConsultationService(catalogue, doctor, locale);
-      applyServices(match ? [match] : []);
-      if (!match) toast.error(t('doctorServiceMissing'));
+      if (match) {
+        applyServices([match]);
+        clearManual();
+        return;
+      }
+      applyServices([]);
+      setManualOpen(true);
+      setManualTitle(manualConsultationTitle(doctor));
+      setManualPrice('');
+      toast.message(t('doctorServiceMissing'), { description: t('manualFallbackHint') });
     } catch {
       applyServices([]);
-      toast.error(t('doctorServiceMissing'));
+      setManualOpen(true);
+      setManualTitle(manualConsultationTitle(doctor));
+      setManualPrice('');
+      toast.message(t('doctorServiceMissing'), { description: t('manualFallbackHint') });
     }
   };
   useEffect(() => {
     if (!open) return;
     setPatient(fixedPatient ?? null);
     setServices([]);
+    clearManual();
     identity.current = null;
     form.reset({
       patientId: fixedPatient?.id ?? '',
@@ -204,7 +269,70 @@ export function ClinicalOrderDialog({
       onOpenChange(false);
     },
   });
-  const submit = form.handleSubmit((values) => {
+  const createManual = useMutation({
+    mutationFn: async () => {
+      if (!branchId || !patient || !selectedDoctor) throw new Error('missing');
+      const unitPrice = (sanitizeMoney(manualPrice) || '0') as MoneyString;
+      const title = manualTitle.trim();
+      if (!title) throw new Error('title');
+      if (toTiyin(unitPrice) <= 0n) throw new Error('price');
+      const note = form.getValues('note')?.trim();
+      const payload = {
+        patientId: patient.id,
+        branchId,
+        settle: 'DEBT' as const,
+        cashierOnly: true as const,
+        ...(note ? { note } : {}),
+        lines: [
+          {
+            title,
+            quantity: 1,
+            unitPrice,
+            discount: '0' as MoneyString,
+            performerUserId: selectedDoctor.id,
+          },
+        ],
+      };
+      manualIdentity.current = identifyInvoiceRequest(payload, manualIdentity.current);
+      return billingApi.quickInvoice({
+        ...payload,
+        idempotencyKey: manualIdentity.current.key,
+      });
+    },
+    onError,
+    onSuccess: (res) => {
+      const invoice = res.data.invoice;
+      toast.success(t('manualSent', { number: invoice.number }), {
+        action: {
+          label: tb('quick.viewInvoice'),
+          onClick: () => router.push(`/invoices/${invoice.id}`),
+        },
+      });
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      void queryClient.invalidateQueries({ queryKey: ['patient-checkout'] });
+      invalidate();
+      manualIdentity.current = null;
+      onOpenChange(false);
+    },
+  });
+  const busy = create.isPending || createManual.isPending;
+  const unitPrice = sanitizeMoney(manualPrice) || '0';
+  let manualTotalLabel = formatUZS('0');
+  try {
+    manualTotalLabel = formatUZS(fromTiyin(toTiyin(unitPrice as MoneyString)));
+  } catch {
+    manualTotalLabel = formatUZS('0');
+  }
+  const canSubmitManual =
+    Boolean(branchId && patient?.id && selectedDoctor && manualTitle.trim()) &&
+    (() => {
+      try {
+        return toTiyin(unitPrice as MoneyString) > 0n;
+      } catch {
+        return false;
+      }
+    })();
+  const submitCatalogue = form.handleSubmit((values) => {
     const payload = {
       ...values,
       note: values.note?.trim() || undefined,
@@ -215,12 +343,29 @@ export function ClinicalOrderDialog({
       identity.current = { fingerprint, key: createId() };
     create.mutate({ ...values, note: payload.note, idempotencyKey: identity.current.key });
   });
-  const consultationLocked = kind === 'CONSULTATION';
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    // Free-text cashier line — skip clinical-order schema (no catalogue serviceId).
+    if (kind === 'CONSULTATION' && manualOpen && !services.length) {
+      if (!patient?.id) {
+        toast.error(t('required'));
+        return;
+      }
+      if (!canSubmitManual) {
+        toast.error(t('manualRequired'));
+        return;
+      }
+      createManual.mutate();
+      return;
+    }
+    void submitCatalogue();
+  };
+  const consultationLocked = kind === 'CONSULTATION' && !manualOpen;
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!create.isPending) onOpenChange(next);
+        if (!busy) onOpenChange(next);
       }}
     >
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
@@ -233,7 +378,7 @@ export function ClinicalOrderDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-5">
-          <fieldset disabled={create.isPending} className="space-y-5">
+          <fieldset disabled={busy} className="space-y-5">
             <div className="space-y-2">
               <Label>{tc('patient')}</Label>
               <PatientCombobox
@@ -278,25 +423,61 @@ export function ClinicalOrderDialog({
                 </p>
               ) : null}
             </div>
-            <ServiceSelection
-              kind={kind}
-              services={services}
-              locked={consultationLocked}
-              emptyHint={
-                consultationLocked
-                  ? form.watch('doctorUserId')
-                    ? t('doctorServiceMissing')
-                    : t('pickDoctorFirst')
-                  : undefined
-              }
-              onChange={applyServices}
-            />
+            {manualOpen && kind === 'CONSULTATION' ? (
+              <div className="space-y-3 rounded-lg border border-dashed bg-muted/20 p-4">
+                <div>
+                  <p className="text-sm font-medium">{t('manualFallbackTitle')}</p>
+                  <p className="text-xs text-muted-foreground">{t('manualFallbackHint')}</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="consult-manual-title">{t('manualTitle')}</Label>
+                  <Input
+                    id="consult-manual-title"
+                    value={manualTitle}
+                    onChange={(e) => setManualTitle(e.target.value)}
+                    placeholder={t('manualTitlePlaceholder')}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="consult-manual-price">{t('manualPrice')}</Label>
+                  <Input
+                    id="consult-manual-price"
+                    inputMode="decimal"
+                    value={manualPrice}
+                    onChange={(e) => setManualPrice(e.target.value)}
+                    placeholder="50000"
+                    className="max-w-[12rem]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('total')}: {manualTotalLabel}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <ServiceSelection
+                kind={kind}
+                services={services}
+                locked={consultationLocked}
+                doctor={selectedDoctor}
+                requireDoctor={kind === 'ULTRASOUND'}
+                emptyHint={
+                  consultationLocked || kind === 'ULTRASOUND'
+                    ? form.watch('doctorUserId')
+                      ? consultationLocked
+                        ? t('doctorServiceMissing')
+                        : t('chooseServices')
+                      : t('pickDoctorFirst')
+                    : undefined
+                }
+                onChange={applyServices}
+              />
+            )}
             <div className="space-y-2">
               <Label htmlFor="clinical-note">{t('note')}</Label>
               <Textarea id="clinical-note" maxLength={2000} rows={2} {...form.register('note')} />
             </div>
           </fieldset>
-          {Object.keys(form.formState.errors).length ? (
+          {Object.keys(form.formState.errors).length && !(manualOpen && !services.length) ? (
             <p role="alert" className="text-sm text-destructive">
               {t('required')}
             </p>
@@ -305,12 +486,19 @@ export function ClinicalOrderDialog({
             <Button
               type="button"
               variant="outline"
-              disabled={create.isPending}
+              disabled={busy}
               onClick={() => onOpenChange(false)}
             >
               {tc('cancel')}
             </Button>
-            <Button type="submit" disabled={create.isPending || !branchId}>
+            <Button
+              type="submit"
+              disabled={
+                busy ||
+                !branchId ||
+                (manualOpen && !services.length ? !canSubmitManual : false)
+              }
+            >
               <Receipt className="mr-2 h-4 w-4" />
               {t('sendToCashier')}
             </Button>
@@ -326,11 +514,13 @@ export function ExtraClinicalServicesDialog({
   onOpenChange,
   orderId,
   existingServiceIds = [],
+  doctor = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orderId: string;
   existingServiceIds?: string[];
+  doctor?: DoctorOption | null;
 }) {
   const t = useTranslations('doctor.clinical');
   const tc = useTranslations('common');
@@ -382,6 +572,8 @@ export function ExtraClinicalServicesDialog({
             kind="ULTRASOUND"
             excludeIds={existingServiceIds}
             services={services}
+            doctor={doctor}
+            requireDoctor
             onChange={setServices}
           />
         </fieldset>

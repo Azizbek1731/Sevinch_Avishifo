@@ -326,6 +326,15 @@ export function VisitForm({ visitId }: { visitId: string }) {
           onOpenChange={setExtraOpen}
           orderId={visit.clinicalOrderId}
           existingServiceIds={order.data?.services.map((service) => service.id)}
+          doctor={
+            order.data?.doctor
+              ? {
+                  id: order.data.doctor.id,
+                  fullName: order.data.doctor.fullName,
+                  specialty: null,
+                }
+              : null
+          }
         />
       ) : null}
       <ConfirmDialog

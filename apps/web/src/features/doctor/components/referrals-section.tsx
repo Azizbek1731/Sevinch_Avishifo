@@ -6,6 +6,7 @@ import { Link } from '@/i18n/routing';
 import { labApi } from '@/features/lab/api';
 import { clinicalOrdersApi } from '@/features/clinical-orders/api';
 import {
+  consultationSearchQueries,
   findDoctorConsultationService,
   isUziSpecialty,
 } from '@/features/clinical-orders/doctor-matching';
@@ -181,9 +182,18 @@ export function ReferralsSection({
     }
     form.setValue('targetSpecialty', doctor.specialty ?? doctor.fullName);
     try {
-      const catalogue = await searchServiceCatalogue(billingApi.searchServices, doctor.fullName, {
-        kind: 'CONSULTATION',
-      });
+      const seen = new Set<string>();
+      const catalogue = [];
+      for (const query of consultationSearchQueries(doctor)) {
+        const page = await searchServiceCatalogue(billingApi.searchServices, query, {
+          kind: 'CONSULTATION',
+        });
+        for (const service of page) {
+          if (seen.has(service.id)) continue;
+          seen.add(service.id);
+          catalogue.push(service);
+        }
+      }
       const match = findDoctorConsultationService(catalogue, doctor, locale);
       setSpecialistService(match ?? null);
       if (!match) toast.error(t('specialistServiceMissing'));

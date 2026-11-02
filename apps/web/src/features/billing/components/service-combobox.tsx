@@ -17,6 +17,10 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { localizedText } from '@/lib/localized';
+import {
+  uziServiceMatchesDoctor,
+  type DoctorOption,
+} from '@/features/clinical-orders/doctor-matching';
 import { billingApi, type ServiceOption } from '../api';
 import { searchServiceCatalogue } from '../service-catalogue';
 
@@ -34,6 +38,8 @@ export interface ServiceComboboxProps {
   proceduresOnly?: boolean;
   /** Surgery cases are scheduled through the dedicated inpatient workflow. */
   excludeSurgery?: boolean;
+  /** When set with ULTRASOUND, only that doctor's catalogue rows are offered. */
+  doctor?: DoctorOption | null;
   disabled?: boolean;
 }
 
@@ -45,6 +51,7 @@ export function ServiceCombobox({
   excludeIds = [],
   proceduresOnly = false,
   excludeSurgery = false,
+  doctor = null,
   disabled = false,
 }: ServiceComboboxProps) {
   const t = useTranslations('common');
@@ -55,10 +62,16 @@ export function ServiceCombobox({
   useEffect(() => {
     setSearch('');
     setOpen(false);
-  }, [kind, proceduresOnly, excludeSurgery]);
+  }, [kind, proceduresOnly, excludeSurgery, doctor?.id]);
 
   const { data } = useQuery({
-    queryKey: ['services', 'billing-search', kind, search, { proceduresOnly, excludeSurgery }],
+    queryKey: [
+      'services',
+      'billing-search',
+      kind,
+      search,
+      { proceduresOnly, excludeSurgery, doctorId: doctor?.id },
+    ],
     queryFn: () =>
       searchServiceCatalogue(billingApi.searchServices, search, {
         kind,
@@ -66,6 +79,13 @@ export function ServiceCombobox({
         excludeSurgery,
       }),
     enabled: open && !disabled,
+  });
+
+  const options = (data ?? []).filter((service) => {
+    if (excludeIds.includes(service.id)) return false;
+    if (kind === 'ULTRASOUND' && doctor)
+      return uziServiceMatchesDoctor(service, doctor, locale);
+    return true;
   });
 
   return (
@@ -105,9 +125,7 @@ export function ServiceCombobox({
           <CommandList>
             <CommandEmpty>{t('notFound')}</CommandEmpty>
             <CommandGroup>
-              {(data ?? [])
-                .filter((s) => !excludeIds.includes(s.id))
-                .map((s) => (
+              {options.map((s) => (
                   <CommandItem
                     key={s.id}
                     value={s.id}

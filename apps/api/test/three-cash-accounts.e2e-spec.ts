@@ -482,6 +482,8 @@ describe('single clinic reception and three cash accounts', () => {
       department: 'Terapiya',
       ward: '2',
       bed: '1',
+      attendingDoctorName: 'Davolovchi Shifokor',
+      homeAddress: 'Toshkent',
     });
     expect(admission.status).toBe(201);
     const admissionId = admission.body.data.id as string;

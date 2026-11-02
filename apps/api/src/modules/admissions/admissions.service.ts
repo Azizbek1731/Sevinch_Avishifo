@@ -69,6 +69,7 @@ export class AdmissionsService {
       roomBillingNextDate: a.roomBillingNextDate?.toISOString().slice(0, 10) ?? null,
       roomBillingNextAt: a.roomBillingNextAt?.toISOString() ?? null,
       attendingDoctorUserId: a.attendingDoctorUserId,
+      attendingDoctorName: a.attendingDoctorName,
       admittedAt: a.admittedAt.toISOString(),
       dischargedAt: a.dischargedAt ? a.dischargedAt.toISOString() : null,
       referredBy: a.referredBy,
@@ -131,39 +132,79 @@ export class AdmissionsService {
       );
     }
 
-    const attendingDoctorUserId =
-      dto.attendingDoctorUserId ?? (user.role === 'DOCTOR' ? user.id : null);
+    const attendingDoctorUserId = dto.attendingDoctorUserId
+      ? dto.attendingDoctorUserId
+      : user.role === 'DOCTOR' && !dto.attendingDoctorName
+        ? user.id
+        : null;
     if (attendingDoctorUserId) await this.validateDoctor(attendingDoctorUserId, branchId);
+    const attendingDoctorName =
+      attendingDoctorUserId ? null : dto.attendingDoctorName?.trim() || null;
+    if (!attendingDoctorUserId && !attendingDoctorName) {
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'Shifokorni tanlang yoki ismini yozing',
+        400,
+      );
+    }
 
     const admittedAt = dto.admittedAt ? new Date(dto.admittedAt) : new Date();
     if (admittedAt.getTime() > Date.now())
       throw new AppException(ErrorCode.VALIDATION_ERROR, 'Yotqizish sanasi kelajakda bo‘lishi mumkin emas', 400);
     if (user.branchIds.length && !user.branchIds.includes(branchId))
       throw new AppException(ErrorCode.FORBIDDEN, 'Bu filialga kirish huquqi yo‘q', 403);
+
+    // Catalog room + daily rate are optional on admit — desk adds room fee later by hand.
     const catalogRoom = dto.inpatientRoomId
       ? await this.inpatientRooms.resolveForStay({ inpatientRoomId: dto.inpatientRoomId, branchId })
       : null;
     const dailyRoomRate =
       dto.dailyRoomRate ?? (catalogRoom ? catalogRoom.pricePerDay.toFixed(2) : undefined);
     const ward =
-      dto.ward ??
+      dto.ward?.trim() ||
       (catalogRoom
         ? `${catalogRoom.floor}-etaj ${catalogRoom.number}${catalogRoom.name ? ` (${catalogRoom.name})` : ''}`
-        : undefined);
+        : null);
+    const autoNumber = dto.autoHistoryNumber !== false;
+    const manualNumber = dto.historyNumber?.trim() || null;
+    if (!autoNumber && !manualNumber) {
+      throw new AppException(ErrorCode.VALIDATION_ERROR, 'Kasallik tarixi raqamini kiriting', 400);
+    }
+
     const clinicId = TenantContext.requireClinicId();
+    const homeAddress = dto.homeAddress?.trim() || null;
     const created = await this.prisma.db.$transaction(async (tx) => {
       // Concurrent admission retries must not create two stays or duplicate room fees.
       await tx.$queryRaw`SELECT "id" FROM "Patient" WHERE "id" = ${dto.patientId} AND "clinicId" = ${clinicId} FOR UPDATE`;
       const existing = await tx.admission.findFirst({ where: { patientId: dto.patientId, status: 'ACTIVE' } });
       if (existing) throw new AppException(ErrorCode.VALIDATION_ERROR, `Bemor allaqachon statsionarda (${existing.historyNumber})`, 409);
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${clinicId + ':admission-number'}, 0))`;
+      let historyNumber: string;
+      if (autoNumber) {
+        historyNumber = await this.nextHistoryNumber(tx);
+      } else {
+        historyNumber = manualNumber!;
+        const clash = await tx.admission.findFirst({
+          where: { historyNumber },
+          select: { id: true },
+        });
+        if (clash) {
+          throw new AppException(
+            ErrorCode.VALIDATION_ERROR,
+            `Kasallik tarixi raqami band: ${historyNumber}`,
+            409,
+          );
+        }
+      }
       const hasRate = dailyRoomRate !== undefined;
       const startDate = hasRate ? new Date(roomBillingDate(admittedAt)) : null;
       const stay = await tx.admission.create({ data: {
-        clinicId, branchId, patientId: dto.patientId, historyNumber: await this.nextHistoryNumber(tx),
-        department: dto.department ?? null, ward: ward ?? null, bed: dto.bed ?? null,
+        clinicId, branchId, patientId: dto.patientId, historyNumber,
+        department: dto.department ?? null, ward, bed: dto.bed ?? null,
         inpatientRoomId: catalogRoom?.id ?? null,
-        attendingDoctorUserId, admittedAt,
+        attendingDoctorUserId,
+        attendingDoctorName,
+        admittedAt,
         dailyRoomRate: dailyRoomRate ?? null,
         roomBillingStartsOn: startDate,
         roomBillingNextDate: startDate,
@@ -172,7 +213,13 @@ export class AdmissionsService {
         referredBy: dto.referredBy ?? null, referralDiagnosis: dto.referralDiagnosis ?? null,
         admissionDiagnosis: dto.admissionDiagnosis ?? null, firstTimeThisYear: dto.firstTimeThisYear ?? null,
       } });
-      await tx.patient.update({ where: { id: dto.patientId }, data: { careType: 'INPATIENT' } });
+      await tx.patient.update({
+        where: { id: dto.patientId },
+        data: {
+          careType: 'INPATIENT',
+          ...(homeAddress ? { address: homeAddress } : {}),
+        },
+      });
       // Kunlik palata haqi avtomatik emas — qabulxona qo‘lda qo‘shadi.
       return stay;
     }, { timeout: 30_000 });
@@ -180,7 +227,13 @@ export class AdmissionsService {
       action: AuditAction.CREATE,
       entity: 'Admission',
       entityId: created.id,
-      after: { patientId: dto.patientId, branchId, attendingDoctorUserId },
+      after: {
+        patientId: dto.patientId,
+        branchId,
+        attendingDoctorUserId,
+        attendingDoctorName,
+        historyNumber: created.historyNumber,
+      },
     });
     return this.map(created);
   }
@@ -340,7 +393,22 @@ export class AdmissionsService {
           bed: dto.bed,
           inpatientRoomId:
             dto.inpatientRoomId === undefined ? undefined : catalogRoom?.id ?? null,
-          attendingDoctorUserId: dto.attendingDoctorUserId,
+          ...(dto.attendingDoctorUserId !== undefined
+            ? {
+                attendingDoctorUserId: dto.attendingDoctorUserId,
+                // Roster pick clears free-text name; clearing the id leaves name alone unless sent.
+                ...(dto.attendingDoctorUserId
+                  ? { attendingDoctorName: null }
+                  : dto.attendingDoctorName !== undefined
+                    ? { attendingDoctorName: dto.attendingDoctorName?.trim() || null }
+                    : {}),
+              }
+            : dto.attendingDoctorName !== undefined
+              ? {
+                  attendingDoctorName: dto.attendingDoctorName?.trim() || null,
+                  attendingDoctorUserId: null,
+                }
+              : {}),
           referredBy: dto.referredBy,
           referralDiagnosis: dto.referralDiagnosis,
           admissionDiagnosis: dto.admissionDiagnosis,
@@ -672,8 +740,32 @@ export class AdmissionsService {
       }),
       this.prisma.db.admission.count({ where }),
     ]);
+    const doctorIds = [
+      ...new Set(
+        rows
+          .map((r) => r.attendingDoctorUserId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const doctors = doctorIds.length
+      ? await this.prisma.db.user.findMany({
+          where: { id: { in: doctorIds } },
+          select: { id: true, fullName: true },
+        })
+      : [];
+    const doctorById = new Map(doctors.map((d) => [d.id, d.fullName]));
     return paginated(
-      rows.map((r) => ({ ...this.map(r), patient: r.patient })),
+      rows.map((r) => {
+        const rosterName = r.attendingDoctorUserId
+          ? doctorById.get(r.attendingDoctorUserId) ?? null
+          : null;
+        const doctorName = rosterName ?? r.attendingDoctorName ?? null;
+        return {
+          ...this.map(r),
+          patient: r.patient,
+          attendingDoctor: doctorName ? { id: r.attendingDoctorUserId, fullName: doctorName } : null,
+        };
+      }),
       { page: q.page, limit: q.limit, total },
     );
   }
@@ -713,6 +805,18 @@ export class AdmissionsService {
     });
     if (!a) throw new AppException(ErrorCode.NOT_FOUND, 'Kasallik tarixi topilmadi', 404);
 
+    const rosterDoctor = a.attendingDoctorUserId
+      ? await this.prisma.db.user.findFirst({
+          where: { id: a.attendingDoctorUserId },
+          select: { id: true, fullName: true },
+        })
+      : null;
+    const attendingDoctor = rosterDoctor
+      ? { id: rosterDoctor.id, fullName: rosterDoctor.fullName }
+      : a.attendingDoctorName
+        ? { id: null, fullName: a.attendingDoctorName }
+        : null;
+
     // A legacy one-dose order can already have its exact bill attached to the
     // delivered dose. Expose it without rewriting or re-billing old records.
     const orders = a.orders.map((order) => ({
@@ -736,6 +840,7 @@ export class AdmissionsService {
 
     return {
       ...this.map(a),
+      attendingDoctor,
       patient: a.patient,
       roomBilling: await this.roomBilling.summary(id),
       orders: orders.map((o) => ({
@@ -857,7 +962,7 @@ export class AdmissionsService {
         bloodGroup: a.patient.bloodGroup,
         allergies: a.patient.allergies,
       },
-      doctor: { fullName: doctor?.fullName ?? null },
+      doctor: { fullName: doctor?.fullName ?? a.attendingDoctorName ?? null },
       orders: a.orders.map((o) => ({
         service: o.service.name,
         schedule: o.schedule,

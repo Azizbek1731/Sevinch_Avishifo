@@ -22,13 +22,26 @@ import {
 } from './telegram-patient-access.service';
 import { VisitReportPdfService } from '../visits/visit-report-pdf.service';
 import { VISIT_REPORT_INCLUDE, buildVisitReportPdfData } from '../visits/visit-report.data';
+import { TreatmentSheetPdfService } from '../admissions/treatment-sheet-pdf.service';
 import { patientDocumentVisibility } from '../patients/patient-document-access';
+import {
+  allOpsAdminChatIds,
+  buildOpsBackupInfo,
+  buildOpsStatusText,
+  isConfiguredAdminPhone,
+  isOpsAdminChat,
+  opsMenuMode,
+  rememberOpsAdminChat,
+  setOpsMenuMode,
+} from './telegram-ops';
 
 /** Buttons a linked patient sees. */
 const PATIENT_BUTTONS = [
   '📅 Qabullarim',
   '🕐 Navbatim',
   '🧪 Tahlillarim',
+  '🩻 UZI natijalarim',
+  '🧾 Muolaja varaqasi',
   '📄 Hujjatlarim',
   '📋 Kasallik tarixim',
 ];
@@ -69,25 +82,60 @@ const CONTACT_KEYBOARD = new Keyboard().requestContact('📱 Raqamni yuborish').
 
 /** Patient-only keyboard, re-sent alongside patient answers. */
 const PATIENT_KEYBOARD = keyboardFor({ patientIds: ['x'], staff: null });
-const CLINIC_PATIENT_KEYBOARD = new Keyboard()
-  .text('🧪 Tahlillarim')
-  .text('🩻 UZI natijalarim')
-  .row()
-  .text('🩺 Shifokor xulosalari')
-  .text('📄 Hujjatlarim')
-  .row()
-  .text('👤 Mening ma’lumotlarim')
-  .text('🔄 Yangilash')
-  .row()
-  .text('ℹ️ Yordam')
-  .resized()
-  .persistent();
+const OPS_BUTTONS = ['Holat', 'Tarmoq', 'Zaxira'] as const;
+const SWITCH_TO_ADMIN = '🛠 Admin menyusi';
+const SWITCH_TO_PATIENT = '👤 Bemor menyusi';
+
+/** Pure patient menu (no admin buttons). */
+function clinicPatientKeyboard(canSwitchToAdmin = false): Keyboard {
+  const kb = new Keyboard()
+    .text('🧪 Tahlillarim')
+    .text('🩻 UZI natijalarim')
+    .row()
+    .text('🩺 Shifokor xulosalari')
+    .text('🧾 Muolaja varaqasi')
+    .row()
+    .text('📄 Hujjatlarim')
+    .text('👤 Mening ma’lumotlarim')
+    .row()
+    .text('🔄 Yangilash')
+    .text('ℹ️ Yordam');
+  if (canSwitchToAdmin) {
+    kb.row().text(SWITCH_TO_ADMIN);
+  }
+  return kb.resized().persistent();
+}
+
+/** Pure admin menu (no patient buttons). */
+function clinicAdminKeyboard(canSwitchToPatient = false): Keyboard {
+  const kb = new Keyboard()
+    .text('Holat')
+    .text('Tarmoq')
+    .row()
+    .text('Zaxira')
+    .text('🔄 Yangilash');
+  if (canSwitchToPatient) {
+    kb.row().text(SWITCH_TO_PATIENT);
+  }
+  return kb.resized().persistent();
+}
+
+const CLINIC_PATIENT_KEYBOARD = clinicPatientKeyboard(false);
 const WAITING_PATIENT_KEYBOARD = new Keyboard()
   .requestContact('📱 Raqamni yuborish')
   .row()
   .text('🔄 Yangilash')
   .text('ℹ️ Yordam')
   .resized();
+const WAITING_OPS_KEYBOARD = new Keyboard()
+  .requestContact('📱 Raqamni yuborish')
+  .row()
+  .text('Holat')
+  .text('Tarmoq')
+  .row()
+  .text('Zaxira')
+  .resized()
+  .persistent();
 
 /** Pick a display name from a multilingual Json name ({ uz, ru, en }). */
 function pickName(name: unknown): string {
@@ -127,14 +175,47 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     private readonly resultPdf: ResultPdfService,
     private readonly patientAccess: TelegramPatientAccessService,
     private readonly visitReportPdf: VisitReportPdfService,
+    private readonly treatmentSheetPdf: TreatmentSheetPdfService,
   ) {}
 
   private get patientOnly(): boolean {
     return this.config.env?.SINGLE_CLINIC_MODE === true;
   }
 
+  /** Active reply keyboard for this chat — admin and patient menus stay separate. */
+  private async menuKeyboardFor(chatId?: number): Promise<Keyboard> {
+    if (!this.patientOnly) return PATIENT_KEYBOARD;
+    if (chatId === undefined || !isOpsAdminChat(chatId)) return CLINIC_PATIENT_KEYBOARD;
+    const mode = opsMenuMode(chatId);
+    if (mode === 'admin') {
+      const linked = (await this.patientAccess.resolve(chatId)).status === 'LINKED';
+      return clinicAdminKeyboard(linked);
+    }
+    return clinicPatientKeyboard(true);
+  }
+
+  private patientKeyboardFor(chatId?: number): Keyboard {
+    if (!this.patientOnly) return PATIENT_KEYBOARD;
+    if (chatId !== undefined && isOpsAdminChat(chatId) && opsMenuMode(chatId) === 'admin') {
+      return clinicAdminKeyboard(false);
+    }
+    return chatId !== undefined && isOpsAdminChat(chatId)
+      ? clinicPatientKeyboard(true)
+      : CLINIC_PATIENT_KEYBOARD;
+  }
+
   private get patientKeyboard(): Keyboard {
-    return this.patientOnly ? CLINIC_PATIENT_KEYBOARD : PATIENT_KEYBOARD;
+    return this.patientKeyboardFor();
+  }
+
+  private waitingKeyboardFor(chatId?: number): Keyboard {
+    return chatId !== undefined && isOpsAdminChat(chatId)
+      ? WAITING_OPS_KEYBOARD
+      : WAITING_PATIENT_KEYBOARD;
+  }
+
+  private async isAdminMenu(chatId: number): Promise<boolean> {
+    return this.patientOnly && isOpsAdminChat(chatId) && opsMenuMode(chatId) === 'admin';
   }
 
   onModuleInit(): void {
@@ -162,8 +243,20 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
               { command: 'menu', description: 'Natijalar va hujjatlar' },
               { command: 'help', description: 'Foydalanish bo‘yicha yordam' },
               { command: 'unlink', description: 'Bemor kartasidan uzilish' },
+              ...(this.patientOnly
+                ? [
+                    { command: 'holat', description: 'Server / loyiha holati (admin)' },
+                    { command: 'tarmoq', description: 'Wi‑Fi / LAN holati (admin)' },
+                    { command: 'zaxira', description: 'Oxirgi zaxira (admin)' },
+                  ]
+                : []),
             ])
             .catch(() => this.logger.warn('Telegram command menu could not be updated'));
+          if (this.patientOnly && allOpsAdminChatIds().length > 0) {
+            this.logger.log(
+              `Telegram ops admins: ${allOpsAdminChatIds().join(', ')}`,
+            );
+          }
         },
       })
       .catch(() =>
@@ -187,14 +280,34 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     bot.command('unlink', (ctx) => this.handleUnlink(ctx));
     bot.command('help', (ctx) => this.handleHelp(ctx));
     bot.on('message:contact', (ctx) => this.handleContact(ctx));
-    // Patient
-    bot.hears('🧪 Tahlillarim', (ctx) => this.handleMyResults(ctx));
-    bot.hears('📄 Hujjatlarim', (ctx) => this.handleMyDocuments(ctx));
-    bot.hears('🩻 UZI natijalarim', (ctx) => this.handleDocumentList(ctx, 'ultrasound', 0));
-    bot.hears('🩺 Shifokor xulosalari', (ctx) => this.handleDocumentList(ctx, 'consultation', 0));
-    bot.hears('👤 Mening ma’lumotlarim', (ctx) => this.handlePatientProfile(ctx));
+    // Patient — blocked while ops admin is on the admin menu (menus stay separate).
+    bot.hears('🧪 Tahlillarim', (ctx) => this.withPatientMenu(ctx, () => this.handleMyResults(ctx)));
+    bot.hears('📄 Hujjatlarim', (ctx) => this.withPatientMenu(ctx, () => this.handleMyDocuments(ctx)));
+    bot.hears('🩻 UZI natijalarim', (ctx) =>
+      this.withPatientMenu(ctx, () => this.handleDocumentList(ctx, 'ultrasound', 0)),
+    );
+    bot.hears('🩺 Shifokor xulosalari', (ctx) =>
+      this.withPatientMenu(ctx, () => this.handleDocumentList(ctx, 'consultation', 0)),
+    );
+    bot.hears('🧾 Muolaja varaqasi', (ctx) =>
+      this.withPatientMenu(ctx, () => this.handleDocumentList(ctx, 'treatment', 0)),
+    );
+    bot.hears('👤 Mening ma’lumotlarim', (ctx) =>
+      this.withPatientMenu(ctx, () => this.handlePatientProfile(ctx)),
+    );
     bot.hears('🔄 Yangilash', (ctx) => this.handleMenu(ctx));
     bot.hears('ℹ️ Yordam', (ctx) => this.handleHelp(ctx));
+    // Server ops (Holat / Tarmoq / Zaxira) — same token as patient bot in single-clinic.
+    if (this.patientOnly) {
+      bot.hears(SWITCH_TO_ADMIN, (ctx) => this.handleSwitchMode(ctx, 'admin'));
+      bot.hears(SWITCH_TO_PATIENT, (ctx) => this.handleSwitchMode(ctx, 'patient'));
+      bot.hears(/^Holat$/i, (ctx) => this.handleOps(ctx, 'holat'));
+      bot.hears(/^Tarmoq$/i, (ctx) => this.handleOps(ctx, 'tarmoq'));
+      bot.hears(/^Zaxira$/i, (ctx) => this.handleOps(ctx, 'zaxira'));
+      bot.command('holat', (ctx) => this.handleOps(ctx, 'holat'));
+      bot.command('tarmoq', (ctx) => this.handleOps(ctx, 'tarmoq'));
+      bot.command('zaxira', (ctx) => this.handleOps(ctx, 'zaxira'));
+    }
     if (!this.patientOnly) {
       bot.hears('📅 Qabullarim', (ctx) => this.handleMyAppointments(ctx));
       bot.hears('🕐 Navbatim', (ctx) => this.handleMyQueue(ctx));
@@ -211,10 +324,10 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     bot.callbackQuery(/^labpdf:([0-9a-f-]{36})$/, (ctx) =>
       this.handleResultPdf(ctx, ctx.match[1] ?? ''),
     );
-    bot.callbackQuery(/^docs:(lab|ultrasound|consultation|files):(\d+)$/, (ctx) =>
+    bot.callbackQuery(/^docs:(lab|ultrasound|consultation|files|treatment):(\d+)$/, (ctx) =>
       this.handleDocumentList(
         ctx,
-        ctx.match[1] as 'lab' | 'ultrasound' | 'consultation' | 'files',
+        ctx.match[1] as 'lab' | 'ultrasound' | 'consultation' | 'files' | 'treatment',
         Number(ctx.match[2]),
       ),
     );
@@ -223,6 +336,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     );
     bot.callbackQuery(/^visitpdf:([0-9a-f-]{36})$/, (ctx) =>
       this.handleVisitReportPdf(ctx, ctx.match[1] ?? ''),
+    );
+    bot.callbackQuery(/^treatpdf:([0-9a-f-]{36})$/, (ctx) =>
+      this.handleTreatmentSheetPdf(ctx, ctx.match[1] ?? ''),
     );
     // Patient asks a clinic to release their history.
     if (!this.patientOnly)
@@ -235,16 +351,114 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         await ctx.answerCallbackQuery({ text: 'Menyuni yangilash uchun /menu bosing.' });
       });
       bot.on('message:text', async (ctx) => {
-        const linked = (await this.patientAccess.resolve(ctx.chat.id)).status === 'LINKED';
+        const chatId = ctx.chat.id;
+        const text = ctx.message?.text?.trim() ?? '';
+        if (
+          OPS_BUTTONS.some((label) => label.toLowerCase() === text.toLowerCase()) ||
+          text === SWITCH_TO_ADMIN ||
+          text === SWITCH_TO_PATIENT
+        ) {
+          return;
+        }
+        const linked = (await this.patientAccess.resolve(chatId)).status === 'LINKED';
+        const ops = isOpsAdminChat(chatId);
+        const adminMode = ops && opsMenuMode(chatId) === 'admin';
+        const markup = linked
+          ? await this.menuKeyboardFor(chatId)
+          : this.waitingKeyboardFor(chatId);
         await ctx.reply(
-          linked
-            ? 'Kerakli bo‘limni pastdagi menyudan tanlang. Yordam uchun /help bosing.'
-            : 'Telefon raqamini qo‘lda yozish o‘rniga «📱 Raqamni yuborish» tugmasini bosing. Natijalar uchun /menu, yordam uchun /help.',
-          {
-            reply_markup: linked ? CLINIC_PATIENT_KEYBOARD : WAITING_PATIENT_KEYBOARD,
-          },
+          adminMode
+            ? 'Admin buyruqlari: Holat, Tarmoq, Zaxira. Menyuni yangilash: /menu'
+            : linked
+              ? 'Kerakli bo‘limni pastdagi menyudan tanlang. Yordam uchun /help bosing.'
+              : ops
+                ? 'Admin uchun raqamingizni «📱 Raqamni yuborish» orqali yuboring, so‘ng Holat / Tarmoq / Zaxira ochiladi.'
+                : 'Telefon raqamini qo‘lda yozish o‘rniga «📱 Raqamni yuborish» tugmasini bosing. Natijalar uchun /menu, yordam uchun /help.',
+          { reply_markup: markup },
         );
       });
+    }
+  }
+
+  /** Patient buttons from an old keyboard must not run while admin menu is active. */
+  private async withPatientMenu(ctx: Context, run: () => Promise<void>): Promise<void> {
+    const chatId = ctx.chat?.id;
+    if (chatId !== undefined && (await this.isAdminMenu(chatId))) {
+      await ctx.reply(
+        `Hozir admin menyudasiz. Bemor bo‘limi uchun «${SWITCH_TO_PATIENT}»ni bosing.`,
+        { reply_markup: await this.menuKeyboardFor(chatId) },
+      );
+      return;
+    }
+    await run();
+  }
+
+  private async handleSwitchMode(ctx: Context, mode: 'admin' | 'patient'): Promise<void> {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined || !isOpsAdminChat(chatId)) {
+      await ctx.reply('Bu tugma faqat klinika administratori uchun.');
+      return;
+    }
+    if (mode === 'patient') {
+      const access = await this.patientAccess.resolve(chatId);
+      if (access.status !== 'LINKED') {
+        await ctx.reply(
+          'Bemor menyusi uchun avval bemor kartasiga ulaning: «📱 Raqamni yuborish».',
+          { reply_markup: clinicAdminKeyboard(false) },
+        );
+        return;
+      }
+    }
+    setOpsMenuMode(chatId, mode);
+    if (mode === 'admin') {
+      await ctx.reply(
+        '🛠 Admin menyusi\n\nHolat — server / loyiha\nTarmoq — Wi‑Fi / LAN\nZaxira — oxirgi dump',
+        { reply_markup: await this.menuKeyboardFor(chatId) },
+      );
+      return;
+    }
+    await this.replyPatientHome(ctx);
+  }
+
+  /** Holat / Tarmoq / Zaxira — only for TELEGRAM_ADMIN_CHAT_ID or linked admin phones. */
+  private async handleOps(ctx: Context, kind: 'holat' | 'tarmoq' | 'zaxira'): Promise<void> {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    let markup: Keyboard = clinicAdminKeyboard(false);
+    try {
+      if (!isOpsAdminChat(chatId)) {
+        await ctx.reply('Bu buyruq faqat klinika administratori uchun.', {
+          reply_markup: await this.menuKeyboardFor(chatId),
+        });
+        return;
+      }
+      // Ops commands always keep (or restore) the admin menu — never mix with patient rows.
+      setOpsMenuMode(chatId, 'admin');
+      markup = await this.menuKeyboardFor(chatId);
+      if (kind === 'zaxira') {
+        const info = await buildOpsBackupInfo();
+        await ctx.reply(info.text, { reply_markup: markup });
+        if (info.dumpPath) {
+          await ctx.replyWithDocument(new InputFile(info.dumpPath), {
+            caption: info.caption ?? undefined,
+          });
+        }
+        return;
+      }
+      const text = await buildOpsStatusText(kind);
+      await ctx.reply(text, { reply_markup: markup });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`ops ${kind} failed: ${detail}`);
+      const hint = detail.length > 160 ? `${detail.slice(0, 160)}…` : detail;
+      await ctx
+        .reply(
+          kind === 'zaxira'
+            ? `Zaxirani yuborib bo‘lmadi.\n${hint}`
+            : `Holatni o‘qib bo‘lmadi.\n${hint}`,
+          { reply_markup: markup },
+        )
+        .catch(() => undefined);
     }
   }
 
@@ -360,13 +574,34 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     resolved?: TelegramPatientAccessResult,
   ): Promise<void> {
     if (ctx.chat?.id === undefined) return;
-    const access = resolved ?? (await this.patientAccess.resolve(ctx.chat.id));
+    const chatId = ctx.chat.id;
+    const ops = isOpsAdminChat(chatId);
+    const access = resolved ?? (await this.patientAccess.resolve(chatId));
+
+    // Ops admins stay on the admin menu by default — never mix patient + admin rows.
+    if (ops && opsMenuMode(chatId) === 'admin') {
+      const linked = access.status === 'LINKED';
+      await ctx.reply(
+        '🛠 Admin menyusi\n\nHolat — server / loyiha ishlayaptimi.\nTarmoq — Wi‑Fi / LAN.\nZaxira — oxirgi dump.\n\nServer yoqilganda va o‘chganda shu chatga xabar keladi.' +
+          (linked ? `\n\nBemor natijalari uchun «${SWITCH_TO_PATIENT}»ni bosing.` : ''),
+        { reply_markup: clinicAdminKeyboard(linked) },
+      );
+      return;
+    }
+
     if (access.status === 'LINKED') {
       await ctx.reply(
         `Bemor kartangiz ulandi ✅\n\n${access.patients.map((p) => `${p.fullName}\nKarta: ${p.mrn}`).join('\n\n')}\n\nKerakli bo‘limni tanlang. Tasdiqlangan natija va xulosalarni PDF ko‘rinishida olishingiz mumkin.`,
         {
-          reply_markup: CLINIC_PATIENT_KEYBOARD,
+          reply_markup: await this.menuKeyboardFor(chatId),
         },
+      );
+      return;
+    }
+    if (ops) {
+      await ctx.reply(
+        'Administrator sifatida ulandingiz ✅\n\nHolat — server ishlayaptimi.\nTarmoq — Wi‑Fi / LAN.\nZaxira — oxirgi dump.',
+        { reply_markup: clinicAdminKeyboard(false) },
       );
       return;
     }
@@ -380,7 +615,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       UNAVAILABLE:
         'Hozir bemor kartasiga ulanib bo‘lmadi. Birozdan keyin «🔄 Yangilash»ni bosing yoki qabulxonaga murojaat qiling.',
     };
-    await ctx.reply(messages[access.status], { reply_markup: WAITING_PATIENT_KEYBOARD });
+    await ctx.reply(messages[access.status], {
+      reply_markup: this.waitingKeyboardFor(chatId),
+    });
   }
 
   private async handlePatientProfile(ctx: Context): Promise<void> {
@@ -399,13 +636,22 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
           ].join('\n'),
         )
         .join('\n\n') + '\n\nMa’lumotda xato bo‘lsa, qabulxonaga murojaat qiling.',
-      { reply_markup: this.patientKeyboard },
+      { reply_markup: await this.menuKeyboardFor(ctx.chat.id) },
     );
   }
 
   private async handleHelp(ctx: Context): Promise<void> {
+    const chatId = ctx.chat?.id;
+    if (chatId !== undefined && (await this.isAdminMenu(chatId))) {
+      await ctx.reply(
+        '🛠 Admin bot\n\nHolat — server / loyiha\nTarmoq — Wi‑Fi / LAN\nZaxira — oxirgi dump\n\nServer yoqilganda va o‘chganda shu chatga xabar keladi.\nBemor natijalari kerak bo‘lsa — «👤 Bemor menyusi».',
+        { reply_markup: await this.menuKeyboardFor(chatId) },
+      );
+      return;
+    }
     await ctx.reply(
-      'ℹ️ Botdan foydalanish\n\n1. /start ni bosing va «📱 Raqamni yuborish» orqali o‘z raqamingizni yuboring.\n2. Raqam qabulxonada kiritilgan asosiy telefon bilan mos bo‘lsa, kartangiz avtomatik ulanadi.\n3. Laboratoriya, UZI yoki shifokor xulosasini tanlab, kerakli PDFni oling. Natija tasdiqlangandan keyin ko‘rinadi.\n\n/menu — bo‘limlarni ochish\n/unlink — kartadan uzilish\n\nRaqam mos kelmasa yoki bir nechta kartada ishlatilsa, qabulxonaga murojaat qiling.',
+      'ℹ️ Botdan foydalanish\n\n1. /start ni bosing va «📱 Raqamni yuborish» orqali o‘z raqamingizni yuboring.\n2. Raqam qabulxonada kiritilgan asosiy telefon bilan mos bo‘lsa, kartangiz avtomatik ulanadi.\n3. Laboratoriya, UZI, shifokor xulosasi yoki muolaja varaqasini tanlab, kerakli PDFni oling. Natija tasdiqlangandan keyin ko‘rinadi.\n\n/menu — bo‘limlarni ochish\n/unlink — kartadan uzilish\n\nRaqam mos kelmasa yoki bir nechta kartada ishlatilsa, qabulxonaga murojaat qiling.',
+      chatId !== undefined ? { reply_markup: await this.menuKeyboardFor(chatId) } : undefined,
     );
   }
 
@@ -494,6 +740,10 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (this.patientOnly) {
+      if (isConfiguredAdminPhone(phone)) {
+        rememberOpsAdminChat(chatId, phone);
+        setOpsMenuMode(chatId, 'admin');
+      }
       const access = await this.patientAccess.linkContact(
         chatId,
         phone,
@@ -729,6 +979,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
           .row()
           .text('🩺 Shifokor xulosalari', 'docs:consultation:0')
           .row()
+          .text('🧾 Muolaja varaqasi', 'docs:treatment:0')
+          .row()
           .text('📎 Yuklangan hujjatlar', 'docs:files:0'),
       },
     );
@@ -737,7 +989,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   /** Explicit patient requests are the consent to deliver these files in this private chat. */
   private async handleDocumentList(
     ctx: Context,
-    type: 'lab' | 'ultrasound' | 'consultation' | 'files',
+    type: 'lab' | 'ultrasound' | 'consultation' | 'files' | 'treatment',
     page: number,
   ): Promise<void> {
     if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => undefined);
@@ -813,6 +1065,33 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         const label = `${doc.title.slice(0, 50)} · ${formatInTimeZone(doc.createdAt, TIMEZONE, 'dd.MM.yyyy')}`;
         captions.push(`📎 ${label}`);
         keyboard.text(label, `docfile:${doc.id}`).row();
+      }
+    } else if (type === 'treatment') {
+      const admissions = await this.prisma.unscoped.admission.findMany({
+        where: {
+          patientId: { in: patientIds },
+          status: { in: ['ACTIVE', 'DISCHARGED'] },
+        },
+        orderBy: [{ admittedAt: 'desc' }, { id: 'desc' }],
+        skip: page * limit,
+        take: limit + 1,
+        select: {
+          id: true,
+          historyNumber: true,
+          admittedAt: true,
+          dischargedAt: true,
+          status: true,
+          department: true,
+          ward: true,
+        },
+      });
+      hasMore = admissions.length > limit;
+      for (const stay of admissions.slice(0, limit)) {
+        const date = formatInTimeZone(stay.admittedAt, TIMEZONE, 'dd.MM.yyyy');
+        const place = [stay.department, stay.ward].filter(Boolean).join(' · ');
+        const label = `${stay.historyNumber} · ${date}${place ? ` · ${place}` : ''}`;
+        captions.push(`🧾 ${label}`);
+        keyboard.text(label.slice(0, 60), `treatpdf:${stay.id}`).row();
       }
     } else {
       const visits = await this.prisma.unscoped.visit.findMany({
@@ -936,6 +1215,115 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     } catch {
       this.logger.warn(`clinical report delivery failed: ${visit.id}`);
       await ctx.reply('Xulosani yuborib bo‘lmadi. Birozdan keyin qayta urinib ko‘ring.');
+    }
+  }
+
+  private async handleTreatmentSheetPdf(ctx: Context, admissionId: string): Promise<void> {
+    await ctx.answerCallbackQuery().catch(() => undefined);
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    const patientIds = await this.linkedPatientIds(chatId);
+    const admission = patientIds.length
+      ? await this.prisma.unscoped.admission.findFirst({
+          where: {
+            id: admissionId,
+            patientId: { in: patientIds },
+            status: { in: ['ACTIVE', 'DISCHARGED'] },
+          },
+          include: {
+            patient: {
+              select: { fullName: true, mrn: true, dob: true, phone: true },
+            },
+            orders: {
+              orderBy: { createdAt: 'asc' },
+              include: {
+                service: { select: { name: true } },
+                administrations: { orderBy: { date: 'asc' } },
+              },
+            },
+          },
+        })
+      : null;
+    if (!admission) {
+      await ctx.reply('Muolaja varaqasi topilmadi yoki endi ochiq emas.');
+      return;
+    }
+    try {
+      const clinic = await this.prisma.unscoped.clinic.findUnique({
+        where: { id: admission.clinicId },
+        select: { name: true, legalName: true, logoUrl: true, address: true, phone: true },
+      });
+      if (!clinic) throw new Error('Clinic not found');
+      const doctor = admission.attendingDoctorUserId
+        ? await this.prisma.unscoped.user.findFirst({
+            where: { id: admission.attendingDoctorUserId, clinicId: admission.clinicId },
+            select: { fullName: true },
+          })
+        : null;
+      const buffer = await this.treatmentSheetPdf.render({
+        clinic,
+        patient: {
+          fullName: admission.patient.fullName,
+          mrn: admission.patient.mrn,
+          dob: admission.patient.dob ? admission.patient.dob.toISOString().slice(0, 10) : null,
+          phone: admission.patient.phone,
+        },
+        admission: {
+          historyNumber: admission.historyNumber,
+          department: admission.department,
+          ward: admission.ward,
+          bed: admission.bed,
+          admittedAt: admission.admittedAt.toISOString(),
+          dischargedAt: admission.dischargedAt ? admission.dischargedAt.toISOString() : null,
+          status: admission.status,
+        },
+        doctorName: doctor?.fullName ?? null,
+        orders: admission.orders.map((order) => {
+          const step = order.schedule === 'EVERY_OTHER_DAY' ? 2 : 1;
+          const times = order.schedule === 'ONCE' ? 1 : order.timesPlanned;
+          const days: Array<{
+            date: string;
+            slots: Array<{ slot: number; status: string | null }>;
+          }> = [];
+          const start = new Date(order.startDate);
+          for (let i = 0; i < times; i += 1) {
+            const d = new Date(start);
+            d.setUTCDate(d.getUTCDate() + i * step);
+            const date = d.toISOString().slice(0, 10);
+            days.push({
+              date,
+              slots: Array.from({ length: order.timesPerDay }, (_, idx) => {
+                const slot = idx + 1;
+                const done = order.administrations.find(
+                  (item) =>
+                    item.slot === slot && item.date.toISOString().slice(0, 10) === date,
+                );
+                return { slot, status: done ? done.status : null };
+              }),
+            });
+          }
+          return {
+            title: this.treatmentSheetPdf.pickServiceTitle(order.service.name),
+            schedule: order.schedule,
+            timesPerDay: order.timesPerDay,
+            days,
+          };
+        }),
+      });
+      await ctx.replyWithDocument(
+        new InputFile(buffer, `muolaja-${admission.historyNumber}.pdf`),
+        { caption: `Muolaja varaqasi · ${admission.historyNumber}` },
+      );
+      await this.audit.log({
+        action: AuditAction.EXPORT,
+        entity: 'AdmissionTreatmentSheet',
+        entityId: admission.id,
+        clinicId: admission.clinicId,
+        after: { channel: 'telegram', requestedByPatient: true },
+      });
+    } catch {
+      this.logger.warn(`treatment sheet delivery failed: ${admission.id}`);
+      await ctx.reply('Muolaja varaqasini yuborib bo‘lmadi. Birozdan keyin qayta urinib ko‘ring.');
     }
   }
 

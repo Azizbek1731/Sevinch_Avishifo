@@ -15,15 +15,42 @@
   "add": {
     "title": "Add a charge",
     "hint": "Saving the charge automatically adds its invoice to the cashier’s pending payments.",
+    "cashierTitle": "Cashier only",
+    "cashierHint": "The service goes to the cashier only — not to lab, ultrasound or doctor worklists. Ends after payment.",
     "catalog": "From catalog",
     "manual": "Additional charge",
+    "modes": {
+      "procedures": "Procedures & exams",
+      "lab": "Laboratory",
+      "uzi": "Ultrasound",
+      "consultation": "Consultation",
+      "cashier": "Cashier only",
+      "manual": "Manual"
+    },
+    "modeHints": {
+      "procedures": "Procedures, diagnostic exams and other services.",
+      "lab": "Laboratory tests only.",
+      "uzi": "Ultrasound services only. Select the doctor first — the order goes to their worklist.",
+      "consultation": "Doctor consultations only. Select the doctor first.",
+      "cashier": "Any service — cashier only, no clinical order."
+    },
+    "doctor": "Doctor",
+    "doctorPlaceholder": "Select a doctor",
+    "doctorLoadError": "Could not load the doctor list.",
+    "doctorEmpty": "No ultrasound specialist found. Check specialties in Staff.",
+    "doctorUziHint": "The selected ultrasound doctor will see the order on their worklist.",
+    "doctorConsultHint": "The selected doctor will see the consultation on their worklist.",
     "service": "Service",
     "name": "Charge description",
     "date": "Date",
     "quantity": "Quantity",
     "price": "Unit price",
+    "total": "Total",
+    "multiHint": "Pick several services one by one — they are added together.",
+    "pickServices": "Choose services from the list",
     "submit": "Add and send to cashier",
-    "saved": "Charge added and sent to cashier"
+    "saved": "Charge added and sent to cashier",
+    "savedMany": "{count} charges added and sent to the cashier"
   },
   "cancelConfirm": "Cancel this patient charge?",
   "loadError": "Could not load charges. Refresh the page.",

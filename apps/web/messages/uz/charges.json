@@ -15,15 +15,42 @@
   "add": {
     "title": "Xarajat qo‘shish",
     "hint": "Xarajat saqlanishi bilan kassadagi “To‘lov kutilmoqda” ro‘yxatiga avtomatik tushadi.",
+    "cashierTitle": "Faqat kassa",
+    "cashierHint": "Xizmat faqat kassaga boradi — laboratoriya, UZI yoki shifokor navbatiga tushmaydi. To‘lovdan keyin yakunlanadi.",
     "catalog": "Katalogdan",
     "manual": "Qo‘shimcha xarajat",
+    "modes": {
+      "procedures": "Muolaja va tekshiruv",
+      "lab": "Laboratoriya",
+      "uzi": "UZI",
+      "consultation": "Shifokor qabuli",
+      "cashier": "Faqat kassa",
+      "manual": "Qo‘lda"
+    },
+    "modeHints": {
+      "procedures": "Muolaja, instrumental tekshiruv va boshqa xizmatlar.",
+      "lab": "Faqat laboratoriya tahlillari.",
+      "uzi": "Faqat UZI xizmatlari. Avval vrachni tanlang — buyurtma uning navbatiga tushadi.",
+      "consultation": "Faqat shifokor qabuli xizmatlari. Avval vrachni tanlang.",
+      "cashier": "Istalgan xizmat — faqat kassa, klinik buyurtmasiz."
+    },
+    "doctor": "Vrach",
+    "doctorPlaceholder": "Vrachni tanlang",
+    "doctorLoadError": "Vrachlar ro‘yxatini yuklab bo‘lmadi.",
+    "doctorEmpty": "UZI mutaxassisi topilmadi. Xodimlar bo‘limida mutaxassislikni tekshiring.",
+    "doctorUziHint": "Tanlangan UZI vrachi buyurtmani o‘z navbatida ko‘radi.",
+    "doctorConsultHint": "Tanlangan shifokor qabulni o‘z navbatida ko‘radi.",
     "service": "Xizmat",
     "name": "Xarajat nomi",
     "date": "Sana",
     "quantity": "Miqdor",
     "price": "Birlik narxi",
+    "total": "Jami",
+    "multiHint": "Bir nechta xizmatni ketma-ket tanlang — hammasi birga qo‘shiladi.",
+    "pickServices": "Ro‘yxatdan xizmat tanlang",
     "submit": "Qo‘shish va kassaga yuborish",
-    "saved": "Xarajat qo‘shildi va kassaga yuborildi"
+    "saved": "Xarajat qo‘shildi va kassaga yuborildi",
+    "savedMany": "{count} ta xarajat qo‘shildi va kassaga yuborildi"
   },
   "cancelConfirm": "Bu xizmatni bemor hisobidan bekor qilasizmi?",
   "loadError": "Xarajatlarni yuklab bo‘lmadi. Sahifani yangilang.",

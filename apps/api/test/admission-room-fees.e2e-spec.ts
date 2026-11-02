@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+﻿import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { INestApplication } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
@@ -43,7 +43,7 @@ describe('calendar room fees (e2e)', () => {
     const p = await patient();
     const admittedAt = new Date(Date.now() - 2 * 86_400_000).toISOString();
     const created = await request(app.getHttpServer()).post(`${API}/admissions`).set(auth(recep))
-      .send({ patientId: p.id, ward: '4', bed: '2', dailyRoomRate: '100000.00', admittedAt }).expect(201);
+      .send({ patientId: p.id, ward: '4', bed: '2', dailyRoomRate: '100000.00', admittedAt, attendingDoctorName: 'Davolovchi Shifokor', homeAddress: 'Toshkent, Chilonzor' }).expect(201);
     const id = created.body.data.id as string;
     await scoped(() => Promise.all([rooms.reconcileAdmission(id), rooms.reconcileAdmission(id)]));
     const rows = await prisma.admissionRoomCharge.findMany({ where: { admissionId: id }, orderBy: { billingDate: 'asc' } });
@@ -61,7 +61,7 @@ describe('calendar room fees (e2e)', () => {
   it('adds a new date after partial payment without changing an earlier invoice or payment', async () => {
     const p = await patient();
     const res = await request(app.getHttpServer()).post(`${API}/admissions`).set(auth(recep))
-      .send({ patientId: p.id, dailyRoomRate: '100000.00' }).expect(201);
+      .send({ patientId: p.id, ward: '1', dailyRoomRate: '100000.00', attendingDoctorName: 'Davolovchi Shifokor', homeAddress: 'Toshkent, Chilonzor' }).expect(201);
     const id = res.body.data.id as string;
     const day = await prisma.admissionRoomCharge.findFirstOrThrow({ where: { admissionId: id } });
     const invoice = await invoiceFor(day.chargeItemId!);
@@ -98,7 +98,7 @@ describe('calendar room fees (e2e)', () => {
   it('starts a newly configured legacy stay today and records zero-price days without an invoice', async () => {
     const p = await patient();
     const created = await request(app.getHttpServer()).post(`${API}/admissions`).set(auth(recep))
-      .send({ patientId: p.id, admittedAt: new Date(Date.now() - 7 * 86_400_000).toISOString() }).expect(201);
+      .send({ patientId: p.id, ward: '1', admittedAt: new Date(Date.now() - 7 * 86_400_000).toISOString(), attendingDoctorName: 'Davolovchi Shifokor', homeAddress: 'Toshkent, Chilonzor' }).expect(201);
     const id = created.body.data.id as string;
     await request(app.getHttpServer()).patch(`${API}/admissions/${id}`).set(auth(recep)).send({ dailyRoomRate: '0.00' }).expect(200);
     const rows = await prisma.admissionRoomCharge.findMany({ where: { admissionId: id } });
@@ -115,7 +115,7 @@ describe('calendar room fees (e2e)', () => {
     const spy = vi.spyOn(app.get(InvoicesService), 'issueChargesInTransaction').mockRejectedValueOnce(new Error('simulated failure'));
     try {
       await request(app.getHttpServer()).post(`${API}/admissions`).set(auth(recep))
-        .send({ patientId: p.id, dailyRoomRate: '100000.00' }).expect(500);
+        .send({ patientId: p.id, ward: '1', dailyRoomRate: '100000.00', attendingDoctorName: 'Davolovchi Shifokor', homeAddress: 'Toshkent, Chilonzor' }).expect(500);
       expect(await prisma.admission.count({ where: { patientId: p.id } })).toBe(0);
       expect(await prisma.chargeItem.count({ where: { patientId: p.id } })).toBe(0);
     } finally { spy.mockRestore(); }
@@ -124,12 +124,12 @@ describe('calendar room fees (e2e)', () => {
     const p = await patient();
     for (const rate of ['-1', '0.001', '1000000000000.00']) {
       await request(app.getHttpServer()).post(`${API}/admissions`).set(auth(recep))
-        .send({ patientId: p.id, dailyRoomRate: rate }).expect(400);
+        .send({ patientId: p.id, ward: '1', dailyRoomRate: rate, attendingDoctorName: 'Davolovchi Shifokor', homeAddress: 'Toshkent, Chilonzor' }).expect(400);
     }
     expect(await prisma.admission.count({ where: { patientId: p.id } })).toBe(0);
     const other = await prisma.branch.create({ data: { clinicId: clinic.clinicId, name: 'Other branch' } });
     await request(app.getHttpServer()).post(`${API}/admissions`).set(auth(recep)).set('x-branch-id', other.id)
-      .send({ patientId: p.id, dailyRoomRate: '100000.00' }).expect(403);
+      .send({ patientId: p.id, ward: '1', dailyRoomRate: '100000.00', attendingDoctorName: 'Davolovchi Shifokor', homeAddress: 'Toshkent, Chilonzor' }).expect(403);
     const otherStay = await prisma.admission.create({ data: {
       clinicId: clinic.clinicId, branchId: other.id, patientId: p.id, historyNumber: `ROOM-${randomUUID()}`, admittedAt: new Date(),
       dailyRoomRate: '100000.00', roomBillingStartsOn: new Date(today()), roomBillingNextDate: new Date(today()), roomRateSetById: clinic.receptionist.id,
@@ -140,3 +140,4 @@ describe('calendar room fees (e2e)', () => {
   });
 
 });
+

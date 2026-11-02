@@ -16,6 +16,8 @@ TELEGRAM_CLINIC_ID=<klinika ID, ixtiyoriy>
 
 API qayta ishga tushiriladi. Token Git’ga kiritilmaydi. Token yo‘q paytda `TELEGRAM_ENABLED=false` qoladi; klinika paneli va PDF yuklash odatdagidek ishlaydi.
 
+`TELEGRAM_ENABLED=true` bo‘lsa, shu tokenni klinika serverining Holat/Tarmoq/Zaxira admin long-polling’i ishlatmaydi — Telegram bir update’ni faqat bitta `getUpdates` oluvchiga beradi. Zaxira va server holati xabarlari (`sendMessage`) bemor-bot yoqilganda ham ishlayveradi.
+
 `TELEGRAM_CLINIC_ID` bo‘sh bo‘lsa, yagona faol klinika avtomatik tanlanadi. Bir nechta faol klinika bo‘lsa, ID aniq belgilanmaguncha kirish yopiq qoladi. Bitta klinika rejimida bot bemorlar uchun ishlaydi: telefon ulash xodim yoki superadmin hisobini ochmaydi. Alohida bemor veb-kabineti o‘rnida Telegramga kirish sahifasi ko‘rsatiladi; portal OTP va oldin berilgan portal sessiyalari orqali shaxsiy ma’lumot olish yopiladi.
 
 Tasdiqlash kodlari faqat klinikaning o‘z Telegram botidagi ulangan shaxsiy chatga yuboriladi. Telegram’ning «Verification Codes» xizmati ishlatilmaydi; kod SMS yoki dastur jurnaliga yuborilmaydi. Botga ulanmagan hisob avval `/start` orqali o‘z raqamini ulashi kerak. Botga ulanmagan hisob Telegram kodi bilan kira olmaydi. Ikki bosqichli himoya yoqilgan bo‘lsa, botga kod yuborilmagani parolning o‘zi bilan kirishga ruxsat bermaydi. Bemorning bitta klinika rejimidagi bot orqali hujjat olish tartibi o‘zgarmaydi.
@@ -24,7 +26,7 @@ Tasdiqlash kodlari faqat klinikaning o‘z Telegram botidagi ulangan shaxsiy cha
 
 1. Botning shaxsiy chatida `/start` bosiladi.
 2. «Raqamni yuborish» tugmasidan o‘z telefon raqami yuboriladi. Raqam bemor kartasidagi asosiy telefon bilan mos bo‘lishi kerak. Boshqa odamning kontakti va guruh chatlari qabul qilinmaydi.
-3. «Tahlillarim», «UZI natijalarim», «Shifokor xulosalari» yoki «Hujjatlarim» tanlanadi. «Mening ma’lumotlarim» bemorning ismi, karta raqami, asosiy telefoni va tug‘ilgan sanasini ko‘rsatadi.
+3. «Tahlillarim», «UZI natijalarim», «Shifokor xulosalari», «Muolaja varaqasi» yoki «Hujjatlarim» tanlanadi. «Mening ma’lumotlarim» bemorning ismi, karta raqami, asosiy telefoni va tug‘ilgan sanasini ko‘rsatadi.
 4. Kerakli hujjat tugmasi bosilganda PDF yoki tasdiqlangan asl fayl yuboriladi. Eski hujjatlar sahifalanadi.
 5. `/unlink` orqali bog‘lanish uziladi.
 
@@ -36,7 +38,7 @@ Bot har bir yuklashda amaldagi telefon bog‘lanishi, bemor kartasi va hujjat ta
 
 Telefon boshqa Telegram chatiga qayta ulanganda eski chat yo‘nalishlari bitta tranzaksiyada o‘chiriladi. Navbatda turgan Telegram xabari ham yuborilishidan oldin egasini tekshiradi: eski chatga yetkazilmaydi. Kompyuter qayta ishga tushganda botning kutilayotgan buyruqlari tashlab yuborilmaydi. Klinika kompyuteri, API va internet ishlab turishi kerak.
 
-Laboratoriya natijasi faqat `APPROVED` yoki `DELIVERED` bo‘lganda ochiladi. Tahlilga biriktirilgan fayl ham tasdiqlangan natijaga aniq bog‘langan bo‘lishi kerak; oddiy ishchi ilova bemorga chiqmaydi. UZI va konsultatsiya PDF’i faqat `COMPLETED` xulosadan yaratiladi. Unda tasdiqlagan shifokor, vaqt, hujjat ID’si va mavjud bo‘lsa oxirgi tuzatishning muallifi/vaqti/sababi ko‘rsatiladi.
+Laboratoriya natijasi faqat `APPROVED` yoki `DELIVERED` bo‘lganda ochiladi. Tahlilga biriktirilgan fayl ham tasdiqlangan natijaga aniq bog‘langan bo‘lishi kerak; oddiy ishchi ilova bemorga chiqmaydi. UZI va konsultatsiya PDF’i faqat `COMPLETED` xulosadan yaratiladi. Unda tasdiqlagan shifokor, vaqt, hujjat ID’si va mavjud bo‘lsa oxirgi tuzatishning muallifi/vaqti/sababi ko‘rsatiladi. Muolaja varaqasi faol yoki chiqarilgan statsionar yozuv uchun PDF qilib yuboriladi (tayinlovlar va berilgan/o‘tkazilgan belgilari bilan).
 
 Bemor tasdiqlangan xulosani olishi uchun yana admin tasdig‘i so‘ralmaydi. Ko‘p klinikali rejimdagi portal va to‘liq kasallik tarixiga alohida ruxsat berish jarayoni `SINGLE_CLINIC_MODE=false` bo‘lganda saqlanadi.
 

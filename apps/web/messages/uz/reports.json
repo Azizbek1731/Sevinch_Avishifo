@@ -28,7 +28,8 @@
     "shifts": "Smenalar",
     "cashflow": "Kassa hisoboti",
     "consumables": "Dori va materiallar",
-    "lab-referrals": "Shifokorlar bo‘yicha yo‘llanmalar"
+    "lab-referrals": "Shifokorlar bo‘yicha yo‘llanmalar",
+    "doctor-activity": "Mening hisobotim"
   },
   "empty": {
     "title": "Ma'lumot yo'q",
@@ -232,5 +233,40 @@
     "retry": "Qayta yuklash",
     "doctorSummary": "{patients} bemor · {orders} yo‘llanma · {tests} tahlil",
     "doctorTotal": "Shifokor bo‘yicha jami"
+  },
+  "doctorActivity": {
+    "pageDescription": "Qabullaringiz, laboratoriyaga va UZI ga yuborgan yo‘llanmalaringiz narxlari bilan",
+    "title": "Shifokor hisoboti",
+    "description": "Tanlangan davrdagi qabullar va ulardan chiqgan laboratoriya / UZI yo‘llanmalari.",
+    "doctor": "Shifokor: {name}",
+    "visitsTitle": "Qabullar",
+    "visitsTotal": "Jami qabul",
+    "visitsCompleted": "Yakunlangan",
+    "visitsInProgress": "Davom etmoqda",
+    "visitsPatients": "Bemorlar",
+    "visitsListTitle": "Qabullar ro‘yxati",
+    "visitsEmpty": "Bu davrda qabul yo‘q.",
+    "labTitle": "Laboratoriyaga yo‘llanmalar",
+    "uziTitle": "UZI yo‘llanmalari",
+    "orders": "Yo‘llanmalar",
+    "items": "Xizmatlar / tahlillar",
+    "amount": "Jami summa",
+    "paidAmount": "To‘langan",
+    "unpaidHint": "To‘lanmagan: {amount}",
+    "labEmpty": "Bu davrda laboratoriya yo‘llanmasi yo‘q.",
+    "uziEmpty": "Bu davrda UZI yo‘llanmasi yo‘q.",
+    "colDate": "Sana",
+    "colPatient": "Bemor",
+    "colLab": "Tahlillar",
+    "colUzi": "UZI xizmatlari",
+    "colAmount": "Summa",
+    "colStatus": "Holat",
+    "paid": "To‘langan",
+    "unpaid": "To‘lov kutilmoqda",
+    "statusCompleted": "Yakunlangan",
+    "statusInProgress": "Davom etmoqda",
+    "statusCancelled": "Bekor qilingan",
+    "loadError": "Hisobotni yuklab bo‘lmadi.",
+    "retry": "Qayta yuklash"
   }
 }

@@ -29,10 +29,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useApiErrorToast } from '@/features/services/hooks';
 import { admissionsApi } from '../api';
 import { ChargesPanel } from './charges-panel';
+import { AdmissionReportsPanel } from './admission-reports';
 import { SurgeriesPanel } from '@/features/surgeries/components/surgeries-panel';
 import { TreatmentSheet } from './treatment-sheet';
 import { OrderDialog } from './order-dialog';
 import { DischargeDialog } from './discharge-dialog';
+import { AttendingDoctorCard } from './attending-doctor-card';
 import { RoomBillingCard } from './room-billing-card';
 
 /** One field of the 003 narrative, saved when it loses focus. */
@@ -149,7 +151,13 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
           <p className="text-sm text-muted-foreground">
             <span className="font-mono">{a.historyNumber}</span>
             {' · '}
-            {[a.department, a.ward && `${t('fields.ward')} ${a.ward}`, a.bed && `№${a.bed}`]
+            {[
+              a.attendingDoctor?.fullName &&
+                `${t('fields.attendingDoctor')}: ${a.attendingDoctor.fullName}`,
+              a.department,
+              a.ward && `${t('fields.roomNumber')} ${a.ward}`,
+              a.bed && `№${a.bed}`,
+            ]
               .filter(Boolean)
               .join(' · ')}
             {' · '}
@@ -203,6 +211,7 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AttendingDoctorCard admission={a} canEdit={canWrite} />
       <RoomBillingCard admission={a} canEdit={canWrite} />
 
       <Tabs defaultValue="sheet">
@@ -214,6 +223,7 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
           {can('charges.read') ? (
             <TabsTrigger value="charges">{t('tabs.charges')}</TabsTrigger>
           ) : null}
+          <TabsTrigger value="reports">{t('tabs.reports')}</TabsTrigger>
         </TabsList>
 
         {can('charges.read') ? (
@@ -221,6 +231,14 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
             <ChargesPanel patientId={a.patientId} admissionId={admissionId} allowAdd={!closed} />
           </TabsContent>
         ) : null}
+
+        <TabsContent value="reports" className="mt-4">
+          <AdmissionReportsPanel
+            patientId={a.patientId}
+            admittedAt={a.admittedAt}
+            dischargedAt={a.dischargedAt}
+          />
+        </TabsContent>
 
         {can('surgery.read') ? (
           <TabsContent value="surgeries" className="mt-4">

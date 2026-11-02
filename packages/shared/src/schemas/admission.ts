@@ -22,30 +22,55 @@ const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
 
 export const roomRateSchema = moneySchema.refine((value) => value.split('.')[0]!.replace(/^0+/, '').length <= 12, 'Room rate is too large');
 
-export const admitPatientSchema = z.object({
-  patientId: idSchema,
-  department: z.string().trim().max(120).optional(),
-  ward: z.string().trim().max(40).optional(),
-  bed: z.string().trim().max(40).optional(),
-  inpatientRoomId: idSchema.optional(),
-  dailyRoomRate: roomRateSchema.optional(),
-  attendingDoctorUserId: idSchema.optional(),
-  admittedAt: z.string().datetime().optional(),
-  referredBy: z.string().trim().max(200).optional(),
-  referralDiagnosis: z.string().trim().max(500).optional(),
-  admissionDiagnosis: z.string().trim().max(500).optional(),
-  firstTimeThisYear: z.coerce.boolean().optional(),
-});
+export const admitPatientSchema = z
+  .object({
+    patientId: idSchema,
+    department: z.string().trim().max(120).optional(),
+    /** Free-text room / palata number — informational only (no catalog bind). */
+    ward: z.string().trim().min(1, 'Xona raqamini kiriting').max(200),
+    bed: z.string().trim().max(40).optional(),
+    inpatientRoomId: idSchema.optional(),
+    dailyRoomRate: roomRateSchema.optional(),
+    attendingDoctorUserId: idSchema.optional(),
+    /** When the doctor is not in the staff roster. */
+    attendingDoctorName: z.string().trim().max(200).optional(),
+    /** Default true — generate KT-YYYY-NNNN. When false, historyNumber is required. */
+    autoHistoryNumber: z.coerce.boolean().optional().default(true),
+    historyNumber: z.string().trim().min(1).max(40).optional(),
+    homeAddress: z.string().trim().min(1, 'Uy manzilini kiriting').max(500),
+    admittedAt: z.string().datetime().optional(),
+    referredBy: z.string().trim().max(200).optional(),
+    referralDiagnosis: z.string().trim().max(500).optional(),
+    admissionDiagnosis: z.string().trim().max(500).optional(),
+    firstTimeThisYear: z.coerce.boolean().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.attendingDoctorUserId && !value.attendingDoctorName?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['attendingDoctorUserId'],
+        message: 'Shifokorni tanlang yoki ismini yozing',
+      });
+    }
+    if (value.autoHistoryNumber === false && !value.historyNumber?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['historyNumber'],
+        message: 'Kasallik tarixi raqamini kiriting',
+      });
+    }
+  });
 export type AdmitPatientInput = z.infer<typeof admitPatientSchema>;
 
 /** The 003 narrative fields, saved as the doctor fills them in. */
 export const updateAdmissionSchema = z.object({
   department: z.string().trim().max(120).optional(),
-  ward: z.string().trim().max(40).optional(),
+  ward: z.string().trim().max(200).optional(),
   bed: z.string().trim().max(40).optional(),
   inpatientRoomId: idSchema.nullable().optional(),
   dailyRoomRate: roomRateSchema.optional(),
   attendingDoctorUserId: idSchema.nullable().optional(),
+  attendingDoctorName: z.string().trim().max(200).nullable().optional(),
   referredBy: z.string().trim().max(200).optional(),
   referralDiagnosis: z.string().trim().max(500).optional(),
   admissionDiagnosis: z.string().trim().max(500).optional(),
@@ -143,6 +168,8 @@ export const addChargeSchema = z.object({
   unitPrice: moneySchema.optional(),
   visitId: idSchema.optional(),
   admissionId: idSchema.optional(),
+  /** Cashier only — do not open laboratory / clinical work from this charge. */
+  cashierOnly: z.boolean().optional(),
 });
 export type AddChargeInput = z.infer<typeof addChargeSchema>;
 

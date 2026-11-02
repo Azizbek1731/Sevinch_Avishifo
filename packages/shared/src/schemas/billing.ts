@@ -37,6 +37,13 @@ export const createInvoiceSchema = z
     patientId: idSchema,
     branchId: idSchema,
     visitId: idSchema.optional(),
+    /** Optional cashier-facing note (e.g. reception free-form entry). */
+    note: z.string().trim().max(500).optional(),
+    /**
+     * Bill only — no laboratory / UZI / doctor clinical handoff is opened.
+     * The sale ends when the cashier collects payment.
+     */
+    cashierOnly: z.boolean().optional(),
     lines: z.array(invoiceLineSchema).min(1).optional(),
   })
   .refine((v) => v.visitId !== undefined || v.lines !== undefined, {
@@ -87,6 +94,9 @@ export const quickInvoiceSchema = z
     patientId: idSchema,
     branchId: idSchema,
     visitId: idSchema.optional(),
+    note: z.string().trim().max(500).optional(),
+    /** Cashier desk only — skip lab / clinical worklist creation. */
+    cashierOnly: z.boolean().optional(),
     lines: z.array(invoiceLineSchema).min(1),
     settle: z.enum(INVOICE_SETTLEMENTS),
     /**

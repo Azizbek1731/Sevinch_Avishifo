@@ -28,7 +28,8 @@
     "shifts": "Сменалар",
     "cashflow": "Касса ҳисоботи",
     "consumables": "Дори ва материаллар",
-    "lab-referrals": "Шифокорлар бўйича йўлланмалар"
+    "lab-referrals": "Шифокорлар бўйича йўлланмалар",
+    "doctor-activity": "Менинг ҳисоботим"
   },
   "empty": {
     "title": "Маълумот йўқ",
@@ -232,5 +233,40 @@
     "retry": "Қайта юклаш",
     "doctorSummary": "{patients} бемор · {orders} йўлланма · {tests} таҳлил",
     "doctorTotal": "Шифокор бўйича жами"
+  },
+  "doctorActivity": {
+    "pageDescription": "Қабулларингиз, лабораторияга ва УЗИ га юборган йўлланмаларингиз нархлари билан",
+    "title": "Шифокор ҳисоботи",
+    "description": "Танланган даврдаги қабуллар ва улардан чиққан лаборатория / УЗИ йўлланмалари.",
+    "doctor": "Шифокор: {name}",
+    "visitsTitle": "Қабуллар",
+    "visitsTotal": "Жами қабул",
+    "visitsCompleted": "Якунланган",
+    "visitsInProgress": "Давом этмоқда",
+    "visitsPatients": "Беморлар",
+    "visitsListTitle": "Қабуллар рўйхати",
+    "visitsEmpty": "Бу даврда қабул йўқ.",
+    "labTitle": "Лабораторияга йўлланмалар",
+    "uziTitle": "УЗИ йўлланмалари",
+    "orders": "Йўлланмалар",
+    "items": "Хизматлар / таҳлиллар",
+    "amount": "Жами сумма",
+    "paidAmount": "Тўланган",
+    "unpaidHint": "Тўланмаган: {amount}",
+    "labEmpty": "Бу даврда лаборатория йўлланмаси йўқ.",
+    "uziEmpty": "Бу даврда УЗИ йўлланмаси йўқ.",
+    "colDate": "Сана",
+    "colPatient": "Бемор",
+    "colLab": "Таҳлиллар",
+    "colUzi": "УЗИ хизматлари",
+    "colAmount": "Сумма",
+    "colStatus": "Ҳолат",
+    "paid": "Тўланган",
+    "unpaid": "Тўлов кутилмоқда",
+    "statusCompleted": "Якунланган",
+    "statusInProgress": "Давом этмоқда",
+    "statusCancelled": "Бекор қилинган",
+    "loadError": "Ҳисоботни юклаб бўлмади.",
+    "retry": "Қайта юклаш"
   }
 }

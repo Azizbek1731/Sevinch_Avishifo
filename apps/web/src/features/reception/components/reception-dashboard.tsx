@@ -5,10 +5,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import {
   ArrowRight,
+  Banknote,
   BedDouble,
   ClipboardList,
   FlaskConical,
   ListPlus,
+  PenLine,
   Receipt,
   UserPlus,
   Stethoscope,
@@ -27,6 +29,7 @@ import { AppointmentsPanel } from './appointments-panel';
 import { QueuePanel } from './queue-panel';
 import { NewPatientDialog } from './new-patient-dialog';
 import { WalkInDialog } from './walk-in-dialog';
+import { ManualEntryDialog } from './manual-entry-dialog';
 import { ClinicalOrderDialog } from '@/features/clinical-orders/components/order-dialog';
 import { ClinicalWorklist } from '@/features/clinical-orders/components/worklist';
 import type { ClinicalKind } from '@/features/clinical-orders/api';
@@ -47,6 +50,8 @@ export function ReceptionDashboard() {
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [addServicesOpen, setAddServicesOpen] = useState(false);
   const [serviceKind, setServiceKind] = useState<'LAB' | undefined>();
+  const [cashierOnlyOpen, setCashierOnlyOpen] = useState(false);
+  const [manualEntryOpen, setManualEntryOpen] = useState(false);
   const [admitPickerOpen, setAdmitPickerOpen] = useState(false);
   const [admitPatient, setAdmitPatient] = useState<{ id: string; fullName: string } | null>(null);
 
@@ -96,6 +101,15 @@ export function ReceptionDashboard() {
           <>
             <button
               type="button"
+              className="rounded-xl border-2 border-primary/40 bg-primary/5 p-5 text-left shadow-sm transition-colors hover:border-primary hover:bg-primary/10 sm:col-span-2"
+              onClick={() => setCashierOnlyOpen(true)}
+            >
+              <Banknote className="mb-4 h-7 w-7 text-primary" />
+              <p className="text-lg font-semibold">{t('workflow.cashierOnly')}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t('workflow.cashierOnlyHint')}</p>
+            </button>
+            <button
+              type="button"
               className="rounded-xl border bg-card p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
               onClick={() => setClinicalKind('CONSULTATION')}
             >
@@ -137,6 +151,15 @@ export function ReceptionDashboard() {
               <p className="mt-1 text-sm text-muted-foreground">
                 {t(SINGLE_CLINIC_MODE ? 'workflow.labPaidHint' : 'workflow.labHint')}
               </p>
+            </button>
+            <button
+              type="button"
+              className="rounded-xl border bg-card p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
+              onClick={() => setManualEntryOpen(true)}
+            >
+              <PenLine className="mb-4 h-6 w-6 text-primary" />
+              <p className="font-semibold">{t('workflow.manual')}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t('workflow.manualHint')}</p>
             </button>
           </>
         ) : null}
@@ -202,6 +225,14 @@ export function ReceptionDashboard() {
         initialKind={serviceKind}
         prepareOnly
       />
+      <AddServicesDialog
+        key="cashier-only"
+        open={cashierOnlyOpen}
+        onOpenChange={setCashierOnlyOpen}
+        prepareOnly
+        cashierOnly
+      />
+      <ManualEntryDialog open={manualEntryOpen} onOpenChange={setManualEntryOpen} />
       <AdmitPickerDialog
         open={admitPickerOpen}
         onOpenChange={setAdmitPickerOpen}

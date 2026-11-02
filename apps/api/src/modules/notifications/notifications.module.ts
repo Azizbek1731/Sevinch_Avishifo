@@ -18,6 +18,7 @@ import { PlatformAlertsService } from './platform-alerts.service';
 // stateless class with no dependencies — a second provider instance is free.
 import { ResultPdfService } from '../lab/result-pdf.service';
 import { VisitReportPdfService } from '../visits/visit-report-pdf.service';
+import { TreatmentSheetPdfService } from '../admissions/treatment-sheet-pdf.service';
 import { TelegramPatientAccessService } from './telegram-patient-access.service';
 
 /**
@@ -39,6 +40,7 @@ import { TelegramPatientAccessService } from './telegram-patient-access.service'
     PlatformAlertsService,
     ResultPdfService,
     VisitReportPdfService,
+    TreatmentSheetPdfService,
     TelegramPatientAccessService,
   ],
   // SMS remains available for ordinary notifications; authentication uses the bot.
@@ -48,6 +50,7 @@ import { TelegramPatientAccessService } from './telegram-patient-access.service'
     TelegramChannel,
     PlatformAlertsService,
     VisitReportPdfService,
+    TreatmentSheetPdfService,
     TelegramPatientAccessService,
   ],
 })

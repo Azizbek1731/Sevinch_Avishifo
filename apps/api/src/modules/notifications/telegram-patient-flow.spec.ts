@@ -11,6 +11,7 @@ import type {
 } from './telegram-patient-access.service';
 import type { ResultPdfService } from '../lab/result-pdf.service';
 import type { VisitReportPdfService } from '../visits/visit-report-pdf.service';
+import type { TreatmentSheetPdfService } from '../admissions/treatment-sheet-pdf.service';
 import { TelegramBotService } from './telegram-bot.service';
 
 interface PatientHandlers {
@@ -56,6 +57,7 @@ function harness(state: TelegramPatientAccessResult = { status: 'UNLINKED', pati
     {} as ResultPdfService,
     access as unknown as TelegramPatientAccessService,
     {} as VisitReportPdfService,
+    {} as TreatmentSheetPdfService,
   ) as unknown as PatientHandlers;
   const reply = vi.fn().mockResolvedValue({});
   const ctx = {

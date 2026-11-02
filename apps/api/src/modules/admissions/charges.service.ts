@@ -103,6 +103,7 @@ export class ChargesService {
       visitId: dto.visitId ?? null, serviceId: dto.serviceId ?? null,
       title: dto.title ?? null, date: dto.date, quantity: dto.quantity,
       unitPrice: dto.unitPrice === undefined ? null : new Prisma.Decimal(dto.unitPrice).toFixed(2),
+      cashierOnly: dto.cashierOnly === true,
     })).digest('hex');
     const result = await this.prisma.db.$transaction(async (tx) => {
       if (dto.idempotencyKey) {
@@ -179,9 +180,12 @@ export class ChargesService {
           requestFingerprint: dto.idempotencyKey ? requestFingerprint : null,
         },
       });
-      // Inpatient: leave on the stay account until discharge. Walk-in: bill now.
-      if (!dto.admissionId) {
-        await this.invoices.issueChargesInTransaction(tx, [charge.id], user, branchId);
+      // Cashier-only: bill now without lab/clinical handoff. Walk-in: bill now.
+      // Inpatient care orders: stay PENDING (lab worklist prepared for LAB).
+      if (dto.cashierOnly || !dto.admissionId) {
+        await this.invoices.issueChargesInTransaction(tx, [charge.id], user, branchId, {
+          skipLab: dto.cashierOnly === true,
+        });
       } else if (serviceKind === 'LAB' && dto.serviceId) {
         await this.lab.prepareInpatientOrderForCharge(tx, {
           patientId: dto.patientId,

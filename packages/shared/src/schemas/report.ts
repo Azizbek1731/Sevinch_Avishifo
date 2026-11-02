@@ -167,3 +167,64 @@ export interface LabReferralReport {
   >;
   periods: Array<LabReferralCounts & { bucket: string }>;
 }
+
+/** Doctor self-service: consultations + outbound lab/UZI referrals with prices. */
+export const doctorActivityQuerySchema = labReferralReportQuerySchema;
+export type DoctorActivityQueryInput = z.infer<typeof doctorActivityQuerySchema>;
+
+export interface DoctorActivityMoneyCounts {
+  patients: number;
+  orders: number;
+  items: number;
+  amount: string;
+  paidAmount: string;
+  unpaidAmount: string;
+}
+
+export interface DoctorActivityReferralLine {
+  id: string;
+  date: string;
+  patientName: string;
+  patientMrn: string;
+  title: string;
+  amount: string;
+  paid: boolean;
+}
+
+export interface DoctorActivityVisitLine {
+  id: string;
+  date: string;
+  patientName: string;
+  patientMrn: string;
+  status: 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  kind: string;
+}
+
+export interface DoctorActivityReport {
+  from: string;
+  to: string;
+  branchId: string;
+  timezone: string;
+  groupBy: 'day' | 'week' | 'month';
+  doctorUserId: string;
+  doctorName: string;
+  visits: {
+    total: number;
+    completed: number;
+    inProgress: number;
+    patients: number;
+  };
+  lab: DoctorActivityMoneyCounts;
+  ultrasound: DoctorActivityMoneyCounts;
+  visitLines: DoctorActivityVisitLine[];
+  labLines: DoctorActivityReferralLine[];
+  ultrasoundLines: DoctorActivityReferralLine[];
+  periods: Array<{
+    bucket: string;
+    visits: number;
+    labOrders: number;
+    labAmount: string;
+    ultrasoundOrders: number;
+    ultrasoundAmount: string;
+  }>;
+}

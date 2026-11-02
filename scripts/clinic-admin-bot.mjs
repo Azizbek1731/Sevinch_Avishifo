@@ -248,7 +248,8 @@ export async function handleAdminUpdate(update, context) {
 }
 
 /**
- * Long-polls Telegram for admin commands. Patient TELEGRAM_ENABLED stays off.
+ * Long-polls Telegram for admin Holat/Tarmoq/Zaxira.
+ * Must not run while the patient bot uses the same token (TELEGRAM_ENABLED=true).
  */
 export async function runAdminBot({
   token,

@@ -28,7 +28,8 @@
     "shifts": "Shifts",
     "cashflow": "Cashflow",
     "consumables": "Medicines & materials",
-    "lab-referrals": "Referrals by doctor"
+    "lab-referrals": "Referrals by doctor",
+    "doctor-activity": "My report"
   },
   "empty": {
     "title": "No data",
@@ -232,5 +233,40 @@
     "retry": "Retry",
     "doctorSummary": "{patients} patients · {orders} referrals · {tests} tests",
     "doctorTotal": "Doctor total"
+  },
+  "doctorActivity": {
+    "pageDescription": "Your consultations and lab / ultrasound referrals with prices",
+    "title": "Doctor report",
+    "description": "Consultations in the selected period and lab / ultrasound referrals made from them.",
+    "doctor": "Doctor: {name}",
+    "visitsTitle": "Consultations",
+    "visitsTotal": "Total visits",
+    "visitsCompleted": "Completed",
+    "visitsInProgress": "In progress",
+    "visitsPatients": "Patients",
+    "visitsListTitle": "Visit list",
+    "visitsEmpty": "No visits in this period.",
+    "labTitle": "Laboratory referrals",
+    "uziTitle": "Ultrasound referrals",
+    "orders": "Referrals",
+    "items": "Tests / services",
+    "amount": "Total amount",
+    "paidAmount": "Paid",
+    "unpaidHint": "Unpaid: {amount}",
+    "labEmpty": "No laboratory referrals in this period.",
+    "uziEmpty": "No ultrasound referrals in this period.",
+    "colDate": "Date",
+    "colPatient": "Patient",
+    "colLab": "Tests",
+    "colUzi": "Ultrasound services",
+    "colAmount": "Amount",
+    "colStatus": "Status",
+    "paid": "Paid",
+    "unpaid": "Awaiting payment",
+    "statusCompleted": "Completed",
+    "statusInProgress": "In progress",
+    "statusCancelled": "Cancelled",
+    "loadError": "Could not load the report.",
+    "retry": "Retry"
   }
 }

@@ -195,3 +195,11 @@ export function useLabReferralReport(filters: ReportFilters, doctorUserId?: stri
     refetchInterval: 30_000,
   });
 }
+
+export function useDoctorActivityReport(filters: ReportFilters, doctorUserId?: string) {
+  return useQuery({
+    queryKey: ['reports', 'doctor-activity', { ...filters, doctorUserId }],
+    queryFn: () => reportsApi.doctorActivity(filters, doctorUserId),
+    refetchInterval: 30_000,
+  });
+}

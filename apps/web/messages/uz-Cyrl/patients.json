@@ -34,7 +34,8 @@
     "notFound": "Бемор топилмади",
     "loadError": "Маълумотни юклаб бўлмади",
     "backToList": "Беморлар рўйхатига қайтиш",
-    "addServices": "Хизмат қўшиш"
+    "addServices": "Хизмат қўшиш",
+    "cashierOnly": "Фақат касса"
   },
   "tabs": {
     "overview": "Умумий",
@@ -210,7 +211,8 @@
     "empty": "Ҳисоб-фактуралар йўқ",
     "addServices": "Хизмат қўшиш",
     "addServicesTitle": "Стационар / бир нечта хизмат",
-    "addServicesHint": "Бир нечта хизматни белгилаб, битта чек чиқаринг"
+    "addServicesHint": "Бир нечта хизматни белгилаб, битта чек чиқаринг",
+    "cashierOnly": "Фақат касса"
   },
   "invoiceStatus": {
     "DRAFT": "Қоралама",

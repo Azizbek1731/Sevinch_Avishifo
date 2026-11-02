@@ -16,6 +16,7 @@ import { TenantContext } from '../../core/prisma/tenant-context';
 import { AuditService } from '../../core/audit/audit.service';
 import { SequenceService } from '../../core/sequence/sequence.service';
 import { PricingService } from '../services/pricing.service';
+import { ensureDoctorConsultationService } from '../services/doctor-consult-service';
 import { AddClinicalServicesDto, ClinicalOrderQueryDto, CreateClinicalOrderDto } from './dto';
 
 const INCLUDE = {
@@ -88,9 +89,10 @@ export class ClinicalOrdersService {
     this.scope(user, branchId);
     // User is outside automatic tenant scoping. Return only booking information,
     // with the same clinic, status and branch criteria as order creation.
+    const clinicId = TenantContext.requireClinicId();
     const doctors = await this.prisma.unscoped.user.findMany({
       where: {
-        clinicId: TenantContext.requireClinicId(),
+        clinicId,
         role: 'DOCTOR',
         status: 'ACTIVE',
         deletedAt: null,
@@ -99,6 +101,14 @@ export class ClinicalOrdersService {
       select: { id: true, fullName: true, staffProfile: { select: { specialty: true } } },
       orderBy: { fullName: 'asc' },
     });
+    // Missing "shifokor qabuli" rows (or prices) are created at 0 so'm so reception can bill.
+    for (const doctor of doctors) {
+      await ensureDoctorConsultationService(this.prisma.db, {
+        clinicId,
+        fullName: doctor.fullName,
+        specialty: doctor.staffProfile?.specialty ?? null,
+      });
+    }
     return doctors.map((doctor) => ({
       id: doctor.id,
       fullName: doctor.fullName,
@@ -193,7 +203,7 @@ export class ClinicalOrdersService {
         { initialInvoice: { number: { contains: query.search, mode: 'insensitive' } } },
       ];
     const unpaidInvoice = {
-      status: { in: ['DRAFT', 'ISSUED', 'PARTIALLY_PAID'] as const },
+      status: { in: ['DRAFT', 'ISSUED', 'PARTIALLY_PAID'] as Array<'DRAFT' | 'ISSUED' | 'PARTIALLY_PAID'> },
       refunds: { none: {} },
     };
     const onWardPatient = {
@@ -280,7 +290,7 @@ export class ClinicalOrdersService {
   ) {
     const base = { ...this.scope(user, branchId), kind };
     const unpaid = {
-      status: { in: ['DRAFT', 'ISSUED', 'PARTIALLY_PAID'] as const },
+      status: { in: ['DRAFT', 'ISSUED', 'PARTIALLY_PAID'] as Array<'DRAFT' | 'ISSUED' | 'PARTIALLY_PAID'> },
       refunds: { none: {} },
     };
     const onWardPatient = {

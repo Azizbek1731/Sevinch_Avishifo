@@ -10,6 +10,7 @@ import type { NotificationsService } from './notifications.service';
 import type { TelegramPatientAccessService } from './telegram-patient-access.service';
 import type { ResultPdfService } from '../lab/result-pdf.service';
 import type { VisitReportPdfService } from '../visits/visit-report-pdf.service';
+import type { TreatmentSheetPdfService } from '../admissions/treatment-sheet-pdf.service';
 
 interface Handlers {
   registerHandlers(bot: Bot): void;
@@ -37,6 +38,7 @@ function harness() {
     { render: vi.fn() } as unknown as ResultPdfService,
     { patientIds } as unknown as TelegramPatientAccessService,
     { render: vi.fn() } as unknown as VisitReportPdfService,
+    { render: vi.fn(), pickServiceTitle: vi.fn() } as unknown as TreatmentSheetPdfService,
   ) as unknown as Handlers;
   const reply = vi.fn().mockResolvedValue({});
   const replyWithDocument = vi.fn();

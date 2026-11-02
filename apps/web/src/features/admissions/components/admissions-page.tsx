@@ -93,6 +93,7 @@ export function AdmissionsPage() {
                 <TableRow>
                   <TableHead>{t('table.history')}</TableHead>
                   <TableHead>{t('table.patient')}</TableHead>
+                  <TableHead>{t('table.doctor')}</TableHead>
                   <TableHead>{t('table.place')}</TableHead>
                   <TableHead>{t('table.admitted')}</TableHead>
                   <TableHead>{t('table.days')}</TableHead>
@@ -124,6 +125,9 @@ export function AdmissionsPage() {
                         </Link>
                       </TableCell>
                       <TableCell className="font-medium">{a.patient?.fullName ?? '—'}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {a.attendingDoctor?.fullName ?? a.attendingDoctorName ?? '—'}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {[a.department, a.ward && `${t('fields.ward')} ${a.ward}`, a.bed && `№${a.bed}`]
                           .filter(Boolean)

@@ -62,6 +62,11 @@ export interface AddServicesDialogProps {
   visitId?: string;
   initialKind?: 'LAB';
   prepareOnly?: boolean;
+  /**
+   * Cashier desk only: any catalogue service may be sold, but lab / UZI /
+   * doctor worklists are not opened — payment ends the sale.
+   */
+  cashierOnly?: boolean;
 }
 
 /**
@@ -77,6 +82,7 @@ export function AddServicesDialog({
   visitId,
   initialKind,
   prepareOnly = false,
+  cashierOnly = false,
 }: AddServicesDialogProps) {
   const t = useTranslations('billing');
   const errorToast = useApiErrorToast();
@@ -87,18 +93,22 @@ export function AddServicesDialog({
   const activeBranchId = useAuthStore((s) => s.activeBranchId);
 
   const canPay = !prepareOnly && can('payments.create');
-  const isLab = initialKind === 'LAB';
-  const isProcedureOrder = prepareOnly && !isLab;
-  const titleKey = isLab
-    ? 'quick.labTitle'
-    : isProcedureOrder
-      ? 'quick.proceduresTitle'
-      : 'quick.title';
-  const subtitleKey = isLab
-    ? 'quick.labSubtitle'
-    : isProcedureOrder
-      ? 'quick.proceduresSubtitle'
-      : 'quick.subtitle';
+  const isLab = !cashierOnly && initialKind === 'LAB';
+  const isProcedureOrder = !cashierOnly && prepareOnly && !isLab;
+  const titleKey = cashierOnly
+    ? 'quick.cashierOnlyTitle'
+    : isLab
+      ? 'quick.labTitle'
+      : isProcedureOrder
+        ? 'quick.proceduresTitle'
+        : 'quick.title';
+  const subtitleKey = cashierOnly
+    ? 'quick.cashierOnlySubtitle'
+    : isLab
+      ? 'quick.labSubtitle'
+      : isProcedureOrder
+        ? 'quick.proceduresSubtitle'
+        : 'quick.subtitle';
 
   const [patient, setPatient] = useState<PatientBrief | null>(fixedPatient ?? null);
   /** Selected service per field-array row, keyed by RHF field id. */
@@ -136,7 +146,7 @@ export function AddServicesDialog({
       branchId: activeBranchId ?? '',
       lines: [{ ...EMPTY_LINE }],
     });
-  }, [open, fixedPatient, activeBranchId, initialKind, prepareOnly, form]);
+  }, [open, fixedPatient, activeBranchId, initialKind, prepareOnly, cashierOnly, form]);
 
   // Cash needs an open shift — warn before the server refuses the payment.
   const { data: shift } = useQuery({
@@ -154,6 +164,7 @@ export function AddServicesDialog({
         visitId,
         lines: values.lines ?? [],
         settle,
+        ...(cashierOnly ? { cashierOnly: true } : {}),
         ...(settle === 'PAY_NOW'
           ? {
               payments:
@@ -175,7 +186,7 @@ export function AddServicesDialog({
       onOpenChange(false);
       // A sold lab service just landed on the laboratory worklist — say so,
       // or the desk walks the patient to a lab that has never heard of them.
-      if (labOrder) {
+      if (labOrder && !cashierOnly) {
         toast.info(t('quick.labOrdered', { number: labOrder.orderNumber }));
       }
       if (paid) {
@@ -259,6 +270,9 @@ export function AddServicesDialog({
 
             <div className="space-y-2">
               <Label>{t(isLab ? 'quick.tests' : 'form.lines')}</Label>
+              {cashierOnly ? (
+                <p className="text-sm text-muted-foreground">{t('quick.cashierOnlyHint')}</p>
+              ) : null}
               {isProcedureOrder ? (
                 <p className="text-sm text-muted-foreground">{t('quick.proceduresHint')}</p>
               ) : null}
@@ -279,8 +293,8 @@ export function AddServicesDialog({
                         </span>
                         <ServiceCombobox
                           excludeSurgery
-                          kind={initialKind}
-                          proceduresOnly={isProcedureOrder}
+                          kind={cashierOnly ? undefined : initialKind}
+                          proceduresOnly={!cashierOnly && isProcedureOrder}
                           value={rowServices[field.id] ?? null}
                           onChange={(s) => {
                             setRowServices((prev) => ({ ...prev, [field.id]: s }));

@@ -18,6 +18,7 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { CreateUserDto, PermissionOverridesDto, UpdateUserDto, UpdateUserStatusDto, UserQueryDto } from './dto/user.dto';
+import { ensureDoctorConsultationService } from '../services/doctor-consult-service';
 
 /**
  * TENANCY NOTE (justification for prisma.unscoped):
@@ -208,6 +209,13 @@ export class UsersService {
         staffProfile: response.staffProfile,
       },
     });
+    if (user.role === UserRole.DOCTOR) {
+      await ensureDoctorConsultationService(this.prisma.db, {
+        clinicId,
+        fullName: user.fullName,
+        specialty: user.staffProfile?.specialty ?? null,
+      });
+    }
     return response;
   }
 
@@ -282,6 +290,14 @@ export class UsersService {
       entityId: id,
       ...this.buildUpdateDiff(existing, input),
     });
+
+    if (updated.role === UserRole.DOCTOR && updated.status === UserStatus.ACTIVE) {
+      await ensureDoctorConsultationService(this.prisma.db, {
+        clinicId,
+        fullName: updated.fullName,
+        specialty: updated.staffProfile?.specialty ?? null,
+      });
+    }
 
     return this.toResponse(updated);
   }

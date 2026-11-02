@@ -120,6 +120,8 @@ describe('admissions and charges (e2e)', () => {
         ward: '3',
         bed: '2',
         admissionDiagnosis: 'Pnevmoniya',
+        attendingDoctorName: 'Davolovchi Shifokor',
+        homeAddress: 'Toshkent, Chilonzor',
       })
       .expect(201);
     admissionId = res.body.data.id as string;
@@ -135,7 +137,7 @@ describe('admissions and charges (e2e)', () => {
     const res = await request(app.getHttpServer())
       .post(`${API}/admissions`)
       .set(auth(recep))
-      .send({ patientId });
+      .send({ patientId, ward: '1', attendingDoctorName: 'X', homeAddress: 'A' });
     expect(res.status).toBe(409);
   });
 
@@ -144,10 +146,10 @@ describe('admissions and charges (e2e)', () => {
       .patch(`${API}/admissions/${admissionId}`)
       .set(auth(doctor))
       .send({
-        complaints: 'Yo‘tal, nafas qisishi',
+        complaints: "Yo'tal, nafas qisishi",
         anamnesisMorbi: '3 kun oldin boshlangan',
-        objectiveStatus: 'Umumiy ahvoli o‘rtacha og‘ir',
-        preliminaryDiagnosis: 'O‘ng tomonlama pnevmoniya',
+        objectiveStatus: "Umumiy ahvoli o'rtacha og'ir",
+        preliminaryDiagnosis: "O'ng tomonlama pnevmoniya",
         clinicalDiagnosis: 'J18.9',
         clinicalDiagnosisAt: day(0),
       })
@@ -157,7 +159,7 @@ describe('admissions and charges (e2e)', () => {
       .get(`${API}/admissions/${admissionId}`)
       .set(auth(doctor))
       .expect(200);
-    expect(got.body.data.complaints).toContain('Yo‘tal');
+    expect(got.body.data.complaints).toContain("Yo'tal");
     expect(got.body.data.clinicalDiagnosisAt).toBe(day(0));
   });
 
@@ -219,7 +221,12 @@ describe('admissions and charges (e2e)', () => {
     const admitted = await request(app.getHttpServer())
       .post(`${API}/admissions`)
       .set(auth(recep))
-      .send({ patientId: p.id })
+      .send({
+        patientId: p.id,
+        ward: '1',
+        attendingDoctorName: 'Davolovchi Shifokor',
+        homeAddress: 'Toshkent',
+      })
       .expect(201);
     const stay = admitted.body.data.id as string;
     const order = await request(app.getHttpServer())
@@ -406,7 +413,7 @@ describe('admissions and charges (e2e)', () => {
   });
 
   it('reports the automatically issued unpaid invoice and its exact debt', async () => {
-    // The stay is now reachable from its invoice — the link that makes a debt
+    // The stay is now reachable from its invoice вЂ” the link that makes a debt
     // gate possible at all.
     const check = await request(app.getHttpServer())
       .get(`${API}/admissions/${admissionId}/discharge-check`)
@@ -481,7 +488,7 @@ describe('admissions and charges (e2e)', () => {
       .set(auth(doctor))
       .send({
         outcome: 'RECOVERED',
-        finalDiagnosisMain: 'J18.9 O‘ng tomonlama pnevmoniya',
+        finalDiagnosisMain: "J18.9 O'ng tomonlama pnevmoniya",
         epicrisis: 'Ahvoli yaxshilandi, uyga chiqarildi',
       })
       .expect(201);
@@ -504,14 +511,14 @@ describe('admissions and charges (e2e)', () => {
     const again = await request(app.getHttpServer())
       .post(`${API}/admissions`)
       .set(auth(doctor))
-      .send({ patientId, ward: '2', bed: '3' })
+      .send({ patientId, ward: '2', bed: '3', attendingDoctorName: 'Davolovchi Shifokor', homeAddress: 'Toshkent' })
       .expect(201);
     expect(again.body.data.historyNumber).not.toBe(historyNumber);
 
     const p = await prisma.patient.findUniqueOrThrow({ where: { id: patientId } });
     expect(p.careType).toBe('INPATIENT');
 
-    // And the first stay stays closed — a re-admission is a NEW history.
+    // And the first stay stays closed вЂ” a re-admission is a NEW history.
     const old = await prisma.admission.findUniqueOrThrow({ where: { id: admissionId } });
     expect(old.status).toBe('DISCHARGED');
   });
@@ -537,7 +544,7 @@ describe('admissions and charges (e2e)', () => {
     expect(blocked.status).toBe(409);
     expect(blocked.body.error.code).toBe('ADMISSION_DEBT_UNPAID');
 
-    // ...and the doctor cannot force it either — that is a desk decision.
+    // ...and the doctor cannot force it either вЂ” that is a desk decision.
     const forbidden = await request(app.getHttpServer())
       .post(`${API}/admissions/${stay.id}/discharge`)
       .set(auth(doctor))
@@ -576,7 +583,7 @@ describe('admissions and charges (e2e)', () => {
       await request(app.getHttpServer())
         .post(`${API}/admissions`)
         .set(auth(recep))
-        .send({ patientId: p3.id })
+        .send({ patientId: p3.id, ward: '1', attendingDoctorName: 'Davolovchi Shifokor', homeAddress: 'Toshkent' })
         .expect(201)
     ).body.data.id as string;
     const charge = (
@@ -595,7 +602,7 @@ describe('admissions and charges (e2e)', () => {
       .expect(201);
 
     // Cancelling the bill hands the service back rather than leaving it claimed
-    // by an invoice that no longer exists — the state nothing could get out of.
+    // by an invoice that no longer exists вЂ” the state nothing could get out of.
     const back = await prisma.chargeItem.findUniqueOrThrow({ where: { id: charge } });
     expect(back.status).toBe('PENDING');
     expect(back.invoiceLineId).toBeNull();
@@ -622,7 +629,7 @@ describe('admissions and charges (e2e)', () => {
       await request(app.getHttpServer())
         .post(`${API}/admissions`)
         .set(auth(recep))
-        .send({ patientId: p4.id })
+        .send({ patientId: p4.id, ward: '1', attendingDoctorName: 'Davolovchi Shifokor', homeAddress: 'Toshkent' })
         .expect(201)
     ).body.data.id as string;
     await request(app.getHttpServer())
@@ -656,7 +663,7 @@ describe('admissions and charges (e2e)', () => {
       .post(`${API}/admissions/${admissionId}/administrations`)
       .set(auth(recep))
       .send({ orderId: treatmentOrderId, date: day(0), status: 'SKIPPED' });
-    // The stay is discharged, so the history is closed — either answer is a
+    // The stay is discharged, so the history is closed вЂ” either answer is a
     // refusal, and both are the correct one.
     expect([409, 400]).toContain(res.status);
   });
@@ -681,7 +688,7 @@ describe('admissions and charges (e2e)', () => {
     expect(d.admission.historyNumber).toMatch(/^KT-/);
     // Bed-days: the day of admission counts, so a same-day stay is 1, never 0.
     expect(Number(d.admission.bedDays)).toBeGreaterThanOrEqual(1);
-    // The sheet carries its marks, including the refusal — that is the whole
+    // The sheet carries its marks, including the refusal вЂ” that is the whole
     // reason it is printed rather than re-derived.
     const marks = d.orders.flatMap((o) => o.days.flatMap((x) => x.slots.map((sl) => sl.status)));
     expect(marks).toContain('SKIPPED');
@@ -712,3 +719,4 @@ describe('admissions and charges (e2e)', () => {
       .expect(403);
   });
 });
+

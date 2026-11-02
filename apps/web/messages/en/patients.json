@@ -34,7 +34,8 @@
     "notFound": "Patient not found",
     "loadError": "Failed to load data",
     "backToList": "Back to patient list",
-    "addServices": "Add services"
+    "addServices": "Add services",
+    "cashierOnly": "Cashier only"
   },
   "tabs": {
     "overview": "Overview",
@@ -210,7 +211,8 @@
     "empty": "No invoices",
     "addServices": "Add service",
     "addServicesTitle": "Inpatient / multiple services",
-    "addServicesHint": "Select several services and print a single receipt"
+    "addServicesHint": "Select several services and print a single receipt",
+    "cashierOnly": "Cashier only"
   },
   "invoiceStatus": {
     "DRAFT": "Draft",

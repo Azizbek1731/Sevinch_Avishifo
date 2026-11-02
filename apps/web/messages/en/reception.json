@@ -104,7 +104,27 @@
     "handoff": "Reception prepares services. Issued invoices appear at the cash desk for the cashier to collect payment.",
     "invoices": "Issued invoices",
     "labPaidHint": "Select tests and send the invoice to the cashier. The order enters the laboratory queue after full payment.",
-    "uziHint": "Ultrasound orders, payment status and reports — a dedicated module like the laboratory."
+    "uziHint": "Ultrasound orders, payment status and reports — a dedicated module like the laboratory.",
+    "manual": "Manual entry",
+    "manualHint": "Type a procedure that is not in the catalogue, set the price and note, then send it to the cashier.",
+    "cashierOnly": "Cashier only",
+    "cashierOnlyHint": "E.g. a doctor visit fee: invoice goes to cashier only and ends there — no doctor, lab or ultrasound worklist."
+  },
+  "manualEntry": {
+    "title": "Manual entry",
+    "subtitle": "Choose a patient, enter the procedure and price — the invoice goes to the cashier.",
+    "patient": "Patient",
+    "doctor": "Doctor",
+    "doctorOptional": "Not selected (optional)",
+    "doctorNone": "Not selected",
+    "doctorHint": "Selecting a doctor is optional.",
+    "procedure": "Procedure",
+    "procedurePlaceholder": "e.g. dressing, injection…",
+    "price": "Price",
+    "total": "Total",
+    "note": "Note",
+    "notePlaceholder": "Short note for the cashier (optional)",
+    "submit": "Send to cashier"
   },
   "singleClinicSubtitle": "Patient registration, care orders and payment tracking"
 }

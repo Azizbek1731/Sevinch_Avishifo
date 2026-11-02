@@ -65,7 +65,12 @@ describe('surgeon payouts backed by the cashier ledger', () => {
     });
     expect(patient.status).toBe(201);
     patientId = patient.body.data.id as string;
-    const admission = await post('/admissions', reception).send({ patientId });
+    const admission = await post('/admissions', reception).send({
+      patientId,
+      ward: '1',
+      attendingDoctorName: 'Davolovchi Shifokor',
+      homeAddress: 'Toshkent',
+    });
     expect(admission.status).toBe(201);
     admissionId = admission.body.data.id as string;
     const category = await prisma.serviceCategory.create({

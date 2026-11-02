@@ -43,6 +43,9 @@ const STATUS_TONES: Record<string, StatusTone> = {
   RESULTED: 'blue',
   APPROVED: 'green',
   DELIVERED: 'green',
+  // Clinical / UZI orders
+  WAITING_PAYMENT: 'amber',
+  READY: 'blue',
   // Generic / platform
   OPEN: 'blue',
   CLOSED: 'gray',

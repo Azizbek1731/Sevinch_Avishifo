@@ -1,4 +1,5 @@
 import { LabReferralReportService } from './lab-referral-report.service';
+import { DoctorActivityService } from './doctor-activity.service';
 import { Controller, Get, Query, StreamableFile } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '@avishifo/shared';
@@ -8,6 +9,7 @@ import { CashflowService } from './cashflow.service';
 import { ReportsService } from './reports.service';
 import { XLSX_MIME_TYPE, type SheetSpec } from './xlsx.service';
 import {
+  DoctorActivityQueryDto,
   LabReferralReportQueryDto,
   CashflowQueryDto,
   ConsumablesQueryDto,
@@ -22,6 +24,7 @@ export class ReportsController {
   constructor(
     private readonly reports: ReportsService,
     private readonly labReferrals: LabReferralReportService,
+    private readonly doctorActivity: DoctorActivityService,
     private readonly cashflow: CashflowService,
     private readonly consumables: ConsumablesService,
   ) {}
@@ -39,6 +42,15 @@ export class ReportsController {
       type: XLSX_MIME_TYPE,
       disposition: `attachment; filename="lab-referrals_${query.from}_${query.to}.xlsx"`,
     });
+  }
+
+  @Get('doctor-activity')
+  async doctorActivityReport(
+    @Query() query: DoctorActivityQueryDto,
+    @CurrentUser() user: AuthUser,
+    @ActiveBranch() branchId: string,
+  ) {
+    return this.doctorActivity.report(query, user, branchId);
   }
 
   @Get('consumables')

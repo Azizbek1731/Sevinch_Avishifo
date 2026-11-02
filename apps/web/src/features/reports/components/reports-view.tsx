@@ -17,6 +17,7 @@ import { LabReferralsTab } from './lab-referrals-tab';
 import { CashflowTab } from './cashflow-tab';
 import { ConsumablesTab } from './consumables-tab';
 import { ShiftsTab } from './shifts-tab';
+import { DoctorActivityTab } from './doctor-activity-tab';
 
 const TABS = [
   'revenue',
@@ -36,19 +37,34 @@ export function ReportsView({ initialTab }: { initialTab?: string }) {
 
   const canAnalytics = can('reports.read');
   const canCash = can('reports.cash.read');
+  const canOwn = can('reports.own.read');
+  const ownOnly = canOwn && !canAnalytics && !canCash;
   const tabs = canAnalytics ? TABS : [];
-  const selectedTab =
-    canCash && (initialTab === 'cashflow' || initialTab === 'consumables')
+  const selectedTab = ownOnly
+    ? 'doctor-activity'
+    : canCash && (initialTab === 'cashflow' || initialTab === 'consumables')
       ? initialTab
       : canCash
         ? 'cashflow'
-        : 'revenue';
+        : canAnalytics
+          ? 'revenue'
+          : 'doctor-activity';
 
-  if (!canAnalytics && !canCash) {
+  if (!canAnalytics && !canCash && !canOwn) {
     return (
       <div className="space-y-6">
         <PageHeader title={t('title')} description={t('description')} />
         <EmptyState icon={Lock} title={t('noAccess')} />
+      </div>
+    );
+  }
+
+  if (ownOnly) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={t('title')} description={t('doctorActivity.pageDescription')} />
+        <ReportFilterBar state={state} onChange={setState} />
+        <DoctorActivityTab filters={filters} />
       </div>
     );
   }
@@ -64,6 +80,9 @@ export function ReportsView({ initialTab }: { initialTab?: string }) {
           <TabsList className="w-max">
             {canCash && <TabsTrigger value="cashflow">{t('tabs.cashflow')}</TabsTrigger>}
             {canCash && <TabsTrigger value="consumables">{t('tabs.consumables')}</TabsTrigger>}
+            {canOwn ? (
+              <TabsTrigger value="doctor-activity">{t('tabs.doctor-activity')}</TabsTrigger>
+            ) : null}
             {tabs.map((tab) => (
               <TabsTrigger key={tab} value={tab}>
                 {t(`tabs.${tab}`)}
@@ -71,6 +90,12 @@ export function ReportsView({ initialTab }: { initialTab?: string }) {
             ))}
           </TabsList>
         </div>
+
+        {canOwn ? (
+          <TabsContent value="doctor-activity" className="mt-4">
+            <DoctorActivityTab filters={filters} />
+          </TabsContent>
+        ) : null}
 
         {canCash && (
           <>

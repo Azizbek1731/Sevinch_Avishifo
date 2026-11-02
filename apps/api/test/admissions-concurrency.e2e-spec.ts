@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+﻿import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Prisma } from '@prisma/client';
 import type { AuthUser, MarkAdministrationInput } from '@avishifo/shared';
@@ -103,7 +103,7 @@ describe('legacy ward administration and discharge concurrency', () => {
       },
     });
     const admission = await inClinic(() =>
-      service.admit({ patientId: patient.id }, user, branchId),
+      service.admit({ patientId: patient.id, ward: '1', homeAddress: 'Toshkent', attendingDoctorName: 'Davolovchi' }, user, branchId),
     );
     const admissionId = admission.id as string;
     // Existing orders created before upfront billing retain their dose ledger.
@@ -457,3 +457,4 @@ describe('legacy ward administration and discharge concurrency', () => {
     expect((await inClinic(() => normal.generateAccruals('2026-10'))).totalAccrued).toBe('0.00');
   });
 });
+

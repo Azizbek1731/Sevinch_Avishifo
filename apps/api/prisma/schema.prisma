@@ -719,6 +719,8 @@ model Admission {
   bed                   String? // o'rin
   inpatientRoomId       String?
   attendingDoctorUserId String?
+  /// Free-text attending doctor when the physician is not in the staff list.
+  attendingDoctorName   String?
   /// Snapshot of the active 24h bed price; null keeps old stays unbilled.
   dailyRoomRate         Decimal?  @db.Decimal(14, 2)
   roomBillingStartsOn   DateTime? @db.Date

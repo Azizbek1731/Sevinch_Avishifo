@@ -91,7 +91,10 @@
     "labSubtitle": "Select laboratory tests. The invoice goes to the cashier and the laboratory receives the order after full payment.",
     "tests": "Laboratory tests",
     "test": "Test",
-    "addTest": "Add test"
+    "addTest": "Add test",
+    "cashierOnlyTitle": "Cashier only",
+    "cashierOnlySubtitle": "Pick a service (e.g. doctor visit) — invoice goes to cashier only, not to doctor, lab or ultrasound worklists.",
+    "cashierOnlyHint": "The flow ends after payment. No doctor referral or clinical orders are created."
   },
   "refundDlg": {
     "title": "Refund — {number}",

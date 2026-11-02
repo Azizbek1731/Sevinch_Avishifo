@@ -104,7 +104,27 @@
     "handoff": "Qabulxona xizmatlarni rasmiylashtiradi. Tayyor hisob kassada ko‘rinadi; to‘lovni kassir qabul qiladi.",
     "invoices": "Yuborilgan hisoblar",
     "labPaidHint": "Tahlillarni tanlang va hisobni kassaga yuboring. To‘liq to‘lovdan so‘ng buyurtma laboratoriya navbatiga tushadi.",
-    "uziHint": "UZI buyurtmasi, to‘lov holati va natijalar — laboratoriya kabi alohida bo‘lim."
+    "uziHint": "UZI buyurtmasi, to‘lov holati va natijalar — laboratoriya kabi alohida bo‘lim.",
+    "manual": "Qo‘lda kiritish",
+    "manualHint": "Ro‘yxatda yo‘q muolajani yozing, narx va izoh bilan kassaga yuboring.",
+    "cashierOnly": "Faqat kassaga",
+    "cashierOnlyHint": "Masalan shifokor qabuli: hisob faqat kassaga boradi va shu yerda yakunlanadi — shifokor, laboratoriya yoki UZI navbatiga tushmaydi."
+  },
+  "manualEntry": {
+    "title": "Qo‘lda kiritish",
+    "subtitle": "Bemor, muolaja turi va narxni yozing — hisob kassaga yuboriladi.",
+    "patient": "Bemor",
+    "doctor": "Vrach",
+    "doctorOptional": "Tanlanmagan (ixtiyoriy)",
+    "doctorNone": "Tanlanmagan",
+    "doctorHint": "Vrachni tanlash majburiy emas.",
+    "procedure": "Muolaja turi",
+    "procedurePlaceholder": "Masalan: bog‘lash, in’eksiya…",
+    "price": "Narx",
+    "total": "Jami",
+    "note": "Izoh",
+    "notePlaceholder": "Kassir uchun qisqa izoh (ixtiyoriy)",
+    "submit": "Kassaga yuborish"
   },
   "singleClinicSubtitle": "Bemorlarni ro‘yxatga olish, yo‘llanmalar va to‘lov holatini kuzatish"
 }

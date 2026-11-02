@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useTranslations } from 'next-intl';
-import { Plus, Wallet } from 'lucide-react';
+import { Banknote, Plus, Wallet } from 'lucide-react';
 import { formatUZS } from '@avishifo/shared';
 import { useSocketEvent } from '@/hooks/use-socket';
 import { DataTable } from '@/components/data-table';
@@ -36,6 +36,7 @@ export function PatientInvoicesTab({ patientId, patient }: PatientInvoicesTabPro
   const [invoicePage, setInvoicePage] = useState(1);
   const [txPage, setTxPage] = useState(1);
   const [addServicesOpen, setAddServicesOpen] = useState(false);
+  const [cashierOnlyOpen, setCashierOnlyOpen] = useState(false);
 
   const invoices = usePatientInvoices(patientId, invoicePage, canInvoices);
   const balance = usePatientBalance(patientId, txPage, canBalance);
@@ -153,10 +154,16 @@ export function PatientInvoicesTab({ patientId, patient }: PatientInvoicesTabPro
             <p className="text-sm font-medium">{t('invoices.addServicesTitle')}</p>
             <p className="text-xs text-muted-foreground">{t('invoices.addServicesHint')}</p>
           </div>
-          <Button size="sm" onClick={() => setAddServicesOpen(true)}>
-            <Plus className="mr-1 h-4 w-4" />
-            {t('invoices.addServices')}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => setAddServicesOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              {t('invoices.addServices')}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setCashierOnlyOpen(true)}>
+              <Banknote className="mr-1 h-4 w-4" />
+              {t('invoices.cashierOnly')}
+            </Button>
+          </div>
         </div>
       ) : null}
 
@@ -216,11 +223,19 @@ export function PatientInvoicesTab({ patientId, patient }: PatientInvoicesTabPro
       ) : null}
 
       {canCreate ? (
-        <AddServicesDialog
-          open={addServicesOpen}
-          onOpenChange={setAddServicesOpen}
-          patient={patient}
-        />
+        <>
+          <AddServicesDialog
+            open={addServicesOpen}
+            onOpenChange={setAddServicesOpen}
+            patient={patient}
+          />
+          <AddServicesDialog
+            open={cashierOnlyOpen}
+            onOpenChange={setCashierOnlyOpen}
+            cashierOnly
+            patient={patient}
+          />
+        </>
       ) : null}
     </div>
   );

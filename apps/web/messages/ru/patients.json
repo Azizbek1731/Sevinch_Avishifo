@@ -34,7 +34,8 @@
     "notFound": "Пациент не найден",
     "loadError": "Не удалось загрузить данные",
     "backToList": "Вернуться к списку пациентов",
-    "addServices": "Добавить услуги"
+    "addServices": "Добавить услуги",
+    "cashierOnly": "Только касса"
   },
   "tabs": {
     "overview": "Обзор",
@@ -210,7 +211,8 @@
     "empty": "Счетов нет",
     "addServices": "Добавить услугу",
     "addServicesTitle": "Стационар / несколько услуг",
-    "addServicesHint": "Отметьте несколько услуг и выдайте один чек"
+    "addServicesHint": "Отметьте несколько услуг и выдайте один чек",
+    "cashierOnly": "Только касса"
   },
   "invoiceStatus": {
     "DRAFT": "Черновик",

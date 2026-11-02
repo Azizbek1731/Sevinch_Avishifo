@@ -231,6 +231,7 @@ export class InvoicesService {
     chargeIds: string[],
     user: Pick<AuthUser, 'id' | 'branchIds'>,
     branchId: string,
+    opts: { skipLab?: boolean } = {},
   ): Promise<Invoice & { lines: InvoiceLine[] }> {
     const clinicId = TenantContext.requireClinicId();
     if (user.branchIds.length > 0 && !user.branchIds.includes(branchId)) {
@@ -327,7 +328,7 @@ export class InvoicesService {
       },
       include: { lines: true },
     });
-    await this.lab.prepareOrderForInvoice(tx, invoice, invoice.lines);
+    if (!opts.skipLab) await this.lab.prepareOrderForInvoice(tx, invoice, invoice.lines);
     const context = TenantContext.get();
     // AuditLog is intentionally unscoped, so stamp tenant and actor explicitly.
     await tx.auditLog.create({ data: {
@@ -346,7 +347,7 @@ export class InvoicesService {
     return invoice;
   }
 
-  async create(dto: CreateInvoiceInput, user: AuthUser, opts: { issueImmediately?: boolean; requestKey?: string; requestFingerprint?: string } = {}): Promise<Record<string, unknown>> {
+  async create(dto: CreateInvoiceInput, user: AuthUser, opts: { issueImmediately?: boolean; requestKey?: string; requestFingerprint?: string; skipLab?: boolean } = {}): Promise<Record<string, unknown>> {
     const clinicId = TenantContext.requireClinicId();
 
     if (user.branchIds.length > 0 && !user.branchIds.includes(dto.branchId)) {
@@ -390,7 +391,12 @@ export class InvoicesService {
               select: { id: true, name: true, category: { select: { kind: true } } },
             })
           : [];
-      if (this.config.env.SINGLE_CLINIC_MODE && !dto.visitId && !dto.lines.some((line) => line.chargeItemId)) {
+      if (
+        this.config.env.SINGLE_CLINIC_MODE &&
+        !dto.cashierOnly &&
+        !dto.visitId &&
+        !dto.lines.some((line) => line.chargeItemId)
+      ) {
         const assignedCare = await this.prisma.db.service.count({ where: { id: { in: serviceIds }, category: { kind: { in: ['CONSULTATION', 'ULTRASOUND'] } } } });
         if (assignedCare) throw new AppException(ErrorCode.VALIDATION_ERROR, 'Use the consultation or ultrasound order form to select the treating doctor', 400);
       }
@@ -507,6 +513,7 @@ export class InvoicesService {
           clinicId, branchId: dto.branchId, number, patientId: dto.patientId,
           requestKey: opts.requestKey, requestFingerprint: opts.requestFingerprint,
           visitId: dto.visitId ?? null,
+          note: dto.note?.trim() || null,
           status: opts.issueImmediately ? (total.eq(0) ? 'PAID' : 'ISSUED') : 'DRAFT',
           issuedAt: opts.issueImmediately ? new Date() : null,
           subtotal, discountTotal, total, createdById: user.id,
@@ -518,7 +525,9 @@ export class InvoicesService {
         },
         include: { lines: true },
       });
-      if (opts.issueImmediately) await this.lab.prepareOrderForInvoice(tx, created, created.lines);
+      if (opts.issueImmediately && !opts.skipLab && !dto.cashierOnly) {
+        await this.lab.prepareOrderForInvoice(tx, created, created.lines);
+      }
       return created;
     }).catch(async (error: unknown) => {
       if (opts.requestKey && error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -542,6 +551,7 @@ export class InvoicesService {
         visitId: invoice.visitId,
         total: invoice.total.toFixed(2),
         status: invoice.status,
+        ...(dto.cashierOnly ? { cashierOnly: true } : {}),
       },
     });
 
@@ -570,6 +580,8 @@ export class InvoicesService {
 
     const fingerprint = createHash('sha256').update(JSON.stringify({
       patientId: dto.patientId, branchId: dto.branchId, visitId: dto.visitId ?? null,
+      note: dto.note?.trim() || null,
+      cashierOnly: dto.cashierOnly === true,
       settle: dto.settle,
       lines: dto.lines.map((line) => ({
         serviceId: line.serviceId ?? null, title: line.title ?? null, quantity: line.quantity,
@@ -590,9 +602,23 @@ export class InvoicesService {
     }
     const created = existing
       ? { ...this.mapInvoice(existing), lines: existing.lines.map((line) => this.mapLine(line)), replayed: true }
-      : await this.create({ patientId: dto.patientId, branchId: dto.branchId, visitId: dto.visitId, lines: dto.lines }, user, {
-        issueImmediately: true, requestKey: dto.idempotencyKey, requestFingerprint: dto.idempotencyKey ? fingerprint : undefined,
-      });
+      : await this.create(
+          {
+            patientId: dto.patientId,
+            branchId: dto.branchId,
+            visitId: dto.visitId,
+            note: dto.note,
+            cashierOnly: dto.cashierOnly,
+            lines: dto.lines,
+          },
+          user,
+          {
+            issueImmediately: true,
+            skipLab: dto.cashierOnly === true,
+            requestKey: dto.idempotencyKey,
+            requestFingerprint: dto.idempotencyKey ? fingerprint : undefined,
+          },
+        );
     const invoiceId = created.id as string;
     const issued = created;
 

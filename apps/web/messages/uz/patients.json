@@ -34,7 +34,8 @@
     "notFound": "Bemor topilmadi",
     "loadError": "Ma'lumotni yuklab bo'lmadi",
     "backToList": "Bemorlar ro'yxatiga qaytish",
-    "addServices": "Xizmat qo'shish"
+    "addServices": "Xizmat qo'shish",
+    "cashierOnly": "Faqat kassa"
   },
   "tabs": {
     "overview": "Umumiy",
@@ -210,7 +211,8 @@
     "empty": "Hisob-fakturalar yo'q",
     "addServices": "Xizmat qo'shish",
     "addServicesTitle": "Statsionar / bir nechta xizmat",
-    "addServicesHint": "Bir nechta xizmatni belgilab, bitta chek chiqaring"
+    "addServicesHint": "Bir nechta xizmatni belgilab, bitta chek chiqaring",
+    "cashierOnly": "Faqat kassa"
   },
   "invoiceStatus": {
     "DRAFT": "Qoralama",

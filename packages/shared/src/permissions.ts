@@ -86,6 +86,8 @@ export const PERMISSIONS = [
   'reports.export',
   'reports.cash.read',
   'reports.cash.export',
+  /** Own consultations and outbound lab/UZI referrals — doctors only see themselves. */
+  'reports.own.read',
   // Staff & schedules (M11)
   'staff.read',
   'staff.write',
@@ -203,6 +205,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'lab.orders.write',
     'schedules.read',
     'payroll.read', // own KPI/accruals only (object-level check in service)
+    'reports.own.read',
   ],
   [UserRole.NURSE]: [
     'patients.read',

@@ -51,6 +51,9 @@ export interface AdmissionRow {
   roomBillingNextAt: string | null;
   admittedAt: string;
   dischargedAt: string | null;
+  attendingDoctorUserId?: string | null;
+  attendingDoctorName?: string | null;
+  attendingDoctor?: { id: string | null; fullName: string } | null;
   patient?: {
     id: string;
     mrn: string;
@@ -118,6 +121,8 @@ export interface AdmissionDetail extends AdmissionRow {
     }>;
   };
   attendingDoctorUserId: string | null;
+  attendingDoctorName: string | null;
+  attendingDoctor?: { id: string | null; fullName: string } | null;
   referredBy: string | null;
   referralDiagnosis: string | null;
   admissionDiagnosis: string | null;

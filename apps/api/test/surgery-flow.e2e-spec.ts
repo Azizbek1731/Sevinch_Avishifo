@@ -170,6 +170,8 @@ describe("inpatient surgery workflow", () => {
       patientId,
       ward: "A-2",
       bed: "3",
+      attendingDoctorName: "Davolovchi Shifokor",
+      homeAddress: "Toshkent",
     });
     expect(admission.status).toBe(201);
     admissionId = admission.body.data.id as string;

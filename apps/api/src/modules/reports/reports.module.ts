@@ -1,4 +1,5 @@
 import { LabReferralReportService } from './lab-referral-report.service';
+import { DoctorActivityService } from './doctor-activity.service';
 import { Module } from '@nestjs/common';
 import { ReportsController } from './reports.controller';
 import { ReportsService } from './reports.service';
@@ -17,6 +18,7 @@ import { XlsxService } from './xlsx.service';
   controllers: [ReportsController],
   providers: [
     LabReferralReportService,
+    DoctorActivityService,
     ReportsService,
     CashflowService,
     ConsumablesService,

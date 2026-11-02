@@ -28,7 +28,8 @@
     "shifts": "Смены",
     "cashflow": "Движение денег",
     "consumables": "Лекарства и материалы",
-    "lab-referrals": "Направления по врачам"
+    "lab-referrals": "Направления по врачам",
+    "doctor-activity": "Мой отчёт"
   },
   "empty": {
     "title": "Нет данных",
@@ -232,5 +233,40 @@
     "retry": "Повторить",
     "doctorSummary": "{patients} пациентов · {orders} направлений · {tests} анализов",
     "doctorTotal": "Итого по врачу"
+  },
+  "doctorActivity": {
+    "pageDescription": "Ваши приёмы и направления в лабораторию / УЗИ с суммами",
+    "title": "Отчёт врача",
+    "description": "Приёмы за выбранный период и направления в лабораторию / УЗИ из этих приёмов.",
+    "doctor": "Врач: {name}",
+    "visitsTitle": "Приёмы",
+    "visitsTotal": "Всего приёмов",
+    "visitsCompleted": "Завершено",
+    "visitsInProgress": "В работе",
+    "visitsPatients": "Пациенты",
+    "visitsListTitle": "Список приёмов",
+    "visitsEmpty": "За этот период приёмов нет.",
+    "labTitle": "Направления в лабораторию",
+    "uziTitle": "Направления на УЗИ",
+    "orders": "Направления",
+    "items": "Анализы / услуги",
+    "amount": "Сумма",
+    "paidAmount": "Оплачено",
+    "unpaidHint": "Не оплачено: {amount}",
+    "labEmpty": "За этот период лабораторных направлений нет.",
+    "uziEmpty": "За этот период направлений на УЗИ нет.",
+    "colDate": "Дата",
+    "colPatient": "Пациент",
+    "colLab": "Анализы",
+    "colUzi": "Услуги УЗИ",
+    "colAmount": "Сумма",
+    "colStatus": "Статус",
+    "paid": "Оплачено",
+    "unpaid": "Ожидает оплаты",
+    "statusCompleted": "Завершён",
+    "statusInProgress": "В работе",
+    "statusCancelled": "Отменён",
+    "loadError": "Не удалось загрузить отчёт.",
+    "retry": "Повторить"
   }
 }

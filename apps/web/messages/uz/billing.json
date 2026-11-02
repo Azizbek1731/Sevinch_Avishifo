@@ -91,7 +91,10 @@
     "labSubtitle": "Laboratoriya tahlillarini tanlang. Hisob kassaga yuboriladi, to‘liq to‘lovdan so‘ng laboratoriya buyurtmani oladi.",
     "tests": "Laboratoriya tahlillari",
     "test": "Tahlil",
-    "addTest": "Tahlil qo‘shish"
+    "addTest": "Tahlil qo‘shish",
+    "cashierOnlyTitle": "Faqat kassaga",
+    "cashierOnlySubtitle": "Xizmatni tanlang (masalan shifokor qabuli) — hisob faqat kassaga boradi, shifokor/laboratoriya/UZI navbatiga tushmaydi.",
+    "cashierOnlyHint": "To‘lovdan keyin jarayon yakunlanadi. Shifokorga yo‘llanma va klinik buyurtma yaratilmaydi."
   },
   "refundDlg": {
     "title": "Qaytarish — {number}",

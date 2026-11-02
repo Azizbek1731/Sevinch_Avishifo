@@ -11,6 +11,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { setDefaultResultOrder } from 'node:dns';
 import {
+  createWriteStream,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -53,8 +54,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REFRESH_ENV_KEYS = new Set([
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_ADMIN_CHAT_ID',
+  'TELEGRAM_ADMIN_PHONES',
   'CLINIC_BACKUP_TELEGRAM_CHAT_ID',
 ]);
+const OPS_ADMINS_PATH = join(root, 'run', 'telegram-ops-admins.json');
 
 function loadEnvFile({ refresh = false } = {}) {
   let text = '';
@@ -97,9 +100,29 @@ const apiDir = join(root, 'apps', 'api');
 
 const sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 
+/** Async log stream — sync appendFile blocked the :80 gateway for ~3s per burst. */
+let logStream = null;
+function openLogStream() {
+  try {
+    logStream?.end?.();
+  } catch {
+    // previous stream already closed
+  }
+  try {
+    logStream = createWriteStream(logPath, { flags: 'a' });
+    logStream.on('error', () => {
+      logStream = null;
+    });
+  } catch {
+    logStream = null;
+  }
+}
+openLogStream();
+
 function appendLog(text) {
   try {
-    writeFileSync(logPath, text, { flag: 'a' });
+    if (!logStream || logStream.destroyed) openLogStream();
+    logStream?.write(text);
   } catch {
     // Logging must not take the clinic server down.
   }
@@ -107,9 +130,16 @@ function appendLog(text) {
 
 function rotateLog() {
   try {
-    if (statSync(logPath).size < LOG_LIMIT) return;
+    if (!existsSync(logPath) || statSync(logPath).size < LOG_LIMIT) return;
+    try {
+      logStream?.end?.();
+    } catch {
+      // ignore
+    }
+    logStream = null;
     rmSync(`${logPath}.old`, { force: true });
     renameSync(logPath, `${logPath}.old`);
+    openLogStream();
   } catch {
     // A locked log is rotated on the next check.
   }
@@ -466,18 +496,42 @@ function targetPort(url, pagePort) {
 const STARTING_PAGE = `<!doctype html><html lang="uz"><head><meta charset="utf-8"><meta http-equiv="refresh" content="5"><title>AviShifo</title></head><body style="font-family:system-ui,sans-serif;text-align:center;padding-top:15vh;color:#334155"><h2>Klinika serveri ishga tushmoqda…</h2><p>Sahifa bir necha soniyada o‘zi yangilanadi.</p></body></html>`;
 
 function proxyHttp(req, res, port) {
-  const headers = {
-    ...req.headers,
-    'x-forwarded-proto': 'http',
-    'x-forwarded-host': req.headers.host,
-  };
+  // Drop hop-by-hop headers; force IPv4 loopback. Without family:4 some Windows
+  // Node builds stall ~3s on localhost before the upstream connect succeeds.
+  const headers = { ...req.headers };
+  for (const key of [
+    'connection',
+    'keep-alive',
+    'proxy-connection',
+    'proxy-authenticate',
+    'proxy-authorization',
+    'te',
+    'trailer',
+    'transfer-encoding',
+    'upgrade',
+  ]) {
+    delete headers[key];
+  }
+  headers.host = `127.0.0.1:${port}`;
+  headers['x-forwarded-proto'] = 'http';
+  headers['x-forwarded-host'] = req.headers.host;
+  headers.connection = 'close';
   const upstream = httpRequest(
-    { hostname: '127.0.0.1', port, path: req.url, method: req.method, headers },
+    {
+      hostname: '127.0.0.1',
+      port,
+      path: req.url,
+      method: req.method,
+      headers,
+      family: 4,
+      timeout: 30_000,
+    },
     (response) => {
       res.writeHead(response.statusCode ?? 502, response.headers);
       response.pipe(res);
     },
   );
+  upstream.on('timeout', () => upstream.destroy(new Error('upstream timeout')));
   upstream.on('error', () => {
     if (res.headersSent) {
       res.destroy();
@@ -500,7 +554,7 @@ function proxyHttp(req, res, port) {
 }
 
 function proxyUpgrade(req, socket, head, port) {
-  const upstream = netConnect(port, '127.0.0.1', () => {
+  const upstream = netConnect({ host: '127.0.0.1', port, family: 4 }, () => {
     const lines = [`${req.method} ${req.url} HTTP/${req.httpVersion}`];
     for (const [key, value] of Object.entries(req.headers)) {
       if (value === undefined) continue;
@@ -808,11 +862,25 @@ function backupEnv(name) {
   return value;
 }
 
+function opsAdminIdsFromFile() {
+  try {
+    const raw = JSON.parse(readFileSync(OPS_ADMINS_PATH, 'utf8'));
+    return Array.isArray(raw?.chatIds) ? raw.chatIds.map(String).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
 function adminIds() {
-  return backupEnv('TELEGRAM_ADMIN_CHAT_ID')
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean);
+  return [
+    ...new Set([
+      ...backupEnv('TELEGRAM_ADMIN_CHAT_ID')
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean),
+      ...opsAdminIdsFromFile(),
+    ]),
+  ];
 }
 
 const LIFECYCLE_PATH = join(runDir, 'server-lifecycle.json');
@@ -974,6 +1042,16 @@ async function adminBotScheduler() {
   await sleep(8_000);
   while (!stopping) {
     loadEnvFile({ refresh: true });
+    // Patient bot (Nest long-polling) and admin Holat/Tarmoq/Zaxira cannot share
+    // one token: Telegram delivers each update to only one getUpdates consumer.
+    // When the patient bot is on, keep outbound backup/status sends, skip admin polling.
+    if (backupEnv('TELEGRAM_ENABLED').toLowerCase() === 'true') {
+      say(
+        'Patient Telegram bot is enabled — admin Holat/Tarmoq/Zaxira polling is paused on this token.',
+      );
+      await sleep(15 * 60_000);
+      continue;
+    }
     const token = backupEnv('TELEGRAM_BOT_TOKEN');
     const admins = adminIds();
     if (!token || !admins.length) {
@@ -986,7 +1064,7 @@ async function adminBotScheduler() {
         token,
         adminIds: admins,
         backupDir: BACKUP_DIR,
-        shouldStop: () => stopping,
+        shouldStop: () => stopping || backupEnv('TELEGRAM_ENABLED').toLowerCase() === 'true',
         log: say,
         onReady: async () => {
           say(`Admin Telegram bot ready for ${admins.join(',')}.`);

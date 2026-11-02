@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { BedDouble, GitMerge, Pencil, Plus, Printer, Trash2, UserX } from 'lucide-react';
+import { Banknote, BedDouble, GitMerge, Pencil, Plus, Printer, Trash2, UserX } from 'lucide-react';
 import { formatPhone, formatUZS } from '@avishifo/shared';
 import { Link, useRouter } from '@/i18n/routing';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -55,6 +55,7 @@ export function PatientCardView({ patientId }: { patientId: string }) {
   const [mergeOpen, setMergeOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [addServicesOpen, setAddServicesOpen] = useState(false);
+  const [cashierOnlyOpen, setCashierOnlyOpen] = useState(false);
   const [admitOpen, setAdmitOpen] = useState(false);
 
   const deleteMutation = useMutation({
@@ -142,10 +143,16 @@ export function PatientCardView({ patientId }: { patientId: string }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {can('invoices.write') ? (
-            <Button size="sm" onClick={() => setAddServicesOpen(true)}>
-              <Plus className="mr-1 h-4 w-4" />
-              {t('card.addServices')}
-            </Button>
+            <>
+              <Button size="sm" onClick={() => setAddServicesOpen(true)}>
+                <Plus className="mr-1 h-4 w-4" />
+                {t('card.addServices')}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setCashierOnlyOpen(true)}>
+                <Banknote className="mr-1 h-4 w-4" />
+                {t('card.cashierOnly')}
+              </Button>
+            </>
           ) : null}
           {can('patients.write') ? (
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
@@ -259,6 +266,17 @@ export function PatientCardView({ patientId }: { patientId: string }) {
       <AddServicesDialog
         open={addServicesOpen}
         onOpenChange={setAddServicesOpen}
+        patient={{
+          id: patient.id,
+          mrn: patient.mrn,
+          fullName: patient.fullName,
+          phone: patient.phone,
+        }}
+      />
+      <AddServicesDialog
+        open={cashierOnlyOpen}
+        onOpenChange={setCashierOnlyOpen}
+        cashierOnly
         patient={{
           id: patient.id,
           mrn: patient.mrn,

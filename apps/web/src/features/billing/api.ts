@@ -275,6 +275,8 @@ export interface ServiceOption {
   name: { uz: string; ru?: string; en?: string };
   currentPrice: MoneyString | null;
   isActive: boolean;
+  /** Present on catalogue list responses — used to scope UZI rows per doctor. */
+  category?: { id: string; name: string; kind?: string };
 }
 
 export interface ReceiptSettings {
@@ -402,13 +404,12 @@ export const billingApi = {
   getBalance: (patientId: string) => api.get<PatientBalance>(`/patients/${patientId}/balance`),
   listDebtors: (q: { page?: number }) => api.get<DebtorsResult>('/debtors', q),
 
-  // lookups
+  // lookups — walk every page so lab/procedure pickers are not capped at 20.
   searchServices: (search: string, kind?: ServiceKind) =>
-    api.get<ServiceOption[]>('/services', {
+    api.getAll<ServiceOption>('/services', {
       isActive: true,
       kind,
       search: search || undefined,
-      limit: 20,
     }),
   searchPatients: (search: string) => api.get<PatientBrief[]>('/patients', { search, limit: 10 }),
 };
