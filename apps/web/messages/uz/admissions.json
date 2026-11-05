@@ -23,9 +23,16 @@
   "doctorSave": "Saqlash",
   "doctorSaved": "Davolovchi shifokor saqlandi",
   "doctorMissing": "Davolovchi shifokor ko‘rsatilmagan",
+  "edit": {
+    "button": "Ma’lumotlarni tahrirlash",
+    "title": "Statsionar ma’lumotlarini tahrirlash",
+    "hint": "Xato kiritilgan tarix raqami, xona, shifokor va boshqa maydonlarni shu yerda to‘g‘rilang.",
+    "save": "Saqlash",
+    "saved": "Ma’lumotlar saqlandi"
+  },
   "admit": "Statsionarga yotqizish",
   "admitTitle": "{name} — statsionarga yotqizish",
-  "admitHint": "Shifokor, xona raqami, kasallik tarixi va uy manzilini kiriting. Palata kunlik narxi keyin qo‘lda qo‘shiladi.",
+  "admitHint": "Kelgan sana/vaqt, shifokor, xona raqami, kasallik tarixi va uy manzilini kiriting. Palata kunlik narxi keyin qo‘lda qo‘shiladi.",
   "admitted": "Kasallik tarixi ochildi: {number}",
   "discharge": "Chiqarish",
   "discharged": "Bemor chiqarildi",
@@ -44,6 +51,18 @@
   "empty": {
     "title": "Statsionarda bemor yo‘q",
     "description": "Yotqizish tugmasi orqali bemorni tanlang yoki bemor kartasidan yotqizing."
+  },
+  "filters": {
+    "allStatuses": "Barchasi",
+    "allDoctors": "Barcha shifokorlar",
+    "searchPlaceholder": "Tarix №, bemor yoki xona…",
+    "from": "Dan",
+    "to": "Gacha",
+    "clear": "Tozalash"
+  },
+  "export": {
+    "xlsx": "Excel (.xlsx)",
+    "success": "Excel fayl yuklandi"
   },
   "table": {
     "history": "Tarix №",
@@ -107,6 +126,10 @@
     "historyAutoOn": "Avto",
     "historyAutoOff": "Qo‘lda",
     "historyNumberPlaceholder": "Masalan, KT-2026-0042",
+    "admittedAt": "Kelgan sana va vaqt",
+    "admittedAtHelp": "Bemor haqiqatan kelgan kun/vaqt (Toshkent). Ertasi kuni kiritilsa ham shu sana bo‘yicha hisoblanadi.",
+    "admittedAtInvalid": "Kelgan sana/vaqtni to‘g‘ri kiriting",
+    "admittedAtFuture": "Kelgan sana kelajakda bo‘lishi mumkin emas",
     "homeAddress": "Uy manzili",
     "homeAddressHint": "Bemorning yashash manzili",
     "bed": "O‘rin (ixtiyoriy)",

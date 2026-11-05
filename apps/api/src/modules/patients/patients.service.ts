@@ -17,6 +17,16 @@ import { AuditService } from '../../core/audit/audit.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { SequenceService } from '../../core/sequence/sequence.service';
+import { XlsxService, type SheetSpec } from '../reports/xlsx.service';
+
+const EXPORT_ROW_CAP = 10_000;
+
+function tashkentDayRange(from?: string, to?: string): { gte?: Date; lte?: Date } {
+  return {
+    ...(from ? { gte: new Date(`${from}T00:00:00.000+05:00`) } : {}),
+    ...(to ? { lte: new Date(`${to}T23:59:59.999+05:00`) } : {}),
+  };
+}
 
 /** Age in full years computed from a date-only DOB (UTC). */
 export function ageFromDob(dob: Date | null, now = new Date()): number | null {
@@ -114,14 +124,29 @@ export class PatientsService {
     private readonly prisma: PrismaService,
     private readonly sequence: SequenceService,
     private readonly audit: AuditService,
+    private readonly xlsx: XlsxService,
   ) {}
+
+  private showDeleted(query: PatientQueryInput, user?: AuthUser): boolean {
+    // The flag only asks; holding records.viewDeleted is what decides.
+    return query.deleted === true && user?.permissions.includes('records.viewDeleted') === true;
+  }
+
+  private buildListWhere(query: PatientQueryInput, showDeleted: boolean): Prisma.PatientWhereInput {
+    const created = tashkentDayRange(query.createdFrom, query.createdTo);
+    return {
+      ...(showDeleted ? {} : { deletedAt: null }),
+      ...(query.tag ? { tags: { has: query.tag } } : {}),
+      ...(query.careType ? { careType: query.careType } : {}),
+      ...(query.gender ? { gender: query.gender } : {}),
+      ...(created.gte || created.lte ? { createdAt: created } : {}),
+    };
+  }
 
   async list(query: PatientQueryInput, user?: AuthUser): Promise<PaginatedResult<PatientResponse>> {
     const { skip, take } = skipTake(query);
-    // The flag only asks; holding records.viewDeleted is what decides. Without
-    // it a removed card stays removed no matter what the client sends.
-    const showDeleted =
-      query.deleted === true && user?.permissions.includes('records.viewDeleted') === true;
+    const showDeleted = this.showDeleted(query, user);
+    const extra = this.buildListWhere(query, showDeleted);
 
     if (query.search) {
       // Trigram search path (pg_trgm GIN indexes on "fullName"/"phone").
@@ -130,6 +155,14 @@ export class PatientsService {
       const q = query.search;
       const digits = q.replace(/\D/g, '');
       const tag = query.tag ?? null;
+      const careType = query.careType ?? null;
+      const gender = query.gender ?? null;
+      const createdFrom = query.createdFrom
+        ? new Date(`${query.createdFrom}T00:00:00.000+05:00`)
+        : null;
+      const createdTo = query.createdTo
+        ? new Date(`${query.createdTo}T23:59:59.999+05:00`)
+        : null;
       const rows = await this.prisma.db.$queryRaw<Array<Patient & { total: number }>>`
         SELECT *, (COUNT(*) OVER())::int AS "total"
         FROM "Patient"
@@ -141,6 +174,10 @@ export class PatientsService {
             OR "mrn" ILIKE '%' || ${q} || '%'
           )
           AND (${tag}::text IS NULL OR ${tag}::text = ANY("tags"))
+          AND (${careType}::text IS NULL OR "careType"::text = ${careType})
+          AND (${gender}::text IS NULL OR "gender"::text = ${gender})
+          AND (${createdFrom}::timestamptz IS NULL OR "createdAt" >= ${createdFrom})
+          AND (${createdTo}::timestamptz IS NULL OR "createdAt" <= ${createdTo})
         ORDER BY similarity("fullName", ${q}) DESC
         LIMIT ${take} OFFSET ${skip}
       `;
@@ -148,10 +185,7 @@ export class PatientsService {
       return paginated(rows.map(mapPatient), { page: query.page, limit: query.limit, total });
     }
 
-    const where: Prisma.PatientWhereInput = {
-      ...(showDeleted ? {} : { deletedAt: null }),
-      ...(query.tag ? { tags: { has: query.tag } } : {}),
-    };
+    const where = extra;
     const sort = parseSort(query.sort, { field: 'createdAt', dir: 'desc' });
     const [items, total] = await Promise.all([
       this.prisma.db.patient.findMany({
@@ -163,6 +197,91 @@ export class PatientsService {
       this.prisma.db.patient.count({ where }),
     ]);
     return paginated(items.map(mapPatient), { page: query.page, limit: query.limit, total });
+  }
+
+  async exportXlsx(query: PatientQueryInput, user: AuthUser): Promise<Buffer> {
+    if (!user.permissions.includes('patients.export')) {
+      throw new AppException(ErrorCode.FORBIDDEN, 'Missing permission: patients.export', 403);
+    }
+    const showDeleted = this.showDeleted(query, user);
+    let items: Patient[];
+    if (query.search) {
+      const clinicId = TenantContext.requireClinicId();
+      const q = query.search;
+      const digits = q.replace(/\D/g, '');
+      const tag = query.tag ?? null;
+      const careType = query.careType ?? null;
+      const gender = query.gender ?? null;
+      const createdFrom = query.createdFrom
+        ? new Date(`${query.createdFrom}T00:00:00.000+05:00`)
+        : null;
+      const createdTo = query.createdTo
+        ? new Date(`${query.createdTo}T23:59:59.999+05:00`)
+        : null;
+      items = await this.prisma.db.$queryRaw<Patient[]>`
+        SELECT *
+        FROM "Patient"
+        WHERE "clinicId" = ${clinicId}
+          AND (${showDeleted}::boolean OR "deletedAt" IS NULL)
+          AND (
+            "fullName" ILIKE '%' || ${q} || '%'
+            OR (${digits} <> '' AND "phone" LIKE '%' || ${digits} || '%')
+            OR "mrn" ILIKE '%' || ${q} || '%'
+          )
+          AND (${tag}::text IS NULL OR ${tag}::text = ANY("tags"))
+          AND (${careType}::text IS NULL OR "careType"::text = ${careType})
+          AND (${gender}::text IS NULL OR "gender"::text = ${gender})
+          AND (${createdFrom}::timestamptz IS NULL OR "createdAt" >= ${createdFrom})
+          AND (${createdTo}::timestamptz IS NULL OR "createdAt" <= ${createdTo})
+        ORDER BY similarity("fullName", ${q}) DESC
+        LIMIT ${EXPORT_ROW_CAP}
+      `;
+    } else {
+      const where = this.buildListWhere(query, showDeleted);
+      const sort = parseSort(query.sort, { field: 'createdAt', dir: 'desc' });
+      items = await this.prisma.db.patient.findMany({
+        where,
+        orderBy: { [sort.field]: sort.dir } as Prisma.PatientOrderByWithRelationInput,
+        take: EXPORT_ROW_CAP,
+      });
+    }
+    const mapped = items.map(mapPatient);
+    const sheet: SheetSpec = {
+      name: 'Bemorlar',
+      columns: [
+        { header: 'MRN', key: 'mrn', width: 14 },
+        { header: 'F.I.Sh.', key: 'fullName', width: 28 },
+        { header: 'Telefon', key: 'phone', width: 16 },
+        { header: "Tug'ilgan sana", key: 'dob', width: 14 },
+        { header: 'Yosh', key: 'age', width: 8, quantity: true },
+        { header: 'Jinsi', key: 'gender', width: 10 },
+        { header: 'Davolash turi', key: 'careType', width: 14 },
+        { header: 'Manzil', key: 'address', width: 28 },
+        { header: 'Teglar', key: 'tags', width: 20 },
+        { header: 'Balans', key: 'balance', width: 14, money: true },
+        { header: "Ro'yxatga olingan", key: 'createdAt', width: 20 },
+      ],
+      rows: mapped.map((p) => ({
+        mrn: p.mrn,
+        fullName: p.fullName,
+        phone: p.phone ?? '',
+        dob: p.dob ?? '',
+        age: p.age !== null ? String(p.age) : '',
+        gender: p.gender === 'MALE' ? 'Erkak' : p.gender === 'FEMALE' ? 'Ayol' : p.gender ?? '',
+        careType: p.careType === 'INPATIENT' ? 'Statsionar' : 'Ambulator',
+        address: p.address ?? '',
+        tags: (p.tags ?? []).join(', '),
+        balance: p.balance,
+        createdAt: p.createdAt.slice(0, 16).replace('T', ' '),
+      })),
+    };
+    await this.audit.log({
+      action: AuditAction.EXPORT,
+      entity: 'Patient',
+      entityId: 'list',
+      after: { count: mapped.length, filters: query },
+    });
+    return this.xlsx.buildWorkbook([sheet]);
   }
 
   async create(input: CreatePatientInput, force: boolean): Promise<PatientResponse> {

@@ -88,13 +88,22 @@
     "proceduresTitle": "Order procedures and examinations",
     "proceduresSubtitle": "Select procedures, diagnostic examinations and other services. The invoice will be sent to the cashier.",
     "proceduresHint": "Use the dedicated reception actions for laboratory tests, doctor consultations and ultrasound.",
-    "labSubtitle": "Select laboratory tests. The invoice goes to the cashier and the laboratory receives the order after full payment.",
+    "labSubtitle": "Pick tests by section. The invoice goes to the cashier and the laboratory receives the order after full payment.",
     "tests": "Laboratory tests",
     "test": "Test",
     "addTest": "Add test",
     "cashierOnlyTitle": "Cashier only",
     "cashierOnlySubtitle": "Pick a service (e.g. doctor visit) — invoice goes to cashier only, not to doctor, lab or ultrasound worklists.",
     "cashierOnlyHint": "The flow ends after payment. No doctor referral or clinical orders are created."
+  },
+  "labPicker": {
+    "search": "Search tests…",
+    "all": "All",
+    "other": "Other",
+    "hint": "Choose a section or search, then tick the tests you need.",
+    "empty": "No tests in this section",
+    "loadError": "Could not load the catalogue",
+    "count": "{count}"
   },
   "refundDlg": {
     "title": "Refund — {number}",

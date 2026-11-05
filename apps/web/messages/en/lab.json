@@ -88,6 +88,20 @@
   "catalogAlreadyImported": "Added",
   "importDone": "{created} added, {updated} updated, {skipped} skipped.",
   "importNothingNew": "Nothing new to add — {count} were already there.",
+  "categories": {
+    "HEMATOLOGY": "Hematology",
+    "BIOCHEMISTRY": "Biochemistry",
+    "HORMONES": "Hormones",
+    "COAGULATION": "Coagulation",
+    "IMMUNOLOGY": "Immunology",
+    "TUMOR_MARKERS": "Tumor markers",
+    "VITAMINS": "Vitamins",
+    "URINALYSIS": "Urinalysis",
+    "COPROLOGY": "Stool tests",
+    "ANDROLOGY": "Andrology",
+    "CYTOLOGY": "Cytology",
+    "MICROBIOLOGY": "Microbiology"
+  },
   "biomaterial": {
     "BLOOD": "Blood",
     "URINE": "Urine",

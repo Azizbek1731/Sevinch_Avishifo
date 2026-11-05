@@ -153,6 +153,10 @@ export interface PatientListQuery {
   tag?: string;
   /** Include cards the front desk removed. Honoured only with records.viewDeleted. */
   deleted?: boolean;
+  careType?: 'AMBULATORY' | 'INPATIENT';
+  gender?: 'MALE' | 'FEMALE';
+  createdFrom?: string;
+  createdTo?: string;
   sort?: string;
 }
 
@@ -161,6 +165,11 @@ export interface PatientListQuery {
 export const patientsApi = {
   list: (q: PatientListQuery): Promise<ApiResult<Patient[]>> =>
     api.get<Patient[]>('/patients', { ...q }),
+
+  exportXlsx: async (q: Omit<PatientListQuery, 'page' | 'limit'>): Promise<Blob> => {
+    const res = await api.get<Blob>('/patients', { ...q, page: 1, limit: 100, export: 'xlsx' });
+    return res.data;
+  },
 
   create: (body: CreatePatientInput, force: boolean): Promise<ApiResult<Patient>> =>
     api.post<Patient>('/patients', body, force ? { force: 'true' } : undefined),

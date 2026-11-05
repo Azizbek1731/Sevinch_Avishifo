@@ -277,6 +277,8 @@ export interface ServiceOption {
   isActive: boolean;
   /** Present on catalogue list responses — used to scope UZI rows per doctor. */
   category?: { id: string; name: string; kind?: string };
+  /** Laboratory section (BIOCHEMISTRY, URINALYSIS, …) when kind is LAB. */
+  labCategory?: string | null;
 }
 
 export interface ReceiptSettings {

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { ArrowLeft, LogOut, Plus, Printer, Trash2 } from 'lucide-react';
+import { ArrowLeft, LogOut, Pencil, Plus, Printer, Trash2 } from 'lucide-react';
 import { formatTz } from '@/lib/dates';
 import { Link, useRouter } from '@/i18n/routing';
 import { usePermissions } from '@/hooks/use-permissions';
@@ -35,6 +35,7 @@ import { TreatmentSheet } from './treatment-sheet';
 import { OrderDialog } from './order-dialog';
 import { DischargeDialog } from './discharge-dialog';
 import { AttendingDoctorCard } from './attending-doctor-card';
+import { EditAdmissionDialog } from './edit-admission-dialog';
 import { RoomBillingCard } from './room-billing-card';
 
 /** One field of the 003 narrative, saved when it loses focus. */
@@ -80,6 +81,7 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
   const errorToast = useApiErrorToast();
 
   const [orderOpen, setOrderOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [dischargeOpen, setDischargeOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [note, setNote] = useState({ condition: '', temperatureC: '', pulseBpm: '' });
@@ -164,13 +166,19 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
             {formatTz(a.admittedAt)}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
             <Link href={`/admissions/${admissionId}/print`}>
               <Printer className="mr-2 h-4 w-4" />
               {t('print')}
             </Link>
           </Button>
+          {canWrite ? (
+            <Button variant="outline" onClick={() => setEditOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              {t('edit.button')}
+            </Button>
+          ) : null}
           {canWrite ? (
             <Button variant="destructive" onClick={() => setDischargeOpen(true)}>
               <LogOut className="mr-2 h-4 w-4" />
@@ -211,6 +219,9 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
         </AlertDialogContent>
       </AlertDialog>
 
+      {canWrite ? (
+        <EditAdmissionDialog open={editOpen} onOpenChange={setEditOpen} admission={a} />
+      ) : null}
       <AttendingDoctorCard admission={a} canEdit={canWrite} />
       <RoomBillingCard admission={a} canEdit={canWrite} />
 

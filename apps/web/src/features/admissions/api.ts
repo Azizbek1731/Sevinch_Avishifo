@@ -187,9 +187,25 @@ export interface DischargeCheck {
   deposit: MoneyString;
 }
 
+export type AdmissionListQuery = {
+  status?: 'ACTIVE' | 'DISCHARGED';
+  patientId?: string;
+  search?: string;
+  department?: string;
+  ward?: string;
+  attendingDoctorUserId?: string;
+  admittedFrom?: string;
+  admittedTo?: string;
+  page?: number;
+  limit?: number;
+};
+
 export const admissionsApi = {
-  list: (q: { status?: string; patientId?: string; page?: number; limit?: number }) =>
-    api.get<AdmissionRow[]>('/admissions', { ...q }),
+  list: (q: AdmissionListQuery) => api.get<AdmissionRow[]>('/admissions', { ...q }),
+  exportXlsx: async (q: AdmissionListQuery): Promise<Blob> => {
+    const res = await api.get<Blob>('/admissions', { ...q, export: 'xlsx' });
+    return res.data;
+  },
   get: (id: string) => api.get<AdmissionDetail>(`/admissions/${id}`),
   admit: (body: AdmitPatientInput) => api.post<AdmissionRow>('/admissions', body),
   update: (id: string, body: UpdateAdmissionInput) =>

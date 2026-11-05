@@ -18,6 +18,7 @@ import { ErrorCode, UPLOAD_LIMITS } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
 import { CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { AuthUser } from '@avishifo/shared';
+import { XLSX_MIME_TYPE } from '../reports/xlsx.service';
 import { PatientsService } from './patients.service';
 import { DocumentsService } from './documents.service';
 import { TimelineService } from './timeline.service';
@@ -40,7 +41,14 @@ export class PatientsController {
 
   @Get()
   @RequirePermissions('patients.read')
-  list(@Query() query: PatientQueryDto, @CurrentUser() user: AuthUser) {
+  async list(@Query() query: PatientQueryDto, @CurrentUser() user: AuthUser) {
+    if (query.export === 'xlsx') {
+      const buffer = await this.patients.exportXlsx(query, user);
+      return new StreamableFile(buffer, {
+        type: XLSX_MIME_TYPE,
+        disposition: 'attachment; filename="bemorlar.xlsx"',
+      });
+    }
     return this.patients.list(query, user);
   }
 

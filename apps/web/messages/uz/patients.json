@@ -5,6 +5,19 @@
   "searchPlaceholder": "Ism, telefon yoki MRN bo'yicha qidirish...",
   "filterTag": "Teg bo'yicha",
   "allTags": "Barcha teglar",
+  "filters": {
+    "allCareTypes": "Barcha turlar",
+    "allGenders": "Barcha jinslar",
+    "male": "Erkak",
+    "female": "Ayol",
+    "from": "Dan",
+    "to": "Gacha",
+    "clear": "Tozalash"
+  },
+  "export": {
+    "xlsx": "Excel (.xlsx)",
+    "success": "Excel fayl yuklandi"
+  },
   "created": "Bemor yaratildi",
   "updated": "Bemor ma'lumotlari saqlandi",
   "deleted": "Bemor o'chirildi",

@@ -88,13 +88,22 @@
     "proceduresTitle": "Muolaja va tekshiruvlarni kiritish",
     "proceduresSubtitle": "Muolaja, instrumental tekshiruv va boshqa xizmatlarni tanlang. Tayyor hisob kassaga yuboriladi.",
     "proceduresHint": "Laboratoriya tahlillari, shifokor qabuli va UZI qabulxonadagi alohida tugmalar orqali rasmiylashtiriladi.",
-    "labSubtitle": "Laboratoriya tahlillarini tanlang. Hisob kassaga yuboriladi, to‘liq to‘lovdan so‘ng laboratoriya buyurtmani oladi.",
+    "labSubtitle": "Bo‘limlar bo‘yicha tahlillarni tanlang. Hisob kassaga yuboriladi, to‘liq to‘lovdan so‘ng laboratoriya buyurtmani oladi.",
     "tests": "Laboratoriya tahlillari",
     "test": "Tahlil",
     "addTest": "Tahlil qo‘shish",
     "cashierOnlyTitle": "Faqat kassaga",
     "cashierOnlySubtitle": "Xizmatni tanlang (masalan shifokor qabuli) — hisob faqat kassaga boradi, shifokor/laboratoriya/UZI navbatiga tushmaydi.",
     "cashierOnlyHint": "To‘lovdan keyin jarayon yakunlanadi. Shifokorga yo‘llanma va klinik buyurtma yaratilmaydi."
+  },
+  "labPicker": {
+    "search": "Tahlil qidirish…",
+    "all": "Barchasi",
+    "other": "Boshqa",
+    "hint": "Kerakli bo‘limni tanlang yoki qidiruvdan toping, so‘ng tahlillarni belgilang.",
+    "empty": "Bu bo‘limda tahlil topilmadi",
+    "loadError": "Katalogni yuklab bo‘lmadi",
+    "count": "{count} ta"
   },
   "refundDlg": {
     "title": "Qaytarish — {number}",

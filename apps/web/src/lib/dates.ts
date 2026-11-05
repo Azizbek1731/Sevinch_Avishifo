@@ -32,3 +32,17 @@ export function todayTashkent(): string {
 export function tashkentToUtcIso(date: string, time: string): string {
   return fromZonedTime(`${date}T${time}:00`, TIMEZONE).toISOString();
 }
+
+/** Current Asia/Tashkent clock as `datetime-local` value (`YYYY-MM-DDTHH:mm`). */
+export function nowTashkentDateTimeLocal(): string {
+  return format(toZonedTime(new Date(), TIMEZONE), "yyyy-MM-dd'T'HH:mm");
+}
+
+/** `datetime-local` value in Tashkent → UTC ISO for the API. */
+export function tashkentDateTimeLocalToUtcIso(local: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(local.trim());
+  if (!match) {
+    throw new Error('Invalid datetime-local value');
+  }
+  return tashkentToUtcIso(match[1]!, match[2]!);
+}

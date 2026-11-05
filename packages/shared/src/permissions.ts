@@ -48,6 +48,7 @@ export const PERMISSIONS = [
   // Statsionar
   'admissions.read',
   'admissions.write',
+  'admissions.export',
   /// Marking the treatment sheet — the ward nurse and the desk, not only doctors.
   'admissions.administer',
   /**
@@ -142,6 +143,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'patients.read',
     'admissions.read',
     'admissions.write',
+    'admissions.export',
     'admissions.administer',
     'admissions.force',
     'charges.read',
@@ -229,10 +231,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'lab.orders.write',
     'admissions.read',
     'admissions.write',
+    'admissions.export',
     'admissions.administer',
     'charges.read',
     'charges.write',
     'patients.write',
+    'patients.export',
     'patients.documents.write',
     'appointments.read',
     'appointments.write',

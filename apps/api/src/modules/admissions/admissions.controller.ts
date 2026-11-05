@@ -1,8 +1,19 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  StreamableFile,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { AuthUser } from '@avishifo/shared';
 import { ActiveBranch, CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { PaginatedResult } from '../../common/pagination';
+import { XLSX_MIME_TYPE } from '../reports/xlsx.service';
 import { AdmissionsService } from './admissions.service';
 import { ChargesService } from './charges.service';
 import {
@@ -26,7 +37,17 @@ export class AdmissionsController {
 
   @Get()
   @RequirePermissions('admissions.read')
-  list(@Query() query: AdmissionQueryDto): Promise<PaginatedResult<Record<string, unknown>>> {
+  async list(
+    @Query() query: AdmissionQueryDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<PaginatedResult<Record<string, unknown>> | StreamableFile> {
+    if (query.export === 'xlsx') {
+      const buffer = await this.admissions.exportXlsx(query, user);
+      return new StreamableFile(buffer, {
+        type: XLSX_MIME_TYPE,
+        disposition: 'attachment; filename="statsionar.xlsx"',
+      });
+    }
     return this.admissions.list(query);
   }
 

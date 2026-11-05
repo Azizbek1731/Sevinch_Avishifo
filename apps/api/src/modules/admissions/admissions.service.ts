@@ -25,6 +25,17 @@ import { InvoicesService } from '../billing/invoices.service';
 import { RoomBillingService } from '../billing/room-billing.service';
 import { roomBillingDate, roomBillingDayCount } from '../billing/room-billing-calendar';
 import { InpatientRoomsService } from './inpatient-rooms.service';
+import { XlsxService, type SheetSpec } from '../reports/xlsx.service';
+
+const EXPORT_ROW_CAP = 10_000;
+
+/** Inclusive calendar day bounds in Asia/Tashkent (+05:00). */
+function tashkentDayRange(from?: string, to?: string): { gte?: Date; lte?: Date } {
+  return {
+    ...(from ? { gte: new Date(`${from}T00:00:00.000+05:00`) } : {}),
+    ...(to ? { lte: new Date(`${to}T23:59:59.999+05:00`) } : {}),
+  };
+}
 
 /** Every planned date of an order, from its schedule. */
 function plannedDates(
@@ -51,6 +62,7 @@ export class AdmissionsService {
     private readonly invoices: InvoicesService,
     private readonly roomBilling: RoomBillingService,
     private readonly inpatientRooms: InpatientRoomsService,
+    private readonly xlsx: XlsxService,
   ) {}
 
   private map(a: Admission): Record<string, unknown> {
@@ -371,6 +383,20 @@ export class AdmissionsService {
         throw new AppException(ErrorCode.FORBIDDEN, 'Bu filialga kirish huquqi yo‘q', 403);
       if (dto.attendingDoctorUserId)
         await this.validateDoctor(dto.attendingDoctorUserId, a.branchId);
+      const nextHistory = dto.historyNumber?.trim();
+      if (nextHistory && nextHistory !== a.historyNumber) {
+        const clash = await tx.admission.findFirst({
+          where: { historyNumber: nextHistory, id: { not: id } },
+          select: { id: true },
+        });
+        if (clash) {
+          throw new AppException(
+            ErrorCode.VALIDATION_ERROR,
+            `Kasallik tarixi raqami band: ${nextHistory}`,
+            409,
+          );
+        }
+      }
       // Already-started 24h periods keep their original rate and location.
       // Newly configured legacy stays begin now, never at an unknown old tariff.
       if (dto.dailyRoomRate !== undefined && !user)
@@ -384,6 +410,7 @@ export class AdmissionsService {
       return tx.admission.update({
         where: { id },
         data: {
+          ...(nextHistory ? { historyNumber: nextHistory } : {}),
           department: dto.department,
           ward:
             dto.ward ??
@@ -724,22 +751,40 @@ export class AdmissionsService {
     return this.map(updated);
   }
 
-  async list(q: AdmissionQueryInput): Promise<PaginatedResult<Record<string, unknown>>> {
-    const where: Prisma.AdmissionWhereInput = {
+  private buildListWhere(q: AdmissionQueryInput): Prisma.AdmissionWhereInput {
+    const admitted = tashkentDayRange(q.admittedFrom, q.admittedTo);
+    const search = q.search?.trim();
+    return {
       ...(q.status ? { status: q.status } : {}),
       ...(q.patientId ? { patientId: q.patientId } : {}),
+      ...(q.attendingDoctorUserId ? { attendingDoctorUserId: q.attendingDoctorUserId } : {}),
+      ...(q.department
+        ? { department: { contains: q.department, mode: 'insensitive' } }
+        : {}),
+      ...(q.ward ? { ward: { contains: q.ward, mode: 'insensitive' } } : {}),
+      ...(admitted.gte || admitted.lte ? { admittedAt: admitted } : {}),
+      ...(search
+        ? {
+            OR: [
+              { historyNumber: { contains: search, mode: 'insensitive' } },
+              { attendingDoctorName: { contains: search, mode: 'insensitive' } },
+              { ward: { contains: search, mode: 'insensitive' } },
+              { department: { contains: search, mode: 'insensitive' } },
+              { patient: { fullName: { contains: search, mode: 'insensitive' } } },
+              { patient: { mrn: { contains: search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
     };
-    const [rows, total] = await Promise.all([
-      this.prisma.db.admission.findMany({
-        where,
-        orderBy: { admittedAt: 'desc' },
-        ...skipTake(q),
-        include: {
-          patient: { select: { id: true, mrn: true, fullName: true, dob: true, gender: true } },
-        },
-      }),
-      this.prisma.db.admission.count({ where }),
-    ]);
+  }
+
+  private async mapListRows(
+    rows: Array<
+      Admission & {
+        patient: { id: string; mrn: string; fullName: string; dob: Date | null; gender: string | null };
+      }
+    >,
+  ): Promise<Record<string, unknown>[]> {
     const doctorIds = [
       ...new Set(
         rows
@@ -754,20 +799,99 @@ export class AdmissionsService {
         })
       : [];
     const doctorById = new Map(doctors.map((d) => [d.id, d.fullName]));
-    return paginated(
-      rows.map((r) => {
-        const rosterName = r.attendingDoctorUserId
-          ? doctorById.get(r.attendingDoctorUserId) ?? null
-          : null;
-        const doctorName = rosterName ?? r.attendingDoctorName ?? null;
+    return rows.map((r) => {
+      const rosterName = r.attendingDoctorUserId
+        ? doctorById.get(r.attendingDoctorUserId) ?? null
+        : null;
+      const doctorName = rosterName ?? r.attendingDoctorName ?? null;
+      return {
+        ...this.map(r),
+        patient: r.patient,
+        attendingDoctor: doctorName ? { id: r.attendingDoctorUserId, fullName: doctorName } : null,
+      };
+    });
+  }
+
+  async list(q: AdmissionQueryInput): Promise<PaginatedResult<Record<string, unknown>>> {
+    const where = this.buildListWhere(q);
+    const [rows, total] = await Promise.all([
+      this.prisma.db.admission.findMany({
+        where,
+        orderBy: { admittedAt: 'desc' },
+        ...skipTake(q),
+        include: {
+          patient: { select: { id: true, mrn: true, fullName: true, dob: true, gender: true } },
+        },
+      }),
+      this.prisma.db.admission.count({ where }),
+    ]);
+    return paginated(await this.mapListRows(rows), {
+      page: q.page,
+      limit: q.limit,
+      total,
+    });
+  }
+
+  /** Filtered stays as XLSX — same filters as the list, without the page cap. */
+  async exportXlsx(q: AdmissionQueryInput, user: AuthUser): Promise<Buffer> {
+    if (!user.permissions.includes('admissions.export')) {
+      throw new AppException(ErrorCode.FORBIDDEN, 'Missing permission: admissions.export', 403);
+    }
+    const where = this.buildListWhere(q);
+    const rows = await this.prisma.db.admission.findMany({
+      where,
+      orderBy: { admittedAt: 'desc' },
+      take: EXPORT_ROW_CAP,
+      include: {
+        patient: { select: { id: true, mrn: true, fullName: true, dob: true, gender: true } },
+      },
+    });
+    const mapped = await this.mapListRows(rows);
+    const sheet: SheetSpec = {
+      name: 'Statsionar',
+      columns: [
+        { header: 'Tarix №', key: 'historyNumber', width: 16 },
+        { header: 'MRN', key: 'mrn', width: 14 },
+        { header: 'Bemor', key: 'patientName', width: 28 },
+        { header: 'Shifokor', key: 'doctor', width: 28 },
+        { header: "Bo'lim", key: 'department', width: 18 },
+        { header: 'Xona', key: 'ward', width: 14 },
+        { header: "O'rin", key: 'bed', width: 10 },
+        { header: 'Holat', key: 'status', width: 12 },
+        { header: 'Yotqizilgan', key: 'admittedAt', width: 20 },
+        { header: 'Chiqarilgan', key: 'dischargedAt', width: 20 },
+        { header: 'Kun', key: 'days', width: 8, quantity: true },
+      ],
+      rows: mapped.map((row) => {
+        const admittedAt = String(row.admittedAt ?? '');
+        const dischargedAt = row.dischargedAt ? String(row.dischargedAt) : null;
+        const from = new Date(admittedAt).getTime();
+        const to = dischargedAt ? new Date(dischargedAt).getTime() : Date.now();
+        const days = Math.max(1, Math.ceil((to - from) / 86_400_000));
+        const patient = row.patient as { mrn?: string; fullName?: string } | undefined;
+        const doctor = row.attendingDoctor as { fullName?: string } | null | undefined;
         return {
-          ...this.map(r),
-          patient: r.patient,
-          attendingDoctor: doctorName ? { id: r.attendingDoctorUserId, fullName: doctorName } : null,
+          historyNumber: row.historyNumber,
+          mrn: patient?.mrn ?? '',
+          patientName: patient?.fullName ?? '',
+          doctor: doctor?.fullName ?? row.attendingDoctorName ?? '',
+          department: row.department ?? '',
+          ward: row.ward ?? '',
+          bed: row.bed ?? '',
+          status: row.status === 'ACTIVE' ? 'Yotibdi' : 'Chiqarilgan',
+          admittedAt: admittedAt.slice(0, 16).replace('T', ' '),
+          dischargedAt: dischargedAt ? dischargedAt.slice(0, 16).replace('T', ' ') : '',
+          days: String(days),
         };
       }),
-      { page: q.page, limit: q.limit, total },
-    );
+    };
+    await this.audit.log({
+      action: AuditAction.EXPORT,
+      entity: 'Admission',
+      entityId: 'list',
+      after: { count: mapped.length, filters: q },
+    });
+    return this.xlsx.buildWorkbook([sheet]);
   }
 
   /** Qabulxona bir yoki bir necha 24 soatlik palata haqini qo‘lda qo‘shadi. */

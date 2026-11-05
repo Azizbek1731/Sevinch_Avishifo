@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { XlsxService } from '../reports/xlsx.service';
 import { PatientsController } from './patients.controller';
 import { PatientsService } from './patients.service';
 import { DocumentsService } from './documents.service';
@@ -11,7 +12,7 @@ import { TimelineService } from './timeline.service';
  */
 @Module({
   controllers: [PatientsController],
-  providers: [PatientsService, DocumentsService, TimelineService],
+  providers: [PatientsService, DocumentsService, TimelineService, XlsxService],
   exports: [PatientsService, DocumentsService],
 })
 export class PatientsModule {}

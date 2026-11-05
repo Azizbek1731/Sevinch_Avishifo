@@ -23,9 +23,16 @@
   "doctorSave": "Save",
   "doctorSaved": "Attending doctor saved",
   "doctorMissing": "Attending doctor not set",
+  "edit": {
+    "button": "Edit details",
+    "title": "Edit admission details",
+    "hint": "Correct a mistyped history number, room, doctor, and other fields.",
+    "save": "Save",
+    "saved": "Details saved"
+  },
   "admit": "Admit",
   "admitTitle": "Admit {name}",
-  "admitHint": "Enter the doctor, room number, history number and home address. Daily bed fee is added manually later.",
+  "admitHint": "Enter arrival date/time, doctor, room number, history number and home address. Daily bed fee is added manually later.",
   "admitted": "History opened: {number}",
   "discharge": "Discharge",
   "discharged": "Patient discharged",
@@ -44,6 +51,18 @@
   "empty": {
     "title": "No inpatients",
     "description": "Admit via the button above, or from the patient card."
+  },
+  "filters": {
+    "allStatuses": "All",
+    "allDoctors": "All doctors",
+    "searchPlaceholder": "History №, patient or room…",
+    "from": "From",
+    "to": "To",
+    "clear": "Clear"
+  },
+  "export": {
+    "xlsx": "Excel (.xlsx)",
+    "success": "Excel file downloaded"
   },
   "table": {
     "history": "History №",
@@ -107,6 +126,10 @@
     "historyAutoOn": "Auto",
     "historyAutoOff": "Manual",
     "historyNumberPlaceholder": "e.g. KT-2026-0042",
+    "admittedAt": "Arrival date and time",
+    "admittedAtHelp": "When the patient actually arrived (Tashkent). If entered the next day, the stay still counts from this date.",
+    "admittedAtInvalid": "Enter a valid arrival date and time",
+    "admittedAtFuture": "Arrival cannot be in the future",
     "homeAddress": "Home address",
     "homeAddressHint": "Patient residential address",
     "bed": "Bed (optional)",

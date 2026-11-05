@@ -88,6 +88,20 @@
   "catalogAlreadyImported": "Qo'shilgan",
   "importDone": "{created} ta qo'shildi, {updated} ta yangilandi, {skipped} ta o'tkazib yuborildi.",
   "importNothingNew": "Yangi tekshiruv qo'shilmadi — {count} tasi allaqachon mavjud.",
+  "categories": {
+    "HEMATOLOGY": "Gemotologiya",
+    "BIOCHEMISTRY": "Bioximiya",
+    "HORMONES": "Gormonlar",
+    "COAGULATION": "Koagulogramma",
+    "IMMUNOLOGY": "Immunologiya",
+    "TUMOR_MARKERS": "Onkomarkerlar",
+    "VITAMINS": "Vitaminlar",
+    "URINALYSIS": "Siydik",
+    "COPROLOGY": "Najas tahlillari",
+    "ANDROLOGY": "Andrologiya",
+    "CYTOLOGY": "Sitologiya",
+    "MICROBIOLOGY": "Mikrobiologiya"
+  },
   "biomaterial": {
     "BLOOD": "Qon",
     "URINE": "Siydik",

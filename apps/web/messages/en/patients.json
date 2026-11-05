@@ -5,6 +5,19 @@
   "searchPlaceholder": "Search by name, phone or MRN...",
   "filterTag": "By tag",
   "allTags": "All tags",
+  "filters": {
+    "allCareTypes": "All types",
+    "allGenders": "All genders",
+    "male": "Male",
+    "female": "Female",
+    "from": "From",
+    "to": "To",
+    "clear": "Clear"
+  },
+  "export": {
+    "xlsx": "Excel (.xlsx)",
+    "success": "Excel file downloaded"
+  },
   "created": "Patient created",
   "updated": "Patient details saved",
   "deleted": "Patient deleted",

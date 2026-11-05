@@ -41,6 +41,7 @@ import { PaymentSplit, splitTotalTiyin } from './payment-split';
 import { inputTiyin, needsOpenShift } from '../payment-methods';
 import { identifyInvoiceRequest, type InvoiceRequestIdentity } from '../invoice-request';
 import { ServiceCombobox } from './service-combobox';
+import { LabServicePicker } from './lab-service-picker';
 
 const EMPTY_LINE = { quantity: 1, unitPrice: '0' as MoneyString, discount: '0' as MoneyString };
 
@@ -113,6 +114,8 @@ export function AddServicesDialog({
   const [patient, setPatient] = useState<PatientBrief | null>(fixedPatient ?? null);
   /** Selected service per field-array row, keyed by RHF field id. */
   const [rowServices, setRowServices] = useState<Record<string, ServiceOption | null>>({});
+  /** Lab mode: multi-select catalogue grouped by clinical section. */
+  const [labSelected, setLabSelected] = useState<ServiceOption[]>([]);
   /**
    * How the sale is paid. One entry is the ordinary case; a cashier splitting a
    * bill across Click and cash adds more. Kept in sync with the running total
@@ -139,6 +142,7 @@ export function AddServicesDialog({
     if (!open) return;
     setPatient(fixedPatient ?? null);
     setRowServices({});
+    setLabSelected([]);
     setPayments([{ method: PaymentMethod.CASH, amount: '0' }]);
     requestIdentity.current = null;
     form.reset({
@@ -147,6 +151,24 @@ export function AddServicesDialog({
       lines: [{ ...EMPTY_LINE }],
     });
   }, [open, fixedPatient, activeBranchId, initialKind, prepareOnly, cashierOnly, form]);
+
+  const applyLabSelection = (next: ServiceOption[]) => {
+    setLabSelected(next);
+    if (next.length === 0) {
+      form.setValue('lines', [{ ...EMPTY_LINE }], { shouldValidate: true });
+      return;
+    }
+    form.setValue(
+      'lines',
+      next.map((service) => ({
+        serviceId: service.id,
+        quantity: 1,
+        unitPrice: sanitizeMoney(service.currentPrice || '0') as MoneyString,
+        discount: '0' as MoneyString,
+      })),
+      { shouldValidate: true },
+    );
+  };
 
   // Cash needs an open shift — warn before the server refuses the payment.
   const { data: shift } = useQuery({
@@ -238,7 +260,13 @@ export function AddServicesDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogContent
+          className={
+            isLab
+              ? 'max-h-[92vh] overflow-y-auto sm:max-w-4xl'
+              : 'max-h-[90vh] overflow-y-auto sm:max-w-3xl'
+          }
+        >
           <DialogHeader>
             <DialogTitle>{t(titleKey)}</DialogTitle>
             <DialogDescription>
@@ -276,99 +304,111 @@ export function AddServicesDialog({
               {isProcedureOrder ? (
                 <p className="text-sm text-muted-foreground">{t('quick.proceduresHint')}</p>
               ) : null}
-              <div className="space-y-3">
-                {fields.map((field, idx) => {
-                  const line = watchedLines[idx];
-                  const lt = line
-                    ? lineTotalTiyin(line.quantity, line.unitPrice, line.discount ?? '0')
-                    : null;
-                  return (
-                    <div
-                      key={field.id}
-                      className="grid grid-cols-2 items-end gap-2 rounded-md border p-3 md:grid-cols-[minmax(0,1fr)_80px_140px_140px_120px_36px]"
-                    >
-                      <div className="col-span-2 min-w-0 space-y-1 md:col-span-1">
-                        <span className="text-xs text-muted-foreground">
-                          {t(isLab ? 'quick.test' : 'form.service')}
-                        </span>
-                        <ServiceCombobox
-                          excludeSurgery
-                          kind={cashierOnly ? undefined : initialKind}
-                          proceduresOnly={!cashierOnly && isProcedureOrder}
-                          value={rowServices[field.id] ?? null}
-                          onChange={(s) => {
-                            setRowServices((prev) => ({ ...prev, [field.id]: s }));
-                            form.setValue(`lines.${idx}.serviceId`, s.id, { shouldValidate: true });
-                            applyCatalogPrice(idx, s);
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-xs text-muted-foreground">{t('form.qty')}</span>
-                        <Input
-                          type="number"
-                          min={1}
-                          step={1}
-                          {...form.register(`lines.${idx}.quantity`, { valueAsNumber: true })}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-xs text-muted-foreground">{t('form.unitPrice')}</span>
-                        <Input
-                          inputMode="decimal"
-                          autoComplete="off"
-                          {...form.register(`lines.${idx}.unitPrice`, {
-                            setValueAs: sanitizeMoney,
-                          })}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-xs text-muted-foreground">{t('form.discount')}</span>
-                        <Input
-                          inputMode="decimal"
-                          autoComplete="off"
-                          {...form.register(`lines.${idx}.discount`, { setValueAs: sanitizeMoney })}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-xs text-muted-foreground">{t('form.lineTotal')}</span>
-                        <p className="truncate text-sm font-semibold leading-9">
-                          {lt !== null ? formatUZS(fromTiyin(lt < 0n ? 0n : lt)) : '—'}
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground"
-                        disabled={fields.length <= 1}
-                        onClick={() => {
-                          setRowServices((prev) => {
-                            const next = { ...prev };
-                            delete next[field.id];
-                            return next;
-                          });
-                          remove(idx);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
+              {isLab ? (
+                <LabServicePicker
+                  selected={labSelected}
+                  onChange={applyLabSelection}
+                  disabled={mutation.isPending}
+                />
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    {fields.map((field, idx) => {
+                      const line = watchedLines[idx];
+                      const lt = line
+                        ? lineTotalTiyin(line.quantity, line.unitPrice, line.discount ?? '0')
+                        : null;
+                      return (
+                        <div
+                          key={field.id}
+                          className="grid grid-cols-2 items-end gap-2 rounded-md border p-3 md:grid-cols-[minmax(0,1fr)_80px_140px_140px_120px_36px]"
+                        >
+                          <div className="col-span-2 min-w-0 space-y-1 md:col-span-1">
+                            <span className="text-xs text-muted-foreground">{t('form.service')}</span>
+                            <ServiceCombobox
+                              excludeSurgery
+                              kind={cashierOnly ? undefined : initialKind}
+                              proceduresOnly={!cashierOnly && isProcedureOrder}
+                              value={rowServices[field.id] ?? null}
+                              onChange={(s) => {
+                                setRowServices((prev) => ({ ...prev, [field.id]: s }));
+                                form.setValue(`lines.${idx}.serviceId`, s.id, {
+                                  shouldValidate: true,
+                                });
+                                applyCatalogPrice(idx, s);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-xs text-muted-foreground">{t('form.qty')}</span>
+                            <Input
+                              type="number"
+                              min={1}
+                              step={1}
+                              {...form.register(`lines.${idx}.quantity`, { valueAsNumber: true })}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-xs text-muted-foreground">{t('form.unitPrice')}</span>
+                            <Input
+                              inputMode="decimal"
+                              autoComplete="off"
+                              {...form.register(`lines.${idx}.unitPrice`, {
+                                setValueAs: sanitizeMoney,
+                              })}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-xs text-muted-foreground">{t('form.discount')}</span>
+                            <Input
+                              inputMode="decimal"
+                              autoComplete="off"
+                              {...form.register(`lines.${idx}.discount`, {
+                                setValueAs: sanitizeMoney,
+                              })}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-xs text-muted-foreground">{t('form.lineTotal')}</span>
+                            <p className="truncate text-sm font-semibold leading-9">
+                              {lt !== null ? formatUZS(fromTiyin(lt < 0n ? 0n : lt)) : '—'}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground"
+                            disabled={fields.length <= 1}
+                            onClick={() => {
+                              setRowServices((prev) => {
+                                const next = { ...prev };
+                                delete next[field.id];
+                                return next;
+                              });
+                              remove(idx);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append({ ...EMPTY_LINE })}
+                  >
+                    <Plus className="mr-1 h-4 w-4" />
+                    {t('form.addLine')}
+                  </Button>
+                </>
+              )}
               {form.formState.errors.lines ? (
                 <p className="text-sm text-destructive">{t('form.linesInvalid')}</p>
               ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => append({ ...EMPTY_LINE })}
-              >
-                <Plus className="mr-1 h-4 w-4" />
-                {t(isLab ? 'quick.addTest' : 'form.addLine')}
-              </Button>
             </div>
 
             <Separator />

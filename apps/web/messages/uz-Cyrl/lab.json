@@ -88,6 +88,20 @@
   "catalogAlreadyImported": "Қўшилган",
   "importDone": "{created} та қўшилди, {updated} та янгиланди, {skipped} та ўтказиб юборилди.",
   "importNothingNew": "Янги текширув қўшилмади — {count} таси аллақачон мавжуд.",
+  "categories": {
+    "HEMATOLOGY": "Гемотология",
+    "BIOCHEMISTRY": "Биохимия",
+    "HORMONES": "Гормонлар",
+    "COAGULATION": "Коагулограмма",
+    "IMMUNOLOGY": "Иммунология",
+    "TUMOR_MARKERS": "Онкомаркерлар",
+    "VITAMINS": "Витаминлар",
+    "URINALYSIS": "Сийдик",
+    "COPROLOGY": "Нажас таҳлиллари",
+    "ANDROLOGY": "Андрология",
+    "CYTOLOGY": "Цитология",
+    "MICROBIOLOGY": "Микробиология"
+  },
   "biomaterial": {
     "BLOOD": "Қон",
     "URINE": "Сийдик",

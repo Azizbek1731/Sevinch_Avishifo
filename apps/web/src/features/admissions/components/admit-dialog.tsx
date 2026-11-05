@@ -32,6 +32,10 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useApiErrorToast } from '@/features/services/hooks';
 import { clinicalOrdersApi } from '@/features/clinical-orders/api';
 import { patientsApi } from '@/features/patients/api';
+import {
+  nowTashkentDateTimeLocal,
+  tashkentDateTimeLocalToUtcIso,
+} from '@/lib/dates';
 import { admissionsApi } from '../api';
 
 const OTHER_DOCTOR = '__other__';
@@ -59,6 +63,9 @@ export function AdmitDialog({
   const branchId = useAuthStore((s) => s.activeBranchId);
   const [doctorChoice, setDoctorChoice] = useState('');
   const [autoHistory, setAutoHistory] = useState(true);
+  /** Arrival in Asia/Tashkent — may be backdated when desk enters the stay next day. */
+  const [arrivedAtLocal, setArrivedAtLocal] = useState(nowTashkentDateTimeLocal);
+  const [arrivedAtError, setArrivedAtError] = useState<string | null>(null);
 
   const form = useForm<AdmitPatientInput>({
     resolver: zodResolver(admitPatientSchema),
@@ -92,6 +99,8 @@ export function AdmitDialog({
     if (!open) return;
     setDoctorChoice('');
     setAutoHistory(true);
+    setArrivedAtLocal(nowTashkentDateTimeLocal());
+    setArrivedAtError(null);
     form.reset({
       patientId,
       department: '',
@@ -164,6 +173,18 @@ export function AdmitDialog({
         </DialogHeader>
         <form
           onSubmit={form.handleSubmit((values) => {
+            let admittedAt: string;
+            try {
+              admittedAt = tashkentDateTimeLocalToUtcIso(arrivedAtLocal);
+            } catch {
+              setArrivedAtError(t('fields.admittedAtInvalid'));
+              return;
+            }
+            if (new Date(admittedAt).getTime() > Date.now()) {
+              setArrivedAtError(t('fields.admittedAtFuture'));
+              return;
+            }
+            setArrivedAtError(null);
             const fromList = doctorChoice && doctorChoice !== OTHER_DOCTOR;
             admit.mutate({
               patientId: values.patientId,
@@ -176,6 +197,7 @@ export function AdmitDialog({
               autoHistoryNumber: autoHistory,
               historyNumber: autoHistory ? undefined : values.historyNumber?.trim() || undefined,
               homeAddress: values.homeAddress.trim(),
+              admittedAt,
               referredBy: values.referredBy?.trim() || undefined,
               admissionDiagnosis: values.admissionDiagnosis?.trim() || undefined,
             });
@@ -183,6 +205,26 @@ export function AdmitDialog({
           className="space-y-5"
           noValidate
         >
+          <div className="space-y-1.5">
+            <Label htmlFor="ad-arrived">
+              {t('fields.admittedAt')}
+              <RequiredMark />
+            </Label>
+            <Input
+              id="ad-arrived"
+              type="datetime-local"
+              value={arrivedAtLocal}
+              max={nowTashkentDateTimeLocal()}
+              aria-invalid={Boolean(arrivedAtError)}
+              onChange={(event) => {
+                setArrivedAtLocal(event.target.value);
+                setArrivedAtError(null);
+              }}
+            />
+            <p className="text-xs text-muted-foreground">{t('fields.admittedAtHelp')}</p>
+            {arrivedAtError ? <p className="text-xs text-destructive">{arrivedAtError}</p> : null}
+          </div>
+
           <section className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {t('fields.attendingDoctor')}

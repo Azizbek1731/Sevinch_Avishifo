@@ -5,6 +5,19 @@
   "searchPlaceholder": "Поиск по имени, телефону или MRN...",
   "filterTag": "По тегу",
   "allTags": "Все теги",
+  "filters": {
+    "allCareTypes": "Все типы",
+    "allGenders": "Все полы",
+    "male": "Мужской",
+    "female": "Женский",
+    "from": "С",
+    "to": "По",
+    "clear": "Сбросить"
+  },
+  "export": {
+    "xlsx": "Excel (.xlsx)",
+    "success": "Файл Excel скачан"
+  },
   "created": "Пациент создан",
   "updated": "Данные пациента сохранены",
   "deleted": "Пациент удалён",

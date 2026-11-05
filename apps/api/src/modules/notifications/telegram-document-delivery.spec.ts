@@ -39,6 +39,7 @@ function harness() {
     { patientIds } as unknown as TelegramPatientAccessService,
     { render: vi.fn() } as unknown as VisitReportPdfService,
     { render: vi.fn(), pickServiceTitle: vi.fn() } as unknown as TreatmentSheetPdfService,
+    { buildReportNow: vi.fn(), sendDocument: vi.fn() } as never,
   ) as unknown as Handlers;
   const reply = vi.fn().mockResolvedValue({});
   const replyWithDocument = vi.fn();

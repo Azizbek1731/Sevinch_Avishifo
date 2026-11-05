@@ -64,6 +64,8 @@ export type AdmitPatientInput = z.infer<typeof admitPatientSchema>;
 
 /** The 003 narrative fields, saved as the doctor fills them in. */
 export const updateAdmissionSchema = z.object({
+  /** Correct a mistyped history / chart number (unique per clinic). */
+  historyNumber: z.string().trim().min(1).max(40).optional(),
   department: z.string().trim().max(120).optional(),
   ward: z.string().trim().max(200).optional(),
   bed: z.string().trim().max(40).optional(),
@@ -154,6 +156,15 @@ export type DailyNoteInput = z.infer<typeof dailyNoteSchema>;
 export const admissionQuerySchema = paginationQuerySchema.extend({
   status: z.enum(['ACTIVE', 'DISCHARGED']).optional(),
   patientId: idSchema.optional(),
+  /** History №, bemor F.I.Sh. yoki MRN. */
+  search: z.string().trim().min(1).max(120).optional(),
+  department: z.string().trim().min(1).max(120).optional(),
+  ward: z.string().trim().min(1).max(200).optional(),
+  attendingDoctorUserId: idSchema.optional(),
+  /** Inclusive Tashkent calendar dates. */
+  admittedFrom: dateOnly.optional(),
+  admittedTo: dateOnly.optional(),
+  export: z.enum(['xlsx']).optional(),
 });
 export type AdmissionQueryInput = z.infer<typeof admissionQuerySchema>;
 

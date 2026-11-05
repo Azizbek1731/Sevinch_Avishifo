@@ -88,6 +88,20 @@
   "catalogAlreadyImported": "Добавлено",
   "importDone": "Добавлено {created}, обновлено {updated}, пропущено {skipped}.",
   "importNothingNew": "Новых исследований нет — {count} уже добавлено ранее.",
+  "categories": {
+    "HEMATOLOGY": "Гематология",
+    "BIOCHEMISTRY": "Биохимия",
+    "HORMONES": "Гормоны",
+    "COAGULATION": "Коагулограмма",
+    "IMMUNOLOGY": "Иммунология",
+    "TUMOR_MARKERS": "Онкомаркеры",
+    "VITAMINS": "Витамины",
+    "URINALYSIS": "Моча",
+    "COPROLOGY": "Копрология",
+    "ANDROLOGY": "Андрология",
+    "CYTOLOGY": "Цитология",
+    "MICROBIOLOGY": "Микробиология"
+  },
   "biomaterial": {
     "BLOOD": "Кровь",
     "URINE": "Моча",

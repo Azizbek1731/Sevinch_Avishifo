@@ -68,6 +68,8 @@ export interface ServiceResponse {
   isActive: boolean;
   currentPrice: string | null;
   category?: CategoryResponse;
+  /** LabTest.category when this catalogue row is a laboratory test. */
+  labCategory?: string | null;
   prices?: ServicePriceResponse[];
   createdAt: string;
   updatedAt: string;
@@ -130,7 +132,11 @@ function mapPrice(p: ServicePrice): ServicePriceResponse {
 }
 
 function mapService(
-  s: Service & { category?: ServiceCategory; prices?: ServicePrice[] },
+  s: Service & {
+    category?: ServiceCategory;
+    prices?: ServicePrice[];
+    labTest?: { category: string | null } | null;
+  },
   currentPrice: string | null,
 ): ServiceResponse {
   return {
@@ -144,6 +150,7 @@ function mapService(
     isActive: s.isActive,
     currentPrice,
     ...(s.category ? { category: mapCategory(s.category) } : {}),
+    labCategory: s.labTest ? s.labTest.category : undefined,
     ...(s.prices ? { prices: s.prices.map(mapPrice) } : {}),
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
@@ -262,7 +269,11 @@ export class ServicesService {
     const [rows, total] = await Promise.all([
       this.prisma.db.service.findMany({
         where,
-        include: { category: true },
+        include: {
+          category: true,
+          // Reception lab picker groups by LabTest.category (bioximiya, siydik, …).
+          labTest: { select: { category: true } },
+        },
         orderBy: [{ code: 'asc' }],
         ...skipTake(query),
       }),

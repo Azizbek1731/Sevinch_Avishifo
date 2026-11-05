@@ -25,15 +25,27 @@ import { VISIT_REPORT_INCLUDE, buildVisitReportPdfData } from '../visits/visit-r
 import { TreatmentSheetPdfService } from '../admissions/treatment-sheet-pdf.service';
 import { patientDocumentVisibility } from '../patients/patient-document-access';
 import {
+  allOpsAccountantChatIds,
   allOpsAdminChatIds,
   buildOpsBackupInfo,
   buildOpsStatusText,
+  isConfiguredAccountantPhone,
   isConfiguredAdminPhone,
+  isOpsAccountantChat,
   isOpsAdminChat,
+  isOpsStaffChat,
   opsMenuMode,
+  rememberOpsAccountantChat,
   rememberOpsAdminChat,
   setOpsMenuMode,
+  type OpsMenuMode,
 } from './telegram-ops';
+import { StatsionarDailyTelegramService } from './statsionar-daily-telegram.service';
+import {
+  formatStatsionarReportDateUz,
+  parseStatsionarReportDate,
+} from './statsionar-xlsx.helper';
+import { zonedParts } from './statsionar-daily-schedule';
 
 /** Buttons a linked patient sees. */
 const PATIENT_BUTTONS = [
@@ -83,11 +95,36 @@ const CONTACT_KEYBOARD = new Keyboard().requestContact('📱 Raqamni yuborish').
 /** Patient-only keyboard, re-sent alongside patient answers. */
 const PATIENT_KEYBOARD = keyboardFor({ patientIds: ['x'], staff: null });
 const OPS_BUTTONS = ['Holat', 'Tarmoq', 'Zaxira'] as const;
+const ACCOUNTANT_STATS_BUTTON = '📊 Statsionar Excel';
 const SWITCH_TO_ADMIN = '🛠 Admin menyusi';
+const SWITCH_TO_ACCOUNTANT = '📒 Bug‘alter menyusi';
 const SWITCH_TO_PATIENT = '👤 Bemor menyusi';
 
-/** Pure patient menu (no admin buttons). */
-function clinicPatientKeyboard(canSwitchToAdmin = false): Keyboard {
+/** Chats waiting for a typed statsionar report date (DD.MM.YYYY). */
+const awaitingStatsionarDate = new Set<number>();
+
+function tashkentYmd(offsetDays = 0): string {
+  const p = zonedParts(new Date());
+  const shifted = new Date(Date.UTC(p.year, p.month - 1, p.day + offsetDays));
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}-${String(shifted.getUTCDate()).padStart(2, '0')}`;
+}
+
+function statsionarDatePickerKeyboard(): InlineKeyboard {
+  const today = tashkentYmd(0);
+  const yesterday = tashkentYmd(-1);
+  return new InlineKeyboard()
+    .text(`Bugun (${formatStatsionarReportDateUz(today)})`, `stxlsx:${today}`)
+    .text(`Kecha (${formatStatsionarReportDateUz(yesterday)})`, `stxlsx:${yesterday}`)
+    .row()
+    .text('📅 Boshqa sana', 'stxlsx:ask')
+    .text('✖️ Bekor', 'stxlsx:cancel');
+}
+
+/** Pure patient menu (no staff buttons). */
+function clinicPatientKeyboard(opts: {
+  canSwitchToAdmin?: boolean;
+  canSwitchToAccountant?: boolean;
+} = {}): Keyboard {
   const kb = new Keyboard()
     .text('🧪 Tahlillarim')
     .text('🩻 UZI natijalarim')
@@ -100,19 +137,23 @@ function clinicPatientKeyboard(canSwitchToAdmin = false): Keyboard {
     .row()
     .text('🔄 Yangilash')
     .text('ℹ️ Yordam');
-  if (canSwitchToAdmin) {
+  if (opts.canSwitchToAdmin) {
     kb.row().text(SWITCH_TO_ADMIN);
+  } else if (opts.canSwitchToAccountant) {
+    kb.row().text(SWITCH_TO_ACCOUNTANT);
   }
   return kb.resized().persistent();
 }
 
-/** Pure admin menu (no patient buttons). */
+/** Pure admin menu (no patient / accountant buttons mixed in). */
 function clinicAdminKeyboard(canSwitchToPatient = false): Keyboard {
   const kb = new Keyboard()
     .text('Holat')
     .text('Tarmoq')
     .row()
     .text('Zaxira')
+    .text(ACCOUNTANT_STATS_BUTTON)
+    .row()
     .text('🔄 Yangilash');
   if (canSwitchToPatient) {
     kb.row().text(SWITCH_TO_PATIENT);
@@ -120,7 +161,20 @@ function clinicAdminKeyboard(canSwitchToPatient = false): Keyboard {
   return kb.resized().persistent();
 }
 
-const CLINIC_PATIENT_KEYBOARD = clinicPatientKeyboard(false);
+/** Accountant menu — statsionar Excel on demand; daily file also arrives at 16:30. */
+function clinicAccountantKeyboard(canSwitchToPatient = false): Keyboard {
+  const kb = new Keyboard()
+    .text(ACCOUNTANT_STATS_BUTTON)
+    .row()
+    .text('🔄 Yangilash')
+    .text('ℹ️ Yordam');
+  if (canSwitchToPatient) {
+    kb.row().text(SWITCH_TO_PATIENT);
+  }
+  return kb.resized().persistent();
+}
+
+const CLINIC_PATIENT_KEYBOARD = clinicPatientKeyboard();
 const WAITING_PATIENT_KEYBOARD = new Keyboard()
   .requestContact('📱 Raqamni yuborish')
   .row()
@@ -176,32 +230,40 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     private readonly patientAccess: TelegramPatientAccessService,
     private readonly visitReportPdf: VisitReportPdfService,
     private readonly treatmentSheetPdf: TreatmentSheetPdfService,
+    private readonly statsionarDaily: StatsionarDailyTelegramService,
   ) {}
 
   private get patientOnly(): boolean {
     return this.config.env?.SINGLE_CLINIC_MODE === true;
   }
 
-  /** Active reply keyboard for this chat — admin and patient menus stay separate. */
+  /** Active reply keyboard for this chat — admin / accountant / patient stay separate. */
   private async menuKeyboardFor(chatId?: number): Promise<Keyboard> {
     if (!this.patientOnly) return PATIENT_KEYBOARD;
-    if (chatId === undefined || !isOpsAdminChat(chatId)) return CLINIC_PATIENT_KEYBOARD;
+    if (chatId === undefined || !isOpsStaffChat(chatId)) return CLINIC_PATIENT_KEYBOARD;
     const mode = opsMenuMode(chatId);
-    if (mode === 'admin') {
-      const linked = (await this.patientAccess.resolve(chatId)).status === 'LINKED';
-      return clinicAdminKeyboard(linked);
-    }
-    return clinicPatientKeyboard(true);
+    const linked = (await this.patientAccess.resolve(chatId)).status === 'LINKED';
+    if (mode === 'admin') return clinicAdminKeyboard(linked);
+    if (mode === 'accountant') return clinicAccountantKeyboard(linked);
+    return clinicPatientKeyboard({
+      canSwitchToAdmin: isOpsAdminChat(chatId),
+      canSwitchToAccountant: !isOpsAdminChat(chatId) && isOpsAccountantChat(chatId),
+    });
   }
 
   private patientKeyboardFor(chatId?: number): Keyboard {
     if (!this.patientOnly) return PATIENT_KEYBOARD;
-    if (chatId !== undefined && isOpsAdminChat(chatId) && opsMenuMode(chatId) === 'admin') {
-      return clinicAdminKeyboard(false);
+    if (chatId === undefined) return CLINIC_PATIENT_KEYBOARD;
+    const mode = opsMenuMode(chatId);
+    if (mode === 'admin') return clinicAdminKeyboard(false);
+    if (mode === 'accountant') return clinicAccountantKeyboard(false);
+    if (isOpsAdminChat(chatId)) {
+      return clinicPatientKeyboard({ canSwitchToAdmin: true });
     }
-    return chatId !== undefined && isOpsAdminChat(chatId)
-      ? clinicPatientKeyboard(true)
-      : CLINIC_PATIENT_KEYBOARD;
+    if (isOpsAccountantChat(chatId)) {
+      return clinicPatientKeyboard({ canSwitchToAccountant: true });
+    }
+    return CLINIC_PATIENT_KEYBOARD;
   }
 
   private get patientKeyboard(): Keyboard {
@@ -212,6 +274,12 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     return chatId !== undefined && isOpsAdminChat(chatId)
       ? WAITING_OPS_KEYBOARD
       : WAITING_PATIENT_KEYBOARD;
+  }
+
+  private async isStaffOpsMenu(chatId: number): Promise<boolean> {
+    if (!this.patientOnly || !isOpsStaffChat(chatId)) return false;
+    const mode = opsMenuMode(chatId);
+    return mode === 'admin' || mode === 'accountant';
   }
 
   private async isAdminMenu(chatId: number): Promise<boolean> {
@@ -248,13 +316,20 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
                     { command: 'holat', description: 'Server / loyiha holati (admin)' },
                     { command: 'tarmoq', description: 'Wi‑Fi / LAN holati (admin)' },
                     { command: 'zaxira', description: 'Oxirgi zaxira (admin)' },
+                    {
+                      command: 'statsionar',
+                      description: 'Statsionar Excel (bug‘alter / admin)',
+                    },
                   ]
                 : []),
             ])
             .catch(() => this.logger.warn('Telegram command menu could not be updated'));
           if (this.patientOnly && allOpsAdminChatIds().length > 0) {
+            this.logger.log(`Telegram ops admins: ${allOpsAdminChatIds().join(', ')}`);
+          }
+          if (this.patientOnly && allOpsAccountantChatIds().length > 0) {
             this.logger.log(
-              `Telegram ops admins: ${allOpsAdminChatIds().join(', ')}`,
+              `Telegram accountants: ${allOpsAccountantChatIds().join(', ')}`,
             );
           }
         },
@@ -297,16 +372,20 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     );
     bot.hears('🔄 Yangilash', (ctx) => this.handleMenu(ctx));
     bot.hears('ℹ️ Yordam', (ctx) => this.handleHelp(ctx));
-    // Server ops (Holat / Tarmoq / Zaxira) — same token as patient bot in single-clinic.
+    // Server ops + accountant — same token as patient bot in single-clinic.
     if (this.patientOnly) {
       bot.hears(SWITCH_TO_ADMIN, (ctx) => this.handleSwitchMode(ctx, 'admin'));
+      bot.hears(SWITCH_TO_ACCOUNTANT, (ctx) => this.handleSwitchMode(ctx, 'accountant'));
       bot.hears(SWITCH_TO_PATIENT, (ctx) => this.handleSwitchMode(ctx, 'patient'));
       bot.hears(/^Holat$/i, (ctx) => this.handleOps(ctx, 'holat'));
       bot.hears(/^Tarmoq$/i, (ctx) => this.handleOps(ctx, 'tarmoq'));
       bot.hears(/^Zaxira$/i, (ctx) => this.handleOps(ctx, 'zaxira'));
+      bot.hears(ACCOUNTANT_STATS_BUTTON, (ctx) => this.handleStatsionarExcelMenu(ctx));
       bot.command('holat', (ctx) => this.handleOps(ctx, 'holat'));
       bot.command('tarmoq', (ctx) => this.handleOps(ctx, 'tarmoq'));
       bot.command('zaxira', (ctx) => this.handleOps(ctx, 'zaxira'));
+      bot.command('statsionar', (ctx) => this.handleStatsionarExcelMenu(ctx));
+      bot.callbackQuery(/^stxlsx:(.+)$/, (ctx) => this.handleStatsionarExcelCallback(ctx));
     }
     if (!this.patientOnly) {
       bot.hears('📅 Qabullarim', (ctx) => this.handleMyAppointments(ctx));
@@ -348,44 +427,60 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       bot.callbackQuery(/^ra_(ok|no):(.+)$/, (ctx) => this.handleHistoryDecision(ctx));
     if (this.patientOnly) {
       bot.on('callback_query:data', async (ctx) => {
+        const data = ctx.callbackQuery?.data ?? '';
+        if (data.startsWith('stxlsx:')) return;
         await ctx.answerCallbackQuery({ text: 'Menyuni yangilash uchun /menu bosing.' });
       });
       bot.on('message:text', async (ctx) => {
         const chatId = ctx.chat.id;
         const text = ctx.message?.text?.trim() ?? '';
+        if (awaitingStatsionarDate.has(chatId)) {
+          await this.handleStatsionarDateText(ctx, text);
+          return;
+        }
         if (
           OPS_BUTTONS.some((label) => label.toLowerCase() === text.toLowerCase()) ||
+          text === ACCOUNTANT_STATS_BUTTON ||
           text === SWITCH_TO_ADMIN ||
+          text === SWITCH_TO_ACCOUNTANT ||
           text === SWITCH_TO_PATIENT
         ) {
           return;
         }
         const linked = (await this.patientAccess.resolve(chatId)).status === 'LINKED';
-        const ops = isOpsAdminChat(chatId);
-        const adminMode = ops && opsMenuMode(chatId) === 'admin';
+        const admin = isOpsAdminChat(chatId);
+        const accountant = isOpsAccountantChat(chatId);
+        const mode = opsMenuMode(chatId);
         const markup = linked
           ? await this.menuKeyboardFor(chatId)
           : this.waitingKeyboardFor(chatId);
         await ctx.reply(
-          adminMode
-            ? 'Admin buyruqlari: Holat, Tarmoq, Zaxira. Menyuni yangilash: /menu'
-            : linked
-              ? 'Kerakli bo‘limni pastdagi menyudan tanlang. Yordam uchun /help bosing.'
-              : ops
-                ? 'Admin uchun raqamingizni «📱 Raqamni yuborish» orqali yuboring, so‘ng Holat / Tarmoq / Zaxira ochiladi.'
-                : 'Telefon raqamini qo‘lda yozish o‘rniga «📱 Raqamni yuborish» tugmasini bosing. Natijalar uchun /menu, yordam uchun /help.',
+          mode === 'admin'
+            ? 'Admin buyruqlari: Holat, Tarmoq, Zaxira, Statsionar Excel. Menyuni yangilash: /menu'
+            : mode === 'accountant'
+              ? 'Bug‘alter: Statsionar Excel (sana tanlash mumkin). Har kuni 16:30 da avtomatik yuboriladi. Menyuni yangilash: /menu'
+              : linked
+                ? 'Kerakli bo‘limni pastdagi menyudan tanlang. Yordam uchun /help bosing.'
+                : admin
+                  ? 'Admin uchun raqamingizni «📱 Raqamni yuborish» orqali yuboring, so‘ng Holat / Tarmoq / Zaxira ochiladi.'
+                  : accountant
+                    ? 'Bug‘alter uchun raqamingizni «📱 Raqamni yuborish» orqali yuboring.'
+                    : 'Telefon raqamini qo‘lda yozish o‘rniga «📱 Raqamni yuborish» tugmasini bosing. Natijalar uchun /menu, yordam uchun /help.',
           { reply_markup: markup },
         );
       });
     }
   }
 
-  /** Patient buttons from an old keyboard must not run while admin menu is active. */
+  /** Patient buttons from an old keyboard must not run while staff ops menu is active. */
   private async withPatientMenu(ctx: Context, run: () => Promise<void>): Promise<void> {
     const chatId = ctx.chat?.id;
-    if (chatId !== undefined && (await this.isAdminMenu(chatId))) {
+    if (chatId !== undefined && (await this.isStaffOpsMenu(chatId))) {
+      const mode = opsMenuMode(chatId);
       await ctx.reply(
-        `Hozir admin menyudasiz. Bemor bo‘limi uchun «${SWITCH_TO_PATIENT}»ni bosing.`,
+        mode === 'accountant'
+          ? `Hozir bug‘alter menyusidasiz. Bemor bo‘limi uchun «${SWITCH_TO_PATIENT}»ni bosing.`
+          : `Hozir admin menyudasiz. Bemor bo‘limi uchun «${SWITCH_TO_PATIENT}»ni bosing.`,
         { reply_markup: await this.menuKeyboardFor(chatId) },
       );
       return;
@@ -393,22 +488,38 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     await run();
   }
 
-  private async handleSwitchMode(ctx: Context, mode: 'admin' | 'patient'): Promise<void> {
+  private async handleSwitchMode(ctx: Context, mode: OpsMenuMode): Promise<void> {
     const chatId = ctx.chat?.id;
-    if (chatId === undefined || !isOpsAdminChat(chatId)) {
+    if (chatId === undefined) return;
+
+    if (mode === 'admin' && !isOpsAdminChat(chatId)) {
       await ctx.reply('Bu tugma faqat klinika administratori uchun.');
       return;
     }
+    if (mode === 'accountant' && !isOpsAccountantChat(chatId) && !isOpsAdminChat(chatId)) {
+      await ctx.reply('Bu tugma faqat bug‘alter uchun.');
+      return;
+    }
+    if (mode === 'patient' && !isOpsStaffChat(chatId)) {
+      await ctx.reply('Bu tugma faqat xodimlar uchun.');
+      return;
+    }
+
     if (mode === 'patient') {
       const access = await this.patientAccess.resolve(chatId);
       if (access.status !== 'LINKED') {
         await ctx.reply(
           'Bemor menyusi uchun avval bemor kartasiga ulaning: «📱 Raqamni yuborish».',
-          { reply_markup: clinicAdminKeyboard(false) },
+          {
+            reply_markup: isOpsAdminChat(chatId)
+              ? clinicAdminKeyboard(false)
+              : clinicAccountantKeyboard(false),
+          },
         );
         return;
       }
     }
+
     setOpsMenuMode(chatId, mode);
     if (mode === 'admin') {
       await ctx.reply(
@@ -417,7 +528,138 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       );
       return;
     }
+    if (mode === 'accountant') {
+      await ctx.reply(
+        '📒 Bug‘alter menyusi\n\n📊 Statsionar Excel — hozirgi yotgan bemorlar.\nHar kuni soat 16:30 da (Toshkent) to‘liq ro‘yxat avtomatik yuboriladi.',
+        { reply_markup: await this.menuKeyboardFor(chatId) },
+      );
+      return;
+    }
     await this.replyPatientHome(ctx);
+  }
+
+  private canUseStatsionarExcel(chatId: number): boolean {
+    return isOpsAdminChat(chatId) || isOpsAccountantChat(chatId);
+  }
+
+  /** Opens date picker — Bugun / Kecha / boshqa sana. */
+  private async handleStatsionarExcelMenu(ctx: Context): Promise<void> {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    if (!this.canUseStatsionarExcel(chatId)) {
+      await ctx.reply('Bu buyruq faqat bug‘alter yoki administrator uchun.', {
+        reply_markup: await this.menuKeyboardFor(chatId),
+      });
+      return;
+    }
+    if (isOpsAccountantChat(chatId) && !isOpsAdminChat(chatId)) {
+      setOpsMenuMode(chatId, 'accountant');
+    }
+    awaitingStatsionarDate.delete(chatId);
+    await ctx.reply(
+      '📊 Statsionar hisobot\n\nQaysi kun uchun Excel kerak?\nShu kunda yotgan (va shu kuni chiqarilgan) bemorlar ro‘yxati yuboriladi.',
+      {
+        reply_markup: statsionarDatePickerKeyboard(),
+      },
+    );
+  }
+
+  private async handleStatsionarExcelCallback(ctx: Context): Promise<void> {
+    const chatId = ctx.chat?.id;
+    const raw = ctx.match?.[1] ?? '';
+    if (chatId === undefined) return;
+    if (!this.canUseStatsionarExcel(chatId)) {
+      await ctx.answerCallbackQuery({ text: 'Ruxsat yo‘q' });
+      return;
+    }
+    if (raw === 'cancel') {
+      awaitingStatsionarDate.delete(chatId);
+      await ctx.answerCallbackQuery({ text: 'Bekor qilindi' });
+      await ctx.editMessageText('Statsionar hisobot bekor qilindi.').catch(() => undefined);
+      return;
+    }
+    if (raw === 'ask') {
+      awaitingStatsionarDate.add(chatId);
+      await ctx.answerCallbackQuery();
+      await ctx.reply(
+        'Sanani kiriting (masalan: 03.11.2026).\nBekor qilish: /menu',
+        { reply_markup: await this.menuKeyboardFor(chatId) },
+      );
+      return;
+    }
+    const ymd = parseStatsionarReportDate(raw);
+    if (!ymd) {
+      await ctx.answerCallbackQuery({ text: 'Noto‘g‘ri sana' });
+      return;
+    }
+    awaitingStatsionarDate.delete(chatId);
+    await ctx.answerCallbackQuery({ text: 'Tayyorlanmoqda…' });
+    await this.deliverStatsionarExcel(ctx, chatId, ymd);
+  }
+
+  private async handleStatsionarDateText(ctx: Context, text: string): Promise<void> {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    if (!this.canUseStatsionarExcel(chatId)) {
+      awaitingStatsionarDate.delete(chatId);
+      return;
+    }
+    if (text === '/menu' || text === '🔄 Yangilash' || text === '✖️ Bekor') {
+      awaitingStatsionarDate.delete(chatId);
+      await this.handleMenu(ctx);
+      return;
+    }
+    const ymd = parseStatsionarReportDate(text);
+    if (!ymd) {
+      await ctx.reply(
+        'Sana formati noto‘g‘ri. Masalan: 03.11.2026 yoki 2026-11-03\nBekor: /menu',
+        { reply_markup: await this.menuKeyboardFor(chatId) },
+      );
+      return;
+    }
+    awaitingStatsionarDate.delete(chatId);
+    await this.deliverStatsionarExcel(ctx, chatId, ymd);
+  }
+
+  /** Build and send statsionar Excel for a Tashkent calendar day. */
+  private async deliverStatsionarExcel(
+    ctx: Context,
+    chatId: number,
+    asOfDate: string,
+  ): Promise<void> {
+    const markup = await this.menuKeyboardFor(chatId);
+    const label = formatStatsionarReportDateUz(asOfDate);
+    await ctx.reply(`${label} uchun statsionar ro‘yxati tayyorlanmoqda…`, {
+      reply_markup: markup,
+    });
+    try {
+      const report = await this.statsionarDaily.buildReportNow(asOfDate);
+      if (!report) {
+        await ctx.reply('Excel yaratib bo‘lmadi: klinika aniqlanmadi.', { reply_markup: markup });
+        return;
+      }
+      const caption =
+        `📊 Statsionar bemorlar — ${label}\n` +
+        `Jami: ${report.count} ta\n` +
+        `(shu kunda yotgan / chiqarilgan)`;
+      const ok = await this.statsionarDaily.sendDocument(
+        chatId,
+        report.buffer,
+        report.filename,
+        caption,
+      );
+      if (!ok) {
+        await ctx.reply('Excel yuborib bo‘lmadi. Birozdan keyin qayta urinib ko‘ring.', {
+          reply_markup: markup,
+        });
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`statsionar excel failed: ${detail}`);
+      await ctx
+        .reply(`Excel tayyorlanmadi.\n${detail.slice(0, 160)}`, { reply_markup: markup })
+        .catch(() => undefined);
+    }
   }
 
   /** Holat / Tarmoq / Zaxira — only for TELEGRAM_ADMIN_CHAT_ID or linked admin phones. */
@@ -575,16 +817,27 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     if (ctx.chat?.id === undefined) return;
     const chatId = ctx.chat.id;
-    const ops = isOpsAdminChat(chatId);
+    const admin = isOpsAdminChat(chatId);
+    const accountant = isOpsAccountantChat(chatId);
     const access = resolved ?? (await this.patientAccess.resolve(chatId));
+    const mode = opsMenuMode(chatId);
 
-    // Ops admins stay on the admin menu by default — never mix patient + admin rows.
-    if (ops && opsMenuMode(chatId) === 'admin') {
+    // Staff menus stay pure — never mix patient rows with Holat or Excel.
+    if (admin && mode === 'admin') {
       const linked = access.status === 'LINKED';
       await ctx.reply(
         '🛠 Admin menyusi\n\nHolat — server / loyiha ishlayaptimi.\nTarmoq — Wi‑Fi / LAN.\nZaxira — oxirgi dump.\n\nServer yoqilganda va o‘chganda shu chatga xabar keladi.' +
           (linked ? `\n\nBemor natijalari uchun «${SWITCH_TO_PATIENT}»ni bosing.` : ''),
         { reply_markup: clinicAdminKeyboard(linked) },
+      );
+      return;
+    }
+    if (accountant && mode === 'accountant') {
+      const linked = access.status === 'LINKED';
+      await ctx.reply(
+        '📒 Bug‘alter menyusi\n\n📊 Statsionar Excel — Bugun, Kecha yoki boshqa sana.\nHar kuni soat 16:30 da (Toshkent) avtomatik yuboriladi.' +
+          (linked ? `\n\nBemor natijalari uchun «${SWITCH_TO_PATIENT}»ni bosing.` : ''),
+        { reply_markup: clinicAccountantKeyboard(linked) },
       );
       return;
     }
@@ -598,10 +851,17 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       );
       return;
     }
-    if (ops) {
+    if (admin) {
       await ctx.reply(
         'Administrator sifatida ulandingiz ✅\n\nHolat — server ishlayaptimi.\nTarmoq — Wi‑Fi / LAN.\nZaxira — oxirgi dump.',
         { reply_markup: clinicAdminKeyboard(false) },
+      );
+      return;
+    }
+    if (accountant) {
+      await ctx.reply(
+        'Bug‘alter sifatida ulandingiz ✅\n\n📊 Statsionar Excel — hozirgi yotgan bemorlar.\nHar kuni soat 16:30 da avtomatik yuboriladi.',
+        { reply_markup: clinicAccountantKeyboard(false) },
       );
       return;
     }
@@ -644,7 +904,18 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const chatId = ctx.chat?.id;
     if (chatId !== undefined && (await this.isAdminMenu(chatId))) {
       await ctx.reply(
-        '🛠 Admin bot\n\nHolat — server / loyiha\nTarmoq — Wi‑Fi / LAN\nZaxira — oxirgi dump\n\nServer yoqilganda va o‘chganda shu chatga xabar keladi.\nBemor natijalari kerak bo‘lsa — «👤 Bemor menyusi».',
+        '🛠 Admin bot\n\nHolat — server / loyiha\nTarmoq — Wi‑Fi / LAN\nZaxira — oxirgi dump\n📊 Statsionar Excel — sana tanlab hisobot\n\nServer yoqilganda va o‘chganda shu chatga xabar keladi.\nBemor natijalari kerak bo‘lsa — «👤 Bemor menyusi».',
+        { reply_markup: await this.menuKeyboardFor(chatId) },
+      );
+      return;
+    }
+    if (
+      chatId !== undefined &&
+      isOpsAccountantChat(chatId) &&
+      opsMenuMode(chatId) === 'accountant'
+    ) {
+      await ctx.reply(
+        '📒 Bug‘alter bot\n\n📊 Statsionar Excel — Bugun / Kecha / boshqa sana.\nHar kuni 16:30 (Toshkent) da avtomatik Excel admin va bug‘alterga yuboriladi.\n\nBemor natijalari kerak bo‘lsa — «👤 Bemor menyusi».',
         { reply_markup: await this.menuKeyboardFor(chatId) },
       );
       return;
@@ -743,6 +1014,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       if (isConfiguredAdminPhone(phone)) {
         rememberOpsAdminChat(chatId, phone);
         setOpsMenuMode(chatId, 'admin');
+      } else if (isConfiguredAccountantPhone(phone)) {
+        rememberOpsAccountantChat(chatId, phone);
+        setOpsMenuMode(chatId, 'accountant');
       }
       const access = await this.patientAccess.linkContact(
         chatId,

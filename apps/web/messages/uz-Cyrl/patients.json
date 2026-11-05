@@ -5,6 +5,19 @@
   "searchPlaceholder": "Исм, телефон ёки MRN бўйича қидириш...",
   "filterTag": "Тег бўйича",
   "allTags": "Барча теглар",
+  "filters": {
+    "allCareTypes": "Барча турлар",
+    "allGenders": "Барча жинслар",
+    "male": "Эркак",
+    "female": "Аёл",
+    "from": "Дан",
+    "to": "Гача",
+    "clear": "Тозалаш"
+  },
+  "export": {
+    "xlsx": "Excel (.xlsx)",
+    "success": "Excel файл юкланди"
+  },
   "created": "Бемор яратилди",
   "updated": "Бемор маълумотлари сақланди",
   "deleted": "Бемор ўчирилди",

@@ -13,12 +13,16 @@ import { REPO_ROOT } from '../../core/config/app-config.service';
 
 const OPS_FILE = join(REPO_ROOT, 'run', 'telegram-ops-admins.json');
 
-export type OpsMenuMode = 'admin' | 'patient';
+/** Separated ops menus — never mix Holat with patient or accountant rows. */
+export type OpsMenuMode = 'admin' | 'accountant' | 'patient';
 
 export type TelegramOpsRegistry = {
+  /** Admin chats (Holat / Tarmoq / Zaxira). */
   chatIds: string[];
+  /** Accountant chats (statsionar Excel). */
+  accountantChatIds: string[];
   phones: Record<string, string>;
-  /** Preferred menu when the chat is both admin and patient. Default: admin. */
+  /** Preferred menu when the chat holds more than one role. */
   modes: Record<string, OpsMenuMode>;
   updatedAt: string;
 };
@@ -33,20 +37,35 @@ function parseList(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
+function normalizeConfiguredPhones(raw: string | undefined): string[] {
+  const out: string[] = [];
+  for (const part of parseList(raw)) {
+    const normalized =
+      normalizePhone(part.startsWith('+') ? part : `+${part}`) ??
+      normalizePhone(part.length === 9 ? `+998${part}` : part);
+    if (normalized) out.push(normalized);
+  }
+  return out;
+}
+
 /** Admin chat ids from .env (numeric Telegram user ids). */
 export function configuredAdminChatIds(): string[] {
   return parseList(process.env.TELEGRAM_ADMIN_CHAT_ID);
 }
 
+/** Accountant chat ids from .env — fixed Telegram user ids for finance. */
+export function configuredAccountantChatIds(): string[] {
+  return parseList(process.env.TELEGRAM_ACCOUNTANT_CHAT_ID);
+}
+
 /** Admin phones from .env — normalized to +998… */
 export function configuredAdminPhones(): string[] {
-  const out: string[] = [];
-  for (const part of parseList(process.env.TELEGRAM_ADMIN_PHONES)) {
-    const normalized = normalizePhone(part.startsWith('+') ? part : `+${part}`)
-      ?? normalizePhone(part.length === 9 ? `+998${part}` : part);
-    if (normalized) out.push(normalized);
-  }
-  return out;
+  return normalizeConfiguredPhones(process.env.TELEGRAM_ADMIN_PHONES);
+}
+
+/** Accountant phones from .env — optional, same flow as admin phones. */
+export function configuredAccountantPhones(): string[] {
+  return normalizeConfiguredPhones(process.env.TELEGRAM_ACCOUNTANT_PHONES);
 }
 
 export function isConfiguredAdminPhone(phone: string): boolean {
@@ -55,14 +74,27 @@ export function isConfiguredAdminPhone(phone: string): boolean {
   return configuredAdminPhones().includes(normalized);
 }
 
+export function isConfiguredAccountantPhone(phone: string): boolean {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return false;
+  return configuredAccountantPhones().includes(normalized);
+}
+
 function emptyRegistry(): TelegramOpsRegistry {
-  return { chatIds: [], phones: {}, modes: {}, updatedAt: new Date(0).toISOString() };
+  return {
+    chatIds: [],
+    accountantChatIds: [],
+    phones: {},
+    modes: {},
+    updatedAt: new Date(0).toISOString(),
+  };
 }
 
 function readRegistry(): TelegramOpsRegistry {
   if (memoryRegistry) {
     return {
       chatIds: [...memoryRegistry.chatIds],
+      accountantChatIds: [...memoryRegistry.accountantChatIds],
       phones: { ...memoryRegistry.phones },
       modes: { ...memoryRegistry.modes },
       updatedAt: memoryRegistry.updatedAt,
@@ -72,6 +104,9 @@ function readRegistry(): TelegramOpsRegistry {
     const raw = JSON.parse(readFileSync(OPS_FILE, 'utf8')) as TelegramOpsRegistry;
     return {
       chatIds: Array.isArray(raw.chatIds) ? raw.chatIds.map(String) : [],
+      accountantChatIds: Array.isArray(raw.accountantChatIds)
+        ? raw.accountantChatIds.map(String)
+        : [],
       phones: raw.phones && typeof raw.phones === 'object' ? raw.phones : {},
       modes: raw.modes && typeof raw.modes === 'object' ? raw.modes : {},
       updatedAt: raw.updatedAt ?? new Date().toISOString(),
@@ -84,6 +119,7 @@ function readRegistry(): TelegramOpsRegistry {
 function writeRegistry(registry: TelegramOpsRegistry): void {
   memoryRegistry = {
     chatIds: [...registry.chatIds],
+    accountantChatIds: [...registry.accountantChatIds],
     phones: { ...registry.phones },
     modes: { ...registry.modes },
     updatedAt: registry.updatedAt,
@@ -102,8 +138,29 @@ export function allOpsAdminChatIds(): string[] {
   return [...ids];
 }
 
+export function allOpsAccountantChatIds(): string[] {
+  const ids = new Set([
+    ...configuredAccountantChatIds(),
+    ...readRegistry().accountantChatIds,
+  ]);
+  return [...ids];
+}
+
+/** Admin + accountant — daily statsionar Excel recipients. */
+export function allStatsionarReportChatIds(): string[] {
+  return [...new Set([...allOpsAdminChatIds(), ...allOpsAccountantChatIds()])];
+}
+
 export function isOpsAdminChat(chatId: number | string): boolean {
   return allOpsAdminChatIds().includes(String(chatId));
+}
+
+export function isOpsAccountantChat(chatId: number | string): boolean {
+  return allOpsAccountantChatIds().includes(String(chatId));
+}
+
+export function isOpsStaffChat(chatId: number | string): boolean {
+  return isOpsAdminChat(chatId) || isOpsAccountantChat(chatId);
 }
 
 /** Remember this chat after an admin phone was verified. Defaults to admin menu. */
@@ -113,23 +170,59 @@ export function rememberOpsAdminChat(chatId: number | string, phone: string): vo
   const registry = readRegistry();
   if (!registry.chatIds.includes(id)) registry.chatIds.push(id);
   registry.phones[normalized] = id;
-  if (!registry.modes[id]) registry.modes[id] = 'admin';
+  if (!registry.modes[id] || registry.modes[id] === 'patient') registry.modes[id] = 'admin';
   registry.updatedAt = new Date().toISOString();
   writeRegistry(registry);
 }
 
-/** Admin chats default to the admin menu (never mixed with patient buttons). */
+/** Remember an accountant chat after phone verification. */
+export function rememberOpsAccountantChat(chatId: number | string, phone: string): void {
+  const id = String(chatId);
+  const normalized = normalizePhone(phone) ?? phone;
+  const registry = readRegistry();
+  if (!registry.accountantChatIds.includes(id)) registry.accountantChatIds.push(id);
+  registry.phones[normalized] = id;
+  // Admin wins if the same chat is both; otherwise land on accountant menu.
+  if (!isOpsAdminChat(id) && registry.modes[id] !== 'admin') {
+    registry.modes[id] = 'accountant';
+  }
+  registry.updatedAt = new Date().toISOString();
+  writeRegistry(registry);
+}
+
+/**
+ * Preferred menu for this chat.
+ * Admin chats default to admin; accountants to accountant; everyone else patient.
+ */
 export function opsMenuMode(chatId: number | string): OpsMenuMode {
-  if (!isOpsAdminChat(chatId)) return 'patient';
-  const mode = readRegistry().modes[String(chatId)];
-  return mode === 'patient' ? 'patient' : 'admin';
+  const id = String(chatId);
+  const mode = readRegistry().modes[id];
+  if (mode === 'patient' || mode === 'admin' || mode === 'accountant') {
+    if (mode === 'admin' && !isOpsAdminChat(id)) {
+      return isOpsAccountantChat(id) ? 'accountant' : 'patient';
+    }
+    if (mode === 'accountant' && !isOpsAccountantChat(id) && !isOpsAdminChat(id)) {
+      return 'patient';
+    }
+    if (mode === 'accountant' && isOpsAdminChat(id) && !isOpsAccountantChat(id)) {
+      return 'admin';
+    }
+    return mode;
+  }
+  if (isOpsAdminChat(id)) return 'admin';
+  if (isOpsAccountantChat(id)) return 'accountant';
+  return 'patient';
 }
 
 export function setOpsMenuMode(chatId: number | string, mode: OpsMenuMode): void {
   const id = String(chatId);
-  if (!isOpsAdminChat(id)) return;
+  if (mode === 'admin' && !isOpsAdminChat(id)) return;
+  if (mode === 'accountant' && !isOpsAccountantChat(id) && !isOpsAdminChat(id)) return;
   const registry = readRegistry();
-  if (!registry.chatIds.includes(id)) registry.chatIds.push(id);
+  if (isOpsAdminChat(id) && !registry.chatIds.includes(id)) registry.chatIds.push(id);
+  if (isOpsAccountantChat(id) && !registry.accountantChatIds.includes(id)) {
+    registry.accountantChatIds.push(id);
+  }
   registry.modes[id] = mode;
   registry.updatedAt = new Date().toISOString();
   writeRegistry(registry);
@@ -139,6 +232,7 @@ export function forgetOpsAdminChat(chatId: number | string): void {
   const id = String(chatId);
   const registry = readRegistry();
   registry.chatIds = registry.chatIds.filter((item) => item !== id);
+  registry.accountantChatIds = registry.accountantChatIds.filter((item) => item !== id);
   for (const [phone, bound] of Object.entries(registry.phones)) {
     if (bound === id) delete registry.phones[phone];
   }

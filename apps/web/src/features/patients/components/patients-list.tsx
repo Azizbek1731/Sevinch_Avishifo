@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { useMutation } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { Plus, Search, Trash2, Users } from 'lucide-react';
+import { toast } from 'sonner';
+import { Download, Loader2, Plus, Search, Trash2, Users } from 'lucide-react';
 import { PATIENT_TAGS, formatPhone, formatUZS } from '@avishifo/shared';
 import { useRouter } from '@/i18n/routing';
 import { DataTable } from '@/components/data-table';
@@ -20,22 +22,39 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { formatDate } from '@/lib/dates';
-import type { Patient } from '../api';
-import { usePatientsList, usePermissions } from '../hooks';
+import { formatDate, todayTashkent } from '@/lib/dates';
+import type { Patient, PatientListQuery } from '../api';
+import { patientsApi } from '../api';
+import { useApiErrorToast, usePatientsList, usePermissions } from '../hooks';
 import { PatientFormDialog } from './patient-form-dialog';
 
 const ALL = '__all__';
 const PAGE_LIMIT = 20;
 
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function PatientsList() {
   const t = useTranslations('patients');
   const router = useRouter();
   const can = usePermissions();
+  const errorToast = useApiErrorToast();
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [tag, setTag] = useState<string>(ALL);
+  const [careType, setCareType] = useState<string>(ALL);
+  const [gender, setGender] = useState<string>(ALL);
+  const [createdFrom, setCreatedFrom] = useState('');
+  const [createdTo, setCreatedTo] = useState('');
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   // Only management can ask for these, and only they are offered the switch.
@@ -50,12 +69,29 @@ export function PatientsList() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  const listFilters: Omit<PatientListQuery, 'page' | 'limit'> = {
+    search: debouncedSearch || undefined,
+    tag: tag === ALL ? undefined : tag,
+    careType: careType === 'AMBULATORY' || careType === 'INPATIENT' ? careType : undefined,
+    gender: gender === 'MALE' || gender === 'FEMALE' ? gender : undefined,
+    createdFrom: createdFrom || undefined,
+    createdTo: createdTo || undefined,
+    deleted: showDeleted || undefined,
+  };
+
   const query = usePatientsList({
     page,
     limit: PAGE_LIMIT,
-    search: debouncedSearch || undefined,
-    tag: tag === ALL ? undefined : tag,
-    deleted: showDeleted || undefined,
+    ...listFilters,
+  });
+
+  const exportXlsx = useMutation({
+    mutationFn: () => patientsApi.exportXlsx(listFilters),
+    onSuccess: (blob) => {
+      downloadBlob(blob, `bemorlar_${todayTashkent()}.xlsx`);
+      toast.success(t('export.success'));
+    },
+    onError: errorToast,
   });
 
   const items = useMemo(() => query.data?.data ?? [], [query.data]);
@@ -73,8 +109,6 @@ export function PatientsList() {
         header: t('table.fullName'),
         cell: ({ row }) => (
           <span className="flex items-center gap-2">
-            {/* Struck through, and labelled: management is looking at a record
-                the front desk removed, not at an active patient. */}
             <span
               className={`font-medium ${row.original.deletedAt ? 'text-muted-foreground line-through' : ''}`}
             >
@@ -157,20 +191,51 @@ export function PatientsList() {
   );
 
   const showEmpty =
-    !query.isLoading && items.length === 0 && !debouncedSearch && tag === ALL;
+    !query.isLoading &&
+    items.length === 0 &&
+    !debouncedSearch &&
+    tag === ALL &&
+    careType === ALL &&
+    gender === ALL &&
+    !createdFrom &&
+    !createdTo;
+
+  const hasFilters =
+    Boolean(debouncedSearch || createdFrom || createdTo) ||
+    tag !== ALL ||
+    careType !== ALL ||
+    gender !== ALL ||
+    showDeleted;
 
   return (
     <div className="space-y-4">
       <PageHeader title={t('title')} description={t('subtitle')}>
-        {can('patients.write') ? (
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-1 h-4 w-4" />
-            {t('newPatient')}
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {can('patients.export') ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={exportXlsx.isPending}
+              onClick={() => exportXlsx.mutate()}
+            >
+              {exportXlsx.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {t('export.xlsx')}
+            </Button>
+          ) : null}
+          {can('patients.write') ? (
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              {t('newPatient')}
+            </Button>
+          ) : null}
+        </div>
       </PageHeader>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-end gap-2">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -199,6 +264,61 @@ export function PatientsList() {
             ))}
           </SelectContent>
         </Select>
+        <Select
+          value={careType}
+          onValueChange={(v) => {
+            setCareType(v);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder={t('form.careType')} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>{t('filters.allCareTypes')}</SelectItem>
+            <SelectItem value="AMBULATORY">{t('form.careTypes.AMBULATORY')}</SelectItem>
+            <SelectItem value="INPATIENT">{t('form.careTypes.INPATIENT')}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={gender}
+          onValueChange={(v) => {
+            setGender(v);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder={t('form.gender')} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>{t('filters.allGenders')}</SelectItem>
+            <SelectItem value="MALE">{t('filters.male')}</SelectItem>
+            <SelectItem value="FEMALE">{t('filters.female')}</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-1.5">
+          <Input
+            type="date"
+            value={createdFrom}
+            onChange={(e) => {
+              setCreatedFrom(e.target.value);
+              setPage(1);
+            }}
+            className="w-40"
+            aria-label={t('filters.from')}
+          />
+          <span className="text-muted-foreground">—</span>
+          <Input
+            type="date"
+            value={createdTo}
+            onChange={(e) => {
+              setCreatedTo(e.target.value);
+              setPage(1);
+            }}
+            className="w-40"
+            aria-label={t('filters.to')}
+          />
+        </div>
         {canSeeDeleted ? (
           <Button
             type="button"
@@ -210,6 +330,25 @@ export function PatientsList() {
           >
             <Trash2 className="mr-2 h-4 w-4" />
             {t('showDeleted')}
+          </Button>
+        ) : null}
+        {hasFilters ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearch('');
+              setTag(ALL);
+              setCareType(ALL);
+              setGender(ALL);
+              setCreatedFrom('');
+              setCreatedTo('');
+              setShowDeleted(false);
+              setPage(1);
+            }}
+          >
+            {t('filters.clear')}
           </Button>
         ) : null}
       </div>

@@ -13,6 +13,8 @@ import { SmsChannel } from './channels/sms.channel';
 import { TelegramChannel } from './channels/telegram.channel';
 import { TelegramBotService } from './telegram-bot.service';
 import { PlatformAlertsService } from './platform-alerts.service';
+import { StatsionarDailyTelegramService } from './statsionar-daily-telegram.service';
+import { XlsxService } from '../reports/xlsx.service';
 // Provided here directly rather than via LabModule: LabModule imports
 // NotificationsModule, so importing it back would be a cycle. The renderer is a
 // stateless class with no dependencies — a second provider instance is free.
@@ -38,6 +40,8 @@ import { TelegramPatientAccessService } from './telegram-patient-access.service'
     TelegramChannel,
     TelegramBotService,
     PlatformAlertsService,
+    StatsionarDailyTelegramService,
+    XlsxService,
     ResultPdfService,
     VisitReportPdfService,
     TreatmentSheetPdfService,

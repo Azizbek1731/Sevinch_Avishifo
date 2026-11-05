@@ -49,7 +49,13 @@ export const patientQuerySchema = paginationQuerySchema.extend({
    * records.viewDeleted — the flag asks, the server decides.
    */
   deleted: z.coerce.boolean().optional(),
+  careType: z.enum(['AMBULATORY', 'INPATIENT']).optional(),
+  gender: z.nativeEnum(Gender).optional(),
+  /** Inclusive Tashkent calendar dates on Patient.createdAt. */
+  createdFrom: dateOnlySchema.optional(),
+  createdTo: dateOnlySchema.optional(),
   sort: sortQuerySchema(['createdAt', 'fullName', 'mrn']),
+  export: z.enum(['xlsx']).optional(),
 });
 export type PatientQueryInput = z.infer<typeof patientQuerySchema>;
 
