@@ -55,4 +55,42 @@ describe('single clinic desk responsibilities', () => {
       'charges.write',
     );
   });
+
+  it('keeps the lab desk on lab work without ward or queue management', () => {
+    const permissions = permissionsForRole(UserRole.LAB_TECH);
+    for (const permission of [
+      'lab.orders.read',
+      'lab.orders.write',
+      'lab.results.write',
+      'lab.results.approve',
+    ])
+      expect(permissions).toContain(permission);
+    for (const permission of [
+      'admissions.read',
+      'queue.read',
+      'queue.manage',
+      'surgery.read',
+      'staff.read',
+      'reports.read',
+    ])
+      expect(permissions).not.toContain(permission);
+  });
+
+  it('scopes ultrasound doctors away from ward / surgery / lab desks', () => {
+    const permissions = permissionsForRole(UserRole.DOCTOR, undefined, {
+      specialty: 'UZI/EXO vrach',
+    });
+    for (const permission of ['visits.write', 'queue.call', 'patients.read', 'services.read'])
+      expect(permissions).toContain(permission);
+    for (const permission of [
+      'admissions.read',
+      'admissions.write',
+      'surgery.read',
+      'lab.orders.read',
+      'lab.orders.write',
+      'charges.write',
+      'appointments.read',
+    ])
+      expect(permissions).not.toContain(permission);
+  });
 });

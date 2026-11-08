@@ -29,6 +29,20 @@ describe('homePath', () => {
     expect(homePath(forRole('OPERATING_ROOM'))).toBe('/surgeries');
   });
 
+  it('sends lab staff to the laboratory desk', () => {
+    expect(homePath(forRole('LAB_TECH'))).toBe('/lab');
+  });
+
+  it('sends ultrasound doctors to the UZI desk', () => {
+    expect(
+      homePath({
+        role: 'DOCTOR',
+        permissions: ROLE_PERMISSIONS.DOCTOR,
+        specialty: 'UZI mutaxassisi (UTT)',
+      }),
+    ).toBe('/uzi');
+  });
+
   it('never sends a role without reports.read to the dashboard', () => {
     const roles = Object.keys(ROLE_PERMISSIONS) as UserRole[];
     for (const role of roles) {
@@ -39,7 +53,7 @@ describe('homePath', () => {
     }
   });
 
-  it('falls back to a screen every clinic role can open', () => {
-    expect(homePath({ role: 'DOCTOR', permissions: [] })).toBe('/patients');
+  it('falls back to help when nothing else is open', () => {
+    expect(homePath({ role: 'DOCTOR', permissions: [] })).toBe('/help');
   });
 });

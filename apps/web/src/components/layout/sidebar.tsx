@@ -27,7 +27,6 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
-import type { Permission, UserRole } from '@avishifo/shared';
 import { Link, usePathname } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
@@ -35,92 +34,55 @@ import { Logo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import {
+  NAV_RULES,
+  PLATFORM_NAV_RULES,
+  isNavVisible,
+  type NavKey,
+} from '@/lib/nav-access';
 
-interface NavItem {
-  key: string;
-  href: string;
-  icon: LucideIcon;
-  /** Any of these permissions grants visibility. */
-  permissions?: Permission[];
-  roles?: UserRole[];
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard, permissions: ['reports.read'] },
-  { key: 'ai', href: '/ai', icon: Sparkles, permissions: ['ai.use'] },
-  { key: 'reception', href: '/reception', icon: ClipboardList, permissions: ['queue.manage'] },
-  {
-    key: 'doctor',
-    href: '/doctor',
-    icon: Stethoscope,
-    permissions: ['queue.call'],
-    roles: ['DOCTOR'],
-  },
-  { key: 'patients', href: '/patients', icon: Users, permissions: ['patients.read'] },
-  { key: 'admissions', href: '/admissions', icon: BedDouble, permissions: ['admissions.read'] },
-  { key: 'surgeries', href: '/surgeries', icon: Scissors, permissions: ['surgery.read'] },
-  {
-    key: 'recordAccess',
-    href: '/patients/record-access',
-    icon: ShieldCheck,
-    permissions: ['patients.recordAccess.manage'],
-  },
-  { key: 'cashier', href: '/cashier', icon: CreditCard, permissions: ['payments.create'] },
-  { key: 'invoices', href: '/invoices', icon: Receipt, permissions: ['invoices.read'] },
-  { key: 'expenses', href: '/expenses', icon: Banknote, permissions: ['expenses.read'] },
-  { key: 'lab', href: '/lab', icon: FlaskConical, permissions: ['lab.orders.read'] },
-  {
-    key: 'uzi',
-    href: '/uzi',
-    icon: Activity,
-    permissions: ['visits.write', 'invoices.write'],
-  },
-  { key: 'services', href: '/services', icon: Tags, permissions: ['services.read'] },
-  { key: 'staff', href: '/staff', icon: UserRound, permissions: ['staff.read'] },
-  {
-    key: 'reports',
-    href: '/reports',
-    icon: BarChart3,
-    permissions: ['reports.read', 'reports.cash.read', 'reports.own.read'],
-  },
-  { key: 'feedback', href: '/feedback', icon: MessageSquareHeart, permissions: ['feedback.read'] },
-  { key: 'audit', href: '/audit', icon: ScrollText, permissions: ['audit.read'] },
-  { key: 'settings', href: '/settings', icon: Settings, permissions: ['clinic.settings.read'] },
-  // No permissions: help is for everyone, and its content self-filters by role.
-  { key: 'help', href: '/help', icon: LifeBuoy },
-];
-
-const PLATFORM_ITEMS: NavItem[] = [
-  {
-    key: 'clinics',
-    href: '/platform/clinics',
-    icon: Building2,
-    permissions: ['platform.clinics.read'],
-  },
-  { key: 'plans', href: '/platform/plans', icon: Tags, permissions: ['platform.plans.write'] },
-  {
-    key: 'analytics',
-    href: '/platform/analytics',
-    icon: BarChart3,
-    permissions: ['platform.analytics.read'],
-  },
-];
+const NAV_ICONS: Record<NavKey, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  ai: Sparkles,
+  reception: ClipboardList,
+  doctor: Stethoscope,
+  patients: Users,
+  admissions: BedDouble,
+  surgeries: Scissors,
+  recordAccess: ShieldCheck,
+  cashier: CreditCard,
+  invoices: Receipt,
+  expenses: Banknote,
+  lab: FlaskConical,
+  uzi: Activity,
+  services: Tags,
+  staff: UserRound,
+  reports: BarChart3,
+  feedback: MessageSquareHeart,
+  audit: ScrollText,
+  settings: Settings,
+  help: LifeBuoy,
+  clinics: Building2,
+  plans: Tags,
+  analytics: BarChart3,
+};
 
 function NavLink({
-  item,
+  href,
+  icon: Icon,
   active,
   label,
   onNavigate,
 }: {
-  item: NavItem;
+  href: string;
+  icon: LucideIcon;
   active: boolean;
   label: string;
   onNavigate?: () => void;
 }) {
-  const Icon = item.icon;
   return (
     <Link
-      href={item.href}
+      href={href}
       onClick={onNavigate}
       className={cn(
         'flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-base font-medium transition-colors md:min-h-0 md:text-sm',
@@ -143,20 +105,16 @@ function useNav() {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
 
-  const visible = (items: NavItem[]) =>
-    items.filter((item) => {
-      if (!user) return false;
-      if (item.roles && !item.roles.includes(user.role)) {
-        if (!item.permissions) return false;
-      }
-      if (!item.permissions) return true;
-      return item.permissions.some((p) => user.permissions.includes(p));
-    });
-
   return {
     user,
-    mainItems: !user || user.role === 'SUPER_ADMIN' ? [] : visible(NAV_ITEMS),
-    platformItems: user?.role === 'SUPER_ADMIN' ? PLATFORM_ITEMS : [],
+    mainItems:
+      !user || user.role === 'SUPER_ADMIN'
+        ? []
+        : NAV_RULES.filter((rule) => isNavVisible(rule, user)),
+    platformItems:
+      user?.role === 'SUPER_ADMIN'
+        ? PLATFORM_NAV_RULES.filter((rule) => isNavVisible(rule, user))
+        : [],
     isActive: (href: string) => pathname === href || pathname.startsWith(`${href}/`),
   };
 }
@@ -170,7 +128,8 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
       {mainItems.map((item) => (
         <NavLink
           key={item.key}
-          item={item}
+          href={item.href}
+          icon={NAV_ICONS[item.key]}
           active={isActive(item.href)}
           label={t(item.key as never)}
           onNavigate={onNavigate}
@@ -184,7 +143,8 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
           {platformItems.map((item) => (
             <NavLink
               key={item.key}
-              item={item}
+              href={item.href}
+              icon={NAV_ICONS[item.key]}
               active={isActive(item.href)}
               label={t(item.key as never)}
               onNavigate={onNavigate}

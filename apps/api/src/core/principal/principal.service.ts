@@ -50,7 +50,11 @@ export class PrincipalService {
     // Platform-scope lookup: identity resolution happens before tenant context exists.
     const user = await this.prisma.unscoped.user.findUnique({
       where: { id: payload.sub },
-      include: { branches: true, clinic: { select: { status: true } } },
+      include: {
+        branches: true,
+        clinic: { select: { status: true } },
+        staffProfile: { select: { specialty: true } },
+      },
     });
     if (!user || user.deletedAt) {
       throw new AppException(ErrorCode.UNAUTHORIZED, 'User not found', 401);
@@ -80,6 +84,7 @@ export class PrincipalService {
     }
 
     const overrides = (user.permissionOverrides ?? {}) as { grant?: string[]; revoke?: string[] };
+    const specialty = user.staffProfile?.specialty ?? null;
     return {
       id: user.id,
       clinicId: user.clinicId,
@@ -87,7 +92,8 @@ export class PrincipalService {
       fullName: user.fullName,
       locale: user.locale.replace('uz_Cyrl', 'uz-Cyrl') as Locale,
       branchIds: user.branches.map((b) => b.branchId),
-      permissions: permissionsForRole(user.role as UserRole, overrides),
+      permissions: permissionsForRole(user.role as UserRole, overrides, { specialty }),
+      specialty,
       sessionId: payload.sid,
       impersonatedBy: payload.impersonatedBy,
     };

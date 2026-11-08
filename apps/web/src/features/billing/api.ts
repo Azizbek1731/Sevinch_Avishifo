@@ -275,9 +275,14 @@ export interface ServiceOption {
   name: { uz: string; ru?: string; en?: string };
   currentPrice: MoneyString | null;
   isActive: boolean;
-  /** Present on catalogue list responses — used to scope UZI rows per doctor. */
-  category?: { id: string; name: string; kind?: string };
-  /** Laboratory section (BIOCHEMISTRY, URINALYSIS, …) when kind is LAB. */
+  /** Present on catalogue list responses — used to scope UZI / lab sections. */
+  category?: {
+    id: string;
+    name: string | { uz?: string; ru?: string; en?: string };
+    kind?: string;
+    sortOrder?: number;
+  };
+  /** MoH LabTest.category when present (optional; reception groups by ServiceCategory). */
   labCategory?: string | null;
 }
 

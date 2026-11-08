@@ -369,6 +369,7 @@ export function ReferralsSection({
                     value={targetDoctorId || undefined}
                     onValueChange={(value) => {
                       setTargetDoctorId(value);
+                      setUziServices([]);
                       setClinicalError(false);
                     }}
                   >
@@ -432,6 +433,8 @@ export function ReferralsSection({
                 <ServiceCombobox
                   value={null}
                   kind="ULTRASOUND"
+                  doctor={uziDoctors.find((doctor) => doctor.id === targetDoctorId) ?? null}
+                  disabled={!targetDoctorId}
                   excludeIds={uziServices.map((service) => service.id)}
                   onChange={(service) => {
                     setUziServices((prev) =>

@@ -1,4 +1,8 @@
-import type { Permission, UserRole } from '@avishifo/shared';
+import {
+  isUltrasoundSpecialty,
+  type Permission,
+  type UserRole,
+} from '@avishifo/shared';
 
 /**
  * The first screen a signed-in user should see.
@@ -14,15 +18,23 @@ import type { Permission, UserRole } from '@avishifo/shared';
  * second — it overrode the role-aware destination on every login, not just on a
  * revisit.
  */
-export function homePath(user: { role: UserRole; permissions: readonly Permission[] }): string {
+export function homePath(user: {
+  role: UserRole;
+  permissions: readonly Permission[];
+  specialty?: string | null;
+}): string {
   if (user.role === 'SUPER_ADMIN') return '/platform/clinics';
   if (user.role === 'OPERATING_ROOM') return '/surgeries';
+  if (user.role === 'LAB_TECH') return '/lab';
+  if (user.role === 'DOCTOR' && isUltrasoundSpecialty(user.specialty)) return '/uzi';
 
   const can = (p: Permission): boolean => user.permissions.includes(p);
   if (can('reports.read')) return '/dashboard';
   if (can('queue.manage')) return '/reception';
   if (can('queue.call')) return '/doctor';
   if (can('payments.create')) return '/cashier';
-  if (can('lab.orders.write')) return '/lab';
-  return '/patients';
+  if (can('lab.orders.write') || can('lab.orders.read')) return '/lab';
+  if (can('visits.write') && isUltrasoundSpecialty(user.specialty)) return '/uzi';
+  if (can('patients.read')) return '/patients';
+  return '/help';
 }

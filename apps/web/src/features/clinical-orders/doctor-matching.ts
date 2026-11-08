@@ -1,3 +1,4 @@
+import { isUltrasoundSpecialty } from '@avishifo/shared';
 import type { ServiceOption } from '@/features/billing/api';
 
 export type DoctorOption = {
@@ -22,17 +23,7 @@ const UZI_ROLE_TOKENS = new Set([
 
 /** UZI / UTT / ultrasound specialists only. */
 export function isUziSpecialty(specialty: string | null | undefined): boolean {
-  if (!specialty) return false;
-  const value = specialty.toLowerCase();
-  return (
-    value.includes('uzi') ||
-    value.includes('utt') ||
-    value.includes('узи') ||
-    value.includes('узд') ||
-    value.includes('ultrasound') ||
-    value.includes('exo') ||
-    value.includes('эхо')
-  );
+  return isUltrasoundSpecialty(specialty);
 }
 
 /**
@@ -91,6 +82,20 @@ function titleTokens(title: string): string[] {
     .filter((part) => part.length > 2);
 }
 
+function specialtyMatchesTitle(specialty: string | null | undefined, title: string): boolean {
+  if (!specialty?.trim()) return false;
+  const value = specialty.trim().toLowerCase();
+  if (title.includes(value)) return true;
+  const hayTokens = titleTokens(title);
+  const specialtyParts = titleTokens(value);
+  if (specialtyParts.length === 0) return false;
+  // "UZI/EXO vrach" vs title "UZI/EXO vrach — …" — enough distinctive parts hit.
+  const hits = specialtyParts.filter((part) =>
+    hayTokens.some((token) => tokenCloseEnough(part, token)),
+  ).length;
+  return hits >= Math.min(2, specialtyParts.length);
+}
+
 /** Match consultation price row named like "Specialty — Doctor Name". */
 export function serviceMatchesDoctor(
   service: ServiceOption,
@@ -102,28 +107,32 @@ export function serviceMatchesDoctor(
   if (!fullName) return false;
   if (title.includes(fullName)) {
     if (!doctor.specialty?.trim()) return true;
-    const specialty = doctor.specialty.trim().toLowerCase();
-    if (title.includes(specialty)) return true;
+    if (specialtyMatchesTitle(doctor.specialty, title)) return true;
     // Auto-created rows always embed the Latin full name; specialty script may differ.
     if (service.code?.toUpperCase().startsWith('DOC-')) return true;
     const hayTokens = titleTokens(title);
-    return hayTokens.some((token) => tokenCloseEnough(specialty, token));
+    return hayTokens.some((token) => tokenCloseEnough(doctor.specialty!.trim().toLowerCase(), token));
   }
 
   const doctorTokens = doctorNameTokens(doctor);
   if (doctorTokens.length === 0) return false;
   const hayTokens = titleTokens(title);
 
-  // Every doctor name token must appear in the title (exact or near-miss typo).
-  const nameHit = doctorTokens.every((part) =>
+  const matchedTokens = doctorTokens.filter((part) =>
     hayTokens.some((token) => tokenCloseEnough(part, token)),
   );
+  if (matchedTokens.length === 0) return false;
+
+  // Prefer full-name hits; allow a single distinctive token when specialty (or DOC- row)
+  // already pins the row to this doctor — e.g. "UZI/EXO vrach — Sherzod".
+  const nameHit =
+    matchedTokens.length === doctorTokens.length ||
+    (matchedTokens.length >= 1 &&
+      (specialtyMatchesTitle(doctor.specialty, title) ||
+        Boolean(service.code?.toUpperCase().startsWith('DOC-'))));
   if (!nameHit) return false;
   if (!doctor.specialty?.trim()) return true;
-  const specialty = doctor.specialty.trim().toLowerCase();
-  if (title.includes(specialty) || hayTokens.some((token) => tokenCloseEnough(specialty, token))) {
-    return true;
-  }
+  if (specialtyMatchesTitle(doctor.specialty, title)) return true;
   return Boolean(service.code?.toUpperCase().startsWith('DOC-'));
 }
 
@@ -136,13 +145,22 @@ export function uziServiceMatchesDoctor(
   doctor: DoctorOption,
   _locale?: string,
 ): boolean {
-  const haystack = `${service.category?.name ?? ''} ${serviceNameHaystack(service)}`.toLowerCase();
+  const rawCategory = service.category?.name;
+  const categoryName =
+    typeof rawCategory === 'string'
+      ? rawCategory
+      : rawCategory && typeof rawCategory === 'object'
+        ? [rawCategory.uz, rawCategory.ru, rawCategory.en].filter(Boolean).join(' ')
+        : '';
+  const haystack = `${categoryName} ${serviceNameHaystack(service)}`.toLowerCase();
   const fullName = doctor.fullName.trim().toLowerCase();
   if (!fullName) return false;
   if (haystack.includes(fullName)) return true;
   const tokens = doctorNameTokens(doctor);
   if (tokens.length === 0) return false;
   const hayTokens = titleTokens(haystack);
+  // One distinctive name token in the per-doctor UZI category is enough
+  // ("UZI EXO — Sherzod" ↔ "Abdullayev Sherzod Uzi").
   return tokens.some((token) => hayTokens.some((hay) => tokenCloseEnough(token, hay)));
 }
 

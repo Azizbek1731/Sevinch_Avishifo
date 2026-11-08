@@ -274,7 +274,7 @@ export class ServicesService {
           // Reception lab picker groups by LabTest.category (bioximiya, siydik, …).
           labTest: { select: { category: true } },
         },
-        orderBy: [{ code: 'asc' }],
+        orderBy: [{ category: { sortOrder: 'asc' } }, { code: 'asc' }],
         ...skipTake(query),
       }),
       this.prisma.db.service.count({ where }),

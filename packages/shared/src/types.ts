@@ -53,6 +53,8 @@ export interface AuthUser {
   locale: Locale;
   branchIds: string[];
   permissions: Permission[];
+  /** Staff specialty when present — used to scope UZI desks vs general doctors. */
+  specialty: string | null;
   sessionId: string;
   impersonatedBy?: string;
 }

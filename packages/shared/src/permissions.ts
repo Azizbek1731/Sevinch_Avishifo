@@ -269,9 +269,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'reports.cash.read',
     'reports.cash.export',
   ],
+  // Lab desk: own worklist + test catalogue lookup. No clinic-wide patient /
+  // inpatient / services admin screens (nav hides those even when a permission
+  // is kept for embedded patient search on a new lab order).
   [UserRole.LAB_TECH]: [
     'patients.read',
-    'queue.read',
     'lab.orders.read',
     'lab.orders.write',
     'lab.results.write',
@@ -304,11 +306,52 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   [UserRole.PATIENT]: [],
 };
 
+/**
+ * Ultrasound / EXO / UTT specialists are DOCTOR accounts, but their desk is
+ * the UZI worklist — not the full ward / surgery / lab roster that a general
+ * clinician sees. Permissions that unlock those screens are stripped here;
+ * grant overrides can still re-open a permission if a clinic needs it.
+ */
+export const ULTRASOUND_DOCTOR_PERMISSIONS = [
+  'patients.read',
+  'queue.read',
+  'queue.call',
+  'visits.read',
+  'visits.write',
+  'visits.amend',
+  'services.read',
+  'schedules.read',
+  'payroll.read',
+  'reports.own.read',
+] as const satisfies readonly Permission[];
+
+/** Specialty strings that mean "this doctor is an ultrasound specialist". */
+export function isUltrasoundSpecialty(specialty: string | null | undefined): boolean {
+  if (!specialty) return false;
+  const value = specialty.toLowerCase();
+  return (
+    value.includes('uzi') ||
+    value.includes('utt') ||
+    value.includes('узи') ||
+    value.includes('узд') ||
+    value.includes('ultrasound') ||
+    value.includes('exo') ||
+    value.includes('эхо')
+  );
+}
+
 export function permissionsForRole(
   role: UserRole,
   overrides?: { grant?: readonly string[]; revoke?: readonly string[] },
+  options?: { specialty?: string | null },
 ): Permission[] {
   const base = new Set<Permission>(ROLE_PERMISSIONS[role] ?? []);
+  if (role === UserRole.DOCTOR && isUltrasoundSpecialty(options?.specialty)) {
+    const allowed = new Set<string>(ULTRASOUND_DOCTOR_PERMISSIONS);
+    for (const permission of [...base]) {
+      if (!allowed.has(permission)) base.delete(permission);
+    }
+  }
   for (const p of overrides?.grant ?? []) {
     if ((PERMISSIONS as readonly string[]).includes(p)) base.add(p as Permission);
   }

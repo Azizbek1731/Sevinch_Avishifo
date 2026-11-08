@@ -8,6 +8,11 @@ import { XlsxService } from '../reports/xlsx.service';
 import { allStatsionarReportChatIds } from './telegram-ops';
 import { buildActiveStatsionarXlsx } from './statsionar-xlsx.helper';
 import {
+  buildDailyInvoicesXlsx,
+  buildDailyPaymentsXlsx,
+  buildPatientsXlsx,
+} from './telegram-admin-xlsx.helper';
+import {
   formatStatsionarStamp,
   msUntilNextStatsionarReport,
   statsionarReportSlot,
@@ -78,6 +83,46 @@ export class StatsionarDailyTelegramService implements OnModuleInit, OnModuleDes
         filename: asOfDate ? `statsionar-${asOfDate}.xlsx` : `statsionar-${stamp}.xlsx`,
       };
     });
+  }
+
+  /** Full patient roster Excel for admin Telegram. */
+  async buildPatientsReportNow(): Promise<{
+    buffer: Buffer;
+    count: number;
+    filename: string;
+  } | null> {
+    const clinicId = await this.resolveClinicId();
+    if (!clinicId) return null;
+    return TenantContext.run({ clinicId }, () =>
+      buildPatientsXlsx(this.prisma.db as never, this.xlsx),
+    );
+  }
+
+  /** Invoices created on a Tashkent calendar day. */
+  async buildDailyInvoicesReportNow(asOfDate: string): Promise<{
+    buffer: Buffer;
+    count: number;
+    filename: string;
+  } | null> {
+    const clinicId = await this.resolveClinicId();
+    if (!clinicId) return null;
+    return TenantContext.run({ clinicId }, () =>
+      buildDailyInvoicesXlsx(this.prisma.db as never, this.xlsx, asOfDate),
+    );
+  }
+
+  /** Completed payments on a Tashkent calendar day. */
+  async buildDailyPaymentsReportNow(asOfDate: string): Promise<{
+    buffer: Buffer;
+    count: number;
+    filename: string;
+    total: string;
+  } | null> {
+    const clinicId = await this.resolveClinicId();
+    if (!clinicId) return null;
+    return TenantContext.run({ clinicId }, () =>
+      buildDailyPaymentsXlsx(this.prisma.db as never, this.xlsx, asOfDate),
+    );
   }
 
   async sendDocument(

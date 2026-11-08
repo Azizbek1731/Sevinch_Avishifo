@@ -96,12 +96,15 @@ const CONTACT_KEYBOARD = new Keyboard().requestContact('📱 Raqamni yuborish').
 const PATIENT_KEYBOARD = keyboardFor({ patientIds: ['x'], staff: null });
 const OPS_BUTTONS = ['Holat', 'Tarmoq', 'Zaxira'] as const;
 const ACCOUNTANT_STATS_BUTTON = '📊 Statsionar Excel';
+const ADMIN_REPORTS_BUTTON = '📥 Hisobotlar';
 const SWITCH_TO_ADMIN = '🛠 Admin menyusi';
 const SWITCH_TO_ACCOUNTANT = '📒 Bug‘alter menyusi';
 const SWITCH_TO_PATIENT = '👤 Bemor menyusi';
 
 /** Chats waiting for a typed statsionar report date (DD.MM.YYYY). */
 const awaitingStatsionarDate = new Set<number>();
+/** Chats waiting for a typed date for invoices / payments / pack exports. */
+const awaitingAdminExportDate = new Map<number, 'invoices' | 'payments' | 'pack'>();
 
 function tashkentYmd(offsetDays = 0): string {
   const p = zonedParts(new Date());
@@ -118,6 +121,31 @@ function statsionarDatePickerKeyboard(): InlineKeyboard {
     .row()
     .text('📅 Boshqa sana', 'stxlsx:ask')
     .text('✖️ Bekor', 'stxlsx:cancel');
+}
+
+/** Admin download hub — patients, invoices, payments, statsionar, full pack. */
+function adminReportsKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text('👥 Bemorlar', 'admxlsx:patients')
+    .text('🏥 Statsionar', 'admxlsx:statsionar')
+    .row()
+    .text('🧾 Kunlik fakturalar', 'admxlsx:invoices')
+    .text('💰 Kunlik to‘lovlar', 'admxlsx:payments')
+    .row()
+    .text('📦 Bugungi to‘liq paket', 'admxlsx:pack')
+    .text('✖️ Yopish', 'admxlsx:cancel');
+}
+
+function adminDatedExportKeyboard(kind: 'invoices' | 'payments' | 'pack'): InlineKeyboard {
+  const today = tashkentYmd(0);
+  const yesterday = tashkentYmd(-1);
+  const prefix = kind === 'invoices' ? 'invxlsx' : kind === 'payments' ? 'payxlsx' : 'packxlsx';
+  return new InlineKeyboard()
+    .text(`Bugun (${formatStatsionarReportDateUz(today)})`, `${prefix}:${today}`)
+    .text(`Kecha (${formatStatsionarReportDateUz(yesterday)})`, `${prefix}:${yesterday}`)
+    .row()
+    .text('📅 Boshqa sana', `${prefix}:ask`)
+    .text('✖️ Bekor', `${prefix}:cancel`);
 }
 
 /** Pure patient menu (no staff buttons). */
@@ -154,6 +182,7 @@ function clinicAdminKeyboard(canSwitchToPatient = false): Keyboard {
     .text('Zaxira')
     .text(ACCOUNTANT_STATS_BUTTON)
     .row()
+    .text(ADMIN_REPORTS_BUTTON)
     .text('🔄 Yangilash');
   if (canSwitchToPatient) {
     kb.row().text(SWITCH_TO_PATIENT);
@@ -320,6 +349,10 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
                       command: 'statsionar',
                       description: 'Statsionar Excel (bug‘alter / admin)',
                     },
+                    {
+                      command: 'hisobotlar',
+                      description: 'Bemorlar / fakturalar / to‘lovlar Excel (admin)',
+                    },
                   ]
                 : []),
             ])
@@ -381,11 +414,17 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       bot.hears(/^Tarmoq$/i, (ctx) => this.handleOps(ctx, 'tarmoq'));
       bot.hears(/^Zaxira$/i, (ctx) => this.handleOps(ctx, 'zaxira'));
       bot.hears(ACCOUNTANT_STATS_BUTTON, (ctx) => this.handleStatsionarExcelMenu(ctx));
+      bot.hears(ADMIN_REPORTS_BUTTON, (ctx) => this.handleAdminReportsMenu(ctx));
       bot.command('holat', (ctx) => this.handleOps(ctx, 'holat'));
       bot.command('tarmoq', (ctx) => this.handleOps(ctx, 'tarmoq'));
       bot.command('zaxira', (ctx) => this.handleOps(ctx, 'zaxira'));
       bot.command('statsionar', (ctx) => this.handleStatsionarExcelMenu(ctx));
+      bot.command('hisobotlar', (ctx) => this.handleAdminReportsMenu(ctx));
       bot.callbackQuery(/^stxlsx:(.+)$/, (ctx) => this.handleStatsionarExcelCallback(ctx));
+      bot.callbackQuery(/^admxlsx:(.+)$/, (ctx) => this.handleAdminReportsCallback(ctx));
+      bot.callbackQuery(/^(invxlsx|payxlsx|packxlsx):(.+)$/, (ctx) =>
+        this.handleAdminDatedExportCallback(ctx),
+      );
     }
     if (!this.patientOnly) {
       bot.hears('📅 Qabullarim', (ctx) => this.handleMyAppointments(ctx));
@@ -428,7 +467,15 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     if (this.patientOnly) {
       bot.on('callback_query:data', async (ctx) => {
         const data = ctx.callbackQuery?.data ?? '';
-        if (data.startsWith('stxlsx:')) return;
+        if (
+          data.startsWith('stxlsx:') ||
+          data.startsWith('admxlsx:') ||
+          data.startsWith('invxlsx:') ||
+          data.startsWith('payxlsx:') ||
+          data.startsWith('packxlsx:')
+        ) {
+          return;
+        }
         await ctx.answerCallbackQuery({ text: 'Menyuni yangilash uchun /menu bosing.' });
       });
       bot.on('message:text', async (ctx) => {
@@ -438,9 +485,14 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
           await this.handleStatsionarDateText(ctx, text);
           return;
         }
+        if (awaitingAdminExportDate.has(chatId)) {
+          await this.handleAdminExportDateText(ctx, text);
+          return;
+        }
         if (
           OPS_BUTTONS.some((label) => label.toLowerCase() === text.toLowerCase()) ||
           text === ACCOUNTANT_STATS_BUTTON ||
+          text === ADMIN_REPORTS_BUTTON ||
           text === SWITCH_TO_ADMIN ||
           text === SWITCH_TO_ACCOUNTANT ||
           text === SWITCH_TO_PATIENT
@@ -456,7 +508,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
           : this.waitingKeyboardFor(chatId);
         await ctx.reply(
           mode === 'admin'
-            ? 'Admin buyruqlari: Holat, Tarmoq, Zaxira, Statsionar Excel. Menyuni yangilash: /menu'
+            ? 'Admin: Holat, Tarmoq, Zaxira, Statsionar Excel, Hisobotlar. Menyuni yangilash: /menu'
             : mode === 'accountant'
               ? 'Bug‘alter: Statsionar Excel (sana tanlash mumkin). Har kuni 16:30 da avtomatik yuboriladi. Menyuni yangilash: /menu'
               : linked
@@ -523,7 +575,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     setOpsMenuMode(chatId, mode);
     if (mode === 'admin') {
       await ctx.reply(
-        '🛠 Admin menyusi\n\nHolat — server / loyiha\nTarmoq — Wi‑Fi / LAN\nZaxira — oxirgi dump',
+        '🛠 Admin menyusi\n\nHolat — server / loyiha\nTarmoq — Wi‑Fi / LAN\nZaxira — oxirgi dump\n📊 Statsionar Excel — yotgan bemorlar\n📥 Hisobotlar — bemorlar, fakturalar, to‘lovlar',
         { reply_markup: await this.menuKeyboardFor(chatId) },
       );
       return;
@@ -656,6 +708,248 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       this.logger.warn(`statsionar excel failed: ${detail}`);
+      await ctx
+        .reply(`Excel tayyorlanmadi.\n${detail.slice(0, 160)}`, { reply_markup: markup })
+        .catch(() => undefined);
+    }
+  }
+
+  /** Admin-only hub: patients, invoices, payments, statsionar, full pack. */
+  private async handleAdminReportsMenu(ctx: Context): Promise<void> {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    if (!isOpsAdminChat(chatId)) {
+      await ctx.reply('Hisobotlar faqat administrator uchun.', {
+        reply_markup: await this.menuKeyboardFor(chatId),
+      });
+      return;
+    }
+    setOpsMenuMode(chatId, 'admin');
+    awaitingAdminExportDate.delete(chatId);
+    awaitingStatsionarDate.delete(chatId);
+    await ctx.reply(
+      '📥 Hisobotlar (Excel)\n\n' +
+        '👥 Bemorlar — to‘liq ro‘yxat\n' +
+        '🏥 Statsionar — sana bo‘yicha\n' +
+        '🧾 Kunlik fakturalar — tanlangan kun\n' +
+        '💰 Kunlik to‘lovlar — tanlangan kun\n' +
+        '📦 Bugungi to‘liq paket — hammasi birga',
+      { reply_markup: adminReportsKeyboard() },
+    );
+  }
+
+  private async handleAdminReportsCallback(ctx: Context): Promise<void> {
+    const chatId = ctx.chat?.id;
+    const raw = ctx.match?.[1] ?? '';
+    if (chatId === undefined) return;
+    if (!isOpsAdminChat(chatId)) {
+      await ctx.answerCallbackQuery({ text: 'Ruxsat yo‘q' });
+      return;
+    }
+    setOpsMenuMode(chatId, 'admin');
+    if (raw === 'cancel') {
+      awaitingAdminExportDate.delete(chatId);
+      await ctx.answerCallbackQuery({ text: 'Yopildi' });
+      await ctx.editMessageText('Hisobotlar menyusi yopildi.').catch(() => undefined);
+      return;
+    }
+    if (raw === 'patients') {
+      await ctx.answerCallbackQuery({ text: 'Tayyorlanmoqda…' });
+      await this.deliverPatientsExcel(ctx, chatId);
+      return;
+    }
+    if (raw === 'statsionar') {
+      await ctx.answerCallbackQuery();
+      awaitingStatsionarDate.delete(chatId);
+      await ctx.reply(
+        '📊 Statsionar hisobot\n\nQaysi kun uchun Excel kerak?',
+        { reply_markup: statsionarDatePickerKeyboard() },
+      );
+      return;
+    }
+    if (raw === 'invoices' || raw === 'payments' || raw === 'pack') {
+      await ctx.answerCallbackQuery();
+      awaitingAdminExportDate.delete(chatId);
+      const title =
+        raw === 'invoices'
+          ? '🧾 Kunlik fakturalar'
+          : raw === 'payments'
+            ? '💰 Kunlik to‘lovlar'
+            : '📦 Kunlik to‘liq paket';
+      await ctx.reply(`${title}\n\nQaysi kun uchun Excel kerak?`, {
+        reply_markup: adminDatedExportKeyboard(raw),
+      });
+      return;
+    }
+    await ctx.answerCallbackQuery({ text: 'Noma’lum buyruq' });
+  }
+
+  private async handleAdminDatedExportCallback(ctx: Context): Promise<void> {
+    const chatId = ctx.chat?.id;
+    const kindRaw = ctx.match?.[1] ?? '';
+    const raw = ctx.match?.[2] ?? '';
+    if (chatId === undefined) return;
+    if (!isOpsAdminChat(chatId)) {
+      await ctx.answerCallbackQuery({ text: 'Ruxsat yo‘q' });
+      return;
+    }
+    const kind =
+      kindRaw === 'invxlsx' ? 'invoices' : kindRaw === 'payxlsx' ? 'payments' : 'pack';
+    if (raw === 'cancel') {
+      awaitingAdminExportDate.delete(chatId);
+      await ctx.answerCallbackQuery({ text: 'Bekor qilindi' });
+      await ctx.editMessageText('Hisobot bekor qilindi.').catch(() => undefined);
+      return;
+    }
+    if (raw === 'ask') {
+      awaitingAdminExportDate.set(chatId, kind);
+      await ctx.answerCallbackQuery();
+      await ctx.reply('Sanani kiriting (masalan: 03.11.2026).\nBekor qilish: /menu', {
+        reply_markup: await this.menuKeyboardFor(chatId),
+      });
+      return;
+    }
+    const ymd = parseStatsionarReportDate(raw);
+    if (!ymd) {
+      await ctx.answerCallbackQuery({ text: 'Noto‘g‘ri sana' });
+      return;
+    }
+    awaitingAdminExportDate.delete(chatId);
+    await ctx.answerCallbackQuery({ text: 'Tayyorlanmoqda…' });
+    await this.deliverAdminDatedExport(ctx, chatId, kind, ymd);
+  }
+
+  private async handleAdminExportDateText(ctx: Context, text: string): Promise<void> {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    const kind = awaitingAdminExportDate.get(chatId);
+    if (!kind) return;
+    if (!isOpsAdminChat(chatId)) {
+      awaitingAdminExportDate.delete(chatId);
+      return;
+    }
+    if (text === '/menu' || text === '🔄 Yangilash' || text === '✖️ Bekor') {
+      awaitingAdminExportDate.delete(chatId);
+      await this.handleMenu(ctx);
+      return;
+    }
+    const ymd = parseStatsionarReportDate(text);
+    if (!ymd) {
+      await ctx.reply(
+        'Sana formati noto‘g‘ri. Masalan: 03.11.2026 yoki 2026-11-03\nBekor: /menu',
+        { reply_markup: await this.menuKeyboardFor(chatId) },
+      );
+      return;
+    }
+    awaitingAdminExportDate.delete(chatId);
+    await this.deliverAdminDatedExport(ctx, chatId, kind, ymd);
+  }
+
+  private async deliverPatientsExcel(ctx: Context, chatId: number): Promise<void> {
+    const markup = await this.menuKeyboardFor(chatId);
+    await ctx.reply('Bemorlar ro‘yxati tayyorlanmoqda…', { reply_markup: markup });
+    try {
+      const report = await this.statsionarDaily.buildPatientsReportNow();
+      if (!report) {
+        await ctx.reply('Excel yaratib bo‘lmadi: klinika aniqlanmadi.', { reply_markup: markup });
+        return;
+      }
+      const ok = await this.statsionarDaily.sendDocument(
+        chatId,
+        report.buffer,
+        report.filename,
+        `👥 Bemorlar ro‘yxati\nJami: ${report.count} ta`,
+      );
+      if (!ok) {
+        await ctx.reply('Excel yuborib bo‘lmadi.', { reply_markup: markup });
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`patients excel failed: ${detail}`);
+      await ctx
+        .reply(`Excel tayyorlanmadi.\n${detail.slice(0, 160)}`, { reply_markup: markup })
+        .catch(() => undefined);
+    }
+  }
+
+  private async deliverAdminDatedExport(
+    ctx: Context,
+    chatId: number,
+    kind: 'invoices' | 'payments' | 'pack',
+    asOfDate: string,
+  ): Promise<void> {
+    const markup = await this.menuKeyboardFor(chatId);
+    const label = formatStatsionarReportDateUz(asOfDate);
+    if (kind === 'pack') {
+      await ctx.reply(`${label} uchun to‘liq paket tayyorlanmoqda…`, { reply_markup: markup });
+      await this.deliverPatientsExcel(ctx, chatId);
+      await this.deliverDailyInvoicesExcel(ctx, chatId, asOfDate);
+      await this.deliverDailyPaymentsExcel(ctx, chatId, asOfDate);
+      await this.deliverStatsionarExcel(ctx, chatId, asOfDate);
+      await ctx.reply(`✅ ${label} to‘liq paketi yuborildi.`, { reply_markup: markup });
+      return;
+    }
+    if (kind === 'invoices') {
+      await this.deliverDailyInvoicesExcel(ctx, chatId, asOfDate);
+      return;
+    }
+    await this.deliverDailyPaymentsExcel(ctx, chatId, asOfDate);
+  }
+
+  private async deliverDailyInvoicesExcel(
+    ctx: Context,
+    chatId: number,
+    asOfDate: string,
+  ): Promise<void> {
+    const markup = await this.menuKeyboardFor(chatId);
+    const label = formatStatsionarReportDateUz(asOfDate);
+    await ctx.reply(`${label} fakturalari tayyorlanmoqda…`, { reply_markup: markup });
+    try {
+      const report = await this.statsionarDaily.buildDailyInvoicesReportNow(asOfDate);
+      if (!report) {
+        await ctx.reply('Excel yaratib bo‘lmadi: klinika aniqlanmadi.', { reply_markup: markup });
+        return;
+      }
+      const ok = await this.statsionarDaily.sendDocument(
+        chatId,
+        report.buffer,
+        report.filename,
+        `🧾 Hisob-fakturalar — ${label}\nJami: ${report.count} ta`,
+      );
+      if (!ok) await ctx.reply('Excel yuborib bo‘lmadi.', { reply_markup: markup });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`invoices excel failed: ${detail}`);
+      await ctx
+        .reply(`Excel tayyorlanmadi.\n${detail.slice(0, 160)}`, { reply_markup: markup })
+        .catch(() => undefined);
+    }
+  }
+
+  private async deliverDailyPaymentsExcel(
+    ctx: Context,
+    chatId: number,
+    asOfDate: string,
+  ): Promise<void> {
+    const markup = await this.menuKeyboardFor(chatId);
+    const label = formatStatsionarReportDateUz(asOfDate);
+    await ctx.reply(`${label} to‘lovlari tayyorlanmoqda…`, { reply_markup: markup });
+    try {
+      const report = await this.statsionarDaily.buildDailyPaymentsReportNow(asOfDate);
+      if (!report) {
+        await ctx.reply('Excel yaratib bo‘lmadi: klinika aniqlanmadi.', { reply_markup: markup });
+        return;
+      }
+      const ok = await this.statsionarDaily.sendDocument(
+        chatId,
+        report.buffer,
+        report.filename,
+        `💰 To‘lovlar — ${label}\nAmaliyotlar: ${report.count} ta\nJami: ${report.total} so‘m`,
+      );
+      if (!ok) await ctx.reply('Excel yuborib bo‘lmadi.', { reply_markup: markup });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`payments excel failed: ${detail}`);
       await ctx
         .reply(`Excel tayyorlanmadi.\n${detail.slice(0, 160)}`, { reply_markup: markup })
         .catch(() => undefined);

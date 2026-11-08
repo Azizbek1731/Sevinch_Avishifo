@@ -101,6 +101,8 @@ export function AddChargeDialog({
   const doctorOptions = (doctors.data ?? []).filter((doctor) =>
     mode === 'uzi' ? isUziSpecialty(doctor.specialty) : true,
   );
+  const selectedDoctor =
+    doctorOptions.find((doctor) => doctor.id === doctorUserId) ?? null;
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ['charges', patientId] });
@@ -258,7 +260,11 @@ export function AddChargeDialog({
               <Select
                 value={doctorUserId}
                 disabled={doctors.isLoading || doctors.isError || !doctorOptions.length}
-                onValueChange={setDoctorUserId}
+                onValueChange={(id) => {
+                  setDoctorUserId(id);
+                  // Switching UZI doctor must drop the previous doctor's catalogue rows.
+                  if (mode === 'uzi') setLines([]);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue
@@ -291,7 +297,7 @@ export function AddChargeDialog({
               <div className="space-y-2">
                 <Label>{t('add.service')}</Label>
                 <ServiceCombobox
-                  key={mode}
+                  key={`${mode}:${doctorUserId}`}
                   excludeSurgery
                   disabled={add.isPending || (clinical && !doctorUserId)}
                   proceduresOnly={mode === 'procedures'}
@@ -304,6 +310,7 @@ export function AddChargeDialog({
                           ? 'CONSULTATION'
                           : undefined
                   }
+                  doctor={mode === 'uzi' ? selectedDoctor : null}
                   excludeIds={lines.map((line) => line.service.id)}
                   value={null}
                   onChange={(service) => {

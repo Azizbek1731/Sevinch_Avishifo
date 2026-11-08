@@ -1,4 +1,7 @@
 import type { Prisma } from '@prisma/client';
+import { isUltrasoundSpecialty } from '@avishifo/shared';
+
+export { isUltrasoundSpecialty };
 
 /** Accepts PrismaClient, extended tenant client, or a transaction client. */
 type Db = {
@@ -32,21 +35,6 @@ function pickName(name: unknown): string {
     }
   }
   return typeof name === 'string' ? name : '';
-}
-
-/** UZI / ultrasound specialists use their own catalogue — skip consult fee rows. */
-export function isUltrasoundSpecialty(specialty: string | null | undefined): boolean {
-  if (!specialty) return false;
-  const value = specialty.toLowerCase();
-  return (
-    value.includes('uzi') ||
-    value.includes('utt') ||
-    value.includes('узи') ||
-    value.includes('узд') ||
-    value.includes('ultrasound') ||
-    value.includes('exo') ||
-    value.includes('эхо')
-  );
 }
 
 function serviceMatchesDoctor(

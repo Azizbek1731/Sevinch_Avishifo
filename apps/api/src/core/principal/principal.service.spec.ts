@@ -20,6 +20,7 @@ function principal(role: UserRole, clinicId: string | null) {
           locale: 'uz',
           branches: [],
           permissionOverrides: {},
+          staffProfile: null,
         }),
       },
       authSession: {

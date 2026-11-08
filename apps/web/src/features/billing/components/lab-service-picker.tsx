@@ -4,34 +4,36 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { Check, Search } from 'lucide-react';
-import { LabCategory, formatUZS, type LabCategory as LabCategoryType } from '@avishifo/shared';
+import { formatUZS } from '@avishifo/shared';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { localizedText } from '@/lib/localized';
 import { billingApi, type ServiceOption } from '../api';
 import { serviceName } from './service-combobox';
 
-const CATEGORY_ORDER: readonly LabCategoryType[] = [
-  LabCategory.BIOCHEMISTRY,
-  LabCategory.HEMATOLOGY,
-  LabCategory.URINALYSIS,
-  LabCategory.COAGULATION,
-  LabCategory.HORMONES,
-  LabCategory.IMMUNOLOGY,
-  LabCategory.TUMOR_MARKERS,
-  LabCategory.VITAMINS,
-  LabCategory.COPROLOGY,
-  LabCategory.ANDROLOGY,
-  LabCategory.CYTOLOGY,
-  LabCategory.MICROBIOLOGY,
-];
+const OTHER_KEY = '__other__';
 
-const OTHER_KEY = 'OTHER';
+type SectionMeta = {
+  key: string;
+  label: string;
+  sortOrder: number;
+};
 
-function categoryKey(service: ServiceOption): string {
-  return service.labCategory && Object.values(LabCategory).includes(service.labCategory as LabCategoryType)
-    ? (service.labCategory as string)
-    : OTHER_KEY;
+function sectionMeta(service: ServiceOption, otherLabel: string): SectionMeta {
+  const cat = service.category;
+  if (!cat?.id) {
+    return { key: OTHER_KEY, label: otherLabel, sortOrder: 9999 };
+  }
+  const label =
+    typeof cat.name === 'string'
+      ? cat.name
+      : localizedText(cat.name as { uz?: string; ru?: string; en?: string }, 'uz') || otherLabel;
+  return {
+    key: cat.id,
+    label,
+    sortOrder: typeof cat.sortOrder === 'number' ? cat.sortOrder : 500,
+  };
 }
 
 export interface LabServicePickerProps {
@@ -41,12 +43,11 @@ export interface LabServicePickerProps {
 }
 
 /**
- * Reception laboratory catalogue: tests grouped into clinical sections
- * (bioximiya, siydik, …) with multi-select cards.
+ * Reception laboratory catalogue grouped by the clinic price-list sections
+ * (bioximiya, siydik, gormonlar, …) — ServiceCategory, not MoH LabCategory.
  */
 export function LabServicePicker({ selected, onChange, disabled = false }: LabServicePickerProps) {
   const t = useTranslations('billing.labPicker');
-  const tLab = useTranslations('lab');
   const locale = useLocale();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('ALL');
@@ -58,6 +59,7 @@ export function LabServicePicker({ selected, onChange, disabled = false }: LabSe
 
   const services = data?.data ?? [];
   const selectedIds = useMemo(() => new Set(selected.map((s) => s.id)), [selected]);
+  const otherLabel = t('other');
 
   const q = search.trim().toLowerCase();
   const filtered = useMemo(() => {
@@ -68,50 +70,47 @@ export function LabServicePicker({ selected, onChange, disabled = false }: LabSe
     });
   }, [services, q, locale]);
 
+  const sectionIndex = useMemo(() => {
+    const map = new Map<string, SectionMeta>();
+    for (const service of filtered) {
+      const meta = sectionMeta(service, otherLabel);
+      const prev = map.get(meta.key);
+      if (!prev || meta.sortOrder < prev.sortOrder) map.set(meta.key, meta);
+    }
+    return [...map.values()].sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, locale),
+    );
+  }, [filtered, locale, otherLabel]);
+
   const counts = useMemo(() => {
     const map = new Map<string, number>();
     for (const service of filtered) {
-      const key = categoryKey(service);
+      const key = sectionMeta(service, otherLabel).key;
       map.set(key, (map.get(key) ?? 0) + 1);
     }
     return map;
-  }, [filtered]);
-
-  const visibleCategories = useMemo(() => {
-    const keys = [
-      ...CATEGORY_ORDER.filter((key) => (counts.get(key) ?? 0) > 0),
-      ...((counts.get(OTHER_KEY) ?? 0) > 0 ? [OTHER_KEY] : []),
-    ];
-    return keys;
-  }, [counts]);
+  }, [filtered, otherLabel]);
 
   const sections = useMemo(() => {
-    const byCategory = new Map<string, ServiceOption[]>();
+    const byKey = new Map<string, ServiceOption[]>();
     for (const service of filtered) {
-      const key = categoryKey(service);
+      const key = sectionMeta(service, otherLabel).key;
       if (activeCategory !== 'ALL' && key !== activeCategory) continue;
-      const list = byCategory.get(key) ?? [];
+      const list = byKey.get(key) ?? [];
       list.push(service);
-      byCategory.set(key, list);
+      byKey.set(key, list);
     }
     const order =
       activeCategory === 'ALL'
-        ? visibleCategories
-        : visibleCategories.filter((key) => key === activeCategory);
-    return order.map((key) => ({
-      key,
-      items: byCategory.get(key) ?? [],
+        ? sectionIndex
+        : sectionIndex.filter((s) => s.key === activeCategory);
+    return order.map((meta) => ({
+      ...meta,
+      items: (byKey.get(meta.key) ?? []).sort((a, b) =>
+        serviceName(a, locale).localeCompare(serviceName(b, locale), locale),
+      ),
     }));
-  }, [filtered, activeCategory, visibleCategories]);
-
-  const categoryLabel = (key: string): string => {
-    if (key === OTHER_KEY) return t('other');
-    try {
-      return tLab(`categories.${key}` as never);
-    } catch {
-      return key;
-    }
-  };
+  }, [filtered, activeCategory, sectionIndex, locale, otherLabel]);
 
   const toggle = (service: ServiceOption) => {
     if (disabled) return;
@@ -143,13 +142,13 @@ export function LabServicePicker({ selected, onChange, disabled = false }: LabSe
           onClick={() => setActiveCategory('ALL')}
           disabled={disabled}
         />
-        {visibleCategories.map((key) => (
+        {sectionIndex.map((section) => (
           <CategoryChip
-            key={key}
-            active={activeCategory === key}
-            label={categoryLabel(key)}
-            count={counts.get(key) ?? 0}
-            onClick={() => setActiveCategory(key)}
+            key={section.key}
+            active={activeCategory === section.key}
+            label={section.label}
+            count={counts.get(section.key) ?? 0}
+            onClick={() => setActiveCategory(section.key)}
             disabled={disabled}
           />
         ))}
@@ -191,7 +190,7 @@ export function LabServicePicker({ selected, onChange, disabled = false }: LabSe
             <section key={section.key} className="space-y-2">
               <div className="sticky top-0 z-10 -mx-1 flex items-center justify-between bg-muted/95 px-1 py-1 backdrop-blur">
                 <h3 className="text-sm font-semibold tracking-tight text-foreground">
-                  {categoryLabel(section.key)}
+                  {section.label}
                 </h3>
                 <span className="text-xs text-muted-foreground">
                   {t('count', { count: section.items.length })}
