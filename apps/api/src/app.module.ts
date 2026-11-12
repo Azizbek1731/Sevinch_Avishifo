@@ -41,6 +41,7 @@ import { VisitsModule } from './modules/visits/visits.module';
 import { ServicesModule } from './modules/services/services.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { AdmissionsModule } from './modules/admissions/admissions.module';
+import { AmbulatoryModule } from './modules/ambulatory/ambulatory.module';
 import { SurgeriesModule } from './modules/surgeries/surgeries.module';
 import { LabModule } from './modules/lab/lab.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -127,6 +128,7 @@ import { AiModule } from './modules/ai/ai.module';
     ServicesModule,
     BillingModule,
     AdmissionsModule,
+    AmbulatoryModule,
     SurgeriesModule,
     LabModule,
     NotificationsModule,

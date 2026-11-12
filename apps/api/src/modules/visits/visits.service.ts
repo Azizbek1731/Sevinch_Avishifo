@@ -22,6 +22,7 @@ import { AuditService } from '../../core/audit/audit.service';
 import { randomUUID } from 'node:crypto';
 import { ClinicalOrdersService } from '../clinical-orders/clinical-orders.service';
 import { LabService } from '../lab/lab.service';
+import { attachClinicalOrderToVisitCase } from '../ambulatory/ambulatory-case';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   AddDiagnosisDto,
@@ -29,6 +30,7 @@ import {
   AddPrescriptionDto,
   AddReferralDto,
   AmendVisitDto,
+  CompleteVisitDto,
   CreateVisitDto,
   DrugQueryDto,
   Icd10QueryDto,
@@ -47,11 +49,43 @@ const VISIT_EDIT_FIELDS = [
   'objective',
   'assessmentNote',
   'plan',
+  'diagnosisPrimary',
+  'diagnosisSecondary',
   'nextVisitAt',
   'reportTitle',
   'reportBody',
 ] as const;
 type VisitEditField = (typeof VISIT_EDIT_FIELDS)[number];
+
+function hasClinicalContent(visit: {
+  subjective: string | null;
+  objective: string | null;
+  assessmentNote: string | null;
+  plan: string | null;
+  diagnosisPrimary?: string | null;
+  diagnosisSecondary?: string | null;
+  reportTitle: string | null;
+  reportBody: string | null;
+  physiotherapy?: string | null;
+  diagnoses?: unknown[];
+  prescriptions?: unknown[];
+  documents?: unknown[];
+}): boolean {
+  return Boolean(
+    visit.diagnosisPrimary?.trim() ||
+      visit.diagnosisSecondary?.trim() ||
+      visit.subjective?.trim() ||
+      visit.objective?.trim() ||
+      visit.assessmentNote?.trim() ||
+      visit.plan?.trim() ||
+      visit.reportTitle?.trim() ||
+      visit.reportBody?.trim() ||
+      visit.physiotherapy?.trim() ||
+      (visit.diagnoses?.length ?? 0) > 0 ||
+      (visit.prescriptions?.length ?? 0) > 0 ||
+      (visit.documents?.length ?? 0) > 0,
+  );
+}
 
 const iso = (d: Date | null | undefined): string | null => (d ? d.toISOString() : null);
 const dateOnly = (d: Date | null | undefined): string | null =>
@@ -85,6 +119,17 @@ type VisitDetailRow = Prisma.VisitGetPayload<{
     };
     patient: true;
     doctor: { include: { staffProfile: true } };
+    documents: {
+      orderBy: { createdAt: 'desc' };
+      select: {
+        id: true;
+        title: true;
+        fileName: true;
+        mimeType: true;
+        sizeBytes: true;
+        createdAt: true;
+      };
+    };
   };
 }>;
 
@@ -145,7 +190,12 @@ export class VisitsService {
         },
         select: { id: true },
       });
-      if (care || (await this.isBranchWideDoctorAccess())) return;
+      if (care) return;
+      const ambulatory = await this.prisma.db.ambulatoryCase.findFirst({
+        where: { patientId: visit.patientId, branchId: visit.branchId, doctorUserId: user.id },
+        select: { id: true },
+      });
+      if (ambulatory || (await this.isBranchWideDoctorAccess())) return;
     }
     throw new AppException(ErrorCode.FORBIDDEN, 'No access to this visit', 403);
   }
@@ -239,6 +289,17 @@ export class VisitsService {
         },
         patient: true,
         doctor: { include: { staffProfile: true } },
+        documents: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            fileName: true,
+            mimeType: true,
+            sizeBytes: true,
+            createdAt: true,
+          },
+        },
       },
     });
     if (!visit) throw new AppException(ErrorCode.VISIT_NOT_FOUND, 'Visit not found', 404);
@@ -375,6 +436,9 @@ export class VisitsService {
       objective: v.objective,
       assessmentNote: v.assessmentNote,
       plan: v.plan,
+      diagnosisPrimary: v.diagnosisPrimary,
+      diagnosisSecondary: v.diagnosisSecondary,
+      emptyConfirmReason: v.emptyConfirmReason,
       physiotherapy: v.physiotherapy,
       prescriptionRevision: v.prescriptionRevision,
       startedAt: iso(v.startedAt),
@@ -386,6 +450,14 @@ export class VisitsService {
       diagnoses: v.diagnoses.map((d) => this.toDiagnosis(d)),
       prescriptions: v.prescriptions.map((p) => this.toPrescription(p)),
       referrals: v.referrals.map((r) => this.toReferral(r)),
+      documents: (v.documents ?? []).map((doc) => ({
+        id: doc.id,
+        title: doc.title,
+        fileName: doc.fileName,
+        mimeType: doc.mimeType,
+        sizeBytes: doc.sizeBytes,
+        createdAt: iso(doc.createdAt),
+      })),
       patient: {
         id: v.patient.id,
         mrn: v.patient.mrn,
@@ -605,6 +677,17 @@ export class VisitsService {
     return this.toDetail(visit);
   }
 
+  async requireVisitAttachment(
+    visitId: string,
+    documentId: string,
+    user: AuthUser,
+  ): Promise<void> {
+    const visit = await this.requireVisit(visitId, user);
+    if (!visit.documents.some((doc) => doc.id === documentId)) {
+      throw new AppException(ErrorCode.NOT_FOUND, 'Visit attachment not found', 404);
+    }
+  }
+
   async update(id: string, dto: UpdateVisitDto, user: AuthUser): Promise<Record<string, unknown>> {
     const visit = await this.requireVisit(id, user);
     this.assertVisitWrite(user, visit);
@@ -617,6 +700,8 @@ export class VisitsService {
     if (dto.objective !== undefined) data.objective = dto.objective;
     if (dto.assessmentNote !== undefined) data.assessmentNote = dto.assessmentNote;
     if (dto.plan !== undefined) data.plan = dto.plan;
+    if (dto.diagnosisPrimary !== undefined) data.diagnosisPrimary = dto.diagnosisPrimary;
+    if (dto.diagnosisSecondary !== undefined) data.diagnosisSecondary = dto.diagnosisSecondary;
     if (dto.nextVisitAt !== undefined) data.nextVisitAt = new Date(dto.nextVisitAt);
 
     await this.edit(id, (tx) => tx.visit.update({ where: { id }, data }));
@@ -632,6 +717,8 @@ export class VisitsService {
         objective: visit.objective,
         assessmentNote: visit.assessmentNote,
         plan: visit.plan,
+        diagnosisPrimary: visit.diagnosisPrimary,
+        diagnosisSecondary: visit.diagnosisSecondary,
         nextVisitAt: iso(visit.nextVisitAt),
       },
       after: {
@@ -641,6 +728,8 @@ export class VisitsService {
         objective: dto.objective ?? visit.objective,
         assessmentNote: dto.assessmentNote ?? visit.assessmentNote,
         plan: dto.plan ?? visit.plan,
+        diagnosisPrimary: dto.diagnosisPrimary ?? visit.diagnosisPrimary,
+        diagnosisSecondary: dto.diagnosisSecondary ?? visit.diagnosisSecondary,
         nextVisitAt: dto.nextVisitAt ?? iso(visit.nextVisitAt),
       },
     });
@@ -648,11 +737,16 @@ export class VisitsService {
     return this.getById(id, user);
   }
 
-  async complete(id: string, user: AuthUser): Promise<Record<string, unknown>> {
+  async complete(
+    id: string,
+    user: AuthUser,
+    dto: CompleteVisitDto = {},
+  ): Promise<Record<string, unknown>> {
     const visit = await this.requireVisit(id, user);
     this.assertVisitWrite(user, visit);
     const completedAt = new Date();
     const clinicId = TenantContext.requireClinicId();
+    const emptyReason = dto.emptyReason?.trim() || null;
     await this.prisma.db.$transaction(async (tx) => {
       if (visit.clinicalOrder) {
         // Extras and confirmation take the order lock first, so a concurrently
@@ -688,33 +782,31 @@ export class VisitsService {
       await tx.$queryRaw`SELECT "id" FROM "Visit" WHERE "id" = ${id} AND "clinicId" = ${clinicId} FOR UPDATE`;
       const current = await tx.visit.findFirstOrThrow({
         where: { id },
-        include: { diagnoses: true },
+        include: {
+          diagnoses: true,
+          prescriptions: true,
+          documents: { select: { id: true } },
+        },
       });
       await this.ensureEditable(current);
-      if (
-        current.kind === 'ULTRASOUND' &&
-        (!current.reportTitle?.trim() || !current.reportBody?.trim())
-      ) {
+      // Empty confirmation is allowed: write a reason, or attach an external document.
+      if (!hasClinicalContent(current) && !emptyReason) {
         throw new AppException(
           ErrorCode.VALIDATION_ERROR,
-          'Ultrasound report title and findings are required',
-          400,
-        );
-      }
-      if (
-        current.kind === 'CONSULTATION' &&
-        !current.assessmentNote?.trim() &&
-        !current.diagnoses.length
-      ) {
-        throw new AppException(
-          ErrorCode.VALIDATION_ERROR,
-          'Record a diagnosis before confirming the consultation',
+          'Bo‘sh xulosa uchun sabab yozing yoki hujjat yuklang',
           400,
         );
       }
       await tx.visit.update({
         where: { id },
-        data: { status: 'COMPLETED', completedAt, lockedAt: completedAt },
+        data: {
+          status: 'COMPLETED',
+          completedAt,
+          lockedAt: completedAt,
+          ...(emptyReason && !hasClinicalContent(current)
+            ? { emptyConfirmReason: emptyReason }
+            : {}),
+        },
       });
       if (visit.appointmentId)
         await tx.appointment.update({
@@ -728,7 +820,11 @@ export class VisitsService {
       entity: 'Visit',
       entityId: id,
       before: { status: visit.status, completedAt: iso(visit.completedAt) },
-      after: { status: VisitStatus.COMPLETED, completedAt: completedAt.toISOString() },
+      after: {
+        status: VisitStatus.COMPLETED,
+        completedAt: completedAt.toISOString(),
+        emptyConfirmReason: emptyReason,
+      },
     });
 
     await this.notifications
@@ -769,24 +865,6 @@ export class VisitsService {
           ErrorCode.INVALID_STATUS_TRANSITION,
           'Only confirmed reports can be amended',
           409,
-        );
-      const nextTitle = dto.reportTitle ?? current.reportTitle;
-      const nextBody = dto.reportBody ?? current.reportBody;
-      if (current.kind === 'ULTRASOUND' && (!nextTitle?.trim() || !nextBody?.trim()))
-        throw new AppException(
-          ErrorCode.VALIDATION_ERROR,
-          'A confirmed ultrasound report cannot be empty',
-          400,
-        );
-      if (
-        current.kind === 'CONSULTATION' &&
-        !(dto.assessmentNote ?? current.assessmentNote)?.trim() &&
-        !current.diagnoses.length
-      )
-        throw new AppException(
-          ErrorCode.VALIDATION_ERROR,
-          'A confirmed consultation must retain its diagnosis',
-          400,
         );
       const diff: Record<string, { before: unknown; after: unknown }> = {};
       const data: Prisma.VisitUpdateInput = {};
@@ -1162,10 +1240,35 @@ export class VisitsService {
       let labOrderId: string | undefined;
       let clinicalOrderId: string | undefined;
       if (dto.type === ReferralType.LAB) {
-        if (!dto.labTestIds?.length)
+        let testIds = dto.labTestIds ?? [];
+        if (!testIds.length && dto.serviceIds?.length) {
+          const linked = await tx.labTest.findMany({
+            where: {
+              serviceId: { in: dto.serviceIds },
+              isActive: true,
+              service: { isActive: true, category: { kind: 'LAB' } },
+            },
+            select: { id: true, serviceId: true },
+          });
+          const byService = new Map(
+            linked
+              .filter((row): row is { id: string; serviceId: string } => Boolean(row.serviceId))
+              .map((row) => [row.serviceId, row.id]),
+          );
+          const missing = dto.serviceIds.filter((id) => !byService.has(id));
+          if (missing.length) {
+            throw new AppException(
+              ErrorCode.VALIDATION_ERROR,
+              'Tanlangan laboratoriya xizmati lab-katalogga bog‘lanmagan',
+              400,
+            );
+          }
+          testIds = dto.serviceIds.map((id) => byService.get(id)!);
+        }
+        if (!testIds.length)
           throw new AppException(
             ErrorCode.VALIDATION_ERROR,
-            'labTestIds are required for a LAB referral',
+            'labTestIds or serviceIds are required for a LAB referral',
             400,
           );
         const order = await this.labService.createOrderFromReferral(
@@ -1173,7 +1276,7 @@ export class VisitsService {
             patientId: visit.patientId,
             branchId: visit.branchId,
             visitId: visit.id,
-            testIds: dto.labTestIds,
+            testIds,
             orderedById: user.id,
           },
           tx,
@@ -1202,6 +1305,14 @@ export class VisitsService {
           tx,
         );
         clinicalOrderId = order.id;
+        if (kind === 'ULTRASOUND')
+          await attachClinicalOrderToVisitCase(
+            tx,
+            TenantContext.requireClinicId(),
+            order.id,
+            visit.id,
+            user.id,
+          );
       }
       let targetSpecialty = dto.type === ReferralType.SPECIALIST ? dto.targetSpecialty : undefined;
       if (dto.type === ReferralType.SPECIALIST && dto.targetDoctorUserId && !targetSpecialty?.trim()) {

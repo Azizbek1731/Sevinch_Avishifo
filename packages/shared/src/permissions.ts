@@ -58,6 +58,11 @@ export const PERMISSIONS = [
    * afterwards, and what was outstanding is recorded rather than forgotten.
    */
   'admissions.force',
+  // Ambulator: doctors see only their own cards and lab share (object-level check).
+  'ambulatory.read',
+  'ambulatory.write',
+  /** Setting the doctors' lab share percent is a management decision. */
+  'ambulatory.rates.write',
   'charges.read',
   'charges.write',
   'surgery.read',
@@ -146,6 +151,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'admissions.export',
     'admissions.administer',
     'admissions.force',
+    'ambulatory.read',
+    'ambulatory.write',
+    'ambulatory.rates.write',
     'charges.read',
     'charges.write',
     'patients.write',
@@ -193,6 +201,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'patients.read',
     'admissions.read',
     'admissions.write',
+    'ambulatory.read',
+    'ambulatory.write',
     'charges.read',
     'charges.write',
     'patients.recordAccess.manage',
@@ -233,6 +243,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'admissions.write',
     'admissions.export',
     'admissions.administer',
+    'ambulatory.read',
+    'ambulatory.write',
     'charges.read',
     'charges.write',
     'patients.write',
@@ -289,6 +301,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'surgery.read',
     'invoices.read',
     'admissions.read',
+    'ambulatory.read',
     'charges.read',
     'debts.read',
     'expenses.read',

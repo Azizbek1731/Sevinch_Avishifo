@@ -26,6 +26,7 @@ interface PendingPatient {
   invoiceCount: number;
   due: string;
   oldestAt: Date;
+  latestAt: Date;
 }
 interface InvoiceSnapshot {
   id: string;
@@ -76,8 +77,11 @@ export class PatientPaymentsService {
     const [rows, count] = await Promise.all([
       this.prisma.db.$queryRaw<PendingPatient[]>(Prisma.sql`
         SELECT p.id, p."fullName", p.mrn, p.phone, COUNT(*)::int AS "invoiceCount",
-          SUM(i.total - i."paidTotal")::text AS due, MIN(i."createdAt") AS "oldestAt"
-        ${source} GROUP BY p.id ORDER BY MIN(i."createdAt"), p.id
+          SUM(i.total - i."paidTotal")::text AS due,
+          MIN(i."createdAt") AS "oldestAt",
+          MAX(i."createdAt") AS "latestAt"
+        ${source} GROUP BY p.id
+        ORDER BY MAX(i."createdAt") DESC, p.id
         LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}`),
       this.prisma.db.$queryRaw<Array<{ total: number }>>(
         Prisma.sql`SELECT COUNT(DISTINCT p.id)::int AS total ${source}`,
@@ -88,6 +92,7 @@ export class PatientPaymentsService {
         ...row,
         due: new Prisma.Decimal(row.due).toFixed(2),
         oldestAt: row.oldestAt.toISOString(),
+        latestAt: row.latestAt.toISOString(),
       })),
       { page: query.page, limit: query.limit, total: count[0]?.total ?? 0 },
     );

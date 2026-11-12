@@ -105,6 +105,14 @@
     "loadError": "Katalogni yuklab bo‘lmadi",
     "count": "{count} ta"
   },
+  "uziPicker": {
+    "search": "UZI xizmatini qidirish…",
+    "hint": "Kerakli UZI tekshiruvlarini belgilang — bir nechtasini tanlash mumkin.",
+    "empty": "Bu shifokor uchun UZI xizmati topilmadi",
+    "loadError": "Katalogni yuklab bo‘lmadi",
+    "pickDoctorFirst": "Avval UZI shifokorini tanlang",
+    "count": "{count} ta"
+  },
   "refundDlg": {
     "title": "Qaytarish — {number}",
     "paid": "To'langan",
@@ -217,7 +225,7 @@
   "checkout": {
     "title": "Bemor uchun yagona to‘lov",
     "description": "To‘lanadigan xizmatlarni tanlang. Bemor bor pulini to‘lashi mumkin — qolgani qarz sifatida saqlanadi va keyin to‘lanadi.",
-    "queueDescription": "Har bir bemorning xizmatlari birga ko‘rsatiladi. Keraklilarini yoki barchasini tanlab to‘lang. Qisman to‘lov ham mumkin.",
+    "queueDescription": "Qabulxonadan yangi kelgan hisoblar yuqorida. Topilmasa ism yoki hisob raqami bilan qidiring. Qisman to‘lov ham mumkin.",
     "selectAll": "Barchasini tanlash",
     "selected": "{count} ta hisob tanlandi",
     "invoiceCount": "{count} ta hisob",

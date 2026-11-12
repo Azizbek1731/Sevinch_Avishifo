@@ -11,6 +11,7 @@ import {
   CreditCard,
   Activity,
   FlaskConical,
+  Footprints,
   LayoutDashboard,
   Menu,
   MessageSquareHeart,
@@ -46,8 +47,10 @@ const NAV_ICONS: Record<NavKey, LucideIcon> = {
   ai: Sparkles,
   reception: ClipboardList,
   doctor: Stethoscope,
+  myPatients: BedDouble,
   patients: Users,
   admissions: BedDouble,
+  ambulatory: Footprints,
   surgeries: Scissors,
   recordAccess: ShieldCheck,
   cashier: CreditCard,
@@ -105,17 +108,23 @@ function useNav() {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
 
+  const mainItems =
+    !user || user.role === 'SUPER_ADMIN' ? [] : NAV_RULES.filter((rule) => isNavVisible(rule, user));
+  const platformItems =
+    user?.role === 'SUPER_ADMIN'
+      ? PLATFORM_NAV_RULES.filter((rule) => isNavVisible(rule, user))
+      : [];
+  const matches = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  // Nested entries (/doctor and /doctor/patients) — only the deepest match lights up.
+  const activeHref = [...mainItems, ...platformItems]
+    .map((item) => item.href)
+    .filter(matches)
+    .sort((a, b) => b.length - a.length)[0];
   return {
     user,
-    mainItems:
-      !user || user.role === 'SUPER_ADMIN'
-        ? []
-        : NAV_RULES.filter((rule) => isNavVisible(rule, user)),
-    platformItems:
-      user?.role === 'SUPER_ADMIN'
-        ? PLATFORM_NAV_RULES.filter((rule) => isNavVisible(rule, user))
-        : [],
-    isActive: (href: string) => pathname === href || pathname.startsWith(`${href}/`),
+    mainItems,
+    platformItems,
+    isActive: (href: string) => href === activeHref,
   };
 }
 

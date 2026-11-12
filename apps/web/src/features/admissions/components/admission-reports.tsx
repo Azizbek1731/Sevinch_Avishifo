@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/status-badge';
 import { clinicalOrdersApi, type ClinicalOrder } from '@/features/clinical-orders/api';
 import { patientsApi, type PatientVisit } from '@/features/patients/api';
+import { AddChargeDialog } from './add-charge-dialog';
 
 interface PatientLabOrder {
   id: string;
@@ -61,12 +62,16 @@ function serviceTitles(
 /** Stay-scoped summaries: doctors, laboratory, ultrasound for this patient. */
 export function AdmissionReportsPanel({
   patientId,
+  admissionId,
   admittedAt,
   dischargedAt,
+  canOrder = false,
 }: {
   patientId: string;
+  admissionId?: string;
   admittedAt: string;
   dischargedAt: string | null;
+  canOrder?: boolean;
 }) {
   const t = useTranslations('admissions.reports');
   const tLab = useTranslations('lab');
@@ -74,6 +79,8 @@ export function AdmissionReportsPanel({
   const locale = useLocale();
   const can = usePermissions();
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [orderOpen, setOrderOpen] = useState(false);
+  const [orderMode, setOrderMode] = useState<'lab' | 'uzi'>('lab');
 
   const visits = useQuery({
     queryKey: ['admission-reports', 'visits', patientId],
@@ -179,7 +186,44 @@ export function AdmissionReportsPanel({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
+        {canOrder && admissionId ? (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => {
+                setOrderMode('lab');
+                setOrderOpen(true);
+              }}
+            >
+              <FlaskConical className="mr-1 h-3.5 w-3.5" />
+              {t('orderLab')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setOrderMode('uzi');
+                setOrderOpen(true);
+              }}
+            >
+              <Activity className="mr-1 h-3.5 w-3.5" />
+              {t('orderUzi')}
+            </Button>
+          </div>
+        ) : null}
+      </div>
+
+      {canOrder && admissionId ? (
+        <AddChargeDialog
+          open={orderOpen}
+          onOpenChange={setOrderOpen}
+          patientId={patientId}
+          admissionId={admissionId}
+          initialMode={orderMode}
+        />
+      ) : null}
 
       <ReportSection
         icon={Stethoscope}

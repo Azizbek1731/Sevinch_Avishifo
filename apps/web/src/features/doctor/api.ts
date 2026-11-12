@@ -6,6 +6,7 @@ import type {
   ReplacePrescriptionsInput,
   AddReferralInput,
   AmendVisitInput,
+  CompleteVisitInput,
   Gender,
   QueueKind,
   QueueTicketPayload,
@@ -160,6 +161,15 @@ export interface VisitReferral {
   createdAt: string | null;
 }
 
+export interface VisitDocument {
+  id: string;
+  title: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string | null;
+}
+
 export interface VisitDetail {
   id: string;
   kind: 'CONSULTATION' | 'ULTRASOUND';
@@ -176,6 +186,9 @@ export interface VisitDetail {
   objective: string | null;
   assessmentNote: string | null;
   plan: string | null;
+  diagnosisPrimary: string | null;
+  diagnosisSecondary: string | null;
+  emptyConfirmReason: string | null;
   physiotherapy: string | null;
   prescriptionRevision: number;
   startedAt: string | null;
@@ -187,6 +200,7 @@ export interface VisitDetail {
   diagnoses: VisitDiagnosis[];
   prescriptions: VisitPrescription[];
   referrals: VisitReferral[];
+  documents: VisitDocument[];
   patient: {
     id: string;
     mrn: string;
@@ -285,7 +299,12 @@ export const doctorApi = {
     api.patch<VisitDetail>(`/visits/${id}`, body),
   amendVisit: (id: string, body: AmendVisitInput) =>
     api.post<{ id: string; visit: VisitDetail }>(`/visits/${id}/amendments`, body),
-  completeVisit: (id: string) => api.post<VisitDetail>(`/visits/${id}/complete`),
+  completeVisit: (id: string, body?: CompleteVisitInput) =>
+    api.post<VisitDetail>(`/visits/${id}/complete`, body ?? {}),
+  uploadAttachment: (id: string, form: FormData) =>
+    api.upload<VisitDocument>(`/visits/${id}/attachments`, form),
+  downloadAttachment: (id: string, documentId: string) =>
+    api.get<Blob>(`/visits/${id}/attachments/${documentId}/download`),
   upsertVitals: (id: string, body: UpsertVitalsInput) =>
     api.put<VisitVitals | null>(`/visits/${id}/vitals`, body),
   addDiagnosis: (id: string, body: AddDiagnosisInput) =>

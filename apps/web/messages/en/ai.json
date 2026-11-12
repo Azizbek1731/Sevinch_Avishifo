@@ -13,7 +13,7 @@
   ],
   "privacyNote": "The assistant sees only your clinic's data, and only the areas you already have access to. It has no route to any other clinic's data at all.",
   "disabledTitle": "AviShifo AI is not enabled yet",
-  "disabledBody": "A Gemini API key must be configured on the server. Ask your administrator.",
+  "disabledBody": "An administrator needs to set OPENAI_API_KEY on the server to turn it on.",
   "tools": {
     "clinic_today": "today at a glance",
     "revenue_report": "revenue report",

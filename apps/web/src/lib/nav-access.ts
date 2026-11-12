@@ -10,8 +10,10 @@ export type NavKey =
   | 'ai'
   | 'reception'
   | 'doctor'
+  | 'myPatients'
   | 'patients'
   | 'admissions'
+  | 'ambulatory'
   | 'surgeries'
   | 'recordAccess'
   | 'cashier'
@@ -35,10 +37,14 @@ type NavRule = {
   href: string;
   permissions?: Permission[];
   roles?: UserRole[];
+  /** Shown to these roles only, whatever permissions others hold. */
+  onlyRoles?: UserRole[];
   /** Hide even when a permission exists — scoped desks must not browse these. */
   hideForRoles?: UserRole[];
   /** Hide for ultrasound / EXO specialists (still DOCTOR role). */
   hideForUltrasound?: boolean;
+  /** Hide for doctors other than ultrasound / EXO specialists. */
+  hideForGeneralDoctor?: boolean;
 };
 
 /**
@@ -58,16 +64,32 @@ export const NAV_RULES: NavRule[] = [
     hideForUltrasound: true,
   },
   {
+    // The doctor's own inpatients only — the clinic-wide roster stays closed.
+    key: 'myPatients',
+    href: '/doctor/patients',
+    permissions: ['admissions.read'],
+    onlyRoles: ['DOCTOR'],
+    hideForUltrasound: true,
+  },
+  {
     key: 'patients',
     href: '/patients',
     permissions: ['patients.read'],
-    hideForRoles: ['LAB_TECH'],
+    hideForRoles: ['LAB_TECH', 'DOCTOR'],
     hideForUltrasound: true,
   },
   {
     key: 'admissions',
     href: '/admissions',
     permissions: ['admissions.read'],
+    hideForRoles: ['LAB_TECH', 'DOCTOR'],
+    hideForUltrasound: true,
+  },
+  {
+    // Doctors keep this one: it lists only their own cards and lab share.
+    key: 'ambulatory',
+    href: '/ambulatory',
+    permissions: ['ambulatory.read'],
     hideForRoles: ['LAB_TECH'],
     hideForUltrasound: true,
   },
@@ -75,14 +97,14 @@ export const NAV_RULES: NavRule[] = [
     key: 'surgeries',
     href: '/surgeries',
     permissions: ['surgery.read'],
-    hideForRoles: ['LAB_TECH'],
+    hideForRoles: ['LAB_TECH', 'DOCTOR'],
     hideForUltrasound: true,
   },
   {
     key: 'recordAccess',
     href: '/patients/record-access',
     permissions: ['patients.recordAccess.manage'],
-    hideForRoles: ['LAB_TECH'],
+    hideForRoles: ['LAB_TECH', 'DOCTOR'],
     hideForUltrasound: true,
   },
   { key: 'cashier', href: '/cashier', permissions: ['payments.create'] },
@@ -101,22 +123,24 @@ export const NAV_RULES: NavRule[] = [
     hideForUltrasound: true,
   },
   {
+    // Doctors order tests from the ambulatory card and open results from there.
     key: 'lab',
     href: '/lab',
     permissions: ['lab.orders.read'],
-    hideForUltrasound: true,
+    hideForRoles: ['DOCTOR'],
   },
   {
     key: 'uzi',
     href: '/uzi',
     permissions: ['visits.write', 'invoices.write'],
     hideForRoles: ['LAB_TECH'],
+    hideForGeneralDoctor: true,
   },
   {
     key: 'services',
     href: '/services',
     permissions: ['services.read'],
-    hideForRoles: ['LAB_TECH'],
+    hideForRoles: ['LAB_TECH', 'DOCTOR'],
     hideForUltrasound: true,
   },
   {
@@ -179,7 +203,9 @@ export function isNavVisible(
   user: Pick<AuthUser, 'role' | 'permissions' | 'specialty'>,
 ): boolean {
   if (rule.hideForRoles?.includes(user.role)) return false;
+  if (rule.onlyRoles && !rule.onlyRoles.includes(user.role)) return false;
   if (rule.hideForUltrasound && isUltrasoundUser(user)) return false; // uses specialty + permission fingerprint
+  if (rule.hideForGeneralDoctor && user.role === 'DOCTOR' && !isUltrasoundUser(user)) return false;
   if (rule.roles && !rule.roles.includes(user.role)) {
     if (!rule.permissions) return false;
   }
@@ -202,6 +228,26 @@ export function canAccessAppPath(
   const path = pathname.replace(/^\/(uz-Cyrl|uz|ru|en)(?=\/|$)/, '') || '/';
   if (path === '/' || path === '') return true;
   if (path.startsWith('/help') || path.startsWith('/security')) return true;
+  if (path.startsWith('/doctor/patients')) {
+    return (
+      user.role === 'DOCTOR' &&
+      (user.permissions.includes('admissions.read') || user.permissions.includes('surgery.read'))
+    );
+  }
+  // Bemorlarim → bitta statsionar / operatsiya kartasi. Roster (/admissions,
+  // /surgeries) baribir yopiq qoladi — faqat detail + print.
+  if (user.role === 'DOCTOR') {
+    if (/^\/admissions\/[^/]+(?:\/print)?\/?$/.test(path)) {
+      return user.permissions.includes('admissions.read');
+    }
+    if (/^\/surgeries\/[^/]+\/?$/.test(path)) {
+      return user.permissions.includes('surgery.read');
+    }
+    // Lab results opened from the doctor's own ambulatory card.
+    if (/^\/lab\/[^/]+(?:\/print)?\/?$/.test(path)) {
+      return user.permissions.includes('lab.orders.read');
+    }
+  }
   if (path.startsWith('/doctor/visits')) {
     // UZI specialists open visits from the UZI worklist.
     return (

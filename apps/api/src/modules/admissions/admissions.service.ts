@@ -250,6 +250,35 @@ export class AdmissionsService {
     return this.map(created);
   }
 
+  /** A doctor works only with the stays they lead or operate on. */
+  doctorScope(user?: Pick<AuthUser, 'id' | 'role'>): Prisma.AdmissionWhereInput {
+    if (user?.role !== 'DOCTOR') return {};
+    return {
+      OR: [
+        { attendingDoctorUserId: user.id },
+        { surgeries: { some: { surgeonUserId: user.id } } },
+      ],
+    };
+  }
+
+  async assertCareTeam(id: string, user: Pick<AuthUser, 'id' | 'role'>): Promise<void> {
+    if (user.role !== 'DOCTOR') return;
+    const allowed = await this.prisma.db.admission.count({
+      where: { id, ...this.doctorScope(user) },
+    });
+    if (!allowed) throw new AppException(ErrorCode.NOT_FOUND, 'Kasallik tarixi topilmadi', 404);
+  }
+
+  async assertCareTeamForOrder(orderId: string, user: Pick<AuthUser, 'id' | 'role'>): Promise<void> {
+    if (user.role !== 'DOCTOR') return;
+    const order = await this.prisma.db.treatmentOrder.findFirst({
+      where: { id: orderId },
+      select: { admissionId: true },
+    });
+    if (!order) throw new AppException(ErrorCode.NOT_FOUND, 'Tayinlov topilmadi', 404);
+    await this.assertCareTeam(order.admissionId, user);
+  }
+
   private async require(id: string): Promise<Admission> {
     const a = await this.prisma.db.admission.findFirst({ where: { id } });
     if (!a) throw new AppException(ErrorCode.NOT_FOUND, 'Kasallik tarixi topilmadi', 404);
@@ -496,7 +525,10 @@ export class AdmissionsService {
     db: TenantTransactionClient = this.prisma.db,
   ): Promise<{
     pending: Array<{ id: string; title: Prisma.JsonValue; unitPrice: string; quantity: number }>;
+    /** PENDING charges plus DRAFT stay invoices — everything not yet on the cashier queue. */
     pendingTotal: Prisma.Decimal;
+    draftIds: string[];
+    draftLines: Array<{ id: string; title: Prisma.JsonValue; unitPrice: string; quantity: number }>;
     stayInvoices: Array<{
       id: string;
       number: string;
@@ -546,6 +578,20 @@ export class AdmissionsService {
           })
         : [];
     const stayDebt = openStay.reduce((acc, i) => acc.add(i.total.sub(i.paidTotal)), zero);
+    // UZI / consultation ordered on the ward: held as DRAFT, issued together at discharge.
+    const drafts =
+      stayInvoiceIds.length > 0
+        ? await db.invoice.findMany({
+            where: { id: { in: stayInvoiceIds }, status: 'DRAFT' },
+            select: {
+              id: true,
+              total: true,
+              lines: { select: { id: true, title: true, unitPrice: true, quantity: true } },
+            },
+            orderBy: { createdAt: 'asc' },
+          })
+        : [];
+    const draftTotal = drafts.reduce((acc, i) => acc.add(i.total), zero);
 
     // Everything else the patient owes. Shown so the desk knows, never enforced
     // — see discharge() for why it must not hold a bed.
@@ -568,7 +614,16 @@ export class AdmissionsService {
         unitPrice: c.unitPrice.toFixed(2),
         quantity: c.quantity,
       })),
-      pendingTotal,
+      pendingTotal: pendingTotal.add(draftTotal),
+      draftIds: drafts.map((i) => i.id),
+      draftLines: drafts.flatMap((i) =>
+        i.lines.map((line) => ({
+          id: line.id,
+          title: line.title,
+          unitPrice: line.unitPrice.toFixed(2),
+          quantity: line.quantity,
+        })),
+      ),
       stayInvoices: openStay.map((i) => ({
         id: i.id,
         number: i.number,
@@ -606,9 +661,9 @@ export class AdmissionsService {
       canDischarge: a.status === 'ACTIVE' && blockers.length === 0,
       blockers,
       unbilled: {
-        count: money.pending.length,
+        count: money.pending.length + money.draftLines.length,
         total: money.pendingTotal.toFixed(2),
-        items: money.pending,
+        items: [...money.pending, ...money.draftLines],
       },
       stayDebt: money.stayDebt.toFixed(2),
       accountDue: accountDue.toFixed(2),
@@ -670,27 +725,7 @@ export class AdmissionsService {
       });
       if (laterRoomDay) throw new AppException(ErrorCode.VALIDATION_ERROR, 'Keyingi 24 soatlik davr uchun palata hisobi mavjud. Chiqarish sanasini tekshiring.', 409);
       // Palata haqi qo‘lda qo‘shiladi — chiqarishda avtomatik kun yozilmaydi.
-      await this.lockStayCharges(tx, id);
-      const clinicId = TenantContext.requireClinicId();
-      await tx.$queryRaw`
-        SELECT i."id" FROM "Invoice" i
-        WHERE i."clinicId" = ${clinicId} AND EXISTS (
-          SELECT 1 FROM "ChargeItem" c JOIN "InvoiceLine" l ON l."id" = c."invoiceLineId"
-          WHERE c."admissionId" = ${id} AND c."clinicId" = ${clinicId} AND l."invoiceId" = i."id"
-        ) ORDER BY i."id" FOR UPDATE
-      `;
-      // Accrue-then-pay: roll every PENDING stay line onto one cashier invoice
-      // before checking debt, so discharge payment is a single settlement step.
-      let money = await this.stayMoney(id, a.patientId, tx);
-      if (money.pending.length > 0) {
-        await this.invoices.issueChargesInTransaction(
-          tx,
-          money.pending.map((c) => c.id),
-          user,
-          a.branchId,
-        );
-        money = await this.stayMoney(id, a.patientId, tx);
-      }
+      const { money } = await this.issueStayAccount(tx, a, user);
       if (!forced) {
         // Money owed for THIS stay. Deliberately not the patient's whole debt:
         // the same patient may run up outpatient bills while lying in the bed,
@@ -749,6 +784,74 @@ export class AdmissionsService {
       },
     });
     return this.map(updated);
+  }
+
+  /**
+   * Accrue-then-pay: every PENDING stay line goes onto one cashier invoice and
+   * the stay's held UZI/consultation invoices are released to the cashier, so
+   * the patient settles the whole stay in one visit to the desk.
+   */
+  private async issueStayAccount(
+    tx: TenantTransactionClient,
+    a: { id: string; patientId: string; branchId: string },
+    user: AuthUser,
+  ): Promise<{ money: Awaited<ReturnType<AdmissionsService['stayMoney']>>; invoiceIds: string[] }> {
+    await this.lockStayCharges(tx, a.id);
+    const clinicId = TenantContext.requireClinicId();
+    await tx.$queryRaw`
+      SELECT i."id" FROM "Invoice" i
+      WHERE i."clinicId" = ${clinicId} AND EXISTS (
+        SELECT 1 FROM "ChargeItem" c JOIN "InvoiceLine" l ON l."id" = c."invoiceLineId"
+        WHERE c."admissionId" = ${a.id} AND c."clinicId" = ${clinicId} AND l."invoiceId" = i."id"
+      ) ORDER BY i."id" FOR UPDATE
+    `;
+    let money = await this.stayMoney(a.id, a.patientId, tx);
+    const invoiceIds: string[] = [];
+    if (money.pending.length > 0 || money.draftIds.length > 0) {
+      if (money.pending.length > 0) {
+        const invoice = await this.invoices.issueChargesInTransaction(
+          tx,
+          money.pending.map((c) => c.id),
+          user,
+          a.branchId,
+        );
+        invoiceIds.push(invoice.id);
+      }
+      if (money.draftIds.length > 0) {
+        await tx.invoice.updateMany({
+          where: { id: { in: money.draftIds }, status: 'DRAFT' },
+          data: { status: 'ISSUED', issuedAt: new Date() },
+        });
+        invoiceIds.push(...money.draftIds);
+      }
+      money = await this.stayMoney(a.id, a.patientId, tx);
+    }
+    return { money, invoiceIds };
+  }
+
+  /** "Kassaga yuborish" at the end of the stay — the bill the patient pays before going home. */
+  async billStay(id: string, user: AuthUser): Promise<Record<string, unknown>> {
+    const current = await this.require(id);
+    if (user.branchIds.length && !user.branchIds.includes(current.branchId))
+      throw new AppException(ErrorCode.FORBIDDEN, 'Bu filialga kirish huquqi yo‘q', 403);
+    const { money, invoiceIds } = await this.prisma.db.$transaction(async (tx) => {
+      const a = await this.lockAdmission(tx, id);
+      this.requireActive(a);
+      return this.issueStayAccount(tx, a, user);
+    });
+    if (invoiceIds.length)
+      await this.audit.log({
+        action: AuditAction.UPDATE,
+        entity: 'Admission',
+        entityId: id,
+        after: { billedToCashier: invoiceIds },
+      });
+    return {
+      admissionId: id,
+      invoiceIds,
+      accountDue: money.stayDebt.add(money.pendingTotal).toFixed(2),
+      stayInvoices: money.stayInvoices,
+    };
   }
 
   private buildListWhere(q: AdmissionQueryInput): Prisma.AdmissionWhereInput {
@@ -812,8 +915,13 @@ export class AdmissionsService {
     });
   }
 
-  async list(q: AdmissionQueryInput): Promise<PaginatedResult<Record<string, unknown>>> {
-    const where = this.buildListWhere(q);
+  async list(
+    q: AdmissionQueryInput,
+    user?: Pick<AuthUser, 'id' | 'role'>,
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
+    const where: Prisma.AdmissionWhereInput = {
+      AND: [this.buildListWhere(q), this.doctorScope(user)],
+    };
     const [rows, total] = await Promise.all([
       this.prisma.db.admission.findMany({
         where,
@@ -837,7 +945,9 @@ export class AdmissionsService {
     if (!user.permissions.includes('admissions.export')) {
       throw new AppException(ErrorCode.FORBIDDEN, 'Missing permission: admissions.export', 403);
     }
-    const where = this.buildListWhere(q);
+    const where: Prisma.AdmissionWhereInput = {
+      AND: [this.buildListWhere(q), this.doctorScope(user)],
+    };
     const rows = await this.prisma.db.admission.findMany({
       where,
       orderBy: { admittedAt: 'desc' },

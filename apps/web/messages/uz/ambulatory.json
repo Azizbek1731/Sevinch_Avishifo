@@ -1,0 +1,147 @@
+{
+  "title": "Ambulator",
+  "description": "Ambulator bemorlar kartalari: shifokor bemorni laboratoriya va UZI ga yuboradi, laboratoriya to‘lovidan shifokor ulushi avtomatik hisoblanadi.",
+  "descriptionDoctor": "Sizning ambulator bemorlaringiz va laboratoriya to‘lovlaridan tushgan ulushingiz.",
+  "open": "Ambulator karta ochish",
+  "export": "Excel",
+  "pickPatientTitle": "Ambulator karta ochish",
+  "pickPatientDescription": "Bemorni qidirib tanlang — keyin uni yuborgan shifokorni belgilaysiz.",
+  "tabs": {
+    "cases": "Kartalar",
+    "commissions": "Shifokorlar ulushi",
+    "myCommission": "Mening ulushim"
+  },
+  "status": {
+    "OPEN": "Ochiq",
+    "CLOSED": "Yakunlangan"
+  },
+  "filters": {
+    "allStatuses": "Barchasi",
+    "allDoctors": "Barcha shifokorlar",
+    "searchPlaceholder": "Bemor, karta raqami yoki telefon...",
+    "from": "Boshlanish sanasi",
+    "to": "Tugash sanasi",
+    "clear": "Tozalash"
+  },
+  "fields": {
+    "doctor": "Shifokor",
+    "doctorPlaceholder": "Bemorni yuborgan shifokorni tanlang",
+    "doctorHelp": "Shu kartadan yuborilgan laboratoriya to‘lovining ulushi shu shifokorga yoziladi.",
+    "doctorRequired": "Shifokorni tanlang",
+    "complaint": "Shikoyat",
+    "diagnosis": "Tashxis",
+    "note": "Izoh"
+  },
+  "openDialog": {
+    "title": "{name} — ambulator karta",
+    "hint": "Karta ochilgandan keyin undan laboratoriya va UZI ga yo‘llanma yuboriladi. To‘lov odatdagidek kassada qilinadi.",
+    "opened": "Ambulator karta ochildi: {number}"
+  },
+  "empty": {
+    "title": "Ambulator kartalar yo‘q",
+    "description": "Qabulxonadan shifokor qabuliga yuborilgan bemor shu yerga avtomatik tushadi. Kerak bo‘lsa kartani qo‘lda ham ochish mumkin."
+  },
+  "table": {
+    "number": "Karta №",
+    "patient": "Bemor",
+    "doctor": "Shifokor",
+    "opened": "Ochilgan",
+    "referrals": "Yo‘llanmalar",
+    "labPaid": "Lab to‘langan",
+    "commission": "Shifokor ulushi",
+    "labCount": "Lab: {count}",
+    "uziCount": "UZI: {count}",
+    "pending": "kutilmoqda"
+  },
+  "summary": {
+    "monthCommission": "Bu oy shifokor ulushi",
+    "monthPending": "To‘lov kutilmoqda (ulush)",
+    "monthPatients": "Bu oy bemorlar",
+    "openCards": "Ochiq kartalar"
+  },
+  "commissions": {
+    "commission": "Shifokor ulushi",
+    "pendingCommission": "Kutilayotgan ulush",
+    "paidAmount": "To‘langan lab summasi",
+    "labAmount": "Lab summasi",
+    "patients": "Bemorlar",
+    "orders": "Yo‘llanmalar",
+    "calculation": "Hisoblash: faqat ambulator kartadan yuborilgan laboratoriya. Ulush = kassada to‘langan laboratoriya summasi × yo‘llanma paytidagi foiz (standart {percent}%). Chegirma va qaytarilgan pul ayiriladi, bekor qilinganlar hisoblanmaydi. UZI uchun ulush yo‘q.",
+    "emptyTitle": "Bu davrda ambulator laboratoriya yo‘llanmalari yo‘q",
+    "emptyDescription": "Ambulator kartadan laboratoriyaga yuborilganda bu yerda ko‘rinadi.",
+    "byDoctor": "Shifokorlar bo‘yicha",
+    "byOrder": "Yo‘llanmalar bo‘yicha",
+    "percent": "Joriy foiz",
+    "total": "Jami",
+    "date": "Sana",
+    "tests": "Tahlillar",
+    "payment": "To‘lov",
+    "exported": "Excel fayl yuklandi"
+  },
+  "payment": {
+    "PAID": "To‘langan",
+    "PARTIAL": "Qisman",
+    "UNPAID": "To‘lanmagan"
+  },
+  "uziStatus": {
+    "WAITING_PAYMENT": "To‘lov kutilmoqda",
+    "READY": "Navbatda",
+    "IN_PROGRESS": "Jarayonda",
+    "COMPLETED": "Bajarildi",
+    "CANCELLED": "Bekor qilingan"
+  },
+  "rates": {
+    "button": "Foizlar",
+    "title": "Shifokorlar ulushi (foiz)",
+    "description": "Ambulator kartadan yuborilgan laboratoriya to‘lovidan shifokorga tegadigan foiz.",
+    "default": "Standart foiz (barcha shifokorlar)",
+    "defaultHelp": "Alohida foiz qo‘yilmagan har bir shifokorga shu foiz qo‘llanadi.",
+    "perDoctor": "Alohida foiz",
+    "perDoctorHelp": "Bo‘sh qoldirilsa standart foiz ishlaydi. O‘zgarish faqat yangi yo‘llanmalarga ta’sir qiladi — oldingilari o‘z foizida qoladi.",
+    "save": "Saqlash",
+    "saved": "Foizlar saqlandi"
+  },
+  "detail": {
+    "back": "Ambulator ro‘yxati",
+    "edit": "Tahrirlash",
+    "editTitle": "Kartani tahrirlash",
+    "save": "Saqlash",
+    "saved": "Saqlandi",
+    "doctorLocked": "Kartada shifokor qabuli yoki laboratoriya bor — shifokorni almashtirib bo‘lmaydi. Kerak bo‘lsa yangi karta oching.",
+    "close": "Yakunlash",
+    "reopen": "Qayta ochish",
+    "closed": "Karta yakunlandi",
+    "reopened": "Karta qayta ochildi",
+    "closedHint": "Karta yakunlangan. Yangi yo‘llanma yuborish uchun uni qayta oching.",
+    "remove": "O‘chirish",
+    "removeTitle": "Kartani o‘chirasizmi?",
+    "removeHint": "Karta xato ochilgan bo‘lsa o‘chiring. Undan hech qanday yo‘llanma yuborilmagan.",
+    "removed": "Karta o‘chirildi",
+    "sendLab": "Laboratoriyaga yuborish",
+    "shareBadge": "Shifokor ulushi {percent}%",
+    "labPreview": "{count} ta tahlil · {total} · shifokor ulushi ≈ {share}",
+    "sendToCashier": "Kassaga yuborish",
+    "labSent": "Laboratoriya yo‘llanmasi kassaga yuborildi",
+    "sendUzi": "UZI ga yuborish",
+    "uziDoctor": "UZI shifokori",
+    "noUziDoctors": "Bu filialda UZI shifokori yo‘q.",
+    "uziNoShare": "UZI to‘lovidan shifokor ulushi hisoblanmaydi.",
+    "uziSent": "UZI yo‘llanmasi kassaga yuborildi",
+    "inpatientWarning": "Bemor hozir statsionarda ({number}). Tahlillar statsionar hisobiga yoziladi, shuning uchun ambulator yo‘llanma berilmaydi.",
+    "openStay": "Statsionar kartasini ochish",
+    "labOrders": "Laboratoriya yo‘llanmalari",
+    "noLab": "Laboratoriyaga yuborilmagan",
+    "labStatus": "Holat",
+    "labReady": "Natija tayyor",
+    "labInWork": "Jarayonda",
+    "cancelled": "Bekor qilingan",
+    "uziOrders": "UZI yo‘llanmalari",
+    "noUzi": "UZI ga yuborilmagan",
+    "uziServices": "Tekshiruvlar",
+    "uziTotal": "Summa",
+    "consultations": "Shifokor qabuli",
+    "consultationService": "Xizmat",
+    "openResult": "Natijani ko‘rish",
+    "openVisit": "Qabul oynasi"
+  }
+}

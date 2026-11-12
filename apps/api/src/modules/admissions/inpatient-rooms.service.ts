@@ -104,7 +104,7 @@ export class InpatientRoomsService {
           number: dto.number,
           name: dto.name?.trim() || null,
           capacity: 9999,
-          pricePerDay: dto.pricePerDay,
+          pricePerDay: dto.pricePerDay ?? '0',
         },
       });
       await this.audit.log({

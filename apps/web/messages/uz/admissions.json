@@ -43,6 +43,7 @@
   "noteAdded": "Kundalik yozildi",
   "noNotes": "Kundalik yozuvlari yo‘q",
   "back": "Ro‘yxatga",
+  "backToMyPatients": "Bemorlarimga",
   "print": "Chop etish",
   "status": {
     "ACTIVE": "Yotibdi",
@@ -94,7 +95,9 @@
     "openUzi": "UZI ro‘yxati",
     "attachments": "{count} ta fayl",
     "visit": "Qabul",
-    "labDownloadFailed": "Natijani yuklab bo‘lmadi"
+    "labDownloadFailed": "Natijani yuklab bo‘lmadi",
+    "orderLab": "Lab buyurtma",
+    "orderUzi": "UZI buyurtma"
   },
   "sections": {
     "diagnoses": "Tashxislar",
@@ -114,9 +117,9 @@
     "room": "Statsionar xona",
     "roomPlaceholder": "Etaj va xonani tanlang",
     "roomEmpty": "Bo‘sh xona yo‘q. Sozlamalarda palata qo‘shing yoki bo‘sh o‘rin kutib turing.",
-    "roomNumber": "Xona raqami",
+    "roomNumber": "Xona / palata (ixtiyoriy)",
     "roomNumberHint": "Masalan, 12 yoki 2-etaj 5",
-    "roomNumberHelp": "Faqat ma’lumot uchun — katalogdagi xona va narxga bog‘lanmaydi.",
+    "roomNumberHelp": "Ixtiyoriy. Faqat ma’lumot uchun — katalogdagi xona va narxga bog‘lanmaydi.",
     "attendingDoctor": "Davolovchi shifokor",
     "attendingDoctorPlaceholder": "Shifokorni tanlang",
     "doctorOther": "Ro‘yxatda yo‘q — qo‘lda yozish",
@@ -167,7 +170,7 @@
   "invoiceRaised": "Hisob-faktura chiqarildi: {number}",
   "dischargeCheck": {
     "unbilled": "Hisobga yozilgan, hali fakturasiz {count} ta xizmat — {total} (chiqarishda avtomatik hisob-faktura chiqadi)",
-    "issueInvoice": "Hozir hisob-faktura chiqarish",
+    "issueInvoice": "Kassaga umumiy hisob yuborish",
     "debtTitle": "Shu yotqizish bo‘yicha qarz (chiqarishda to‘lanadi)",
     "accountDue": "Jami to‘lanishi kerak",
     "pay": "To‘lash",
@@ -213,7 +216,7 @@
     "addedMany": "{count} kunlik palata haqi hisobga qo‘shildi",
     "currency": "so‘m",
     "total": "Jami · {days} × 24 soat",
-    "enableHint": "Avval 24 soatlik narxni saqlang, keyin kunlik haqni qo‘lda qo‘shing.",
+    "enableHint": "Narx ixtiyoriy. Agar haq qo‘shmoqchi bo‘lsangiz, avval narxni saqlang (bepul uchun 0 yoki bo‘sh).",
     "nextHint": "Keyingi qo‘shiladigan kun: {date}",
     "reverseHint": "Xato qo‘shilgan kunni «Qo‘shilgan kunlar»dan qaytarish mumkin — faqat oxirgi to‘lanmagan kun.",
     "editHint": "Yangi narx keyingi qo‘lda qo‘shiladigan kundagi summaga ta’sir qiladi. Avvalgi kunlar o‘zgarmaydi.",
@@ -227,5 +230,6 @@
     "reversed": "Kunlik haq qaytarildi",
     "cancelled": "Bekor qilingan",
     "paid": "To‘langan"
-  }
+  },
+  "billedToCashier": "Statsionar hisobi kassaga yuborildi"
 }

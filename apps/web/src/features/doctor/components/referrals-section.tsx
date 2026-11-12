@@ -10,7 +10,9 @@ import {
   findDoctorConsultationService,
   isUziSpecialty,
 } from '@/features/clinical-orders/doctor-matching';
-import { ServiceCombobox, serviceName } from '@/features/billing/components/service-combobox';
+import { serviceName } from '@/features/billing/components/service-combobox';
+import { LabServicePicker } from '@/features/billing/components/lab-service-picker';
+import { UziServicePicker } from '@/features/billing/components/uzi-service-picker';
 import { billingApi, type ServiceOption } from '@/features/billing/api';
 import { searchServiceCatalogue } from '@/features/billing/service-catalogue';
 import { localizedText } from '@/lib/localized';
@@ -18,15 +20,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { ChevronsUpDown, Send, Trash2 } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { addReferralSchema, ReferralType, type AddReferralInput } from '@avishifo/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -35,12 +35,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { EmptyState } from '@/components/empty-state';
-import type { LabTestItem, VisitReferral } from '../api';
-import { useAddReferral, useLabTests } from '../hooks';
-
-function labTestName(test: LabTestItem, locale: string): string {
-  return localizedText(test.name, locale) || test.code;
-}
+import type { VisitReferral } from '../api';
+import { useAddReferral } from '../hooks';
 
 export function ReferralsSection({
   visitId,
@@ -58,14 +54,12 @@ export function ReferralsSection({
   const locale = useLocale();
 
   const addReferral = useAddReferral(visitId);
-  const [selectedTests, setSelectedTests] = useState<string[]>([]);
+  const [labServices, setLabServices] = useState<ServiceOption[]>([]);
   const [uziServices, setUziServices] = useState<ServiceOption[]>([]);
   const [specialistService, setSpecialistService] = useState<ServiceOption | null>(null);
   const [targetDoctorId, setTargetDoctorId] = useState('');
-  const [testsOpen, setTestsOpen] = useState(false);
   const [labError, setLabError] = useState(false);
   const [clinicalError, setClinicalError] = useState(false);
-  const [testSearch, setTestSearch] = useState('');
   const orders = useQuery({
     queryKey: ['lab-orders', { visitId, includeUnpaid: true }],
     queryFn: () => labApi.listOrders({ visitId, includeUnpaid: true, limit: 100 }),
@@ -93,7 +87,7 @@ export function ReferralsSection({
   useEffect(() => {
     onUnsavedChange?.(
       dirty ||
-        selectedTests.length > 0 ||
+        labServices.length > 0 ||
         uziServices.length > 0 ||
         Boolean(specialistService) ||
         Boolean(targetDoctorId) ||
@@ -101,7 +95,7 @@ export function ReferralsSection({
     );
   }, [
     dirty,
-    selectedTests.length,
+    labServices.length,
     uziServices.length,
     specialistService,
     targetDoctorId,
@@ -117,40 +111,34 @@ export function ReferralsSection({
   const specialistDoctors = useMemo(() => doctors.data ?? [], [doctors.data]);
 
   useEffect(() => {
-    form.setValue('labTestIds', selectedTests.length ? selectedTests : undefined, {
-      shouldValidate: false,
-    });
-  }, [selectedTests, form]);
-
-  useEffect(() => {
-    if (type === ReferralType.ULTRASOUND) {
+    if (type === ReferralType.LAB) {
+      form.setValue(
+        'serviceIds',
+        labServices.length ? labServices.map((service) => service.id) : undefined,
+        { shouldValidate: false },
+      );
+      form.setValue('labTestIds', undefined, { shouldValidate: false });
+      form.setValue('targetDoctorUserId', undefined, { shouldValidate: false });
+    } else if (type === ReferralType.ULTRASOUND) {
       form.setValue(
         'serviceIds',
         uziServices.length ? uziServices.map((service) => service.id) : undefined,
         { shouldValidate: false },
       );
+      form.setValue('labTestIds', undefined, { shouldValidate: false });
       form.setValue('targetDoctorUserId', targetDoctorId || undefined, { shouldValidate: false });
     } else if (type === ReferralType.SPECIALIST) {
       form.setValue('serviceIds', specialistService ? [specialistService.id] : undefined, {
         shouldValidate: false,
       });
+      form.setValue('labTestIds', undefined, { shouldValidate: false });
       form.setValue('targetDoctorUserId', targetDoctorId || undefined, { shouldValidate: false });
     } else {
       form.setValue('serviceIds', undefined, { shouldValidate: false });
+      form.setValue('labTestIds', undefined, { shouldValidate: false });
       form.setValue('targetDoctorUserId', undefined, { shouldValidate: false });
     }
-  }, [type, uziServices, specialistService, targetDoctorId, form]);
-
-  const {
-    data: labTests,
-    isLoading: testsLoading,
-    isError: testsError,
-  } = useLabTests(type === ReferralType.LAB, testSearch);
-
-  const toggleTest = (id: string) => {
-    setSelectedTests((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-    setLabError(false);
-  };
+  }, [type, labServices, uziServices, specialistService, targetDoctorId, form]);
 
   const resetForm = () => {
     form.reset({
@@ -161,9 +149,7 @@ export function ReferralsSection({
       targetDoctorUserId: undefined,
       targetSpecialty: undefined,
     });
-    setTestSearch('');
-    setTestsOpen(false);
-    setSelectedTests([]);
+    setLabServices([]);
     setUziServices([]);
     setSpecialistService(null);
     setTargetDoctorId('');
@@ -205,7 +191,7 @@ export function ReferralsSection({
 
   const onSubmit = form.handleSubmit(
     (values) => {
-      if (values.type === ReferralType.LAB && selectedTests.length === 0) {
+      if (values.type === ReferralType.LAB && labServices.length === 0) {
         setLabError(true);
         return;
       }
@@ -233,13 +219,15 @@ export function ReferralsSection({
             values.type === ReferralType.ULTRASOUND || values.type === ReferralType.SPECIALIST
               ? targetDoctorId
               : undefined,
-          labTestIds: values.type === ReferralType.LAB ? selectedTests : undefined,
+          labTestIds: undefined,
           serviceIds:
-            values.type === ReferralType.ULTRASOUND
-              ? uziServices.map((service) => service.id)
-              : values.type === ReferralType.SPECIALIST && specialistService
-                ? [specialistService.id]
-                : undefined,
+            values.type === ReferralType.LAB
+              ? labServices.map((service) => service.id)
+              : values.type === ReferralType.ULTRASOUND
+                ? uziServices.map((service) => service.id)
+                : values.type === ReferralType.SPECIALIST && specialistService
+                  ? [specialistService.id]
+                  : undefined,
           note: values.note?.trim() || undefined,
         },
         { onSuccess: resetForm },
@@ -275,7 +263,7 @@ export function ReferralsSection({
                     setTargetDoctorId('');
                     setUziServices([]);
                     setSpecialistService(null);
-                    setSelectedTests([]);
+                    setLabServices([]);
                     setLabError(false);
                     setClinicalError(false);
                   }}
@@ -294,73 +282,6 @@ export function ReferralsSection({
                   </SelectContent>
                 </Select>
               </div>
-
-              {type === ReferralType.LAB ? (
-                <div className="min-w-52 space-y-1.5">
-                  <Label>{t('labTests')}</Label>
-                  <Popover open={testsOpen} onOpenChange={setTestsOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={addReferral.isPending}
-                        className="w-64 justify-between font-normal"
-                      >
-                        {selectedTests.length > 0
-                          ? t('labTestsSelected', { count: selectedTests.length })
-                          : tCommon('select')}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[min(28rem,90vw)] p-2" align="start">
-                      <Input
-                        value={testSearch}
-                        onChange={(event) => setTestSearch(event.target.value)}
-                        placeholder={t('labReferral.search')}
-                        className="mb-2"
-                      />
-                      <div
-                        className="max-h-64 overflow-y-auto"
-                        onWheel={(event) => event.stopPropagation()}
-                      >
-                        {testsLoading ? (
-                          <p className="p-2 text-sm text-muted-foreground">
-                            {t('labReferral.loading')}
-                          </p>
-                        ) : null}
-                        {testsError ? (
-                          <p className="p-2 text-sm text-destructive">{t('labReferral.loadError')}</p>
-                        ) : null}
-                        {!testsLoading && !testsError && labTests?.length === 0 ? (
-                          <p className="p-2 text-sm text-muted-foreground">
-                            {t('labReferral.noTests')}
-                          </p>
-                        ) : null}
-                        {(labTests ?? [])
-                          .filter((test) => test.isActive)
-                          .map((test) => (
-                            <label
-                              key={test.id}
-                              className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-                            >
-                              <Checkbox
-                                checked={selectedTests.includes(test.id)}
-                                onCheckedChange={() => toggleTest(test.id)}
-                              />
-                              <span className="min-w-0 whitespace-normal">
-                                {labTestName(test, locale)}{' '}
-                                <span className="text-muted-foreground">{test.code}</span>
-                              </span>
-                            </label>
-                          ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                  {labError ? (
-                    <p className="text-xs text-destructive">{t('labTestsRequired')}</p>
-                  ) : null}
-                </div>
-              ) : null}
 
               {type === ReferralType.ULTRASOUND ? (
                 <div className="min-w-52 space-y-1.5">
@@ -427,45 +348,35 @@ export function ReferralsSection({
               </Button>
             </div>
 
+            {type === ReferralType.LAB ? (
+              <div className="space-y-2 rounded-lg border p-3">
+                <Label>{t('labTests')}</Label>
+                <LabServicePicker
+                  selected={labServices}
+                  disabled={addReferral.isPending}
+                  onChange={(next) => {
+                    setLabServices(next);
+                    setLabError(false);
+                  }}
+                />
+                {labError ? (
+                  <p className="text-xs text-destructive">{t('labTestsRequired')}</p>
+                ) : null}
+              </div>
+            ) : null}
+
             {type === ReferralType.ULTRASOUND ? (
               <div className="space-y-2 rounded-lg border p-3">
                 <Label>{t('uziServices')}</Label>
-                <ServiceCombobox
-                  value={null}
-                  kind="ULTRASOUND"
+                <UziServicePicker
+                  selected={uziServices}
                   doctor={uziDoctors.find((doctor) => doctor.id === targetDoctorId) ?? null}
-                  disabled={!targetDoctorId}
-                  excludeIds={uziServices.map((service) => service.id)}
-                  onChange={(service) => {
-                    setUziServices((prev) =>
-                      prev.some((item) => item.id === service.id) ? prev : [...prev, service],
-                    );
+                  disabled={!targetDoctorId || addReferral.isPending}
+                  onChange={(next) => {
+                    setUziServices(next);
                     setClinicalError(false);
                   }}
                 />
-                {uziServices.length ? (
-                  <ul className="divide-y rounded-md border">
-                    {uziServices.map((service) => (
-                      <li
-                        key={service.id}
-                        className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
-                      >
-                        <span>{serviceName(service, locale)}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={tCommon('delete')}
-                          onClick={() =>
-                            setUziServices((prev) => prev.filter((item) => item.id !== service.id))
-                          }
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
                 {clinicalError ? (
                   <p className="text-xs text-destructive">{t('uziReferralRequired')}</p>
                 ) : null}

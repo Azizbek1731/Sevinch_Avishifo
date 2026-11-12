@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { createSurgerySchema, formatUZS, type CreateSurgeryInput } from '@avishifo/shared';
+import { createSurgerySchema, type CreateSurgeryInput } from '@avishifo/shared';
 import { createId } from '@/lib/id';
+import { localizedText } from '@/lib/localized';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -46,6 +47,7 @@ export function CreateSurgeryDialog({
   admissionId?: string;
 }) {
   const t = useTranslations('surgeries');
+  const locale = useLocale();
   const branchId = useAuthStore((s) => s.activeBranchId);
   const [service, setService] = useState<ServiceRow | null>(null);
   const [admissionSearch, setAdmissionSearch] = useState('');
@@ -77,6 +79,8 @@ export function CreateSurgeryDialog({
         serviceId: '',
         surgeonUserId: '',
         scheduledDate: todayTashkent(),
+        title: '',
+        unitPrice: undefined,
         note: '',
         idempotencyKey: createId(),
       });
@@ -94,12 +98,16 @@ export function CreateSurgeryDialog({
   });
   const submit = form.handleSubmit((values) => {
     const payload = {
-      ...values,
+      admissionId: values.admissionId,
+      serviceId: values.serviceId,
+      surgeonUserId: values.surgeonUserId,
+      scheduledDate: values.scheduledDate,
+      title: values.title?.trim() || undefined,
+      unitPrice: values.unitPrice?.trim() || undefined,
       note: values.note?.trim() || undefined,
-      idempotencyKey: undefined,
     };
     identity.current = identifySurgeryRequest(payload, identity.current);
-    create.mutate({ ...values, note: payload.note, idempotencyKey: identity.current.key });
+    create.mutate({ ...payload, idempotencyKey: identity.current.key });
   });
   return (
     <Dialog
@@ -164,13 +172,39 @@ export function CreateSurgeryDialog({
                 onChange={(next) => {
                   setService(next);
                   form.setValue('serviceId', next.id, { shouldValidate: true });
+                  form.setValue('title', localizedText(next.name, locale), {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  });
+                  form.setValue('unitPrice', next.currentPrice ?? '', {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  });
                 }}
               />
-              {service?.currentPrice ? (
-                <p className="text-sm font-medium">
-                  {t('fee')}: {formatUZS(service.currentPrice)}
-                </p>
-              ) : null}
+              <p className="text-xs text-muted-foreground">{t('overrideHint')}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="surgery-title">{t('operationName')}</Label>
+                  <Input
+                    id="surgery-title"
+                    maxLength={200}
+                    placeholder={t('operationNamePlaceholder')}
+                    disabled={!service}
+                    {...form.register('title')}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="surgery-fee">{t('fee')}</Label>
+                  <Input
+                    id="surgery-fee"
+                    inputMode="decimal"
+                    placeholder="0"
+                    disabled={!service}
+                    {...form.register('unitPrice')}
+                  />
+                </div>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>{t('surgeon')}</Label>

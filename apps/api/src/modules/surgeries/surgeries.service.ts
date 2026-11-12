@@ -599,6 +599,8 @@ export class SurgeriesService {
       serviceId: dto.serviceId,
       surgeonUserId: dto.surgeonUserId,
       scheduledDate: dto.scheduledDate,
+      title: dto.title?.trim() || null,
+      unitPrice: dto.unitPrice ?? null,
       note: dto.note ?? null,
       branchId,
     });
@@ -654,7 +656,15 @@ export class SurgeriesService {
           "Faol operatsiya xizmatini tanlang",
           400,
         );
-      const unitPrice = await this.currentPrice(tx, service.id, branchId);
+      const cataloguePrice = await this.currentPrice(tx, service.id, branchId);
+      const unitPrice =
+        dto.unitPrice !== undefined ? new Prisma.Decimal(dto.unitPrice) : cataloguePrice;
+      if (unitPrice.lt(0))
+        throw new AppException(ErrorCode.VALIDATION_ERROR, 'Operatsiya narxi noto‘g‘ri', 400);
+      const titleOverride = dto.title?.trim();
+      const feeTitle: Prisma.InputJsonValue = titleOverride
+        ? { uz: titleOverride, ru: titleOverride, en: titleOverride }
+        : (service.name as Prisma.InputJsonValue);
       const fee = await tx.chargeItem.create({
         data: {
           clinicId,
@@ -662,7 +672,7 @@ export class SurgeriesService {
           admissionId: admission.id,
           patientId: admission.patientId,
           serviceId: service.id,
-          title: service.name as Prisma.InputJsonValue,
+          title: feeTitle,
           date: new Date(dto.scheduledDate),
           quantity: 1,
           unitPrice,
@@ -806,9 +816,16 @@ export class SurgeriesService {
               "Ushbu turga mos faol katalog elementi topilmadi",
               400,
             );
-          title = service.name;
-          unit = service.unit;
-          unitPrice = await this.currentPrice(tx, service.id, branchId);
+          const cataloguePrice = await this.currentPrice(tx, service.id, branchId);
+          const titleOverride = item.title?.trim();
+          title = titleOverride
+            ? { uz: titleOverride, ru: titleOverride, en: titleOverride }
+            : service.name;
+          unit = item.unit?.trim() || service.unit;
+          unitPrice =
+            item.unitPrice !== undefined
+              ? new Prisma.Decimal(item.unitPrice)
+              : cataloguePrice;
         } else if (!item.title || !unit || unitPrice === null) {
           throw new AppException(
             ErrorCode.VALIDATION_ERROR,

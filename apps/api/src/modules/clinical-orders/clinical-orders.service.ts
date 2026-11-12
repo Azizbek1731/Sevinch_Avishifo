@@ -17,6 +17,7 @@ import { AuditService } from '../../core/audit/audit.service';
 import { SequenceService } from '../../core/sequence/sequence.service';
 import { PricingService } from '../services/pricing.service';
 import { ensureDoctorConsultationService } from '../services/doctor-consult-service';
+import { ensureOpenAmbulatoryCase } from '../ambulatory/ambulatory-case';
 import { AddClinicalServicesDto, ClinicalOrderQueryDto, CreateClinicalOrderDto } from './dto';
 
 const INCLUDE = {
@@ -387,6 +388,8 @@ export class ClinicalOrdersService {
       userId: string;
       clinicalOrderId?: string;
       visitId?: string | null;
+      /** Inpatient: stays off the cashier queue until discharge issues the stay account. */
+      draft?: boolean;
     },
   ) {
     const clinicId = TenantContext.requireClinicId();
@@ -399,8 +402,8 @@ export class ClinicalOrdersService {
         number: context.number,
         requestKey: context.requestKey,
         requestFingerprint: context.requestFingerprint,
-        status: total.eq(0) ? 'PAID' : 'ISSUED',
-        issuedAt: new Date(),
+        status: total.eq(0) ? 'PAID' : context.draft ? 'DRAFT' : 'ISSUED',
+        issuedAt: context.draft && !total.eq(0) ? null : new Date(),
         subtotal: total,
         total,
         paidTotal: zero(),
@@ -480,7 +483,7 @@ export class ClinicalOrdersService {
         status: 'ACTIVE',
         deletedAt: null,
       },
-      select: { id: true },
+      select: { id: true, fullName: true },
     });
     const membership = await tx.userBranch.findFirst({
       where: { userId: input.doctorUserId, branchId: input.branchId },
@@ -512,15 +515,6 @@ export class ClinicalOrdersService {
         );
       return { id: existing.id };
     }
-    const invoice = await this.invoice(tx, plans, {
-      patientId: input.patientId,
-      branchId: input.branchId,
-      doctorUserId: input.doctorUserId,
-      number,
-      requestKey: input.requestKey,
-      requestFingerprint: hash,
-      userId: input.orderedById,
-    });
     const stay = await tx.admission.findFirst({
       where: {
         patientId: input.patientId,
@@ -529,6 +523,16 @@ export class ClinicalOrdersService {
       },
       select: { id: true },
       orderBy: { admittedAt: 'desc' },
+    });
+    const invoice = await this.invoice(tx, plans, {
+      patientId: input.patientId,
+      branchId: input.branchId,
+      doctorUserId: input.doctorUserId,
+      number,
+      requestKey: input.requestKey,
+      requestFingerprint: hash,
+      userId: input.orderedById,
+      draft: Boolean(stay),
     });
     if (stay) {
       await this.linkInvoiceToStay(
@@ -540,12 +544,24 @@ export class ClinicalOrdersService {
         input.orderedById,
       );
     }
+    const ambulatory =
+      kind === 'CONSULTATION' && !stay
+        ? await ensureOpenAmbulatoryCase(tx, {
+            clinicId,
+            branchId: input.branchId,
+            patientId: input.patientId,
+            doctorUserId: doctor.id,
+            doctorName: doctor.fullName,
+            userId: input.orderedById,
+          })
+        : null;
     const order = await tx.clinicalOrder.create({
       data: {
         clinicId,
         patientId: input.patientId,
         branchId: input.branchId,
         doctorUserId: input.doctorUserId,
+        ambulatoryCaseId: ambulatory?.card.id ?? null,
         kind,
         initialInvoiceId: invoice.id,
         note: input.note,
@@ -555,6 +571,16 @@ export class ClinicalOrdersService {
     });
     await tx.invoice.update({ where: { id: invoice.id }, data: { clinicalOrderId: order.id } });
     return { id: order.id };
+  }
+
+  /** UZI sent from an ambulator karta; the caller has already checked card access. */
+  async listForAmbulatoryCase(caseId: string, branchId: string) {
+    const orders = await this.prisma.db.clinicalOrder.findMany({
+      where: { ambulatoryCaseId: caseId, branchId },
+      include: INCLUDE,
+      orderBy: { createdAt: 'desc' },
+    });
+    return orders.map((order) => this.map(order));
   }
 
   async announceReferralOrder(id: string): Promise<void> {
@@ -585,6 +611,39 @@ export class ClinicalOrdersService {
         source: 'UZI_REFERRAL',
       },
     });
+  }
+
+  /** Doctor on the ward may order UZI/consultation without cashier rights. */
+  async createForActiveStay(dto: CreateClinicalOrderDto, user: AuthUser, branchId: string) {
+    this.scope(user, branchId);
+    if (dto.branchId !== branchId)
+      throw new AppException(ErrorCode.FORBIDDEN, 'Active branch does not match', 403);
+    const stay = await this.prisma.db.admission.findFirst({
+      where: {
+        patientId: dto.patientId,
+        branchId,
+        status: 'ACTIVE',
+        ...(user.role === 'DOCTOR'
+          ? {
+              OR: [
+                { attendingDoctorUserId: user.id },
+                { surgeries: { some: { surgeonUserId: user.id } } },
+              ],
+            }
+          : {}),
+      },
+      select: { id: true },
+    });
+    if (!stay) {
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        user.role === 'DOCTOR'
+          ? 'Faqat o‘zingizga biriktirilgan statsionar bemorga buyurtma berasiz'
+          : 'Faqat faol statsionardagi bemorga UZI/konsultatsiya buyurtma qilinadi',
+        400,
+      );
+    }
+    return this.create(dto, user, branchId);
   }
 
   async create(dto: CreateClinicalOrderDto, user: AuthUser, branchId: string) {
@@ -638,27 +697,41 @@ export class ClinicalOrdersService {
           );
         return { id: old.id, created: false };
       }
+      const stay = await tx.admission.findFirst({
+        where: { patientId: dto.patientId, branchId, status: 'ACTIVE' },
+        select: { id: true },
+        orderBy: { admittedAt: 'desc' },
+      });
       const invoice = await this.invoice(tx, plans, {
         ...dto,
         number,
         requestKey: dto.idempotencyKey,
         requestFingerprint: hash,
         userId: user.id,
-      });
-      const stay = await tx.admission.findFirst({
-        where: { patientId: dto.patientId, branchId, status: 'ACTIVE' },
-        select: { id: true },
-        orderBy: { admittedAt: 'desc' },
+        draft: Boolean(stay),
       });
       if (stay) {
         await this.linkInvoiceToStay(tx, invoice, stay.id, dto.patientId, branchId, user.id);
       }
+      // Outpatient doctor visits land on the doctor's ambulatory card.
+      const ambulatory =
+        dto.kind === 'CONSULTATION' && !stay
+          ? await ensureOpenAmbulatoryCase(tx, {
+              clinicId,
+              branchId,
+              patientId: dto.patientId,
+              doctorUserId: doctor.id,
+              doctorName: doctor.fullName,
+              userId: user.id,
+            })
+          : null;
       const order = await tx.clinicalOrder.create({
         data: {
           clinicId,
           patientId: dto.patientId,
           branchId,
           doctorUserId: dto.doctorUserId,
+          ambulatoryCaseId: ambulatory?.card.id ?? null,
           kind: dto.kind,
           initialInvoiceId: invoice.id,
           note: dto.note,
@@ -667,7 +740,7 @@ export class ClinicalOrdersService {
         },
       });
       await tx.invoice.update({ where: { id: invoice.id }, data: { clinicalOrderId: order.id } });
-      return { id: order.id, created: true };
+      return { id: order.id, created: true, ambulatory: ambulatory?.created ? ambulatory.card : null };
     });
     if (result.created)
       await this.audit.log({
@@ -675,6 +748,18 @@ export class ClinicalOrdersService {
         entity: 'ClinicalOrder',
         entityId: result.id,
         after: { patientId: dto.patientId, kind: dto.kind, doctorUserId: dto.doctorUserId },
+      });
+    if ('ambulatory' in result && result.ambulatory)
+      await this.audit.log({
+        action: AuditAction.CREATE,
+        entity: 'AmbulatoryCase',
+        entityId: result.ambulatory.id,
+        after: {
+          number: result.ambulatory.number,
+          patientId: dto.patientId,
+          doctorUserId: dto.doctorUserId,
+          source: 'CONSULTATION',
+        },
       });
     return this.get(result.id, user, branchId);
   }
@@ -796,6 +881,11 @@ export class ClinicalOrdersService {
           'An examination is already present on this order',
           409,
         );
+      const stay = await tx.admission.findFirst({
+        where: { patientId: order.patientId, branchId, status: 'ACTIVE' },
+        select: { id: true },
+        orderBy: { admittedAt: 'desc' },
+      });
       const invoice = await this.invoice(tx, plans, {
         patientId: order.patientId,
         branchId,
@@ -806,11 +896,7 @@ export class ClinicalOrdersService {
         number,
         requestKey: dto.idempotencyKey,
         requestFingerprint: hash,
-      });
-      const stay = await tx.admission.findFirst({
-        where: { patientId: order.patientId, branchId, status: 'ACTIVE' },
-        select: { id: true },
-        orderBy: { admittedAt: 'desc' },
+        draft: Boolean(stay),
       });
       if (stay) {
         await this.linkInvoiceToStay(tx, invoice, stay.id, order.patientId, branchId, user.id);

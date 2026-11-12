@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { ArrowLeft, LogOut, Pencil, Plus, Printer, Trash2 } from 'lucide-react';
 import { formatTz } from '@/lib/dates';
 import { Link, useRouter } from '@/i18n/routing';
+import { useSearchParams } from 'next/navigation';
 import { usePermissions } from '@/hooks/use-permissions';
 import {
   AlertDialog,
@@ -80,6 +81,15 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
   const queryClient = useQueryClient();
   const errorToast = useApiErrorToast();
 
+  const searchParams = useSearchParams();
+  const fromMine = searchParams.get('from') === 'mine';
+  const tabParam = searchParams.get('tab');
+  const defaultTab = useMemo(() => {
+    if (tabParam === 'charges' || tabParam === 'reports' || tabParam === 'sheet' || tabParam === 'history' || tabParam === 'notes' || tabParam === 'surgeries') {
+      return tabParam;
+    }
+    return fromMine ? 'reports' : 'sheet';
+  }, [tabParam, fromMine]);
   const [orderOpen, setOrderOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [dischargeOpen, setDischargeOpen] = useState(false);
@@ -141,9 +151,9 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Button variant="ghost" size="sm" asChild className="-ml-2 mb-1">
-            <Link href="/admissions">
+            <Link href={fromMine ? '/doctor/patients' : '/admissions'}>
               <ArrowLeft className="mr-1 h-4 w-4" />
-              {t('back')}
+              {fromMine ? t('backToMyPatients') : t('back')}
             </Link>
           </Button>
           <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight">
@@ -225,16 +235,16 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
       <AttendingDoctorCard admission={a} canEdit={canWrite} />
       <RoomBillingCard admission={a} canEdit={canWrite} />
 
-      <Tabs defaultValue="sheet">
+      <Tabs defaultValue={defaultTab} key={defaultTab}>
         <TabsList className="flex h-auto w-full flex-wrap justify-start">
+          <TabsTrigger value="reports">{t('tabs.reports')}</TabsTrigger>
+          {can('charges.read') ? (
+            <TabsTrigger value="charges">{t('tabs.charges')}</TabsTrigger>
+          ) : null}
           <TabsTrigger value="sheet">{t('tabs.sheet')}</TabsTrigger>
           <TabsTrigger value="history">{t('tabs.history')}</TabsTrigger>
           <TabsTrigger value="notes">{t('tabs.notes')}</TabsTrigger>
           {can('surgery.read') ? <TabsTrigger value="surgeries">{ts('title')}</TabsTrigger> : null}
-          {can('charges.read') ? (
-            <TabsTrigger value="charges">{t('tabs.charges')}</TabsTrigger>
-          ) : null}
-          <TabsTrigger value="reports">{t('tabs.reports')}</TabsTrigger>
         </TabsList>
 
         {can('charges.read') ? (
@@ -246,8 +256,10 @@ export function AdmissionDetail({ admissionId }: { admissionId: string }) {
         <TabsContent value="reports" className="mt-4">
           <AdmissionReportsPanel
             patientId={a.patientId}
+            admissionId={admissionId}
             admittedAt={a.admittedAt}
             dischargedAt={a.dischargedAt}
+            canOrder={!closed && can('charges.write')}
           />
         </TabsContent>
 

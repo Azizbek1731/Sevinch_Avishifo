@@ -65,6 +65,8 @@ export class DocumentsService {
     labOrderId?: string,
     /** UZI / clinical-order attachment link. */
     clinicalOrderId?: string,
+    /** Doctor visit attachment (external conclusion / empty-visit substitute). */
+    visitId?: string,
   ): Promise<DocumentResponse> {
     await this.patients.requirePatient(patientId);
 
@@ -124,6 +126,20 @@ export class DocumentsService {
             );
           }
         }
+        if (visitId) {
+          await tx.$queryRaw`SELECT "id" FROM "Visit" WHERE "id" = ${visitId} AND "clinicId" = ${clinicId} FOR UPDATE`;
+          const visit = await tx.visit.findFirst({ where: { id: visitId } });
+          if (!visit || visit.patientId !== patientId) {
+            throw new AppException(ErrorCode.NOT_FOUND, 'Visit not found', 404);
+          }
+          if (visit.status === 'COMPLETED' || visit.status === 'CANCELLED') {
+            throw new AppException(
+              ErrorCode.VALIDATION_ERROR,
+              'Yakunlangan tashrifga fayl yuklab bo‘lmaydi',
+              409,
+            );
+          }
+        }
         return tx.patientDocument.create({
           data: {
             // Required by Prisma's checked input type; the tenant extension re-stamps the same value.
@@ -138,6 +154,7 @@ export class DocumentsService {
             uploadedById,
             labOrderId: labOrderId ?? null,
             clinicalOrderId: clinicalOrderId ?? null,
+            visitId: visitId ?? null,
           },
         });
       });

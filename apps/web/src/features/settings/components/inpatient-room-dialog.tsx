@@ -139,7 +139,7 @@ export function InpatientRoomDialog({
             <Input
               id="ir-price"
               inputMode="decimal"
-              placeholder="150000"
+              placeholder={t('priceOptionalPlaceholder')}
               {...form.register('pricePerDay')}
             />
           </div>

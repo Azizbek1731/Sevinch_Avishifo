@@ -45,10 +45,14 @@ export function AdmitPickerDialog({
   open,
   onOpenChange,
   onPick,
+  title,
+  description,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onPick: (patient: { id: string; fullName: string }) => void;
+  title?: string;
+  description?: string;
 }) {
   const t = useTranslations('admissions');
   const tReception = useTranslations('reception');
@@ -81,8 +85,8 @@ export function AdmitPickerDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{t('pickPatientTitle')}</DialogTitle>
-            <DialogDescription>{t('pickPatientDescription')}</DialogDescription>
+            <DialogTitle>{title ?? t('pickPatientTitle')}</DialogTitle>
+            <DialogDescription>{description ?? t('pickPatientDescription')}</DialogDescription>
           </DialogHeader>
 
           <div className="relative">

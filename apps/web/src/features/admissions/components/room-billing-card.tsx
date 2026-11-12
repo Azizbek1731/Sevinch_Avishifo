@@ -85,7 +85,9 @@ export function RoomBillingCard({
             className="space-y-1.5"
             onSubmit={(event) => {
               event.preventDefault();
-              const parsed = roomRateSchema.safeParse(value.trim().replace(',', '.'));
+              const raw = value.trim().replace(',', '.');
+              // Empty = free (0); price is optional for inpatient stays.
+              const parsed = roomRateSchema.safeParse(raw === '' ? '0' : raw);
               setInvalid(!parsed.success);
               if (parsed.success) save.mutate(parsed.data);
             }}

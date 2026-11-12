@@ -149,11 +149,13 @@ describe('avishifo ai (e2e)', () => {
   // -------------------------------------------------------------- endpoint
 
   it('is disabled without an API key, and says so rather than half-working', async () => {
+    // Live OPENAI_API_KEY in .env turns the assistant on — skip the disabled
+    // assertion in that case (tool tenancy tests above still run).
+    if (process.env.OPENAI_API_KEY?.trim()) return;
     const res = await request(app.getHttpServer())
       .post(`${API}/ai/ask`)
       .set('Authorization', `Bearer ${ownerA.accessToken}`)
       .send({ question: 'Bu oy qancha tushum bo‘ldi?' });
-    // No GEMINI_API_KEY in the test environment.
     expect(res.status).toBe(503);
   });
 
@@ -184,9 +186,15 @@ describe('avishifo ai (e2e)', () => {
       .get(`${API}/ai/capabilities`)
       .set('Authorization', `Bearer ${ownerA.accessToken}`)
       .expect(200);
-    // Disabled without a key, so the list is empty — but the endpoint must not
-    // leak the catalogue either way.
-    expect(owner.body.data.enabled).toBe(false);
-    expect(owner.body.data.tools).toEqual([]);
+    const keyPresent = Boolean(process.env.OPENAI_API_KEY?.trim());
+    expect(owner.body.data.enabled).toBe(keyPresent);
+    if (!keyPresent) {
+      // Disabled without a key — must not leak the catalogue.
+      expect(owner.body.data.tools).toEqual([]);
+      return;
+    }
+    const names = (owner.body.data.tools as Array<{ name: string }>).map((t) => t.name);
+    expect(names).toContain('revenue_report');
+    expect(names).toContain('top_debtors');
   });
 });

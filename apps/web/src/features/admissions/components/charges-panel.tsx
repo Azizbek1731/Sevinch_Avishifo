@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { BedDouble, Plus, Receipt, Trash2, Wallet } from 'lucide-react';
+import { BedDouble, Plus, Receipt, Sparkles, Trash2, Wallet } from 'lucide-react';
 import { formatUZS, fromTiyin, toTiyin } from '@avishifo/shared';
 import { cn } from '@/lib/utils';
 import { Link, useRouter } from '@/i18n/routing';
@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { AddChargeDialog } from './add-charge-dialog';
+import { AiBillScanDialog } from './ai-bill-scan-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { useApiErrorToast } from '@/features/services/hooks';
 import { useAuthStore } from '@/stores/auth-store';
@@ -50,8 +51,15 @@ export function ChargesPanel({
   const errorToast = useApiErrorToast();
 
   const canWrite = can('charges.write');
-  const canBill = canWrite && can('invoices.write');
+  // A stay is billed as one account at discharge, never line by line mid-stay.
+  const canBill = canWrite && can('invoices.write') && !admissionId;
   const [addOpen, setAddOpen] = useState(false);
+  const [addMode, setAddMode] = useState<'lab' | 'uzi' | 'massage' | 'procedures' | undefined>(
+    undefined,
+  );
+  const [aiScanOpen, setAiScanOpen] = useState(false);
+  const role = useAuthStore((s) => s.user?.role);
+  const wardDoctor = role === 'DOCTOR' && Boolean(admissionId);
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -68,6 +76,7 @@ export function ChargesPanel({
   });
 
   const items = useMemo(() => query.data?.items ?? [], [query.data]);
+  const billable = useMemo(() => items.filter((c) => !c.admissionId), [items]);
 
   const invalidate = (): void => {
     void queryClient.invalidateQueries({ queryKey: ['charges', patientId] });
@@ -105,8 +114,8 @@ export function ChargesPanel({
       return next;
     });
 
-  const selectedIds = items.filter((c) => selected.has(c.id)).map((c) => c.id);
-  const allSelected = items.length > 0 && selectedIds.length === items.length;
+  const selectedIds = billable.filter((c) => selected.has(c.id)).map((c) => c.id);
+  const allSelected = billable.length > 0 && selectedIds.length === billable.length;
   const selectedTotal = items
     .filter((c) => selected.has(c.id))
     .reduce((acc, c) => acc + toTiyin(c.lineTotal), 0n);
@@ -174,20 +183,78 @@ export function ChargesPanel({
         </Card>
       ) : null}
       {canWrite && allowAdd ? (
-        <Button variant="outline" onClick={() => setAddOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          {t('add.title')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {wardDoctor ? (
+            <>
+              <Button
+                onClick={() => {
+                  setAddMode('lab');
+                  setAddOpen(true);
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                {t('add.modes.lab')}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAddMode('uzi');
+                  setAddOpen(true);
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                {t('add.modes.uzi')}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAddMode('massage');
+                  setAddOpen(true);
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                {t('add.modes.massage')}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAddMode('procedures');
+                  setAddOpen(true);
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                {t('add.title')}
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAddMode(undefined);
+                setAddOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              {t('add.title')}
+            </Button>
+          )}
+          {admissionId && !wardDoctor ? (
+            <Button variant="default" onClick={() => setAiScanOpen(true)}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              {t('aiScan.button')}
+            </Button>
+          ) : null}
+        </div>
       ) : null}
       <Card>
         <CardContent className="p-0">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
             <div className="flex items-center gap-3">
-              {canBill && items.length > 0 ? (
+              {canBill && billable.length > 0 ? (
                 <Checkbox
                   checked={allSelected}
                   onCheckedChange={(v) =>
-                    setSelected(v === true ? new Set(items.map((c) => c.id)) : new Set())
+                    setSelected(v === true ? new Set(billable.map((c) => c.id)) : new Set())
                   }
                   aria-label={t('selectAll')}
                 />
@@ -199,7 +266,7 @@ export function ChargesPanel({
                 </p>
               </div>
             </div>
-            {canBill && items.length > 0 ? (
+            {canBill && billable.length > 0 ? (
               <Button
                 disabled={selectedIds.length === 0 || bill.isPending}
                 onClick={() => bill.mutate(selectedIds)}
@@ -235,7 +302,9 @@ export function ChargesPanel({
                     on && 'bg-primary/[0.04]',
                   )}
                 >
-                  {canBill ? <Checkbox checked={on} onCheckedChange={() => toggle(c.id)} /> : null}
+                  {canBill && !c.admissionId ? (
+                    <Checkbox checked={on} onCheckedChange={() => toggle(c.id)} />
+                  ) : null}
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-2 truncate text-sm font-medium">
                       {chargeTitle(c.title, locale)}
@@ -282,10 +351,22 @@ export function ChargesPanel({
       </Card>
       <AddChargeDialog
         open={addOpen}
-        onOpenChange={setAddOpen}
+        onOpenChange={(open) => {
+          setAddOpen(open);
+          if (!open) setAddMode(undefined);
+        }}
         patientId={patientId}
         admissionId={admissionId}
+        initialMode={addMode}
       />
+      {admissionId ? (
+        <AiBillScanDialog
+          open={aiScanOpen}
+          onOpenChange={setAiScanOpen}
+          patientId={patientId}
+          admissionId={admissionId}
+        />
+      ) : null}
       <ConfirmDialog
         open={cancelId !== null}
         onOpenChange={(open) => {

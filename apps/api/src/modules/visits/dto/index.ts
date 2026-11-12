@@ -5,6 +5,7 @@ import {
   addPrescriptionSchema,
   addReferralSchema,
   amendVisitSchema,
+  completeVisitSchema,
   drugQuerySchema,
   icd10QuerySchema,
   idSchema,
@@ -43,6 +44,7 @@ export const addDrugSchema = z.object({
 export class CreateVisitDto extends createZodDto(createVisitSchema) {}
 export class UpdateVisitDto extends createZodDto(updateVisitSchema) {}
 export class AmendVisitDto extends createZodDto(amendVisitSchema) {}
+export class CompleteVisitDto extends createZodDto(completeVisitSchema) {}
 export class UpsertVitalsDto extends createZodDto(upsertVitalsSchema) {}
 export class AddDiagnosisDto extends createZodDto(addDiagnosisSchema) {}
 export class AddPrescriptionDto extends createZodDto(addPrescriptionSchema) {}

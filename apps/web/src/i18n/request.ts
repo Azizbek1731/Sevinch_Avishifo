@@ -37,6 +37,7 @@ export const MESSAGE_NAMESPACES = [
   'expenses',
   'charges',
   'admissions',
+  'ambulatory',
   'surgeries',
   'admissionPrint',
   'cardPrint',

@@ -1,15 +1,34 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Res } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Res,
+  StreamableFile,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
-import type { AuthUser } from '@avishifo/shared';
+import { UPLOAD_LIMITS, type AuthUser } from '@avishifo/shared';
 import { ActiveBranch, CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { PaginatedResult } from '../../common/pagination';
+import { DocumentsService } from '../patients/documents.service';
 import { VisitsService } from './visits.service';
 import {
   AddDiagnosisDto,
   AddPrescriptionDto,
   AddReferralDto,
   AmendVisitDto,
+  CompleteVisitDto,
   CreateVisitDto,
   PaginationQueryDto,
   ReplacePrescriptionsDto,
@@ -23,7 +42,10 @@ import {
 @ApiTags('visits')
 @Controller('visits')
 export class VisitsController {
-  constructor(private readonly visits: VisitsService) {}
+  constructor(
+    private readonly visits: VisitsService,
+    private readonly documents: DocumentsService,
+  ) {}
 
   @Post()
   @RequirePermissions('visits.write')
@@ -91,9 +113,57 @@ export class VisitsController {
   @RequirePermissions('visits.write')
   complete(
     @Param('id') id: string,
+    @Body() dto: CompleteVisitDto = {},
     @CurrentUser() user: AuthUser,
   ): Promise<Record<string, unknown>> {
-    return this.visits.complete(id, user);
+    return this.visits.complete(id, user, dto ?? {});
+  }
+
+  /** External conclusion / empty-visit substitute — stored on the patient folder. */
+  @Post(':id/attachments')
+  @RequirePermissions('visits.write')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: UPLOAD_LIMITS.MAX_FILE_SIZE_MB * 1024 * 1024 },
+    }),
+  )
+  async uploadAttachment(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body('title') title: string | undefined,
+    @CurrentUser() user: AuthUser,
+  ): Promise<unknown> {
+    if (!file) throw new BadRequestException('file is required');
+    const visit = await this.visits.getById(id, user);
+    const patientId = (visit as { patient: { id: string } }).patient.id;
+    const cleanTitle = (title ?? '').trim() || file.originalname;
+    return this.documents.upload(
+      patientId,
+      { buffer: file.buffer, originalname: file.originalname },
+      { category: 'OTHER', title: cleanTitle.slice(0, 200) },
+      user.id,
+      undefined,
+      undefined,
+      id,
+    );
+  }
+
+  @Get(':id/attachments/:documentId/download')
+  @RequirePermissions('patients.read')
+  async downloadAttachment(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @CurrentUser() user: AuthUser,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<StreamableFile> {
+    await this.visits.requireVisitAttachment(id, documentId, user);
+    const file = await this.documents.download(documentId);
+    response.setHeader('Cache-Control', 'no-store');
+    return new StreamableFile(file.stream, {
+      type: file.mimeType,
+      disposition: `attachment; filename="${encodeURIComponent(file.fileName)}"`,
+    });
   }
 
   @Post(':id/amendments')

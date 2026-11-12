@@ -128,5 +128,22 @@
     },
     "dedicatedActionsHint": "Use the dedicated reception actions for doctor consultations and ultrasound.",
     "noDoctors": "No active doctors are assigned to this branch. Check the branch or contact the administrator."
+  },
+  "myPatients": {
+    "title": "My patients",
+    "subtitle": "Your inpatients and surgery schedule. Open a chart to order lab/ultrasound and review results here.",
+    "search": "Name or chart number…",
+    "inpatientTitle": "In hospital",
+    "inpatientEmpty": "No inpatients yet",
+    "inpatientEmptyHint": "They appear when you are set as attending doctor.",
+    "surgeryTitle": "Surgery schedule",
+    "surgeryEmpty": "No planned surgeries",
+    "surgeryEmptyHint": "Cases where you are the surgeon appear here.",
+    "surgeryBadge": "Surgery: {date}",
+    "surgeryOnlyHint": "{count} patient(s) only on the surgery plan.",
+    "ward": "ward",
+    "openAnalyses": "Tests",
+    "openCharges": "Charges",
+    "openSurgery": "Surgery"
   }
 }

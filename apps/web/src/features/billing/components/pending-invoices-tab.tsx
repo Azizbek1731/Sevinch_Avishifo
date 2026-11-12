@@ -111,7 +111,7 @@ export function PendingInvoicesTab() {
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       <span>{invoice.mrn}</span>
                       {invoice.phone ? <span>{formatPhone(invoice.phone)}</span> : null}
-                      <span>{formatTz(invoice.oldestAt)}</span>
+                      <span>{formatTz(invoice.latestAt ?? invoice.oldestAt)}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">

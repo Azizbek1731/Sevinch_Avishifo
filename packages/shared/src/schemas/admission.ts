@@ -26,8 +26,11 @@ export const admitPatientSchema = z
   .object({
     patientId: idSchema,
     department: z.string().trim().max(120).optional(),
-    /** Free-text room / palata number — informational only (no catalog bind). */
-    ward: z.string().trim().min(1, 'Xona raqamini kiriting').max(200),
+    /** Free-text room / palata — informational only; optional on admit. */
+    ward: z.preprocess(
+      (value) => (typeof value === 'string' && !value.trim() ? undefined : value),
+      z.string().trim().max(200).optional(),
+    ),
     bed: z.string().trim().max(40).optional(),
     inpatientRoomId: idSchema.optional(),
     dailyRoomRate: roomRateSchema.optional(),
@@ -36,7 +39,11 @@ export const admitPatientSchema = z
     attendingDoctorName: z.string().trim().max(200).optional(),
     /** Default true — generate KT-YYYY-NNNN. When false, historyNumber is required. */
     autoHistoryNumber: z.coerce.boolean().optional().default(true),
-    historyNumber: z.string().trim().min(1).max(40).optional(),
+    /** Empty string allowed while auto is on; superRefine enforces when manual. */
+    historyNumber: z.preprocess(
+      (value) => (typeof value === 'string' && !value.trim() ? undefined : value),
+      z.string().trim().min(1).max(40).optional(),
+    ),
     homeAddress: z.string().trim().min(1, 'Uy manzilini kiriting').max(500),
     admittedAt: z.string().datetime().optional(),
     referredBy: z.string().trim().max(200).optional(),
@@ -201,6 +208,44 @@ export const chargeQuerySchema = z.object({
   status: z.enum(['PENDING', 'INVOICED', 'CANCELLED']).optional(),
 });
 export type ChargeQueryInput = z.infer<typeof chargeQuerySchema>;
+
+/** One bill line suggested by AI from a photo of a paper account. */
+export const aiBillLineSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  quantity: z.coerce.number().int().min(1).max(999).default(1),
+  unitPrice: moneySchema,
+  date: dateOnly.optional(),
+  note: z.string().trim().max(300).optional(),
+});
+export type AiBillLine = z.infer<typeof aiBillLineSchema>;
+
+export const aiBillExtractResultSchema = z.object({
+  patientName: z.string().trim().max(200).nullable().optional(),
+  doctorName: z.string().trim().max(200).nullable().optional(),
+  notes: z.string().trim().max(1000).nullable().optional(),
+  lines: z.array(aiBillLineSchema).max(100),
+});
+export type AiBillExtractResult = z.infer<typeof aiBillExtractResultSchema>;
+
+/** Desk confirms / edits AI lines, then saves them as PENDING stay charges. */
+export const addChargesBatchSchema = z.object({
+  patientId: idSchema,
+  admissionId: idSchema.optional(),
+  /** Default date for lines that omit one (YYYY-MM-DD). */
+  date: dateOnly,
+  items: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1).max(200),
+        quantity: z.coerce.number().int().min(1).max(999).default(1),
+        unitPrice: moneySchema,
+        date: dateOnly.optional(),
+      }),
+    )
+    .min(1)
+    .max(100),
+});
+export type AddChargesBatchInput = z.infer<typeof addChargesBatchSchema>;
 
 /** Qabulxona bir yoki bir necha 24 soatlik palata kunini qo‘lda qo‘shadi. */
 export const addRoomChargesSchema = z.object({

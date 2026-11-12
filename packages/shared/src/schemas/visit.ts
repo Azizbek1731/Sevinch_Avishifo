@@ -10,9 +10,17 @@ export const updateVisitSchema = z.object({
   objective: z.string().optional(),
   assessmentNote: z.string().optional(),
   plan: z.string().optional(),
+  diagnosisPrimary: z.string().max(10000).optional(),
+  diagnosisSecondary: z.string().max(10000).optional(),
   nextVisitAt: isoDateTimeSchema.optional(),
 });
 export type UpdateVisitInput = z.infer<typeof updateVisitSchema>;
+
+/** Confirm a visit — empty sheets need a reason or an uploaded document. */
+export const completeVisitSchema = z.object({
+  emptyReason: z.string().trim().min(3).max(2000).optional(),
+});
+export type CompleteVisitInput = z.infer<typeof completeVisitSchema>;
 
 export const upsertVitalsSchema = z.object({
   heightCm: z.number().min(30).max(250).optional(),
@@ -101,11 +109,15 @@ export const addReferralSchema = z
     note: z.string().optional(),
   })
   .superRefine((value, ctx) => {
-    if (value.type === ReferralType.LAB && !value.labTestIds?.length) {
+    if (
+      value.type === ReferralType.LAB &&
+      !value.labTestIds?.length &&
+      !value.serviceIds?.length
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['labTestIds'],
-        message: 'labTestIds are required for a LAB referral',
+        path: ['serviceIds'],
+        message: 'labTestIds or serviceIds are required for a LAB referral',
       });
     }
     if (value.type === ReferralType.ULTRASOUND) {

@@ -14,6 +14,12 @@
   },
   "add": {
     "title": "Xarajat qo‘shish",
+    "doctorTitle": "Lab / UZI / xizmat buyurtma",
+    "doctorHint": "Narxlar katalogdan ko‘rinadi. Buyurtma statsionar hisobga yoziladi; to‘lov chiqarishda kassada.",
+    "doctorPriceHint": "Har bir xizmat yonida joriy narx ko‘rsatiladi — keragini tanlang.",
+    "doctorSubmit": "Buyurtmani saqlash",
+    "doctorSaved": "Buyurtma qo‘shildi",
+    "doctorSavedMany": "{count} ta buyurtma qo‘shildi",
     "hint": "Xarajat saqlanishi bilan kassadagi “To‘lov kutilmoqda” ro‘yxatiga avtomatik tushadi.",
     "cashierTitle": "Faqat kassa",
     "cashierHint": "Xizmat faqat kassaga boradi — laboratoriya, UZI yoki shifokor navbatiga tushmaydi. To‘lovdan keyin yakunlanadi.",
@@ -25,14 +31,16 @@
       "uzi": "UZI",
       "consultation": "Shifokor qabuli",
       "cashier": "Faqat kassa",
-      "manual": "Qo‘lda"
+      "manual": "Qo‘lda",
+      "massage": "Massaj"
     },
     "modeHints": {
       "procedures": "Muolaja, instrumental tekshiruv va boshqa xizmatlar.",
       "lab": "Faqat laboratoriya tahlillari.",
       "uzi": "Faqat UZI xizmatlari. Avval vrachni tanlang — buyurtma uning navbatiga tushadi.",
       "consultation": "Faqat shifokor qabuli xizmatlari. Avval vrachni tanlang.",
-      "cashier": "Istalgan xizmat — faqat kassa, klinik buyurtmasiz."
+      "cashier": "Istalgan xizmat — faqat kassa, klinik buyurtmasiz.",
+      "massage": "Faqat massaj xizmatlari. Statsionar hisobga yoziladi."
     },
     "doctor": "Vrach",
     "doctorPlaceholder": "Vrachni tanlang",
@@ -54,5 +62,31 @@
   },
   "cancelConfirm": "Bu xizmatni bemor hisobidan bekor qilasizmi?",
   "loadError": "Xarajatlarni yuklab bo‘lmadi. Sahifani yangilang.",
-  "openSurgery": "Operatsiya kartasi"
+  "openSurgery": "Operatsiya kartasi",
+  "aiScan": {
+    "button": "AI bilan qo‘shish",
+    "title": "Hisob blankasini AI o‘qishi",
+    "hint": "СЧЁТ-СОГЛАШЕНИЕ yoki shunga o‘xshash blankani suratga oling. AI qatorlarni chiqaradi — keraksizini olib tashlang, xatolarni tuzating, so‘ng saqlang. Kassaga yuborish keyinroq «belgilab yuborish» orqali.",
+    "upload": "Rasm yuklash",
+    "scanning": "AI o‘qiyapti…",
+    "scanned": "AI {count} ta qator topdi",
+    "disabled": "AI o‘qish yoqilmagan. Administrator OPENAI_API_KEY ni .env ga qo‘ysin.",
+    "date": "Asosiy sana",
+    "model": "Model: {model}",
+    "previewAlt": "Yuklangan hisob rasmi",
+    "patient": "Blankadagi bemor",
+    "doctor": "Blankadagi shifokor",
+    "notes": "Izoh",
+    "linesTitle": "Kiritiladigan qatorlar ({count})",
+    "name": "Nomi",
+    "qty": "Miqdor",
+    "price": "Narx",
+    "total": "Jami",
+    "editHint": "Keraksiz qatorni o‘chiring, nom/narxni tuzating. Saqlashdan keyin statsionar hisobga PENDING bo‘lib tushadi.",
+    "empty": "Avval hisob blankasi rasmini yuklang.",
+    "needLines": "Saqlash uchun kamida bitta to‘g‘ri qator kerak.",
+    "save": "Hisobga saqlash",
+    "saving": "Saqlanmoqda…",
+    "saved": "{count} ta xarajat statsionar hisobga qo‘shildi"
+  }
 }

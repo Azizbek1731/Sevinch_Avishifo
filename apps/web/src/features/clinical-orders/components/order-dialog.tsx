@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/select';
 import { PatientCombobox } from '@/features/billing/components/patient-combobox';
 import { ServiceCombobox, serviceName } from '@/features/billing/components/service-combobox';
+import { UziServicePicker } from '@/features/billing/components/uzi-service-picker';
 import {
   billingApi,
   sanitizeMoney,
@@ -50,6 +51,7 @@ import { identifyInvoiceRequest, type InvoiceRequestIdentity } from '@/features/
 import { searchServiceCatalogue } from '@/features/billing/service-catalogue';
 import { useApiErrorToast } from '@/features/reception/hooks';
 import { useAuthStore } from '@/stores/auth-store';
+import { ambulatoryApi } from '@/features/ambulatory/api';
 import { clinicalOrdersApi, type ClinicalKind } from '../api';
 import {
   consultationSearchQueries,
@@ -85,6 +87,28 @@ function ServiceSelection({
   const locale = useLocale();
   const total = services.reduce((sum, service) => sum + toTiyin(service.currentPrice ?? '0'), 0n);
   const pickerDisabled = requireDoctor && !doctor;
+  const isUzi = kind === 'ULTRASOUND';
+
+  if (isUzi) {
+    return (
+      <div className="space-y-3">
+        <Label>{t('services')}</Label>
+        <UziServicePicker
+          selected={services}
+          doctor={doctor}
+          disabled={pickerDisabled}
+          excludeIds={excludeIds}
+          onChange={onChange}
+        />
+        <div className="flex justify-between rounded-lg bg-muted/40 p-3">
+          <span>{t('total')}</span>
+          <strong className="tabular-nums">{formatUZS(fromTiyin(total))}</strong>
+        </div>
+        <p className="text-xs text-muted-foreground">{t('priceHint')}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <Label>{t('services')}</Label>
@@ -92,7 +116,7 @@ function ServiceSelection({
         <ServiceCombobox
           value={null}
           kind={kind}
-          doctor={kind === 'ULTRASOUND' ? doctor : null}
+          doctor={null}
           disabled={pickerDisabled}
           excludeIds={[...excludeIds, ...services.map((service) => service.id)]}
           onChange={(service) => {
@@ -294,10 +318,17 @@ export function ClinicalOrderDialog({
         ],
       };
       manualIdentity.current = identifyInvoiceRequest(payload, manualIdentity.current);
-      return billingApi.quickInvoice({
+      const res = await billingApi.quickInvoice({
         ...payload,
         idempotencyKey: manualIdentity.current.key,
       });
+      if (kind === 'CONSULTATION') {
+        // 409 means the patient already has an open card with this doctor.
+        await ambulatoryApi
+          .open({ patientId: patient.id, doctorUserId: selectedDoctor.id })
+          .catch(() => undefined);
+      }
+      return res;
     },
     onError,
     onSuccess: (res) => {
@@ -310,6 +341,7 @@ export function ClinicalOrderDialog({
       });
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
       void queryClient.invalidateQueries({ queryKey: ['patient-checkout'] });
+      void queryClient.invalidateQueries({ queryKey: ['ambulatory'] });
       invalidate();
       manualIdentity.current = null;
       onOpenChange(false);
@@ -368,7 +400,13 @@ export function ClinicalOrderDialog({
         if (!busy) onOpenChange(next);
       }}
     >
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent
+        className={
+          kind === 'ULTRASOUND'
+            ? 'max-h-[90vh] overflow-y-auto sm:max-w-3xl'
+            : 'max-h-[90vh] overflow-y-auto sm:max-w-2xl'
+        }
+      >
         <DialogHeader>
           <DialogTitle>
             {t(kind === 'ULTRASOUND' ? 'newUltrasound' : 'newConsultation')}
@@ -562,7 +600,7 @@ export function ExtraClinicalServicesDialog({
         if (!create.isPending) onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{t('extraServices')}</DialogTitle>
           <DialogDescription>{t('extraHint')}</DialogDescription>

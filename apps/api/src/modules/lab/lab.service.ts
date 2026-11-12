@@ -23,6 +23,7 @@ import { SequenceService } from '../../core/sequence/sequence.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { parseReferenceRanges } from './reference-ranges';
 import { PricingService } from '../services/pricing.service';
+import { attachLabOrderToVisitCase } from '../ambulatory/ambulatory-case';
 import {
   FINAL_LAB_STATUSES,
   isLabInvoicePaid,
@@ -613,8 +614,33 @@ export class LabService {
     });
   }
 
-  /** Idempotent invoice-to-laboratory handoff, inside the cashier invoice transaction. */
+  /**
+   * Idempotent invoice-to-laboratory handoff, inside the cashier invoice transaction.
+   * Every outpatient lab order passes here, so a doctor visit's order also lands on its ambulatory card.
+   */
   async prepareOrderForInvoice(
+    tx: TenantTransactionClient,
+    invoice: {
+      id: string;
+      patientId: string;
+      branchId: string;
+      visitId: string | null;
+      createdById: string | null;
+    },
+    lines: { serviceId: string | null }[],
+  ): Promise<{ id: string; orderNumber: string } | null> {
+    const order = await this.orderForInvoice(tx, invoice, lines);
+    if (order)
+      await attachLabOrderToVisitCase(
+        tx,
+        TenantContext.requireClinicId(),
+        order.id,
+        invoice.createdById,
+      );
+    return order;
+  }
+
+  private async orderForInvoice(
     tx: TenantTransactionClient,
     invoice: {
       id: string;

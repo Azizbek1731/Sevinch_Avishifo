@@ -43,6 +43,7 @@
   "noteAdded": "Note added",
   "noNotes": "No daily notes",
   "back": "Back to list",
+  "backToMyPatients": "Back to my patients",
   "print": "Print",
   "status": {
     "ACTIVE": "In hospital",
@@ -94,7 +95,9 @@
     "openUzi": "Ultrasound list",
     "attachments": "{count} file(s)",
     "visit": "Visit",
-    "labDownloadFailed": "Could not download the result"
+    "labDownloadFailed": "Could not download the result",
+    "orderLab": "Order lab",
+    "orderUzi": "Order ultrasound"
   },
   "sections": {
     "diagnoses": "Diagnoses",
@@ -114,9 +117,9 @@
     "room": "Inpatient room",
     "roomPlaceholder": "Select floor and room",
     "roomEmpty": "No free rooms. Add rooms in Settings or wait for a bed.",
-    "roomNumber": "Room number",
+    "roomNumber": "Room / ward (optional)",
     "roomNumberHint": "e.g. 12 or floor 2 room 5",
-    "roomNumberHelp": "Informational only — not linked to the room catalog or price.",
+    "roomNumberHelp": "Optional. Informational only — not linked to the room catalog or price.",
     "attendingDoctor": "Attending doctor",
     "attendingDoctorPlaceholder": "Select a doctor",
     "doctorOther": "Not in list — type name",
@@ -167,7 +170,7 @@
   "invoiceRaised": "Invoice raised: {number}",
   "dischargeCheck": {
     "unbilled": "{count} account line(s) not yet invoiced — {total} (auto-invoiced at discharge)",
-    "issueInvoice": "Raise invoice now",
+    "issueInvoice": "Send the stay bill to the cashier",
     "debtTitle": "Owed for this stay (pay at discharge)",
     "accountDue": "Total due",
     "pay": "Pay",
@@ -213,7 +216,7 @@
     "addedMany": "{count} room days were added to the bill",
     "currency": "UZS",
     "total": "Total · {days} × 24h",
-    "enableHint": "Save the 24h rate first, then add daily charges manually.",
+    "enableHint": "Rate is optional. To add days, save a rate first (empty or 0 = free).",
     "nextHint": "Next day to add: {date}",
     "reverseHint": "You can reverse a mistaken day under “Added days” — only the latest unpaid day.",
     "editHint": "The new rate applies to the next manually added day. Earlier days stay unchanged.",
@@ -227,5 +230,6 @@
     "reversed": "Room day reversed",
     "cancelled": "Cancelled",
     "paid": "Paid"
-  }
+  },
+  "billedToCashier": "Stay bill sent to the cashier"
 }

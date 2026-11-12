@@ -306,6 +306,8 @@ export interface PendingPatient {
   invoiceCount: number;
   due: string;
   oldestAt: string;
+  /** Most recent unpaid invoice — cashier queue is ordered by this. */
+  latestAt: string;
 }
 export interface PatientOutstanding {
   patient: PatientBrief & { balance: string };

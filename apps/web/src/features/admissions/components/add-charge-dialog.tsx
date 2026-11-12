@@ -28,15 +28,26 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ServiceCombobox, serviceName } from '@/features/billing/components/service-combobox';
+import { LabServicePicker } from '@/features/billing/components/lab-service-picker';
+import { UziServicePicker } from '@/features/billing/components/uzi-service-picker';
 import { sanitizeMoney, type ServiceOption } from '@/features/billing/api';
 import { clinicalOrdersApi } from '@/features/clinical-orders/api';
 import { isUziSpecialty } from '@/features/clinical-orders/doctor-matching';
 import { useApiErrorToast } from '@/features/services/hooks';
 import { chargesApi } from '../api';
 
-type ChargeMode = 'procedures' | 'lab' | 'uzi' | 'consultation' | 'cashier' | 'manual';
+type ChargeMode =
+  | 'procedures'
+  | 'lab'
+  | 'uzi'
+  | 'massage'
+  | 'consultation'
+  | 'cashier'
+  | 'manual';
 
-const CATALOG_MODES: ChargeMode[] = ['procedures', 'lab', 'uzi', 'consultation', 'cashier'];
+const CATALOG_MODES: ChargeMode[] = ['procedures', 'lab', 'uzi', 'consultation', 'cashier', 'manual'];
+/** Stay charges are settled at discharge, so the ward has no cashier-now mode. */
+const STAY_MODES: ChargeMode[] = ['lab', 'uzi', 'massage', 'procedures', 'consultation', 'manual'];
 
 type CatalogLine = {
   key: string;
@@ -55,11 +66,14 @@ export function AddChargeDialog({
   onOpenChange,
   patientId,
   admissionId,
+  initialMode,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   patientId: string;
   admissionId?: string;
+  /** Prefill mode (e.g. doctor opens Lab/UZI from Bemorlarim). */
+  initialMode?: ChargeMode;
 }) {
   const t = useTranslations('charges');
   const tc = useTranslations('common');
@@ -68,7 +82,10 @@ export function AddChargeDialog({
   const errorToast = useApiErrorToast();
   const titleId = useId();
   const branchId = useAuthStore((s) => s.activeBranchId);
-  const [mode, setMode] = useState<ChargeMode>('procedures');
+  const role = useAuthStore((s) => s.user?.role);
+  const wardDoctor = role === 'DOCTOR' && Boolean(admissionId);
+  const modes = admissionId ? STAY_MODES : CATALOG_MODES;
+  const [mode, setMode] = useState<ChargeMode>(initialMode ?? (wardDoctor ? 'lab' : 'procedures'));
   const [date, setDate] = useState(todayTashkent());
   const [lines, setLines] = useState<CatalogLine[]>([]);
   const [doctorUserId, setDoctorUserId] = useState('');
@@ -81,7 +98,7 @@ export function AddChargeDialog({
 
   useEffect(() => {
     if (!open) return;
-    setMode('procedures');
+    setMode(initialMode ?? (wardDoctor ? 'lab' : 'procedures'));
     setDate(todayTashkent());
     setLines([]);
     setDoctorUserId('');
@@ -91,7 +108,7 @@ export function AddChargeDialog({
     lineKeys.current = new Map();
     manualKey.current = null;
     clinicalKey.current = null;
-  }, [open, patientId, admissionId]);
+  }, [open, patientId, admissionId, initialMode, wardDoctor]);
 
   const doctors = useQuery({
     queryKey: ['clinical-orders', 'doctors', branchId],
@@ -119,14 +136,20 @@ export function AddChargeDialog({
         if (!branchId) throw new Error('branch');
         if (!doctorUserId) throw new Error('doctor');
         if (!clinicalKey.current) clinicalKey.current = createId();
-        await clinicalOrdersApi.create({
+        const body = {
           patientId,
           branchId,
           doctorUserId,
-          kind: mode === 'uzi' ? 'ULTRASOUND' : 'CONSULTATION',
+          kind: (mode === 'uzi' ? 'ULTRASOUND' : 'CONSULTATION') as 'ULTRASOUND' | 'CONSULTATION',
           serviceIds: lines.map((line) => line.service.id),
           idempotencyKey: clinicalKey.current,
-        });
+        };
+        // Stay orders go on the stay account (held until discharge), whoever enters them.
+        if (admissionId) {
+          await clinicalOrdersApi.createInpatient(body);
+        } else {
+          await clinicalOrdersApi.create(body);
+        }
         return lines.length;
       }
       const cashierOnly = mode === 'cashier' ? true : undefined;
@@ -168,7 +191,16 @@ export function AddChargeDialog({
     },
     onSuccess: (count) => {
       invalidate();
-      toast.success(count > 1 ? t('add.savedMany', { count }) : t('add.saved'));
+      void qc.invalidateQueries({ queryKey: ['admission-reports'] });
+      toast.success(
+        wardDoctor
+          ? count > 1
+            ? t('add.doctorSavedMany', { count })
+            : t('add.doctorSaved')
+          : count > 1
+            ? t('add.savedMany', { count })
+            : t('add.saved'),
+      );
       lineKeys.current = new Map();
       manualKey.current = null;
       clinicalKey.current = null;
@@ -221,16 +253,32 @@ export function AddChargeDialog({
         if (!add.isPending) onOpenChange(value);
       }}
     >
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent
+        className={
+          mode === 'uzi'
+            ? 'max-h-[90vh] overflow-y-auto sm:max-w-3xl'
+            : 'sm:max-w-xl'
+        }
+      >
         <DialogHeader>
-          <DialogTitle>{mode === 'cashier' ? t('add.cashierTitle') : t('add.title')}</DialogTitle>
+          <DialogTitle>
+            {wardDoctor
+              ? t('add.doctorTitle')
+              : mode === 'cashier'
+                ? t('add.cashierTitle')
+                : t('add.title')}
+          </DialogTitle>
           <DialogDescription>
-            {mode === 'cashier' ? t('add.cashierHint') : t('add.hint')}
+            {wardDoctor
+              ? t('add.doctorHint')
+              : mode === 'cashier'
+                ? t('add.cashierHint')
+                : t('add.hint')}
           </DialogDescription>
         </DialogHeader>
         <fieldset disabled={add.isPending} className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            {([...CATALOG_MODES, 'manual'] as ChargeMode[]).map((value) => (
+            {modes.map((value) => (
               <Button
                 key={value}
                 type="button"
@@ -242,6 +290,9 @@ export function AddChargeDialog({
               </Button>
             ))}
           </div>
+          {wardDoctor && (mode === 'lab' || mode === 'uzi') ? (
+            <p className="text-xs text-muted-foreground">{t('add.doctorPriceHint')}</p>
+          ) : null}
 
           <div className="space-y-2">
             <Label htmlFor="charge-date">{t('add.date')}</Label>
@@ -294,116 +345,165 @@ export function AddChargeDialog({
 
           {isCatalog ? (
             <div className="space-y-3">
-              <div className="space-y-2">
-                <Label>{t('add.service')}</Label>
-                <ServiceCombobox
-                  key={`${mode}:${doctorUserId}`}
-                  excludeSurgery
-                  disabled={add.isPending || (clinical && !doctorUserId)}
-                  proceduresOnly={mode === 'procedures'}
-                  kind={
-                    mode === 'lab'
-                      ? 'LAB'
-                      : mode === 'uzi'
-                        ? 'ULTRASOUND'
-                        : mode === 'consultation'
-                          ? 'CONSULTATION'
-                          : undefined
-                  }
-                  doctor={mode === 'uzi' ? selectedDoctor : null}
-                  excludeIds={lines.map((line) => line.service.id)}
-                  value={null}
-                  onChange={(service) => {
-                    setLines((prev) => [
-                      ...prev,
-                      {
-                        key: createId(),
-                        service,
-                        quantity: 1,
-                        unitPrice: service.currentPrice ?? '0',
-                      },
-                    ]);
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">{t(`add.modeHints.${mode}`)}</p>
-                <p className="text-xs text-muted-foreground">{t('add.multiHint')}</p>
-              </div>
-
-              <ul className="divide-y rounded-lg border">
-                {lines.map((line) => (
-                  <li
-                    key={line.key}
-                    className={
-                      clinical
-                        ? 'grid gap-2 p-3 sm:grid-cols-[1fr_120px_36px]'
-                        : 'grid gap-2 p-3 sm:grid-cols-[1fr_72px_120px_36px]'
-                    }
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {serviceName(line.service, locale)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{line.service.code}</p>
-                    </div>
-                    {!clinical ? (
-                      <div className="space-y-1">
-                        <span className="text-xs text-muted-foreground">{t('add.quantity')}</span>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={999}
-                          value={line.quantity}
-                          onChange={(e) => {
-                            const quantity = Math.max(1, Math.min(999, Number(e.target.value) || 1));
-                            setLines((prev) =>
-                              prev.map((item) =>
-                                item.key === line.key ? { ...item, quantity } : item,
-                              ),
-                            );
-                          }}
-                        />
-                      </div>
-                    ) : null}
-                    <div className="space-y-1">
-                      <span className="text-xs text-muted-foreground">{t('add.price')}</span>
-                      {clinical ? (
-                        <p className="flex h-9 items-center text-sm tabular-nums">
-                          {formatUZS(line.unitPrice as MoneyString)}
-                        </p>
-                      ) : (
-                        <Input
-                          inputMode="decimal"
-                          value={line.unitPrice}
-                          onChange={(e) => {
-                            const unitPrice = e.target.value;
-                            setLines((prev) =>
-                              prev.map((item) =>
-                                item.key === line.key ? { ...item, unitPrice } : item,
-                              ),
-                            );
-                          }}
-                        />
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="self-end text-destructive"
-                      aria-label={tc('delete')}
-                      onClick={() => {
-                        lineKeys.current.delete(line.key);
-                        setLines((prev) => prev.filter((item) => item.key !== line.key));
+              {mode === 'uzi' || mode === 'lab' ? (
+                <div className="space-y-2">
+                  <Label>{t('add.service')}</Label>
+                  {mode === 'uzi' ? (
+                    <UziServicePicker
+                      selected={lines.map((line) => line.service)}
+                      doctor={selectedDoctor}
+                      disabled={add.isPending || !doctorUserId}
+                      onChange={(next) => {
+                        setLines((prev) => {
+                          const prevById = new Map(prev.map((line) => [line.service.id, line]));
+                          return next.map((service) => {
+                            const existing = prevById.get(service.id);
+                            if (existing) return existing;
+                            return {
+                              key: createId(),
+                              service,
+                              quantity: 1,
+                              unitPrice: service.currentPrice ?? '0',
+                            };
+                          });
+                        });
                       }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </li>
-                ))}
-                {!lines.length ? (
-                  <li className="p-4 text-sm text-muted-foreground">{t('add.pickServices')}</li>
-                ) : null}
-              </ul>
+                    />
+                  ) : (
+                    <LabServicePicker
+                      selected={lines.map((line) => line.service)}
+                      disabled={add.isPending}
+                      onChange={(next) => {
+                        setLines((prev) => {
+                          const prevById = new Map(prev.map((line) => [line.service.id, line]));
+                          return next.map((service) => {
+                            const existing = prevById.get(service.id);
+                            if (existing) return existing;
+                            return {
+                              key: createId(),
+                              service,
+                              quantity: 1,
+                              unitPrice: service.currentPrice ?? '0',
+                            };
+                          });
+                        });
+                      }}
+                    />
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {t(`add.modeHints.${mode}`)}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label>{t('add.service')}</Label>
+                    <ServiceCombobox
+                      key={`${mode}:${doctorUserId}`}
+                      excludeSurgery
+                      disabled={add.isPending || (clinical && !doctorUserId)}
+                      proceduresOnly={mode === 'procedures'}
+                      massageOnly={mode === 'massage'}
+                      kind={mode === 'consultation' ? 'CONSULTATION' : undefined}
+                      doctor={null}
+                      excludeIds={lines.map((line) => line.service.id)}
+                      value={null}
+                      onChange={(service) => {
+                        setLines((prev) => [
+                          ...prev,
+                          {
+                            key: createId(),
+                            service,
+                            quantity: 1,
+                            unitPrice: service.currentPrice ?? '0',
+                          },
+                        ]);
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">{t(`add.modeHints.${mode}`)}</p>
+                    <p className="text-xs text-muted-foreground">{t('add.multiHint')}</p>
+                  </div>
+
+                  <ul className="divide-y rounded-lg border">
+                    {lines.map((line) => (
+                      <li
+                        key={line.key}
+                        className={
+                          clinical
+                            ? 'grid gap-2 p-3 sm:grid-cols-[1fr_120px_36px]'
+                            : 'grid gap-2 p-3 sm:grid-cols-[1fr_72px_120px_36px]'
+                        }
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {serviceName(line.service, locale)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{line.service.code}</p>
+                        </div>
+                        {!clinical ? (
+                          <div className="space-y-1">
+                            <span className="text-xs text-muted-foreground">{t('add.quantity')}</span>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={999}
+                              value={line.quantity}
+                              onChange={(e) => {
+                                const quantity = Math.max(
+                                  1,
+                                  Math.min(999, Number(e.target.value) || 1),
+                                );
+                                setLines((prev) =>
+                                  prev.map((item) =>
+                                    item.key === line.key ? { ...item, quantity } : item,
+                                  ),
+                                );
+                              }}
+                            />
+                          </div>
+                        ) : null}
+                        <div className="space-y-1">
+                          <span className="text-xs text-muted-foreground">{t('add.price')}</span>
+                          {clinical ? (
+                            <p className="flex h-9 items-center text-sm tabular-nums">
+                              {formatUZS(line.unitPrice as MoneyString)}
+                            </p>
+                          ) : (
+                            <Input
+                              inputMode="decimal"
+                              value={line.unitPrice}
+                              onChange={(e) => {
+                                const unitPrice = e.target.value;
+                                setLines((prev) =>
+                                  prev.map((item) =>
+                                    item.key === line.key ? { ...item, unitPrice } : item,
+                                  ),
+                                );
+                              }}
+                            />
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="self-end text-destructive"
+                          aria-label={tc('delete')}
+                          onClick={() => {
+                            lineKeys.current.delete(line.key);
+                            setLines((prev) => prev.filter((item) => item.key !== line.key));
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </li>
+                    ))}
+                    {!lines.length ? (
+                      <li className="p-4 text-sm text-muted-foreground">{t('add.pickServices')}</li>
+                    ) : null}
+                  </ul>
+                </>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
@@ -462,7 +562,7 @@ export function AddChargeDialog({
             disabled={add.isPending || !canSubmit}
             onClick={() => add.mutate()}
           >
-            {t('add.submit')}
+            {wardDoctor ? t('add.doctorSubmit') : t('add.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

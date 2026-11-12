@@ -46,7 +46,10 @@ export function AiPage() {
         ...prev,
         {
           role: 'assistant',
-          text: err instanceof ApiError ? tErr(err.code as never) : tErr('INTERNAL_ERROR'),
+          text:
+            err instanceof ApiError
+              ? err.message?.trim() || tErr(err.code as never)
+              : tErr('INTERNAL_ERROR'),
         },
       ]),
   });

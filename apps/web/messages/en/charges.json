@@ -14,6 +14,12 @@
   },
   "add": {
     "title": "Add a charge",
+    "doctorTitle": "Order lab / ultrasound / services",
+    "doctorHint": "Catalogue prices are shown. Orders go on the inpatient account; payment is at discharge.",
+    "doctorPriceHint": "Each service shows its current price.",
+    "doctorSubmit": "Save order",
+    "doctorSaved": "Order added",
+    "doctorSavedMany": "{count} orders added",
     "hint": "Saving the charge automatically adds its invoice to the cashier’s pending payments.",
     "cashierTitle": "Cashier only",
     "cashierHint": "The service goes to the cashier only — not to lab, ultrasound or doctor worklists. Ends after payment.",
@@ -25,14 +31,16 @@
       "uzi": "Ultrasound",
       "consultation": "Consultation",
       "cashier": "Cashier only",
-      "manual": "Manual"
+      "manual": "Manual",
+      "massage": "Massage"
     },
     "modeHints": {
       "procedures": "Procedures, diagnostic exams and other services.",
       "lab": "Laboratory tests only.",
       "uzi": "Ultrasound services only. Select the doctor first — the order goes to their worklist.",
       "consultation": "Doctor consultations only. Select the doctor first.",
-      "cashier": "Any service — cashier only, no clinical order."
+      "cashier": "Any service — cashier only, no clinical order.",
+      "massage": "Massage services only. Added to the stay account."
     },
     "doctor": "Doctor",
     "doctorPlaceholder": "Select a doctor",
@@ -54,5 +62,31 @@
   },
   "cancelConfirm": "Cancel this patient charge?",
   "loadError": "Could not load charges. Refresh the page.",
-  "openSurgery": "Operation record"
+  "openSurgery": "Operation record",
+  "aiScan": {
+    "button": "Add with AI",
+    "title": "AI bill scan",
+    "hint": "Photograph the paper bill agreement. AI suggests lines — remove extras, fix mistakes, then save. Send to cashier later by selecting lines.",
+    "upload": "Upload photo",
+    "scanning": "AI is reading…",
+    "scanned": "AI found {count} lines",
+    "disabled": "AI scan is off. Ask an admin to set OPENAI_API_KEY in .env.",
+    "date": "Default date",
+    "model": "Model: {model}",
+    "previewAlt": "Uploaded bill photo",
+    "patient": "Patient on form",
+    "doctor": "Doctor on form",
+    "notes": "Notes",
+    "linesTitle": "Lines to save ({count})",
+    "name": "Title",
+    "qty": "Qty",
+    "price": "Price",
+    "total": "Total",
+    "editHint": "Delete unwanted lines and fix prices. After save they stay PENDING on the inpatient account.",
+    "empty": "Upload a bill photo first.",
+    "needLines": "At least one valid line is required.",
+    "save": "Save to account",
+    "saving": "Saving…",
+    "saved": "{count} charges added to the inpatient account"
+  }
 }

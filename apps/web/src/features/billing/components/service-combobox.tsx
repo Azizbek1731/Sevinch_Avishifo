@@ -28,6 +28,15 @@ export function serviceName(s: ServiceOption, locale: string): string {
   return localizedText(s.name, locale);
 }
 
+const MASSAGE = /massa|массаж/i;
+
+export function isMassageService(s: ServiceOption): boolean {
+  const category = s.category?.name;
+  const categoryText =
+    typeof category === 'string' ? category : Object.values(category ?? {}).join(' ');
+  return MASSAGE.test(categoryText) || Object.values(s.name).some((v) => MASSAGE.test(v ?? ''));
+}
+
 export interface ServiceComboboxProps {
   /** Currently selected service (display only; source of truth is the form). */
   value: ServiceOption | null;
@@ -36,6 +45,8 @@ export interface ServiceComboboxProps {
   kind?: 'LAB' | 'CONSULTATION' | 'ULTRASOUND';
   excludeIds?: string[];
   proceduresOnly?: boolean;
+  /** Only the "Massaj" catalogue section (procedures). */
+  massageOnly?: boolean;
   /** Surgery cases are scheduled through the dedicated inpatient workflow. */
   excludeSurgery?: boolean;
   /** When set with ULTRASOUND, only that doctor's catalogue rows are offered. */
@@ -50,6 +61,7 @@ export function ServiceCombobox({
   kind,
   excludeIds = [],
   proceduresOnly = false,
+  massageOnly = false,
   excludeSurgery = false,
   doctor = null,
   disabled = false,
@@ -62,7 +74,7 @@ export function ServiceCombobox({
   useEffect(() => {
     setSearch('');
     setOpen(false);
-  }, [kind, proceduresOnly, excludeSurgery, doctor?.id]);
+  }, [kind, proceduresOnly, massageOnly, excludeSurgery, doctor?.id]);
 
   const { data } = useQuery({
     queryKey: [
@@ -70,12 +82,12 @@ export function ServiceCombobox({
       'billing-search',
       kind,
       search,
-      { proceduresOnly, excludeSurgery, doctorId: doctor?.id },
+      { proceduresOnly, massageOnly, excludeSurgery, doctorId: doctor?.id },
     ],
     queryFn: () =>
       searchServiceCatalogue(billingApi.searchServices, search, {
         kind,
-        proceduresOnly,
+        proceduresOnly: proceduresOnly || massageOnly,
         excludeSurgery,
       }),
     enabled: open && !disabled,
@@ -83,6 +95,7 @@ export function ServiceCombobox({
 
   const options = (data ?? []).filter((service) => {
     if (excludeIds.includes(service.id)) return false;
+    if (massageOnly && !isMassageService(service)) return false;
     if (kind === 'ULTRASOUND' && doctor)
       return uziServiceMatchesDoctor(service, doctor, locale);
     return true;

@@ -105,6 +105,14 @@
     "loadError": "Could not load the catalogue",
     "count": "{count}"
   },
+  "uziPicker": {
+    "search": "Search ultrasound…",
+    "hint": "Tick the ultrasound exams you need — multiple selection is allowed.",
+    "empty": "No ultrasound services for this doctor",
+    "loadError": "Could not load the catalogue",
+    "pickDoctorFirst": "Select an ultrasound doctor first",
+    "count": "{count}"
+  },
   "refundDlg": {
     "title": "Refund — {number}",
     "paid": "Paid",
@@ -217,7 +225,7 @@
   "checkout": {
     "title": "Patient payment",
     "description": "Select services to pay. The patient may pay what they have now — any remainder stays as debt and can be paid later.",
-    "queueDescription": "All outstanding bills are grouped by patient. Select individual bills or pay all. Partial payment is allowed.",
+    "queueDescription": "Newest invoices from reception appear at the top. Use search by name or invoice number if needed. Partial payment is allowed.",
     "selectAll": "Select all",
     "selected": "{count} bills selected",
     "invoiceCount": "{count} bills",

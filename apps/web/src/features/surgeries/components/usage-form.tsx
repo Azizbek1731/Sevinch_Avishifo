@@ -224,17 +224,24 @@ export function SurgeryUsageForm({
                                   { shouldDirty: true },
                                 );
                                 form.clearErrors(`items.${index}.service`);
+                                form.clearErrors(`items.${index}.title`);
+                                form.clearErrors(`items.${index}.unit`);
+                                form.clearErrors(`items.${index}.unitPrice`);
                               }}
                             />
-                          ) : (
-                            <Input
-                              id={`${prefix}-title`}
-                              maxLength={200}
-                              {...form.register(`items.${index}.title`)}
-                              {...errorProps('title')}
-                            />
-                          )}
-                          {error(row.source === 'CATALOGUE' ? 'service' : 'title')}
+                          ) : null}
+                          {row.source === 'CATALOGUE' ? error('service') : null}
+                          <Input
+                            id={`${prefix}-title`}
+                            className={row.source === 'CATALOGUE' ? 'mt-2' : undefined}
+                            maxLength={200}
+                            placeholder={
+                              row.source === 'CATALOGUE' ? t('overrideNameHint') : undefined
+                            }
+                            {...form.register(`items.${index}.title`)}
+                            {...errorProps('title')}
+                          />
+                          {error('title')}
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -253,7 +260,6 @@ export function SurgeryUsageForm({
                           <Input
                             id={`${prefix}-unit`}
                             maxLength={30}
-                            readOnly={row.source === 'CATALOGUE'}
                             {...form.register(`items.${index}.unit`)}
                             {...errorProps('unit')}
                           />
@@ -264,7 +270,6 @@ export function SurgeryUsageForm({
                           <Input
                             id={`${prefix}-unitPrice`}
                             inputMode="decimal"
-                            readOnly={row.source === 'CATALOGUE'}
                             {...form.register(`items.${index}.unitPrice`)}
                             {...errorProps('unitPrice')}
                           />

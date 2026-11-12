@@ -38,6 +38,8 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'TreatmentOrder',
   'TreatmentAdministration',
   'ChargeItem',
+  'AmbulatoryCase',
+  'AmbulatoryCommissionRate',
   'SurgeryCase',
   'SurgeryEntry',
   'SurgeryStaffFee',

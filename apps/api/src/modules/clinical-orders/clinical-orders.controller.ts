@@ -59,6 +59,21 @@ export class ClinicalOrdersController {
     return this.orders.create(dto, user, branchId);
   }
 
+  /**
+   * Statsionar vrach: UZI / konsultatsiya buyurtmasi.
+   * Kassaga `invoices.write` shart emas — bemor ACTIVE yotuvda bo‘lishi kerak;
+   * hisob stay PENDING ga bog‘lanadi.
+   */
+  @Post('inpatient')
+  @RequirePermissions('charges.write')
+  createInpatient(
+    @Body() dto: CreateClinicalOrderDto,
+    @CurrentUser() user: AuthUser,
+    @ActiveBranch() branchId: string,
+  ) {
+    return this.orders.createForActiveStay(dto, user, branchId);
+  }
+
   @Get('doctors')
   @RequirePermissions('services.read')
   doctors(@CurrentUser() user: AuthUser, @ActiveBranch() branchId: string) {

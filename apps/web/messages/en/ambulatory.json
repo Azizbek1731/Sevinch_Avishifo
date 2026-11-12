@@ -1,0 +1,147 @@
+{
+  "title": "Outpatient",
+  "description": "Outpatient cards: the doctor refers the patient to the lab and ultrasound, and the doctor's share of the lab payment is calculated automatically.",
+  "descriptionDoctor": "Your outpatients and your share of their paid lab work.",
+  "open": "Open outpatient card",
+  "export": "Excel",
+  "pickPatientTitle": "Open outpatient card",
+  "pickPatientDescription": "Find the patient — then choose the doctor who referred them.",
+  "tabs": {
+    "cases": "Cards",
+    "commissions": "Doctors' share",
+    "myCommission": "My share"
+  },
+  "status": {
+    "OPEN": "Open",
+    "CLOSED": "Closed"
+  },
+  "filters": {
+    "allStatuses": "All",
+    "allDoctors": "All doctors",
+    "searchPlaceholder": "Patient, card number or phone...",
+    "from": "From",
+    "to": "To",
+    "clear": "Clear"
+  },
+  "fields": {
+    "doctor": "Doctor",
+    "doctorPlaceholder": "Choose the referring doctor",
+    "doctorHelp": "The share of lab payments sent from this card goes to this doctor.",
+    "doctorRequired": "Choose a doctor",
+    "complaint": "Complaint",
+    "diagnosis": "Diagnosis",
+    "note": "Note"
+  },
+  "openDialog": {
+    "title": "{name} — outpatient card",
+    "hint": "Lab and ultrasound referrals are sent from the open card. Payment happens at the cashier as usual.",
+    "opened": "Outpatient card opened: {number}"
+  },
+  "empty": {
+    "title": "No outpatient cards",
+    "description": "Patients sent from reception for a doctor visit land here automatically. You can also open a card manually."
+  },
+  "table": {
+    "number": "Card #",
+    "patient": "Patient",
+    "doctor": "Doctor",
+    "opened": "Opened",
+    "referrals": "Referrals",
+    "labPaid": "Lab paid",
+    "commission": "Doctor's share",
+    "labCount": "Lab: {count}",
+    "uziCount": "US: {count}",
+    "pending": "pending"
+  },
+  "summary": {
+    "monthCommission": "Doctors' share this month",
+    "monthPending": "Awaiting payment (share)",
+    "monthPatients": "Patients this month",
+    "openCards": "Open cards"
+  },
+  "commissions": {
+    "commission": "Doctor's share",
+    "pendingCommission": "Expected share",
+    "paidAmount": "Lab amount paid",
+    "labAmount": "Lab amount",
+    "patients": "Patients",
+    "orders": "Referrals",
+    "calculation": "Calculation: only lab sent from an outpatient card. Share = lab amount paid at the cashier × the percent at referral time (default {percent}%). Discounts and refunds are deducted; cancelled orders are excluded. Ultrasound earns no share.",
+    "emptyTitle": "No outpatient lab referrals in this period",
+    "emptyDescription": "They appear here once lab is sent from an outpatient card.",
+    "byDoctor": "By doctor",
+    "byOrder": "By referral",
+    "percent": "Current %",
+    "total": "Total",
+    "date": "Date",
+    "tests": "Tests",
+    "payment": "Payment",
+    "exported": "Excel file downloaded"
+  },
+  "payment": {
+    "PAID": "Paid",
+    "PARTIAL": "Partial",
+    "UNPAID": "Unpaid"
+  },
+  "uziStatus": {
+    "WAITING_PAYMENT": "Awaiting payment",
+    "READY": "Queued",
+    "IN_PROGRESS": "In progress",
+    "COMPLETED": "Done",
+    "CANCELLED": "Cancelled"
+  },
+  "rates": {
+    "button": "Percentages",
+    "title": "Doctors' share (percent)",
+    "description": "The percent of lab payments sent from an outpatient card that goes to the doctor.",
+    "default": "Default percent (all doctors)",
+    "defaultHelp": "Applies to every doctor without an individual percent.",
+    "perDoctor": "Individual percent",
+    "perDoctorHelp": "Leave empty to use the default. Changes affect new referrals only — earlier ones keep their percent.",
+    "save": "Save",
+    "saved": "Percentages saved"
+  },
+  "detail": {
+    "back": "Outpatient list",
+    "edit": "Edit",
+    "editTitle": "Edit card",
+    "save": "Save",
+    "saved": "Saved",
+    "doctorLocked": "This card has a doctor visit or lab orders — the doctor cannot be changed. Open a new card if needed.",
+    "close": "Close card",
+    "reopen": "Reopen",
+    "closed": "Card closed",
+    "reopened": "Card reopened",
+    "closedHint": "The card is closed. Reopen it to send a new referral.",
+    "remove": "Delete",
+    "removeTitle": "Delete this card?",
+    "removeHint": "Delete it if it was opened by mistake. No referrals were sent from it.",
+    "removed": "Card deleted",
+    "sendLab": "Send to lab",
+    "shareBadge": "Doctor's share {percent}%",
+    "labPreview": "{count} tests · {total} · doctor's share ≈ {share}",
+    "sendToCashier": "Send to cashier",
+    "labSent": "Lab referral sent to the cashier",
+    "sendUzi": "Send to ultrasound",
+    "uziDoctor": "Ultrasound doctor",
+    "noUziDoctors": "No ultrasound doctor in this branch.",
+    "uziNoShare": "Ultrasound payments earn no doctor's share.",
+    "uziSent": "Ultrasound referral sent to the cashier",
+    "inpatientWarning": "The patient is currently an inpatient ({number}). Tests go to the inpatient account, so an outpatient referral is not possible.",
+    "openStay": "Open inpatient card",
+    "labOrders": "Lab referrals",
+    "noLab": "Not sent to the lab",
+    "labStatus": "Status",
+    "labReady": "Result ready",
+    "labInWork": "In progress",
+    "cancelled": "Cancelled",
+    "uziOrders": "Ultrasound referrals",
+    "noUzi": "Not sent to ultrasound",
+    "uziServices": "Examinations",
+    "uziTotal": "Amount",
+    "consultations": "Doctor visit",
+    "consultationService": "Service",
+    "openResult": "Open result",
+    "openVisit": "Open visit"
+  }
+}

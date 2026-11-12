@@ -1,16 +1,35 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useIsMutating } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
+import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
-import { AlertTriangle, CheckCircle2, FileDown, Lock, Plus, Printer } from 'lucide-react';
+import { toast } from 'sonner';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FileDown,
+  Lock,
+  Paperclip,
+  Plus,
+  Printer,
+  Upload,
+} from 'lucide-react';
 import { VisitStatus, formatUZS, fromTiyin, toTiyin } from '@avishifo/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ConfirmDialog } from '@/components/confirm-dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
 import { Link } from '@/i18n/routing';
@@ -20,7 +39,7 @@ import { localizedText } from '@/lib/localized';
 import { useAuthStore } from '@/stores/auth-store';
 import { useClinicalOrder } from '@/features/clinical-orders/hooks';
 import { ExtraClinicalServicesDialog } from '@/features/clinical-orders/components/order-dialog';
-import { parseAllergies } from '../api';
+import { doctorApi, parseAllergies, type VisitDetail } from '../api';
 import { useApiErrorToast, useCompleteVisit, useVisit } from '../hooks';
 import { DiagnosesSection } from './diagnoses-section';
 import { PrescriptionsSection } from './prescriptions-section';
@@ -31,18 +50,37 @@ import { ClinicalHistoryPanel } from './clinical-history';
 import { UziAttachments } from '@/features/uzi/components/uzi-attachments';
 import { UltrasoundReport } from './ultrasound-report';
 
+function visitHasClinicalContent(visit: VisitDetail): boolean {
+  return Boolean(
+    visit.diagnosisPrimary?.trim() ||
+      visit.diagnosisSecondary?.trim() ||
+      visit.subjective?.trim() ||
+      visit.objective?.trim() ||
+      visit.assessmentNote?.trim() ||
+      visit.plan?.trim() ||
+      visit.reportTitle?.trim() ||
+      visit.reportBody?.trim() ||
+      visit.physiotherapy?.trim() ||
+      visit.diagnoses.length ||
+      visit.prescriptions.length ||
+      (visit.documents?.length ?? 0) > 0,
+  );
+}
+
 export function VisitForm({ visitId }: { visitId: string }) {
   const t = useTranslations('visits');
   const tc = useTranslations('common');
   const locale = useLocale();
   const tr = useTranslations('doctor.clinical');
   const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
   const query = useVisit(visitId, { refetchInterval: 10_000 });
   const visit = query.data;
   const ownsVisit = user?.role !== 'DOCTOR' || visit?.doctorUserId === user.id;
   const canWrite = ownsVisit && (user?.permissions.includes('visits.write') ?? false);
   const canAmend = ownsVisit && (user?.permissions.includes('visits.amend') ?? false);
   const [confirmComplete, setConfirmComplete] = useState(false);
+  const [emptyReason, setEmptyReason] = useState('');
   const [extraOpen, setExtraOpen] = useState(false);
   const [soapDirty, setSoapDirty] = useState(false);
   const [vitalsDirty, setVitalsDirty] = useState(false);
@@ -51,11 +89,18 @@ export function VisitForm({ visitId }: { visitId: string }) {
   const [referralDirty, setReferralDirty] = useState(false);
   const [reportDirty, setReportDirty] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const examFileRef = useRef<HTMLInputElement>(null);
+  const confirmFileRef = useRef<HTMLInputElement>(null);
   const pendingMutations = useIsMutating({ mutationKey: ['visits', visitId] });
-  const completeVisit = useCompleteVisit(visitId);
+  const completeVisit = useCompleteVisit(visitId, () => {
+    setConfirmComplete(false);
+    setEmptyReason('');
+  });
   const order = useClinicalOrder(visit?.clinicalOrderId);
   const onError = useApiErrorToast();
-  const unsaved = soapDirty || vitalsDirty || rxDirty || dxDirty || referralDirty || reportDirty;
+  // Diagnosis autosaves on blur — don't block "Tasdiqlash" while the doctor is still typing it.
+  const blockingUnsaved = soapDirty || vitalsDirty || rxDirty || referralDirty || reportDirty;
+  const unsaved = blockingUnsaved || dxDirty;
   useEffect(() => {
     if (!unsaved) return;
     const warn = (event: BeforeUnloadEvent) => {
@@ -65,6 +110,22 @@ export function VisitForm({ visitId }: { visitId: string }) {
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [unsaved]);
+
+  const uploadAttachment = useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('title', file.name);
+      return doctorApi.uploadAttachment(visitId, form);
+    },
+    onSuccess: () => {
+      toast.success(t('attachmentUploaded'));
+      void queryClient.invalidateQueries({ queryKey: ['visits', visitId] });
+      void queryClient.invalidateQueries({ queryKey: ['patients'] });
+    },
+    onError,
+  });
+
   const downloadPdf = async () => {
     setDownloading(true);
     try {
@@ -81,6 +142,7 @@ export function VisitForm({ visitId }: { visitId: string }) {
       setDownloading(false);
     }
   };
+
   if (query.isLoading)
     return (
       <div className="space-y-4">
@@ -98,6 +160,7 @@ export function VisitForm({ visitId }: { visitId: string }) {
         </Button>
       </div>
     );
+
   const locked = visit.status === VisitStatus.COMPLETED;
   const cancelled = visit.status === VisitStatus.CANCELLED || order.data?.status === 'CANCELLED';
   const sectionsDisabled = locked || cancelled || !canWrite || completeVisit.isPending;
@@ -108,16 +171,18 @@ export function VisitForm({ visitId }: { visitId: string }) {
     : [];
   const due = order.data ? toTiyin(order.data.invoice.due) + toTiyin(order.data.additionalDue) : 0n;
   const orderUnavailable = Boolean(visit.clinicalOrderId) && (!order.data || order.isError);
-  const reportReady = !ultrasound || Boolean(visit.reportTitle?.trim() && visit.reportBody?.trim());
+  const docs = visit.documents ?? [];
+  const hasContent = visitHasClinicalContent({ ...visit, documents: docs });
   const canComplete =
     canWrite &&
     !locked &&
     !cancelled &&
-    reportReady &&
-    !unsaved &&
+    !blockingUnsaved &&
     pendingMutations === 0 &&
     due === 0n &&
     !orderUnavailable;
+  const canConfirmEmpty = hasContent || emptyReason.trim().length >= 3;
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -294,11 +359,60 @@ export function VisitForm({ visitId }: { visitId: string }) {
               </Card>
             )}
             <DiagnosesSection
-              visitId={visit.id}
-              diagnoses={visit.diagnoses}
-              disabled={sectionsDisabled}
+              visit={visit}
+              disabled={sectionsDisabled && !(locked && canAmend)}
               onUnsavedChange={setDxDirty}
             />
+            <Card>
+              <CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Paperclip className="h-4 w-4" />
+                  {t('attachmentsTitle')}
+                </CardTitle>
+                {!sectionsDisabled ? (
+                  <>
+                    <input
+                      ref={examFileRef}
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) uploadAttachment.mutate(file);
+                        e.target.value = '';
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={uploadAttachment.isPending}
+                      onClick={() => examFileRef.current?.click()}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      {uploadAttachment.isPending ? t('uploading') : t('uploadAttachment')}
+                    </Button>
+                  </>
+                ) : null}
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-sm text-muted-foreground">{t('attachmentsHint')}</p>
+                {docs.length ? (
+                  <ul className="divide-y rounded-lg border">
+                    {docs.map((doc) => (
+                      <li
+                        key={doc.id}
+                        className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+                      >
+                        <span className="truncate">{doc.title || doc.fileName}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{t('attachmentsEmpty')}</p>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
           <TabsContent value="rx" className="mt-0">
             <PrescriptionsSection
@@ -337,18 +451,89 @@ export function VisitForm({ visitId }: { visitId: string }) {
           }
         />
       ) : null}
-      <ConfirmDialog
+
+      <Dialog
         open={confirmComplete}
-        onOpenChange={setConfirmComplete}
-        title={tr('confirmTitle')}
-        description={tr('confirmDescription')}
-        confirmLabel={tr('confirmReport')}
-        cancelLabel={tc('cancel')}
-        onConfirm={() => {
-          setConfirmComplete(false);
-          if (canComplete) completeVisit.mutate(undefined);
+        onOpenChange={(open) => {
+          if (completeVisit.isPending) return;
+          setConfirmComplete(open);
+          if (!open) setEmptyReason('');
         }}
-      />
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{tr('confirmTitle')}</DialogTitle>
+            <DialogDescription>
+              {hasContent ? tr('confirmDescription') : t('emptyConfirmDescription')}
+            </DialogDescription>
+          </DialogHeader>
+          {!hasContent ? (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="empty-reason">{t('emptyConfirmReason')}</Label>
+                <Textarea
+                  id="empty-reason"
+                  rows={3}
+                  value={emptyReason}
+                  onChange={(e) => setEmptyReason(e.target.value)}
+                  placeholder={t('emptyConfirmReasonPlaceholder')}
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={confirmFileRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadAttachment.mutate(file);
+                    e.target.value = '';
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={uploadAttachment.isPending}
+                  onClick={() => confirmFileRef.current?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {t('uploadAttachment')}
+                </Button>
+                <span className="text-xs text-muted-foreground">{t('emptyConfirmOrUpload')}</span>
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={completeVisit.isPending}
+              onClick={() => setConfirmComplete(false)}
+            >
+              {tc('cancel')}
+            </Button>
+            <Button
+              type="button"
+              disabled={
+                !canComplete ||
+                completeVisit.isPending ||
+                uploadAttachment.isPending ||
+                !canConfirmEmpty
+              }
+              onClick={() => {
+                if (!canComplete || !canConfirmEmpty) return;
+                completeVisit.mutate(
+                  hasContent ? {} : { emptyReason: emptyReason.trim() },
+                );
+              }}
+            >
+              {tr('confirmReport')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

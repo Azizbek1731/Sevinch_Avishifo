@@ -128,5 +128,22 @@
     },
     "dedicatedActionsHint": "Shifokor qabuli va UZI uchun qabulxonadagi alohida tugmalardan foydalaning.",
     "noDoctors": "Bu filialda faol shifokor topilmadi. Filialni tekshiring yoki administratorga murojaat qiling."
+  },
+  "myPatients": {
+    "title": "Bemorlarim",
+    "subtitle": "Sizga biriktirilgan statsionar bemorlar va operatsiya rejangiz. Ichiga kirib lab/UZI buyurtma qiling va natijani shu yerda ko‘ring.",
+    "search": "F.I.Sh. yoki karta raqami…",
+    "inpatientTitle": "Statsionarda yotganlar",
+    "inpatientEmpty": "Hozircha statsionar bemoringiz yo‘q",
+    "inpatientEmptyHint": "Sizni davolovchi shifokor qilib belgilashganda shu yerda chiqadi.",
+    "surgeryTitle": "Operatsiya rejalari",
+    "surgeryEmpty": "Rejalashtirilgan operatsiya yo‘q",
+    "surgeryEmptyHint": "Siz jarroh sifatida belgilangan operatsiyalar shu yerda.",
+    "surgeryBadge": "Operatsiya: {date}",
+    "surgeryOnlyHint": "{count} ta bemor faqat operatsiya rejasida (statsionar ro‘yxatda alohida).",
+    "ward": "xona",
+    "openAnalyses": "Analizlar",
+    "openCharges": "Xarajatlar",
+    "openSurgery": "Operatsiya"
   }
 }

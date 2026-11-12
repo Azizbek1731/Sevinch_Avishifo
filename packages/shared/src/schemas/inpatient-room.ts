@@ -3,12 +3,18 @@ import { idSchema, moneySchema, paginationQuerySchema } from './common';
 
 export const inpatientRoomFloorSchema = z.coerce.number().int().min(1).max(20);
 
+/** Empty / omitted → free ward (0). Catalog price is optional on create. */
+const optionalRoomPriceSchema = z.preprocess((value) => {
+  if (value === '' || value === null || value === undefined) return '0';
+  return value;
+}, moneySchema);
+
 export const createInpatientRoomSchema = z.object({
   branchId: idSchema,
   floor: inpatientRoomFloorSchema,
   number: z.string().trim().min(1).max(40),
   name: z.string().trim().max(120).optional(),
-  pricePerDay: moneySchema,
+  pricePerDay: optionalRoomPriceSchema.optional().default('0'),
 });
 export type CreateInpatientRoomInput = z.infer<typeof createInpatientRoomSchema>;
 
@@ -16,7 +22,7 @@ export const updateInpatientRoomSchema = z.object({
   floor: inpatientRoomFloorSchema.optional(),
   number: z.string().trim().min(1).max(40).optional(),
   name: z.string().trim().max(120).nullable().optional(),
-  pricePerDay: moneySchema.optional(),
+  pricePerDay: optionalRoomPriceSchema.optional(),
   isActive: z.boolean().optional(),
 });
 export type UpdateInpatientRoomInput = z.infer<typeof updateInpatientRoomSchema>;

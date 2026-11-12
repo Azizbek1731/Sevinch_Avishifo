@@ -13,7 +13,7 @@
   ],
   "privacyNote": "Yordamchi faqat sizning klinikangiz ma’lumotini va faqat sizda ruxsat bor bo‘limlarni ko‘radi. Boshqa klinikalarning ma’lumotiga umuman yo‘l yo‘q.",
   "disabledTitle": "AviShifo AI hali yoqilmagan",
-  "disabledBody": "Yoqish uchun serverda Gemini API kaliti sozlanishi kerak. Administratoringizga murojaat qiling.",
+  "disabledBody": "Yoqish uchun serverda OPENAI_API_KEY sozlanishi kerak. Administratoringizga murojaat qiling.",
   "tools": {
     "clinic_today": "bugungi holat",
     "revenue_report": "tushum hisoboti",

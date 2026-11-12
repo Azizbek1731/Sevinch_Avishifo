@@ -45,24 +45,38 @@ function canonicalDecimal(value: string, precision: 2 | 3): string {
   return `${whole.replace(/^0+(?=\d)/, '')}.${fraction.padEnd(precision, '0')}`;
 }
 
-/** Catalogue snapshots are for display only; the server owns catalogue pricing. */
+/** Catalogue pick autofills; desk may override title / unit / price before save. */
 export function serializeUsageRows(
   rows: readonly UsageDraftRow[],
   kind: 'MATERIAL' | 'ANESTHESIA',
 ): Omit<AddSurgeryEntriesInput, 'idempotencyKey'> {
   return {
-    items: rows.map((row) => ({
-      kind,
-      quantity: canonicalDecimal(row.quantity, 3),
-      note: row.note.trim() || undefined,
-      ...(row.source === 'CATALOGUE'
-        ? { serviceId: row.service?.id }
-        : {
-            title: row.title.trim(),
-            unit: row.unit.trim(),
-            unitPrice: canonicalDecimal(row.unitPrice, 2),
-          }),
-    })),
+    items: rows.map((row) => {
+      const base = {
+        kind,
+        quantity: canonicalDecimal(row.quantity, 3),
+        note: row.note.trim() || undefined,
+      };
+      if (row.source === 'CATALOGUE' && row.service?.id) {
+        return {
+          ...base,
+          serviceId: row.service.id,
+          ...(row.title.trim() ? { title: row.title.trim() } : {}),
+          ...(row.unit.trim() ? { unit: row.unit.trim() } : {}),
+          ...(row.unitPrice.trim()
+            ? { unitPrice: canonicalDecimal(row.unitPrice, 2) }
+            : {}),
+        };
+      }
+      return {
+        ...base,
+        title: row.title.trim(),
+        unit: row.unit.trim(),
+        unitPrice: row.unitPrice.trim()
+          ? canonicalDecimal(row.unitPrice, 2)
+          : row.unitPrice.trim(),
+      };
+    }),
   };
 }
 
@@ -80,14 +94,18 @@ export function validateUsageRows(
   const payload = serializeUsageRows(rows, kind);
   rows.forEach((row, index) => {
     if (row.source !== 'CATALOGUE' && row.source !== 'MANUAL') add(index, 'source');
-    if (row.source === 'CATALOGUE' && (!row.service || row.service.currentPrice === null)) {
+    if (
+      row.source === 'CATALOGUE' &&
+      (!row.service ||
+        (row.service.currentPrice === null && !row.unitPrice.trim()))
+    ) {
       add(index, 'service');
     }
     const parsed = surgeryEntryItemSchema.safeParse(payload.items[index]);
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
         const field = issue.path[0];
-        if (field === 'serviceId' || (row.source === 'CATALOGUE' && field === 'title')) {
+        if (field === 'serviceId') {
           add(index, 'service');
         } else if (
           field === 'title' ||
@@ -111,9 +129,7 @@ export function usageRowsTotals(rows: readonly UsageDraftRow[]): {
 } {
   const lines = rows.map((row) => {
     const quantity = decimal(row.quantity);
-    const price = decimal(
-      row.source === 'CATALOGUE' ? (row.service?.currentPrice ?? '') : row.unitPrice,
-    );
+    const price = decimal(row.unitPrice || (row.service?.currentPrice ?? ''));
     if (!/^\d{1,9}(?:\.\d{1,3})?$/.test(quantity) || !/^\d{1,12}(?:\.\d{1,2})?$/.test(price)) {
       return null;
     }

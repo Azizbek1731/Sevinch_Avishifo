@@ -29,7 +29,7 @@ import { ReportsService } from '../reports/reports.service';
  * exists.
  */
 
-/** A JSON-Schema-ish parameter description, as Gemini's function calling expects. */
+/** A JSON-Schema-ish parameter description, as OpenAI tool calling expects. */
 export interface AiToolParameter {
   type: 'string' | 'number' | 'integer' | 'boolean';
   description: string;

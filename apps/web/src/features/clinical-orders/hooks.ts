@@ -34,7 +34,7 @@ export function useClinicalOrder(id: string | null | undefined) {
 export function useInvalidateClinicalOrders() {
   const qc = useQueryClient();
   return () => {
-    for (const key of ['clinical-orders', 'visits', 'patients', 'invoices']) {
+    for (const key of ['clinical-orders', 'visits', 'patients', 'invoices', 'ambulatory']) {
       void qc.invalidateQueries({ queryKey: [key] });
     }
   };

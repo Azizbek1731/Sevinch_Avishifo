@@ -5,6 +5,7 @@ import { ServicesModule } from '../services/services.module';
 import { XlsxService } from '../reports/xlsx.service';
 import { AdmissionsController, ChargesController } from './admissions.controller';
 import { AdmissionsService } from './admissions.service';
+import { BillScanService } from './bill-scan.service';
 import { ChargesService } from './charges.service';
 import { InpatientRoomsController } from './inpatient-rooms.controller';
 import { InpatientRoomsService } from './inpatient-rooms.service';
@@ -16,7 +17,7 @@ import { InpatientRoomsService } from './inpatient-rooms.service';
 @Module({
   imports: [BillingModule, LabModule, ServicesModule],
   controllers: [AdmissionsController, ChargesController, InpatientRoomsController],
-  providers: [AdmissionsService, ChargesService, InpatientRoomsService, XlsxService],
+  providers: [AdmissionsService, ChargesService, BillScanService, InpatientRoomsService, XlsxService],
   exports: [AdmissionsService, ChargesService, InpatientRoomsService],
 })
 export class AdmissionsModule {}

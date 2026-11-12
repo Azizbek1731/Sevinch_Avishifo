@@ -11,6 +11,7 @@ import {
   CLINIC_PDF_COLORS,
   drawClinicLetterhead,
   drawClinicPageFurniture,
+  formalClinicName,
   preparePdfClinicLogo,
   type PdfClinicProfile,
 } from '../../common/pdf/clinic-letterhead';
@@ -23,12 +24,18 @@ export interface VisitReportPdfData {
   clinic: PdfClinicProfile;
   patient: { fullName: string; mrn: string; dob: string | null };
   doctorName: string;
+  doctorSpecialty: string | null;
+  doctorPhone: string | null;
   confirmedAt: string;
   latestAmendment?: { at: string; authorName: string; reason: string | null } | null;
   subjective: string | null;
   objective: string | null;
   assessmentNote: string | null;
   plan: string | null;
+  diagnosisPrimary?: string | null;
+  diagnosisSecondary?: string | null;
+  emptyConfirmReason?: string | null;
+  documents?: Array<{ id: string; title: string; fileName: string }>;
   physiotherapy?: string | null;
   diagnoses: Array<{ code: string; name: string; note: string | null; primary: boolean }>;
   prescriptions: PrescriptionFormatItem[];
@@ -67,7 +74,37 @@ const PRESCRIPTION_LABELS = {
 
 export type VisitReportPdfMode = 'summary' | 'prescription';
 
-/** Server-rendered A4 report; doctor/time identify the clinical confirmation. */
+function birthYearLabel(dob: string | null): string | null {
+  if (!dob) return null;
+  const year = formatInTimeZone(dob, TIMEZONE, 'yyyy');
+  return `${year} y.t.`;
+}
+
+function formatDoctorPhone(phone: string | null): string | null {
+  if (!phone?.trim()) return null;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('998')) {
+    return `+998-${digits.slice(3, 5)}-${digits.slice(5, 8)}-${digits.slice(8, 10)}-${digits.slice(10)}`;
+  }
+  return phone.trim();
+}
+
+/** Plain clinical line for the tavsiya sheet (not formal Rp.). */
+function formatTavsiyaMedicine(
+  group: readonly PrescriptionFormatItem[],
+  labels: (typeof PRESCRIPTION_LABELS)['uz'],
+): string {
+  const lines = formatPrescriptionGroup(group, labels);
+  const name = lines.components.join(' + ');
+  const tail = [lines.dtd.replace(/^M\.\s*/, ''), lines.signature].filter(Boolean).join(', ');
+  return tail ? `${name} — ${tail}` : name;
+}
+
+/**
+ * Server-rendered A4 report.
+ * Consultation summary follows the clinic's simple «tavsiya» sheet
+ * (FISH → TASHXIS → narrative → TAVSIYA → doctor), not a dense SOAP dump.
+ */
 @Injectable()
 export class VisitReportPdfService {
   async render(
@@ -78,12 +115,13 @@ export class VisitReportPdfService {
     const logo = await preparePdfClinicLogo(data.clinic.logoUrl);
     const prescriptionLabels = PRESCRIPTION_LABELS[locale];
     const prescriptionOnly = mode === 'prescription' && data.kind !== 'ULTRASOUND';
+    const clinicName = formalClinicName(data.clinic);
     const reportTitle = prescriptionOnly
       ? prescriptionLabels.documentTitle
       : data.title ||
         (data.kind === 'ULTRASOUND'
           ? 'Ultratovush tekshiruvi xulosasi'
-          : 'Shifokor konsultatsiyasi xulosasi');
+          : `«${clinicName}» KLINIKASIDAGI KO‘RIK`);
     const doc = new PDFDocument({
       size: 'A4',
       margins: { top: 74, bottom: 62, left: MARGIN, right: MARGIN },
@@ -100,63 +138,221 @@ export class VisitReportPdfService {
     });
     doc.registerFont('body', FONT).registerFont('bold', BOLD);
     drawClinicLetterhead(doc, data.clinic, logo, MARGIN);
+
+    if (prescriptionOnly) {
+      this.renderPrescriptionOnly(doc, data, prescriptionLabels, reportTitle);
+    } else if (data.kind === 'ULTRASOUND') {
+      this.renderUltrasound(doc, data, prescriptionLabels, reportTitle);
+    } else {
+      this.renderConsultationTavsiya(doc, data, prescriptionLabels, reportTitle);
+    }
+
+    drawClinicPageFurniture(doc, data.clinic, {
+      margin: MARGIN,
+      documentLabel: reportTitle,
+    });
+    doc.end();
+    return result;
+  }
+
+  private ensureSpace(doc: PDFKit.PDFDocument, needed = 90): void {
+    if (doc.y > doc.page.height - needed) doc.addPage();
+  }
+
+  private heading(doc: PDFKit.PDFDocument, title: string): void {
+    this.ensureSpace(doc, 100);
+    doc
+      .moveDown(0.55)
+      .font('bold')
+      .fontSize(11)
+      .fillColor(CLINIC_PDF_COLORS.ink)
+      .text(title, MARGIN, doc.y, { width: CONTENT_WIDTH });
+    doc.moveDown(0.2);
+  }
+
+  private bodyText(doc: PDFKit.PDFDocument, text: string): void {
+    doc.font('body').fontSize(10).fillColor(CLINIC_PDF_COLORS.ink).text(text.trim(), {
+      width: CONTENT_WIDTH,
+      lineGap: 2.5,
+      paragraphGap: 4,
+    });
+  }
+
+  private labeledBlock(doc: PDFKit.PDFDocument, label: string, body: string | null): void {
+    if (!body?.trim()) return;
+    this.ensureSpace(doc, 100);
+    doc.moveDown(0.45);
+    doc.font('bold').fontSize(10).fillColor(CLINIC_PDF_COLORS.ink).text(label, {
+      width: CONTENT_WIDTH,
+      continued: false,
+    });
+    this.bodyText(doc, body);
+  }
+
+  private renderConsultationTavsiya(
+    doc: PDFKit.PDFDocument,
+    data: VisitReportPdfData,
+    prescriptionLabels: (typeof PRESCRIPTION_LABELS)['uz'],
+    reportTitle: string,
+  ): void {
+    const dateLine = formatInTimeZone(data.confirmedAt, TIMEZONE, 'dd.MM.yyyy');
+    doc
+      .font('body')
+      .fontSize(10)
+      .fillColor(CLINIC_PDF_COLORS.ink)
+      .text(`${dateLine} y.`, MARGIN, doc.y, { width: CONTENT_WIDTH });
+    doc.moveDown(0.55);
+    doc
+      .font('bold')
+      .fontSize(12)
+      .fillColor(CLINIC_PDF_COLORS.ink)
+      .text(reportTitle, MARGIN, doc.y, { width: CONTENT_WIDTH, align: 'center' });
+    doc.moveDown(0.7);
+
+    const birth = birthYearLabel(data.patient.dob);
+    doc
+      .font('bold')
+      .fontSize(10.5)
+      .fillColor(CLINIC_PDF_COLORS.ink)
+      .text(`FISH:   ${data.patient.fullName}${birth ? `, ${birth}` : ''}`, {
+        width: CONTENT_WIDTH,
+      });
+    doc
+      .font('body')
+      .fontSize(8.5)
+      .fillColor(CLINIC_PDF_COLORS.muted)
+      .text(`Karta: ${data.patient.mrn}`, { width: CONTENT_WIDTH });
+    doc.moveDown(0.45);
+
+    const freePrimary = data.diagnosisPrimary?.trim();
+    const freeSecondary = data.diagnosisSecondary?.trim();
+    const legacyPrimary = data.diagnoses.filter((item) => item.primary);
+    const legacySecondary = data.diagnoses.filter((item) => !item.primary);
+    if (freePrimary || freeSecondary || legacyPrimary.length || legacySecondary.length) {
+      this.heading(doc, 'TASHXISI:');
+      if (freePrimary) {
+        doc
+          .font('bold')
+          .fontSize(10)
+          .fillColor(CLINIC_PDF_COLORS.ink)
+          .text(`ASOSIY:  ${freePrimary}`, { width: CONTENT_WIDTH });
+      } else if (legacyPrimary.length) {
+        doc
+          .font('bold')
+          .fontSize(10)
+          .fillColor(CLINIC_PDF_COLORS.ink)
+          .text(
+            `ASOSIY:  ${legacyPrimary
+              .map((item) => (item.note?.trim() ? `${item.name}. ${item.note.trim()}` : item.name))
+              .join('\n')}`,
+            { width: CONTENT_WIDTH },
+          );
+      }
+      if (freeSecondary) {
+        doc
+          .font('bold')
+          .fontSize(10)
+          .fillColor(CLINIC_PDF_COLORS.ink)
+          .text(`YONDOSH:  ${freeSecondary}`, { width: CONTENT_WIDTH });
+      } else if (legacySecondary.length) {
+        doc
+          .font('bold')
+          .fontSize(10)
+          .fillColor(CLINIC_PDF_COLORS.ink)
+          .text(
+            `YONDOSH:  ${legacySecondary
+              .map((item) => (item.note?.trim() ? `${item.name}. ${item.note.trim()}` : item.name))
+              .join('\n')}`,
+            { width: CONTENT_WIDTH },
+          );
+      }
+    }
+
+    this.labeledBlock(doc, 'Shikoyatlari / anamnezi:', data.subjective);
+    this.labeledBlock(doc, 'Obyektiv holat:', data.objective);
+    this.labeledBlock(doc, 'Laborator-instrumental / xulosa:', data.assessmentNote);
+    this.labeledBlock(doc, 'Xulosa:', data.body);
+
+    const groups = groupPrescriptionItems(data.prescriptions);
+    const hasTavsiya =
+      Boolean(data.plan?.trim()) || groups.length > 0 || Boolean(data.physiotherapy?.trim());
+    if (hasTavsiya) {
+      this.heading(doc, 'TAVSIYA:');
+      if (data.plan?.trim()) this.bodyText(doc, data.plan);
+      for (const group of groups) {
+        const line = formatTavsiyaMedicine(group, prescriptionLabels);
+        if (!line) continue;
+        this.ensureSpace(doc, 70);
+        doc
+          .font('body')
+          .fontSize(10)
+          .fillColor(CLINIC_PDF_COLORS.ink)
+          .text(line, MARGIN, doc.y, { width: CONTENT_WIDTH, lineGap: 2 });
+      }
+      if (data.physiotherapy?.trim()) {
+        this.labeledBlock(doc, `${prescriptionLabels.physiotherapy}:`, data.physiotherapy);
+      }
+    }
+
+    if (data.emptyConfirmReason?.trim()) {
+      this.labeledBlock(
+        doc,
+        'Bo‘sh xulosa sababi:',
+        data.emptyConfirmReason,
+      );
+    }
+    if (data.documents?.length) {
+      this.labeledBlock(
+        doc,
+        'Biriktirilgan hujjatlar:',
+        data.documents.map((docItem) => `• ${docItem.title || docItem.fileName}`).join('\n'),
+      );
+    }
+
+    this.renderSignature(doc, data);
+    this.renderAmendment(doc, data);
+  }
+
+  private renderUltrasound(
+    doc: PDFKit.PDFDocument,
+    data: VisitReportPdfData,
+    prescriptionLabels: (typeof PRESCRIPTION_LABELS)['uz'],
+    reportTitle: string,
+  ): void {
     doc
       .font('bold')
       .fontSize(13)
       .fillColor(CLINIC_PDF_COLORS.ink)
       .text(reportTitle, MARGIN, doc.y, { width: CONTENT_WIDTH });
-    doc.y += 12;
-    const patientY = doc.y;
-    const patientWidth = CONTENT_WIDTH - 24;
-    const metadata = [
-      `Karta: ${data.patient.mrn}${data.patient.dob ? ` · Tug‘ilgan sana: ${formatInTimeZone(data.patient.dob, TIMEZONE, 'dd.MM.yyyy')}` : ''}`,
-      `Shifokor: ${data.doctorName}`,
-      `Tasdiqlangan: ${formatInTimeZone(data.confirmedAt, TIMEZONE, 'dd.MM.yyyy HH:mm')}`,
-    ];
-    doc.font('bold').fontSize(10.5);
-    const patientHeight = doc.heightOfString(data.patient.fullName, { width: patientWidth });
-    doc.font('body').fontSize(8.5);
-    const metadataHeight = metadata.reduce((height, line) =>
-      height + doc.heightOfString(line, { width: patientWidth }) + 4, 0);
-    const boxHeight = patientHeight + metadataHeight + 34;
-    doc.roundedRect(MARGIN, patientY, CONTENT_WIDTH, boxHeight, 5)
-      .fillColor(CLINIC_PDF_COLORS.pale).fill();
-    doc.font('body').fontSize(7).fillColor(CLINIC_PDF_COLORS.muted)
-      .text('BEMOR', MARGIN + 12, patientY + 9, { width: patientWidth });
-    doc.font('bold').fontSize(10.5).fillColor(CLINIC_PDF_COLORS.ink)
-      .text(data.patient.fullName, MARGIN + 12, patientY + 20, { width: patientWidth });
-    doc.y += 7;
-    for (const line of metadata) {
-      doc.font('body').fontSize(8.5).fillColor(CLINIC_PDF_COLORS.muted)
-        .text(line, MARGIN + 12, doc.y, { width: patientWidth });
-      doc.y += 4;
-    }
-    doc.x = MARGIN;
-    doc.y = patientY + boxHeight + 8;
-
-    const section = (title: string, body: string | null) => {
-      if (!body?.trim()) return;
-      if (doc.y > doc.page.height - 115) doc.addPage();
-      doc
-        .moveDown(0.6)
-        .font('bold')
-        .fontSize(11)
-        .fillColor(CLINIC_PDF_COLORS.blue)
-        .text(title, MARGIN, doc.y, { width: CONTENT_WIDTH });
-      doc.moveDown(0.3).font('body').fontSize(10).fillColor(CLINIC_PDF_COLORS.ink).text(body.trim(), {
+    doc.moveDown(0.6);
+    const birth = birthYearLabel(data.patient.dob);
+    doc
+      .font('bold')
+      .fontSize(10.5)
+      .text(`FISH:   ${data.patient.fullName}${birth ? `, ${birth}` : ''}`, {
         width: CONTENT_WIDTH,
-        lineGap: 3,
-        paragraphGap: 6,
       });
-    };
-
-    if (!prescriptionOnly) {
-      section('Xulosa', data.body);
-      section('Shikoyatlar va anamnez', data.subjective);
-      section('Ko‘rik va tekshiruv', data.objective);
-      section('Baholash', data.assessmentNote);
-      section(
-        'Tashxis',
+    doc
+      .font('body')
+      .fontSize(8.5)
+      .fillColor(CLINIC_PDF_COLORS.muted)
+      .text(
+        [
+          `Karta: ${data.patient.mrn}`,
+          `Shifokor: ${data.doctorName}`,
+          `Tasdiqlangan: ${formatInTimeZone(data.confirmedAt, TIMEZONE, 'dd.MM.yyyy HH:mm')}`,
+        ].join(' · '),
+        { width: CONTENT_WIDTH },
+      );
+    doc.moveDown(0.5);
+    this.labeledBlock(doc, 'Xulosa:', data.body);
+    this.labeledBlock(doc, 'Shikoyatlar / anamnez:', data.subjective);
+    this.labeledBlock(doc, 'Ko‘rik va tekshiruv:', data.objective);
+    this.labeledBlock(doc, 'Baholash:', data.assessmentNote);
+    if (data.diagnoses.length) {
+      this.labeledBlock(
+        doc,
+        'Tashxis:',
         data.diagnoses
           .map(
             (item) =>
@@ -164,13 +360,45 @@ export class VisitReportPdfService {
           )
           .join('\n'),
       );
-      section('Davolash va tavsiyalar', data.plan);
     }
+    this.labeledBlock(doc, 'Tavsiyalar:', data.plan);
+    this.labeledBlock(doc, prescriptionLabels.physiotherapy, data.physiotherapy ?? null);
+    this.renderSignature(doc, data);
+    this.renderAmendment(doc, data);
+  }
+
+  private renderPrescriptionOnly(
+    doc: PDFKit.PDFDocument,
+    data: VisitReportPdfData,
+    prescriptionLabels: (typeof PRESCRIPTION_LABELS)['uz'],
+    reportTitle: string,
+  ): void {
+    doc
+      .font('bold')
+      .fontSize(13)
+      .fillColor(CLINIC_PDF_COLORS.ink)
+      .text(reportTitle, MARGIN, doc.y, { width: CONTENT_WIDTH });
+    doc.moveDown(0.5);
+    const birth = birthYearLabel(data.patient.dob);
+    doc
+      .font('bold')
+      .fontSize(10.5)
+      .text(`FISH:   ${data.patient.fullName}${birth ? `, ${birth}` : ''}`, {
+        width: CONTENT_WIDTH,
+      });
+    doc
+      .font('body')
+      .fontSize(8.5)
+      .fillColor(CLINIC_PDF_COLORS.muted)
+      .text(
+        `Karta: ${data.patient.mrn} · Shifokor: ${data.doctorName} · ${formatInTimeZone(data.confirmedAt, TIMEZONE, 'dd.MM.yyyy HH:mm')}`,
+        { width: CONTENT_WIDTH },
+      );
+    doc.moveDown(0.5);
 
     const groups = groupPrescriptionItems(data.prescriptions);
-    if (groups.length === 0 && prescriptionOnly) {
+    if (groups.length === 0) {
       doc
-        .moveDown(0.6)
         .font('body')
         .fontSize(10)
         .fillColor(CLINIC_PDF_COLORS.muted)
@@ -196,21 +424,10 @@ export class VisitReportPdfService {
             .heightOfString(row.text, { width: CONTENT_WIDTH - row.indent, lineGap: 3 }),
         0,
       );
-      const headingHeight = index === 0 && !prescriptionOnly ? 32 : 0;
       const pageBottom = doc.page.height - doc.page.margins.bottom;
-      // Keep an ordinary Rp. block together. A block longer than a page stays
-      // in text flow so PDFKit can wrap and paginate every component and note.
-      const required = Math.min(groupHeight + headingHeight + 12, pageBottom - doc.page.margins.top);
+      const required = Math.min(groupHeight + 12, pageBottom - doc.page.margins.top);
       if (doc.y + required > pageBottom) doc.addPage();
-      if (index === 0 && !prescriptionOnly) {
-        doc
-          .moveDown(0.6)
-          .font('bold')
-          .fontSize(11)
-          .fillColor(CLINIC_PDF_COLORS.blue)
-          .text(prescriptionLabels.title, MARGIN, doc.y, { width: CONTENT_WIDTH });
-        doc.moveDown(0.3);
-      }
+      if (index > 0) doc.moveDown(0.35);
       for (const row of rows) {
         doc
           .font(row.bold ? 'bold' : 'body')
@@ -222,41 +439,61 @@ export class VisitReportPdfService {
           });
       }
       doc.x = MARGIN;
-      doc.moveDown(0.7);
     }
-    section(prescriptionLabels.physiotherapy, data.physiotherapy ?? null);
+    this.labeledBlock(doc, prescriptionLabels.physiotherapy, data.physiotherapy ?? null);
+    this.renderSignature(doc, data);
+  }
 
-    if (doc.y > doc.page.height - 130) doc.addPage();
+  private renderSignature(doc: PDFKit.PDFDocument, data: VisitReportPdfData): void {
+    this.ensureSpace(doc, 120);
+    doc.moveDown(1.2);
+    const role = data.doctorSpecialty?.trim() || 'Shifokor';
     doc
-      .moveDown(1.2)
       .font('bold')
       .fontSize(10)
-      .fillColor(CLINIC_PDF_COLORS.blue)
-      .text(`Tasdiqlagan shifokor: ${data.doctorName}`);
+      .fillColor(CLINIC_PDF_COLORS.ink)
+      .text(`${role}:`, MARGIN, doc.y, { width: CONTENT_WIDTH * 0.45, continued: false });
+    const roleBottom = doc.y;
     doc
-      .font('body')
-      .fontSize(9)
-      .fillColor(CLINIC_PDF_COLORS.muted)
-      .text(formatInTimeZone(data.confirmedAt, TIMEZONE, 'dd.MM.yyyy HH:mm'));
-    doc.moveDown(0.4).fontSize(8).text('Hujjat klinika tizimida shifokor tomonidan tasdiqlangan.');
-    if (!prescriptionOnly && data.latestAmendment) {
-      section(
-        'Oxirgi tuzatish',
-        [
-          `${formatInTimeZone(data.latestAmendment.at, TIMEZONE, 'dd.MM.yyyy HH:mm')} · ${data.latestAmendment.authorName}`,
-          data.latestAmendment.reason ? `Sabab: ${data.latestAmendment.reason}` : null,
-          'Ushbu nusxa oxirgi tuzatishlarni o‘z ichiga oladi.',
-        ]
-          .filter(Boolean)
-          .join('\n'),
-      );
+      .font('bold')
+      .fontSize(10)
+      .text(data.doctorName, MARGIN + CONTENT_WIDTH * 0.45, roleBottom - 12, {
+        width: CONTENT_WIDTH * 0.55,
+        align: 'right',
+      });
+    doc.y = Math.max(doc.y, roleBottom);
+    const phone = formatDoctorPhone(data.doctorPhone);
+    if (phone) {
+      doc.moveDown(0.35);
+      doc
+        .font('body')
+        .fontSize(9)
+        .fillColor(CLINIC_PDF_COLORS.muted)
+        .text(`Tel: ${phone}`, { width: CONTENT_WIDTH });
     }
+    doc
+      .moveDown(0.35)
+      .font('body')
+      .fontSize(8)
+      .fillColor(CLINIC_PDF_COLORS.muted)
+      .text(
+        `Tasdiqlangan: ${formatInTimeZone(data.confirmedAt, TIMEZONE, 'dd.MM.yyyy HH:mm')}`,
+        { width: CONTENT_WIDTH },
+      );
+  }
 
-    drawClinicPageFurniture(doc, data.clinic, {
-      margin: MARGIN,
-      documentLabel: reportTitle,
-    });
-    doc.end();
-    return result;
+  private renderAmendment(doc: PDFKit.PDFDocument, data: VisitReportPdfData): void {
+    if (!data.latestAmendment) return;
+    this.labeledBlock(
+      doc,
+      'Oxirgi tuzatish:',
+      [
+        `${formatInTimeZone(data.latestAmendment.at, TIMEZONE, 'dd.MM.yyyy HH:mm')} · ${data.latestAmendment.authorName}`,
+        data.latestAmendment.reason ? `Sabab: ${data.latestAmendment.reason}` : null,
+        'Ushbu nusxa oxirgi tuzatishlarni o‘z ichiga oladi.',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
   }
 }

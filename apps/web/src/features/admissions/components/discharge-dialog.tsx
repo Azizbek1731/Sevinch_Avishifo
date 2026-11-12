@@ -30,7 +30,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useApiErrorToast } from '@/features/services/hooks';
 import { formatUZS } from '@avishifo/shared';
-import { admissionsApi, chargesApi, chargeTitle } from '../api';
+import { admissionsApi, chargeTitle } from '../api';
 
 const OUTCOMES = ['RECOVERED', 'IMPROVED', 'UNCHANGED', 'WORSE', 'TRANSFERRED', 'DIED'] as const;
 
@@ -77,9 +77,9 @@ export function DischargeDialog({
   };
 
   const raiseInvoice = useMutation({
-    mutationFn: () => chargesApi.invoice((check.data?.unbilled.items ?? []).map((i) => i.id)),
-    onSuccess: (res) => {
-      toast.success(t('invoiceRaised', { number: res.data.number }));
+    mutationFn: () => admissionsApi.bill(admissionId),
+    onSuccess: () => {
+      toast.success(t('billedToCashier'));
       refresh();
     },
     onError: errorToast,
@@ -148,17 +148,19 @@ export function DischargeDialog({
                     </li>
                   ))}
                 </ul>
-                <Button
-                  size="sm"
-                  className="mt-3 w-full"
-                  disabled={raiseInvoice.isPending}
-                  onClick={() => raiseInvoice.mutate()}
-                >
-                  {raiseInvoice.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  {t('dischargeCheck.issueInvoice')}
-                </Button>
+                {can('charges.write') && can('invoices.write') ? (
+                  <Button
+                    size="sm"
+                    className="mt-3 w-full"
+                    disabled={raiseInvoice.isPending}
+                    onClick={() => raiseInvoice.mutate()}
+                  >
+                    {raiseInvoice.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    {t('dischargeCheck.issueInvoice')}
+                  </Button>
+                ) : null}
               </div>
             ) : null}
 

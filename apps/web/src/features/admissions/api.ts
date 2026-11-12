@@ -213,6 +213,12 @@ export const admissionsApi = {
   discharge: (id: string, body: DischargeInput) =>
     api.post<AdmissionRow>(`/admissions/${id}/discharge`, body),
   dischargeCheck: (id: string) => api.get<DischargeCheck>(`/admissions/${id}/discharge-check`),
+  /** Pending lines + held UZI/consultation bills → cashier, once, at the end of the stay. */
+  bill: (id: string) =>
+    api.post<{ admissionId: string; invoiceIds: string[]; accountDue: string }>(
+      `/admissions/${id}/bill`,
+      {},
+    ),
   remove: (id: string) => api.delete<{ id: string; invoicedKept: number }>(`/admissions/${id}`),
 
   createOrder: (id: string, body: CreateOrderInput) =>
@@ -228,10 +234,34 @@ export const admissionsApi = {
     api.delete<AdmissionDetail>(`/admissions/${id}/room-charges/${date}`),
 };
 
+export type AiBillScanLine = {
+  title: string;
+  quantity: number;
+  unitPrice: MoneyString;
+  date?: string;
+  note?: string;
+};
+
+export type AiBillScanResult = {
+  patientName?: string | null;
+  doctorName?: string | null;
+  notes?: string | null;
+  lines: AiBillScanLine[];
+  model: string;
+};
+
 export const chargesApi = {
   list: (patientId: string, status?: ChargeStatus, admissionId?: string) =>
     api.get<ChargeList>('/charges', { patientId, status, admissionId }),
   add: (body: AddChargeInput) => api.post<ChargeRow>('/charges', body),
+  addBatch: (body: {
+    patientId: string;
+    admissionId?: string;
+    date: string;
+    items: Array<{ title: string; quantity: number; unitPrice: string; date?: string }>;
+  }) => api.post<{ items: ChargeRow[]; count: number }>('/charges/batch', body),
+  aiScanStatus: () => api.get<{ enabled: boolean; model: string }>('/charges/ai-scan/status'),
+  aiScan: (form: FormData) => api.upload<AiBillScanResult>('/charges/ai-scan', form),
   cancel: (id: string) => api.delete<{ id: string }>(`/charges/${id}`),
   invoice: (chargeIds: string[]) =>
     api.post<{ id: string; number: string; total: MoneyString }>('/charges/invoice', { chargeIds }),

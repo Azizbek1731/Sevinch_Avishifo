@@ -12,11 +12,28 @@ const surgeryDateSchema = z
     );
   }, "Invalid calendar date");
 
+const blankToUndefined = (value: unknown): unknown =>
+  value === "" || value === null ? undefined : value;
+
 export const createSurgerySchema = z.object({
   admissionId: idSchema,
   serviceId: idSchema,
   surgeonUserId: idSchema,
   scheduledDate: surgeryDateSchema,
+  /** Optional overrides after catalogue pick — empty falls back to catalogue. */
+  title: z.preprocess(
+    blankToUndefined,
+    z.string().trim().min(1).max(200).optional(),
+  ),
+  unitPrice: z.preprocess(
+    blankToUndefined,
+    moneySchema
+      .refine(
+        (value) => /^\d{1,12}(?:\.\d{1,2})?$/.test(value),
+        "Amount too large",
+      )
+      .optional(),
+  ),
   note: z.string().trim().max(1000).optional(),
   idempotencyKey: z.string().uuid(),
 });

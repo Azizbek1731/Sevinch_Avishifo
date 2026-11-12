@@ -57,12 +57,12 @@ describe('surgery usage draft serialization', () => {
   });
 
   it.each(['MATERIAL', 'ANESTHESIA'] as const)(
-    'serializes mixed %s rows with catalogue authority and normalized manual input',
+    'serializes mixed %s rows with catalogue overrides and normalized manual input',
     (kind) => {
       const rows = [
         catalogueRow({
-          title: 'Stale manual title',
-          unit: 'stale unit',
+          title: 'Override catalogue title',
+          unit: 'pack',
           unitPrice: '999.99',
           quantity: ' 0,125 ',
           note: '  Catalogue note  ',
@@ -81,7 +81,15 @@ describe('surgery usage draft serialization', () => {
 
       expect(payload).toEqual({
         items: [
-          { kind, serviceId: service.id, quantity: '0.125', note: 'Catalogue note' },
+          {
+            kind,
+            serviceId: service.id,
+            title: 'Override catalogue title',
+            unit: 'pack',
+            unitPrice: '999.99',
+            quantity: '0.125',
+            note: 'Catalogue note',
+          },
           {
             kind,
             title: 'Anaesthetic vial',
@@ -92,9 +100,6 @@ describe('surgery usage draft serialization', () => {
           },
         ],
       });
-      expect(payload.items[0]).not.toHaveProperty('unitPrice');
-      expect(payload.items[0]).not.toHaveProperty('title');
-      expect(payload.items[0]).not.toHaveProperty('unit');
       expect(payload.items[1]).not.toHaveProperty('serviceId');
       expect(rows).toEqual(original);
       expect(validateUsageRows(rows, kind)).toEqual([]);
@@ -106,6 +111,22 @@ describe('surgery usage draft serialization', () => {
       ).toBe(true);
     },
   );
+
+  it('omits blank catalogue overrides so the server can fall back to catalogue values', () => {
+    const payload = serializeUsageRows(
+      [catalogueRow({ quantity: '2', note: 'Keep note' })],
+      'MATERIAL',
+    );
+    expect(payload.items[0]).toEqual({
+      kind: 'MATERIAL',
+      serviceId: service.id,
+      quantity: '2.000',
+      note: 'Keep note',
+      unit: 'dona',
+    });
+    expect(payload.items[0]).not.toHaveProperty('title');
+    expect(payload.items[0]).not.toHaveProperty('unitPrice');
+  });
 
   it('preserves entered rows and their order when a middle row is removed', () => {
     const rows = [
@@ -170,12 +191,24 @@ describe('surgery usage row validation', () => {
     expect(serializeUsageRows(rows, 'MATERIAL').items).toHaveLength(count);
   });
 
-  it('rejects a catalogue item without a current price despite stale manual values', () => {
+  it('rejects a catalogue item without a current price when no override price is entered', () => {
     const rows = [
-      catalogueRow({ service: { ...service, currentPrice: null }, unitPrice: '12.20' }),
+      catalogueRow({ service: { ...service, currentPrice: null }, unitPrice: '' }),
     ];
     expect(validateUsageRows(rows, 'MATERIAL')).not.toEqual([]);
     expect(usageRowsTotals(rows)).toEqual({ lines: [null], total: null });
+  });
+
+  it('accepts a catalogue pick whose price was cleared when an override price is entered', () => {
+    const rows = [
+      catalogueRow({
+        service: { ...service, currentPrice: null },
+        title: 'Override name',
+        unitPrice: '12.20',
+      }),
+    ];
+    expect(validateUsageRows(rows, 'MATERIAL')).toEqual([]);
+    expect(usageRowsTotals(rows)).toEqual({ lines: ['12.20'], total: '12.20' });
   });
 
   it.each([
@@ -216,12 +249,16 @@ describe('surgery usage totals', () => {
     expect(usageRowsTotals(rows)).toEqual({ lines: ['0.01', '0.01'], total: '0.02' });
   });
 
-  it('uses the selected catalogue price and manual price according to row source', () => {
+  it('prefers editable draft prices over catalogue defaults for line totals', () => {
     const rows = [
       catalogueRow({ quantity: '0.125', unitPrice: '999.99' }),
+      catalogueRow({ quantity: '0.125' }),
       manualRow({ service, quantity: '2', unitPrice: '0.10' }),
     ];
-    expect(usageRowsTotals(rows)).toEqual({ lines: ['1.53', '0.20'], total: '1.73' });
+    expect(usageRowsTotals(rows)).toEqual({
+      lines: ['125.00', '1.53', '0.20'],
+      total: '126.73',
+    });
   });
 
   it('preserves cents even when the total exceeds safe floating point integer precision', () => {

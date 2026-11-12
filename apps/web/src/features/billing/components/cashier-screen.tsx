@@ -26,6 +26,7 @@ export function CashierScreen() {
 
   useSocketEvent('invoice.paid', () => {
     void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    void queryClient.invalidateQueries({ queryKey: ['billing', 'patient-pending'] });
     void queryClient.invalidateQueries({ queryKey: ['debtors'] });
     void queryClient.invalidateQueries({ queryKey: ['shifts'] });
   });

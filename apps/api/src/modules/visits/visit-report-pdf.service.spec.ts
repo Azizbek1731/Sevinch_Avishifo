@@ -11,6 +11,8 @@ const report: VisitReportPdfData = {
   clinic: { name: 'Sinov klinikasi', legalName: null, address: null, phone: null },
   patient: { fullName: 'Sinov Bemor', mrn: 'TEST-001', dob: '1990-01-01' },
   doctorName: 'Sinov Shifokor',
+  doctorSpecialty: 'Kardiolog',
+  doctorPhone: '+998914276493',
   confirmedAt: '2026-10-11T10:00:00.000Z',
   subjective: null,
   objective: null,
@@ -97,7 +99,7 @@ describe('confirmed clinical report PDF', () => {
     expect(() => buildVisitReportPdfData(draft, report.clinic)).toThrow('Only a confirmed visit');
   });
 
-  it('renders one Rp. per mixture, keeps legacy directions and includes physiotherapy', async () => {
+  it('prints consultation tavsiya lines without formal Rp. blocks', async () => {
     const text = vi.spyOn(PDFDocument.prototype, 'text');
     try {
       await new VisitReportPdfService().render({
@@ -105,6 +107,12 @@ describe('confirmed clinical report PDF', () => {
         kind: 'CONSULTATION',
         title: null,
         body: null,
+        subjective: 'Bosh og‘rig‘i',
+        plan: 'Parhezga rioya qilish.',
+        diagnoses: [
+          { code: 'I11', name: 'Gipertoniya', note: null, primary: true },
+          { code: 'E11', name: 'Qandli diabet', note: null, primary: false },
+        ],
         prescriptions: [
           {
             drugName: 'Sol. Natrii chloridi',
@@ -136,6 +144,60 @@ describe('confirmed clinical report PDF', () => {
         physiotherapy: 'Fizioterapiya bo‘yicha shifokor yozuvi. Синтетический текст.',
       });
       const rendered = text.mock.calls.map(([value]) => String(value)).join('\n');
+      expect(rendered).toContain('TASHXISI:');
+      expect(rendered).toContain('ASOSIY:');
+      expect(rendered).toContain('YONDOSH:');
+      expect(rendered).toContain('TAVSIYA:');
+      expect(rendered).toContain('Parhezga rioya qilish.');
+      expect(rendered).toContain('Sol. Natrii chloridi 0,9% - 200 ml');
+      expect(rendered).toContain('Sol. Acidi ascorbinici 5% - 2 ml');
+      expect(rendered).not.toContain('Rp.:');
+      expect(rendered).toContain('200 ml, v/i, 30 tomchi/daqiqa, kuniga 1 marta, 3-5 kun, Sekin yuborilsin');
+      expect(rendered).toContain('Legacy medicine — 1 tabletka, kechqurun, 7 kun');
+      expect(rendered).toContain('Fizioterapiya bo‘yicha shifokor yozuvi. Синтетический текст.');
+      expect(rendered).toContain('Kardiolog:');
+      expect(rendered).toContain('Tel: +998-91-427-64-93');
+      expect(rendered).not.toContain('CHILD DIRECTIONS');
+      expect(rendered).not.toContain('CHILD NOTE');
+    } finally {
+      text.mockRestore();
+    }
+  });
+
+  it('keeps formal Rp. formatting on the prescription-only PDF', async () => {
+    const text = vi.spyOn(PDFDocument.prototype, 'text');
+    try {
+      await new VisitReportPdfService().render(
+        {
+          ...report,
+          kind: 'CONSULTATION',
+          title: null,
+          body: null,
+          prescriptions: [
+            {
+              drugName: 'Sol. Natrii chloridi',
+              strength: '0,9% - 200 ml',
+              quantity: 'N. 5',
+              form: 'flac.',
+              dosage: '200 ml',
+              route: 'v/i',
+              dripRate: '30',
+              frequency: 'kuniga 1 marta',
+              durationDays: 9,
+              durationText: '3-5 kun',
+              instructions: 'Sekin yuborilsin',
+            },
+            {
+              drugName: 'Sol. Acidi ascorbinici',
+              strength: '5% - 2 ml',
+              combineWithPrevious: true,
+            },
+          ],
+        },
+        'uz',
+        'prescription',
+      );
+      const rendered = text.mock.calls.map(([value]) => String(value)).join('\n');
       expect(rendered).toContain('Rp.: Sol. Natrii chloridi 0,9% - 200 ml');
       expect(rendered).toContain('Sol. Acidi ascorbinici 5% - 2 ml');
       expect(rendered).not.toContain('Rp.: Sol. Acidi ascorbinici');
@@ -143,10 +205,6 @@ describe('confirmed clinical report PDF', () => {
       expect(rendered).toContain(
         'S.: 200 ml, v/i, 30 tomchi/daqiqa, kuniga 1 marta, 3-5 kun, Sekin yuborilsin',
       );
-      expect(rendered).toContain('S.: 1 tabletka, kechqurun, 7 kun');
-      expect(rendered).toContain('Fizioterapiya bo‘yicha shifokor yozuvi. Синтетический текст.');
-      expect(rendered).not.toContain('CHILD DIRECTIONS');
-      expect(rendered).not.toContain('CHILD NOTE');
     } finally {
       text.mockRestore();
     }
@@ -169,9 +227,9 @@ describe('confirmed clinical report PDF', () => {
         physiotherapy: 'PHYSIOTHERAPY AFTER LARGE GROUP',
       });
       const rendered = text.mock.calls.map(([value]) => String(value)).join('\n');
-      expect(result.toString('latin1').match(/\/Type \/Page\b/g)?.length).toBeGreaterThan(2);
+      expect(result.toString('latin1').match(/\/Type \/Page\b/g)?.length).toBeGreaterThan(1);
       expect(rendered).toContain('SYNTHETIC COMPONENT 90 Synthetic strength text');
-      expect(rendered).toContain('S.: BASE INSTRUCTIONS AT END OF LARGE GROUP');
+      expect(rendered).toContain('BASE INSTRUCTIONS AT END OF LARGE GROUP');
       expect(rendered).toContain('PHYSIOTHERAPY AFTER LARGE GROUP');
     } finally {
       text.mockRestore();

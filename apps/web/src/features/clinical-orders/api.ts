@@ -62,6 +62,9 @@ export const clinicalOrdersApi = {
     api.get<ClinicalStatusCounts>('/clinical-orders/status-counts', { kind }),
   get: (id: string) => api.get<ClinicalOrder>(`/clinical-orders/${id}`),
   create: (body: CreateClinicalOrderInput) => api.post<ClinicalOrder>('/clinical-orders', body),
+  /** Ward doctor path — requires ACTIVE admission; uses charges.write. */
+  createInpatient: (body: CreateClinicalOrderInput) =>
+    api.post<ClinicalOrder>('/clinical-orders/inpatient', body),
   start: (id: string) => api.post<{ visitId: string }>(`/clinical-orders/${id}/start`),
   addServices: (id: string, body: AddClinicalServicesInput) =>
     api.post<{ invoiceId: string; number: string; total: string }>(

@@ -1102,6 +1102,7 @@ model Patient {
   labOrders           LabOrder[]
   feedbacks           Feedback[]
   admissions          Admission[]
+  ambulatoryCases     AmbulatoryCase[]
   surgeries           SurgeryCase[]
   surgeryPayouts      SurgeryPayout[]
   chargeItems         ChargeItem[]
@@ -1128,16 +1129,20 @@ model PatientDocument {
   labOrderId   String?
   /// UZI / clinical-order attachment (scan, captured image, exported PDF).
   clinicalOrderId String?
+  /// Doctor visit attachment (external conclusion / empty-visit substitute).
+  visitId      String?
   createdAt    DateTime         @default(now()) @db.Timestamptz(6)
 
   patient         Patient         @relation(fields: [patientId], references: [id])
   labOrder        LabOrder?       @relation(fields: [labOrderId], references: [id])
   clinicalOrder   ClinicalOrder?  @relation(fields: [clinicalOrderId], references: [id])
+  visit           Visit?          @relation(fields: [visitId], references: [id])
   labResults      LabResult[]
 
   @@index([clinicId, patientId])
   @@index([labOrderId])
   @@index([clinicalOrderId])
+  @@index([visitId])
 }
 
 enum RecordAccessStatus {
@@ -1347,8 +1352,13 @@ model Visit {
   objective            String?
   assessmentNote       String?
   plan                 String?
+  /// Free-text clinical diagnosis (ASOSIY / YONDOSH), handwritten by the doctor.
+  diagnosisPrimary     String?
+  diagnosisSecondary   String?
   physiotherapy        String?
   prescriptionRevision Int            @default(0)
+  /// Set when the doctor confirms an empty sheet and explains why.
+  emptyConfirmReason   String?
   startedAt            DateTime       @default(now()) @db.Timestamptz(6)
   completedAt          DateTime?      @db.Timestamptz(6)
   /// completedAt + clinic.visitLockHours → read-only; edits become amendments
@@ -1369,6 +1379,7 @@ model Visit {
   invoices      Invoice[]
   labOrders     LabOrder[]
   feedback      Feedback?
+  documents     PatientDocument[]
 
   @@index([clinicId, patientId, startedAt])
   @@index([clinicId, doctorUserId, startedAt])
@@ -2009,19 +2020,25 @@ model LabOrder {
   referringDoctorUserId String?
   /// Snapshot keeps historical referrals readable after a staff rename/deactivation.
   referringDoctorName String?
+  /// Sent from an ambulator karta — the card doctor earns a share of the paid lab bill.
+  ambulatoryCaseId   String?
+  /// Share snapshot at order time, so a later rate change never rewrites history.
+  ambulatoryCommissionPercent Decimal? @db.Decimal(5, 2)
   collectedAt        DateTime?           @db.Timestamptz(6)
   deliveredAt        DateTime?           @db.Timestamptz(6)
   createdAt          DateTime            @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime            @updatedAt @db.Timestamptz(6)
 
-  patient     Patient           @relation(fields: [patientId], references: [id])
-  visit       Visit?            @relation(fields: [visitId], references: [id])
-  items       LabOrderItem[]
-  attachments PatientDocument[]
+  patient        Patient           @relation(fields: [patientId], references: [id])
+  visit          Visit?            @relation(fields: [visitId], references: [id])
+  ambulatoryCase AmbulatoryCase?   @relation(fields: [ambulatoryCaseId], references: [id])
+  items          LabOrderItem[]
+  attachments    PatientDocument[]
 
   @@unique([clinicId, orderNumber])
   @@index([clinicId, branchId, status])
   @@index([clinicId, patientId])
+  @@index([clinicId, ambulatoryCaseId])
   @@index([clinicId, branchId, referringDoctorUserId, createdAt], map: "LabOrder_referring_doctor_date_idx")
 }
 
@@ -2177,6 +2194,59 @@ model PayrollAccrual {
   @@unique([clinicId, doctorUserId, period])
 }
 
+// ============================================================ AMBULATOR
+
+enum AmbulatoryCaseStatus {
+  OPEN
+  CLOSED
+}
+
+/// Ambulator karta: reception opens it for a walk-in patient of one doctor.
+/// Lab work sent from the card earns that doctor a share of the paid lab bill.
+model AmbulatoryCase {
+  id           String               @id @default(uuid(7))
+  clinicId     String
+  branchId     String
+  patientId    String
+  /// "AK-2026-0001", sequential per clinic per year
+  number       String
+  status       AmbulatoryCaseStatus @default(OPEN)
+  doctorUserId String
+  /// Snapshot keeps old cards readable after a staff rename/deactivation.
+  doctorName   String
+  complaint    String?
+  diagnosis    String?
+  note         String?
+  openedAt     DateTime             @db.Timestamptz(6)
+  closedAt     DateTime?            @db.Timestamptz(6)
+  openedById   String?
+  closedById   String?
+  createdAt    DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime             @updatedAt @db.Timestamptz(6)
+
+  patient        Patient         @relation(fields: [patientId], references: [id])
+  labOrders      LabOrder[]
+  clinicalOrders ClinicalOrder[]
+
+  @@unique([clinicId, number])
+  @@index([clinicId, branchId, status, openedAt])
+  @@index([clinicId, doctorUserId, openedAt])
+  @@index([clinicId, patientId])
+}
+
+/// Per-doctor override of the clinic default ambulatory lab share (percent).
+model AmbulatoryCommissionRate {
+  id           String   @id @default(uuid(7))
+  clinicId     String
+  doctorUserId String
+  percent      Decimal  @db.Decimal(5, 2)
+  updatedById  String?
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([clinicId, doctorUserId])
+}
+
 // ============================================================ NOTIFICATIONS (M13)
 
 model NotificationTemplate {
@@ -2293,12 +2363,14 @@ model ClinicalOrder {
   kind               ServiceKind
   initialInvoiceId   String      @unique
   visitId            String?     @unique
+  ambulatoryCaseId   String?
   note               String?
   requestKey         String
   requestFingerprint String
   createdAt          DateTime    @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime    @updatedAt @db.Timestamptz(6)
   patient            Patient     @relation(fields: [patientId], references: [id])
+  ambulatoryCase     AmbulatoryCase? @relation(fields: [ambulatoryCaseId], references: [id])
   doctor             User        @relation(fields: [doctorUserId], references: [id])
   initialInvoice     Invoice     @relation("InitialClinicalInvoice", fields: [initialInvoiceId], references: [id])
   invoices           Invoice[]   @relation("ClinicalOrderInvoices")
@@ -2310,4 +2382,5 @@ model ClinicalOrder {
   @@index([clinicId, branchId, createdAt])
   @@index([clinicId, doctorUserId, createdAt])
   @@index([clinicId, patientId])
+  @@index([clinicId, ambulatoryCaseId])
 }

@@ -59,6 +59,17 @@ function buildUrl(path: string, query?: Query): string {
 
 let refreshPromise: Promise<string | null> | null = null;
 
+function tokenSubject(token: string): string | null {
+  try {
+    const part = token.split('.')[1] ?? '';
+    const json = atob(part.replace(/-/g, '+').replace(/_/g, '/'));
+    const sub = (JSON.parse(json) as { sub?: unknown }).sub;
+    return typeof sub === 'string' ? sub : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Single-flight refresh: many 401s → one refresh call. Resolves null only when
  * the server rejects the refresh cookie. A dropped Wi-Fi or a restarting server
@@ -84,6 +95,14 @@ async function refreshAccessToken(): Promise<string | null> {
         }
         const json = (await res.json().catch(() => null)) as ApiResponse<{ accessToken: string }> | null;
         if (res.ok && json?.success) {
+          // The refresh cookie is shared by all tabs: another login in this browser
+          // must not silently turn this tab into that user.
+          const current = useAuthStore.getState().user;
+          const subject = tokenSubject(json.data.accessToken);
+          if (current && subject && subject !== current.id) {
+            window.location.reload();
+            throw new ApiError('UNAUTHORIZED' as ErrorCode, 'Session changed', 401);
+          }
           useAuthStore.getState().setAccessToken(json.data.accessToken);
           return json.data.accessToken;
         }

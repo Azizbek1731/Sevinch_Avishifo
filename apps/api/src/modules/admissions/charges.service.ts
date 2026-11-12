@@ -6,6 +6,7 @@ import {
   ErrorCode,
   type ChargeQueryInput,
   type AddChargeInput,
+  type AddChargesBatchInput,
   type AuthUser,
   type InvoiceChargesInput,
 } from '@avishifo/shared';
@@ -61,11 +62,31 @@ export class ChargesService {
     };
   }
 
+  /** A doctor touches a stay's account only when they lead it or operate on it. */
+  private async assertStayAccess(
+    admissionId: string | null | undefined,
+    user: Pick<AuthUser, 'id' | 'role'>,
+  ): Promise<void> {
+    if (!admissionId || user.role !== 'DOCTOR') return;
+    const allowed = await this.prisma.db.admission.count({
+      where: {
+        id: admissionId,
+        OR: [
+          { attendingDoctorUserId: user.id },
+          { surgeries: { some: { surgeonUserId: user.id } } },
+        ],
+      },
+    });
+    if (!allowed) throw new AppException(ErrorCode.NOT_FOUND, 'Kasallik tarixi topilmadi', 404);
+  }
+
   /** Pending total covers the complete filtered ledger, independent of display limit. */
   async listForPatient(
     query: ChargeQueryInput,
     branchId: string,
+    user?: Pick<AuthUser, 'id' | 'role'>,
   ): Promise<Record<string, unknown>> {
+    if (user) await this.assertStayAccess(query.admissionId, user);
     const scope = {
       patientId: query.patientId,
       branchId,
@@ -97,6 +118,13 @@ export class ChargesService {
     if (user.branchIds.length > 0 && !user.branchIds.includes(branchId)) {
       throw new AppException(ErrorCode.FORBIDDEN, 'No access to this branch', 403);
     }
+    if (dto.admissionId && dto.cashierOnly)
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'Statsionar xizmatlari chiqishda umumiy hisob bilan kassaga yuboriladi',
+        400,
+      );
+    await this.assertStayAccess(dto.admissionId, user);
     const clinicId = TenantContext.requireClinicId();
     const requestFingerprint = createHash('sha256').update(JSON.stringify({
       branchId, patientId: dto.patientId, admissionId: dto.admissionId ?? null,
@@ -212,9 +240,79 @@ export class ChargesService {
     return this.map(result.charge);
   }
 
-  async cancel(id: string, branchId: string): Promise<{ id: string }> {
+  /** Save many desk-confirmed AI / manual lines onto the patient (PENDING on stay). */
+  async addBatch(
+    dto: AddChargesBatchInput,
+    user: AuthUser,
+    branchId: string,
+  ): Promise<{ items: Record<string, unknown>[]; count: number }> {
+    if (user.branchIds.length > 0 && !user.branchIds.includes(branchId)) {
+      throw new AppException(ErrorCode.FORBIDDEN, 'No access to this branch', 403);
+    }
+    await this.assertStayAccess(dto.admissionId, user);
+    const clinicId = TenantContext.requireClinicId();
+    const created = await this.prisma.db.$transaction(async (tx) => {
+      const patient = await tx.patient.findFirst({
+        where: { id: dto.patientId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!patient) throw new AppException(ErrorCode.PATIENT_NOT_FOUND, 'Bemor topilmadi', 404);
+
+      if (dto.admissionId) {
+        await tx.$queryRaw`SELECT "id" FROM "Admission" WHERE "id" = ${dto.admissionId} AND "clinicId" = ${clinicId} AND "branchId" = ${branchId} FOR UPDATE`;
+        const admission = await tx.admission.findFirst({
+          where: { id: dto.admissionId, patientId: dto.patientId, branchId, status: 'ACTIVE' },
+          select: { id: true },
+        });
+        if (!admission)
+          throw new AppException(ErrorCode.VALIDATION_ERROR, 'Faol statsionar yozuvi topilmadi', 400);
+      }
+
+      const rows = [];
+      for (const item of dto.items) {
+        const charge = await tx.chargeItem.create({
+          data: {
+            clinicId,
+            branchId,
+            patientId: dto.patientId,
+            admissionId: dto.admissionId ?? null,
+            title: { uz: item.title },
+            date: new Date(item.date ?? dto.date),
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            createdById: user.id,
+          },
+        });
+        // Walk-in without admission → bill immediately; stay charges stay PENDING.
+        if (!dto.admissionId) {
+          await this.invoices.issueChargesInTransaction(tx, [charge.id], user, branchId, {});
+        }
+        rows.push(await tx.chargeItem.findFirstOrThrow({ where: { id: charge.id } }));
+      }
+      return rows;
+    }, { timeout: 60_000 });
+
+    await this.audit.log({
+      action: AuditAction.CREATE,
+      entity: 'ChargeItemBatch',
+      entityId: dto.patientId,
+      after: {
+        admissionId: dto.admissionId ?? null,
+        branchId,
+        count: created.length,
+      },
+    });
+    return { items: created.map((c) => this.map(c)), count: created.length };
+  }
+
+  async cancel(
+    id: string,
+    branchId: string,
+    user?: Pick<AuthUser, 'id' | 'role'>,
+  ): Promise<{ id: string }> {
     const c = await this.prisma.db.chargeItem.findFirst({ where: { id, branchId } });
     if (!c) throw new AppException(ErrorCode.NOT_FOUND, 'Yozuv topilmadi', 404);
+    if (user) await this.assertStayAccess(c.admissionId, user);
     if (c.surgeryId) throw new AppException(ErrorCode.VALIDATION_ERROR, 'Operatsiya xarajatini operatsiya kartasidan bekor qiling', 409);
     if (c.status === 'INVOICED') {
       // …unless the bill it was on is gone. Cancelling an invoice used to leave
@@ -273,6 +371,16 @@ export class ChargesService {
         409,
       );
     }
+    const stayIds = [...new Set(charges.flatMap((c) => (c.admissionId ? [c.admissionId] : [])))];
+    if (
+      stayIds.length &&
+      (await this.prisma.db.admission.count({ where: { id: { in: stayIds }, status: 'ACTIVE' } }))
+    )
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'Statsionar xizmatlari chiqishda umumiy hisob bilan kassaga yuboriladi',
+        409,
+      );
     if (new Set(charges.map((c) => c.patientId)).size !== 1) {
       throw new AppException(
         ErrorCode.VALIDATION_ERROR,

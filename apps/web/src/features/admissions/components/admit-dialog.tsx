@@ -189,7 +189,7 @@ export function AdmitDialog({
             admit.mutate({
               patientId: values.patientId,
               department: values.department?.trim() || undefined,
-              ward: values.ward.trim(),
+              ward: values.ward?.trim() || undefined,
               attendingDoctorUserId: fromList ? doctorChoice : undefined,
               attendingDoctorName: fromList
                 ? undefined
@@ -262,10 +262,7 @@ export function AdmitDialog({
 
           <section className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-1">
-              <Label htmlFor="ad-ward">
-                {t('fields.roomNumber')}
-                <RequiredMark />
-              </Label>
+              <Label htmlFor="ad-ward">{t('fields.roomNumber')}</Label>
               <Input
                 id="ad-ward"
                 placeholder={t('fields.roomNumberHint')}

@@ -10,6 +10,7 @@ import type {
   ReplacePrescriptionsInput,
   AddReferralInput,
   AmendVisitInput,
+  CompleteVisitInput,
   UpdateVisitInput,
   UpsertVitalsInput,
   VisitTemplateUpsertInput,
@@ -300,10 +301,14 @@ export function useAddReferral(visitId: string) {
 
 export function useCompleteVisit(visitId: string, onDone?: () => void) {
   const t = useTranslations('visits');
-  return useVisitMutation(visitId, () => doctorApi.completeVisit(visitId), {
-    successMessage: t('visitCompleted'),
-    onSuccess: onDone,
-  });
+  return useVisitMutation(
+    visitId,
+    (body?: CompleteVisitInput) => doctorApi.completeVisit(visitId, body),
+    {
+      successMessage: t('visitCompleted'),
+      onSuccess: onDone,
+    },
+  );
 }
 
 export function useCreateTemplate() {
