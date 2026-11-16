@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { dateOnlySchema, idSchema, paginationQuerySchema } from './common';
+import { dateOnlySchema, idSchema, moneySchema, paginationQuerySchema } from './common';
 
 /** Clinic default when no per-doctor override exists. */
 export const AMBULATORY_DEFAULT_LAB_PERCENT = 25;
@@ -57,6 +57,27 @@ export const ambulatoryUziOrderSchema = z.object({
 });
 export type AmbulatoryUziOrderInput = z.infer<typeof ambulatoryUziOrderSchema>;
 
+/** A catalogue service is billed at its current price; a free-text line carries its own. */
+export const ambulatoryServiceItemSchema = z
+  .object({
+    serviceId: idSchema.optional(),
+    title: optionalText(200),
+    unitPrice: moneySchema
+      .refine((value) => /^\d{1,12}(?:\.\d{1,2})?$/.test(value), 'Amount too large')
+      .refine((value) => Number(value) > 0, 'Price must be positive')
+      .optional(),
+    quantity: z.coerce.number().int().min(1).max(99).default(1),
+  })
+  .refine((item) => Boolean(item.serviceId) || Boolean(item.title && item.unitPrice), {
+    message: 'Choose a service or enter a name and price',
+  });
+
+export const ambulatoryServiceOrderSchema = z.object({
+  idempotencyKey: z.string().uuid(),
+  items: z.array(ambulatoryServiceItemSchema).min(1).max(30),
+});
+export type AmbulatoryServiceOrderInput = z.infer<typeof ambulatoryServiceOrderSchema>;
+
 export const ambulatoryCommissionQuerySchema = z
   .object({
     from: dateOnlySchema,
@@ -80,39 +101,68 @@ export const ambulatoryCommissionQuerySchema = z
   });
 export type AmbulatoryCommissionQueryInput = z.infer<typeof ambulatoryCommissionQuerySchema>;
 
+/** Referral directions a doctor can earn a share on; EXO is a marked subset of ultrasound. */
+export const AMBULATORY_SHARE_GROUPS = ['LAB', 'UZI', 'EXO'] as const;
+export type AmbulatoryShareGroup = (typeof AMBULATORY_SHARE_GROUPS)[number];
+export type AmbulatorySharePercents = Record<AmbulatoryShareGroup, number>;
+
+/** Clinic defaults when no per-doctor override exists: UZI and EXO earn nothing unless set. */
+export const AMBULATORY_DEFAULT_PERCENTS: AmbulatorySharePercents = {
+  LAB: AMBULATORY_DEFAULT_LAB_PERCENT,
+  UZI: 0,
+  EXO: 0,
+};
+
 const percentSchema = z.coerce.number().min(0).max(100).multipleOf(0.01);
 
 export const ambulatoryRatesSchema = z.object({
-  defaultPercent: percentSchema,
-  /** percent null removes the override, so the doctor falls back to the default. */
+  defaults: z.object({ LAB: percentSchema, UZI: percentSchema, EXO: percentSchema }),
+  /** null removes the override, so the doctor falls back to the default of that group. */
   doctors: z
-    .array(z.object({ doctorUserId: idSchema, percent: percentSchema.nullable() }))
+    .array(
+      z.object({
+        doctorUserId: idSchema,
+        percents: z.object({
+          LAB: percentSchema.nullable(),
+          UZI: percentSchema.nullable(),
+          EXO: percentSchema.nullable(),
+        }),
+      }),
+    )
     .max(500),
+  /** Ultrasound services counted as EXO; every other ultrasound service is UZI. */
+  echoServiceIds: z.array(idSchema).max(1000),
 });
 export type AmbulatoryRatesInput = z.infer<typeof ambulatoryRatesSchema>;
 
 /** Money values are decimal strings with 2 places. */
-export interface AmbulatoryCommissionTotals {
-  patients: number;
+export interface AmbulatoryCommissionAmounts {
   orders: number;
-  labAmount: string;
+  /** Billed amount of the referred work, net of invoice discounts. */
+  amount: string;
   paidAmount: string;
   commission: string;
-  /** Share the doctor will earn once the outstanding lab bills are paid. */
+  /** Share the doctor will earn once the outstanding bills are paid. */
   pendingCommission: string;
+}
+
+export interface AmbulatoryCommissionTotals extends AmbulatoryCommissionAmounts {
+  patients: number;
+  byGroup: Record<AmbulatoryShareGroup, AmbulatoryCommissionAmounts>;
 }
 
 export interface AmbulatoryCommissionDoctor extends AmbulatoryCommissionTotals {
   doctorUserId: string;
   doctorName: string;
   specialty: string | null;
-  /** Rate for new orders today (orders keep their own snapshot). */
-  currentPercent: number;
+  /** Rates for new orders today (orders keep their own snapshot). */
+  currentPercents: AmbulatorySharePercents;
 }
 
 export type AmbulatoryPaymentState = 'PAID' | 'PARTIAL' | 'UNPAID';
 
 export interface AmbulatoryCommissionOrder {
+  group: AmbulatoryShareGroup;
   orderId: string;
   orderNumber: string;
   createdAt: string;
@@ -121,10 +171,10 @@ export interface AmbulatoryCommissionOrder {
   patient: { id: string; mrn: string; fullName: string };
   doctorUserId: string;
   doctorName: string;
-  /** Lab test names as stored: { uz, ru, en } or a plain string. */
+  /** Test / examination names as stored: { uz, ru, en } or a plain string. */
   tests: Array<Record<string, string> | string>;
   invoiceNumber: string | null;
-  labAmount: string;
+  amount: string;
   paidAmount: string;
   percent: number;
   commission: string;
@@ -136,13 +186,29 @@ export interface AmbulatoryCommissionReport {
   from: string;
   to: string;
   doctorUserId: string | null;
-  defaultPercent: number;
+  defaultPercents: AmbulatorySharePercents;
   totals: AmbulatoryCommissionTotals;
   doctors: AmbulatoryCommissionDoctor[];
   orders: AmbulatoryCommissionOrder[];
 }
 
+export interface AmbulatoryRateDoctor {
+  doctorUserId: string;
+  fullName: string;
+  specialty: string | null;
+  percents: Record<AmbulatoryShareGroup, number | null>;
+}
+
+export interface AmbulatoryUltrasoundService {
+  id: string;
+  code: string;
+  name: Record<string, string> | string;
+  category: string;
+  isEcho: boolean;
+}
+
 export interface AmbulatoryRates {
-  defaultPercent: number;
-  doctors: { doctorUserId: string; fullName: string; specialty: string | null; percent: number | null }[];
+  defaults: AmbulatorySharePercents;
+  doctors: AmbulatoryRateDoctor[];
+  ultrasoundServices: AmbulatoryUltrasoundService[];
 }

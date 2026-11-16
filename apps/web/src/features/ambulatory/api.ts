@@ -6,7 +6,11 @@ import type {
   AmbulatoryCommissionTotals,
   AmbulatoryLabOrderInput,
   AmbulatoryRates,
+  AmbulatoryPaymentState,
   AmbulatoryRatesInput,
+  AmbulatoryServiceOrderInput,
+  AmbulatoryShareGroup,
+  AmbulatorySharePercents,
   AmbulatoryUziOrderInput,
   MoneyString,
   OpenAmbulatoryCaseInput,
@@ -40,7 +44,7 @@ export interface AmbulatoryCaseRow {
   };
   labOrders?: number;
   uziOrders?: number;
-  labAmount?: MoneyString;
+  amount?: MoneyString;
   paidAmount?: MoneyString;
   commission?: MoneyString;
   pendingCommission?: MoneyString;
@@ -60,17 +64,39 @@ export interface AmbulatoryUziOrder {
   services: { id: string; title: Record<string, string> | string; quantity: number }[];
   note: string | null;
   createdAt: string;
+  /** Referring doctor's UZI / EXO parts (UZI orders on a card only). */
+  shares?: {
+    group: AmbulatoryShareGroup;
+    percent: number;
+    amount: MoneyString;
+    commission: MoneyString;
+    pendingCommission: MoneyString;
+  }[];
+}
+
+export interface AmbulatoryCaseService {
+  id: string;
+  serviceId: string | null;
+  title: Record<string, string> | string;
+  quantity: number;
+  unitPrice: MoneyString;
+  lineTotal: MoneyString;
+  createdAt: string;
+  invoiceNumber: string | null;
+  cancelled: boolean;
+  paymentState: AmbulatoryPaymentState | null;
 }
 
 export interface AmbulatoryCaseDetail
   extends Omit<AmbulatoryCaseRow, 'labOrders' | 'uziOrders' | 'patient'> {
   patient: NonNullable<AmbulatoryCaseRow['patient']> & { address: string | null };
-  currentPercent: number;
+  currentPercents: AmbulatorySharePercents;
   activeStay: { id: string; historyNumber: string } | null;
   totals: AmbulatoryCommissionTotals;
   labOrders: AmbulatoryLabOrder[];
   uziOrders: AmbulatoryUziOrder[];
   consultations: AmbulatoryUziOrder[];
+  services: AmbulatoryCaseService[];
 }
 
 export interface AmbulatoryListQuery {
@@ -103,6 +129,8 @@ export const ambulatoryApi = {
     api.post<AmbulatoryCaseDetail>(`/ambulatory/${id}/lab`, body),
   sendUzi: (id: string, body: AmbulatoryUziOrderInput) =>
     api.post<AmbulatoryCaseDetail>(`/ambulatory/${id}/uzi`, body),
+  addServices: (id: string, body: AmbulatoryServiceOrderInput) =>
+    api.post<AmbulatoryCaseDetail>(`/ambulatory/${id}/services`, body),
   commissions: (q: CommissionQuery) =>
     api.get<AmbulatoryCommissionReport>('/ambulatory/commissions', { ...q }),
   exportCommissions: async (q: CommissionQuery): Promise<Blob> =>

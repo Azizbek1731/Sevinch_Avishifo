@@ -865,6 +865,7 @@ model ChargeItem {
   administrationId String?      @unique
   serviceId        String?
   surgeryId        String?
+  ambulatoryCaseId String?
   /// Name snapshot at write time { uz, ru, en }
   title            Json
   date             DateTime     @db.Date
@@ -882,6 +883,7 @@ model ChargeItem {
   administration TreatmentAdministration? @relation(fields: [administrationId], references: [id])
   service        Service?                 @relation(fields: [serviceId], references: [id])
   surgery        SurgeryCase?             @relation("SurgeryCharges", fields: [surgeryId], references: [id])
+  ambulatoryCase AmbulatoryCase?          @relation(fields: [ambulatoryCaseId], references: [id])
   surgeryFee     SurgeryCase?             @relation("SurgeryFee")
   surgeryEntry   SurgeryEntry?            @relation("SurgeryEntryCharge")
   surgeryStaffFee SurgeryStaffFee?         @relation("SurgeryStaffFeeCharge")
@@ -892,6 +894,7 @@ model ChargeItem {
   @@index([clinicId, patientId, status])
   @@index([clinicId, admissionId])
   @@index([clinicId, surgeryId])
+  @@index([clinicId, ambulatoryCaseId])
 }
 
 enum SurgeryStatus {
@@ -1538,6 +1541,8 @@ model Service {
   unit        String   @default("dona")
   vatIncluded Boolean  @default(true)
   isActive    Boolean  @default(true)
+  /// ULTRASOUND service counted as EXO for the referring doctor's share.
+  isEcho      Boolean  @default(false)
   createdAt   DateTime @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @db.Timestamptz(6)
 
@@ -2227,6 +2232,7 @@ model AmbulatoryCase {
   patient        Patient         @relation(fields: [patientId], references: [id])
   labOrders      LabOrder[]
   clinicalOrders ClinicalOrder[]
+  charges        ChargeItem[]
 
   @@unique([clinicId, number])
   @@index([clinicId, branchId, status, openedAt])
@@ -2239,7 +2245,10 @@ model AmbulatoryCommissionRate {
   id           String   @id @default(uuid(7))
   clinicId     String
   doctorUserId String
-  percent      Decimal  @db.Decimal(5, 2)
+  /// Lab share; null falls back to the clinic default.
+  percent      Decimal? @db.Decimal(5, 2)
+  uziPercent   Decimal? @db.Decimal(5, 2)
+  echoPercent  Decimal? @db.Decimal(5, 2)
   updatedById  String?
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @db.Timestamptz(6)
@@ -2364,6 +2373,9 @@ model ClinicalOrder {
   initialInvoiceId   String      @unique
   visitId            String?     @unique
   ambulatoryCaseId   String?
+  /// Referring doctor's share at the time the order landed on the card (null = no share).
+  ambulatoryUziPercent  Decimal? @db.Decimal(5, 2)
+  ambulatoryEchoPercent Decimal? @db.Decimal(5, 2)
   note               String?
   requestKey         String
   requestFingerprint String

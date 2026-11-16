@@ -5,7 +5,12 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Download, Loader2, Wallet } from 'lucide-react';
-import { formatUZS, type AmbulatoryPaymentState } from '@avishifo/shared';
+import {
+  AMBULATORY_SHARE_GROUPS,
+  formatUZS,
+  type AmbulatoryPaymentState,
+  type AmbulatoryShareGroup,
+} from '@avishifo/shared';
 import { Link } from '@/i18n/routing';
 import { formatTz, todayTashkent } from '@/lib/dates';
 import { localizedText } from '@/lib/localized';
@@ -61,6 +66,12 @@ export const paymentBadge: Record<AmbulatoryPaymentState, 'default' | 'secondary
   UNPAID: 'outline',
 };
 
+export const groupTone: Record<AmbulatoryShareGroup, string> = {
+  LAB: 'border-sky-300 bg-sky-50 text-sky-800 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-200',
+  UZI: 'border-violet-300 bg-violet-50 text-violet-800 dark:border-violet-500/40 dark:bg-violet-500/10 dark:text-violet-200',
+  EXO: 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200',
+};
+
 export function CommissionsTab() {
   const t = useTranslations('ambulatory');
   const locale = useLocale();
@@ -110,7 +121,7 @@ export function CommissionsTab() {
         { key: 'commission', value: formatUZS(data.totals.commission), accent: true },
         { key: 'pendingCommission', value: formatUZS(data.totals.pendingCommission) },
         { key: 'paidAmount', value: formatUZS(data.totals.paidAmount) },
-        { key: 'labAmount', value: formatUZS(data.totals.labAmount) },
+        { key: 'amount', value: formatUZS(data.totals.amount) },
         { key: 'patients', value: data.totals.patients.toLocaleString(locale) },
         { key: 'orders', value: data.totals.orders.toLocaleString(locale) },
       ]
@@ -191,8 +202,37 @@ export function CommissionsTab() {
               </Card>
             ))}
           </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {AMBULATORY_SHARE_GROUPS.map((group) => {
+              const part = data.totals.byGroup[group];
+              return (
+                <Card key={group} className={cn('border', groupTone[group])}>
+                  <CardContent className="flex items-end justify-between gap-3 p-4">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide opacity-80">
+                        {t(`groups.${group}`)}
+                      </p>
+                      <p className="mt-1 text-xl font-semibold tabular-nums">
+                        {formatUZS(part.commission)}
+                      </p>
+                    </div>
+                    <div className="text-right text-xs opacity-80">
+                      <p>{t('commissions.groupOrders', { count: part.orders })}</p>
+                      <p className="tabular-nums">
+                        {t('commissions.groupPaid', { amount: formatUZS(part.paidAmount) })}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
           <p className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
-            {t('commissions.calculation', { percent: data.defaultPercent })}
+            {t('commissions.calculation', {
+              lab: data.defaultPercents.LAB,
+              uzi: data.defaultPercents.UZI,
+              exo: data.defaultPercents.EXO,
+            })}
           </p>
 
           {data.orders.length === 0 ? (
@@ -220,7 +260,11 @@ export function CommissionsTab() {
                           <TableHead className="text-right">{t('commissions.patients')}</TableHead>
                           <TableHead className="text-right">{t('commissions.orders')}</TableHead>
                           <TableHead className="text-right">{t('commissions.paidAmount')}</TableHead>
-                          <TableHead className="text-right">{t('commissions.percent')}</TableHead>
+                          {AMBULATORY_SHARE_GROUPS.map((group) => (
+                            <TableHead key={group} className="text-right">
+                              {t(`groups.${group}`)}
+                            </TableHead>
+                          ))}
                           <TableHead className="text-right">{t('commissions.commission')}</TableHead>
                           <TableHead className="text-right">
                             {t('commissions.pendingCommission')}
@@ -236,9 +280,16 @@ export function CommissionsTab() {
                           >
                             <TableCell>
                               <p className="font-medium">{doctor.doctorName}</p>
-                              {doctor.specialty ? (
-                                <p className="text-xs text-muted-foreground">{doctor.specialty}</p>
-                              ) : null}
+                              <p className="text-xs text-muted-foreground">
+                                {[
+                                  doctor.specialty,
+                                  AMBULATORY_SHARE_GROUPS.map(
+                                    (group) => `${t(`groups.${group}`)} ${doctor.currentPercents[group]}%`,
+                                  ).join(' · '),
+                                ]
+                                  .filter(Boolean)
+                                  .join(' — ')}
+                              </p>
                             </TableCell>
                             <TableCell className="text-right tabular-nums">
                               {doctor.patients}
@@ -247,9 +298,13 @@ export function CommissionsTab() {
                             <TableCell className="text-right tabular-nums">
                               {formatUZS(doctor.paidAmount)}
                             </TableCell>
-                            <TableCell className="text-right tabular-nums">
-                              {doctor.currentPercent}%
-                            </TableCell>
+                            {AMBULATORY_SHARE_GROUPS.map((group) => (
+                              <TableCell key={group} className="text-right tabular-nums">
+                                {Number(doctor.byGroup[group].commission) > 0
+                                  ? formatUZS(doctor.byGroup[group].commission)
+                                  : '—'}
+                              </TableCell>
+                            ))}
                             <TableCell className="text-right font-semibold tabular-nums text-primary">
                               {formatUZS(doctor.commission)}
                             </TableCell>
@@ -271,7 +326,11 @@ export function CommissionsTab() {
                           <TableCell className="text-right tabular-nums">
                             {formatUZS(data.totals.paidAmount)}
                           </TableCell>
-                          <TableCell />
+                          {AMBULATORY_SHARE_GROUPS.map((group) => (
+                            <TableCell key={group} className="text-right tabular-nums">
+                              {formatUZS(data.totals.byGroup[group].commission)}
+                            </TableCell>
+                          ))}
                           <TableCell className="text-right font-semibold tabular-nums">
                             {formatUZS(data.totals.commission)}
                           </TableCell>
@@ -294,10 +353,11 @@ export function CommissionsTab() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>{t('commissions.date')}</TableHead>
+                        <TableHead>{t('commissions.group')}</TableHead>
                         <TableHead>{t('table.patient')}</TableHead>
                         {!isDoctor ? <TableHead>{t('table.doctor')}</TableHead> : null}
                         <TableHead>{t('commissions.tests')}</TableHead>
-                        <TableHead className="text-right">{t('commissions.labAmount')}</TableHead>
+                        <TableHead className="text-right">{t('commissions.amount')}</TableHead>
                         <TableHead className="text-right">{t('commissions.paidAmount')}</TableHead>
                         <TableHead className="text-right">{t('commissions.commission')}</TableHead>
                         <TableHead>{t('commissions.payment')}</TableHead>
@@ -305,9 +365,14 @@ export function CommissionsTab() {
                     </TableHeader>
                     <TableBody>
                       {data.orders.map((order) => (
-                        <TableRow key={order.orderId}>
+                        <TableRow key={`${order.group}:${order.orderId}`}>
                           <TableCell className="whitespace-nowrap text-muted-foreground">
                             {formatTz(order.createdAt)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={groupTone[order.group]}>
+                              {t(`groups.${order.group}`)}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Link
@@ -331,7 +396,7 @@ export function CommissionsTab() {
                             </p>
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {formatUZS(order.labAmount)}
+                            {formatUZS(order.amount)}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
                             {formatUZS(order.paidAmount)}

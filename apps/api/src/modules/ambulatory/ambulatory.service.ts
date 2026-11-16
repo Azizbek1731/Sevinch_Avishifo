@@ -3,19 +3,20 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AmbulatoryCase } from '@prisma/client';
 import {
-  AMBULATORY_DEFAULT_LAB_PERCENT,
+  AMBULATORY_SHARE_GROUPS,
   AuditAction,
   ErrorCode,
   type AmbulatoryCaseQueryInput,
   type AmbulatoryCommissionDoctor,
-  type AmbulatoryCommissionOrder,
   type AmbulatoryCommissionQueryInput,
   type AmbulatoryCommissionReport,
-  type AmbulatoryCommissionTotals,
   type AmbulatoryLabOrderInput,
   type AmbulatoryPaymentState,
   type AmbulatoryRates,
+  type AmbulatoryShareGroup,
+  type AmbulatorySharePercents,
   type AmbulatoryRatesInput,
+  type AmbulatoryServiceOrderInput,
   type AmbulatoryUziOrderInput,
   type AuthUser,
   type OpenAmbulatoryCaseInput,
@@ -29,141 +30,41 @@ import type { TenantTransactionClient } from '../../core/prisma/tenant-extension
 import { AuditService } from '../../core/audit/audit.service';
 import { LabService } from '../lab/lab.service';
 import { ClinicalOrdersService } from '../clinical-orders/clinical-orders.service';
+import { InvoicesService } from '../billing/invoices.service';
+import { PricingService } from '../services/pricing.service';
 import {
-  AMBULATORY_PERCENT_SETTING,
+  AMBULATORY_PERCENT_SETTINGS,
+  ambulatoryPercents,
+  defaultPercentsFrom,
   linkLabOrderToCase,
+  linkUziOrderToCase,
   nextAmbulatoryNumber,
   openVisitForCase,
+  overridePercents,
 } from './ambulatory-case';
+import {
+  earning,
+  labShare,
+  money,
+  orderOf,
+  totalsOf,
+  uziShares,
+  type LabRow,
+  type Share,
+  type UziRow,
+} from './ambulatory-share';
 import { cashflowRangeUtc } from '../reports/cashflow.service';
 import { XlsxService, type SheetSpec } from '../reports/xlsx.service';
 
-const SETTINGS_KEY = AMBULATORY_PERCENT_SETTING;
-const zero = new Prisma.Decimal(0);
-const money = (value: Prisma.Decimal) =>
-  value.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP).toFixed(2);
+/** Lab, UZI and consultations have their own referral flows; surgery is inpatient-only. */
+const CARD_SERVICE_KINDS = ['PROCEDURE', 'DIAGNOSTICS', 'OTHER', 'MATERIAL', 'MEDICINE'] as const;
+const GROUP_LABEL: Record<AmbulatoryShareGroup, string> = { LAB: 'Laboratoriya', UZI: 'UZI', EXO: 'EXO' };
 
 /** Tashkent calendar day bounds (+05:00), inclusive. */
 function dayRange(from?: string, to?: string): { gte?: Date; lt?: Date } {
   return {
     ...(from ? { gte: new Date(`${from}T00:00:00.000+05:00`) } : {}),
     ...(to ? { lt: new Date(new Date(`${to}T00:00:00.000+05:00`).getTime() + 86_400_000) } : {}),
-  };
-}
-
-interface LabRow {
-  orderId: string;
-  orderNumber: string;
-  createdAt: Date;
-  orderStatus: string;
-  caseId: string;
-  caseNumber: string;
-  doctorUserId: string;
-  doctorName: string;
-  patientId: string;
-  mrn: string;
-  fullName: string;
-  percent: string | null;
-  invoiceId: string | null;
-  invoiceNumber: string | null;
-  invoiceStatus: string | null;
-  invoiceTotal: string | null;
-  paidTotal: string | null;
-  refunded: string;
-  linesTotal: string;
-  labLinesTotal: string;
-  tests: Array<Record<string, string> | string>;
-}
-
-export interface LabShare {
-  row: LabRow;
-  cancelled: boolean;
-  labAmount: Prisma.Decimal;
-  paidAmount: Prisma.Decimal;
-  percent: Prisma.Decimal;
-  commission: Prisma.Decimal;
-  pendingCommission: Prisma.Decimal;
-  paymentState: AmbulatoryPaymentState;
-}
-
-/**
- * The doctor's share is computed from the lab part of the bill only, net of
- * invoice discounts and refunds, and only for what the cashier actually took.
- */
-export function labShare(row: LabRow, fallbackPercent: number): LabShare {
-  const percent = new Prisma.Decimal(row.percent ?? fallbackPercent);
-  const cancelled =
-    row.orderStatus === 'CANCELLED' ||
-    !row.invoiceId ||
-    row.invoiceStatus === 'CANCELLED' ||
-    row.invoiceStatus === 'REFUNDED';
-  const total = new Prisma.Decimal(row.invoiceTotal ?? 0);
-  const linesTotal = new Prisma.Decimal(row.linesTotal);
-  const labLines = new Prisma.Decimal(row.labLinesTotal);
-  const netPaid = Prisma.Decimal.min(
-    total,
-    Prisma.Decimal.max(0, new Prisma.Decimal(row.paidTotal ?? 0).sub(row.refunded)),
-  );
-  if (cancelled) {
-    return {
-      row,
-      cancelled,
-      labAmount: zero,
-      paidAmount: zero,
-      percent,
-      commission: zero,
-      pendingCommission: zero,
-      paymentState: 'UNPAID',
-    };
-  }
-  const labAmount = linesTotal.gt(0) ? labLines.mul(total).div(linesTotal) : zero;
-  const paidAmount = total.gt(0) ? labAmount.mul(netPaid).div(total) : zero;
-  const commission = paidAmount.mul(percent).div(100).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-  const expected = labAmount.mul(percent).div(100).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-  return {
-    row,
-    cancelled,
-    labAmount,
-    paidAmount,
-    percent,
-    commission,
-    pendingCommission: Prisma.Decimal.max(0, expected.sub(commission)),
-    paymentState: netPaid.gte(total) ? 'PAID' : netPaid.gt(0) ? 'PARTIAL' : 'UNPAID',
-  };
-}
-
-function totalsOf(shares: LabShare[]): AmbulatoryCommissionTotals {
-  const sum = (pick: (share: LabShare) => Prisma.Decimal) =>
-    money(shares.reduce((acc, share) => acc.add(pick(share)), zero));
-  return {
-    patients: new Set(shares.map((share) => share.row.patientId)).size,
-    orders: shares.length,
-    labAmount: sum((share) => share.labAmount),
-    paidAmount: sum((share) => share.paidAmount),
-    commission: sum((share) => share.commission),
-    pendingCommission: sum((share) => share.pendingCommission),
-  };
-}
-
-function orderOf(share: LabShare): AmbulatoryCommissionOrder {
-  const { row } = share;
-  return {
-    orderId: row.orderId,
-    orderNumber: row.orderNumber,
-    createdAt: row.createdAt.toISOString(),
-    caseId: row.caseId,
-    caseNumber: row.caseNumber,
-    patient: { id: row.patientId, mrn: row.mrn, fullName: row.fullName },
-    doctorUserId: row.doctorUserId,
-    doctorName: row.doctorName,
-    tests: row.tests ?? [],
-    invoiceNumber: row.invoiceNumber,
-    labAmount: money(share.labAmount),
-    paidAmount: money(share.paidAmount),
-    percent: share.percent.toNumber(),
-    commission: money(share.commission),
-    pendingCommission: money(share.pendingCommission),
-    paymentState: share.paymentState,
   };
 }
 
@@ -178,6 +79,8 @@ export class AmbulatoryService {
     private readonly lab: LabService,
     private readonly clinicalOrders: ClinicalOrdersService,
     private readonly xlsx: XlsxService,
+    private readonly invoices: InvoicesService,
+    private readonly pricing: PricingService,
   ) {}
 
   // ------------------------------------------------------------ helpers
@@ -254,23 +157,74 @@ export class AmbulatoryService {
     return locked;
   }
 
-  async defaultPercent(): Promise<number> {
+  async defaultPercents(): Promise<AmbulatorySharePercents> {
     const clinic = await this.prisma.unscoped.clinic.findUnique({
       where: { id: TenantContext.requireClinicId() },
       select: { settings: true },
     });
-    const value = ((clinic?.settings ?? {}) as Record<string, unknown>)[SETTINGS_KEY];
-    return typeof value === 'number' && value >= 0 && value <= 100
-      ? value
-      : AMBULATORY_DEFAULT_LAB_PERCENT;
+    return defaultPercentsFrom(clinic?.settings);
   }
 
-  private async percentFor(doctorUserId: string): Promise<number> {
-    const override = await this.prisma.db.ambulatoryCommissionRate.findFirst({
-      where: { doctorUserId },
-      select: { percent: true },
-    });
-    return override ? override.percent.toNumber() : this.defaultPercent();
+  private percentsFor(doctorUserId: string): Promise<AmbulatorySharePercents> {
+    return ambulatoryPercents(this.prisma.db, TenantContext.requireClinicId(), doctorUserId);
+  }
+
+  /** Lab and UZI/EXO shares of the cards matched by `filter` (aliases: c = card, o = order). */
+  private async shares(branchId: string, filter: Prisma.Sql): Promise<Share[]> {
+    const [labs, uzis, defaults] = await Promise.all([
+      this.labRows(branchId, filter),
+      this.uziRows(branchId, filter),
+      this.defaultPercents(),
+    ]);
+    return [
+      ...labs.map((row) => labShare(row, defaults.LAB)),
+      ...uziShares(uzis),
+    ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  private async uziRows(branchId: string, filter: Prisma.Sql): Promise<UziRow[]> {
+    const clinicId = TenantContext.requireClinicId();
+    // Raw SQL bypasses the tenant extension; every source and join is scoped explicitly.
+    return this.prisma.db.$queryRaw<UziRow[]>(Prisma.sql`
+      SELECT o.id AS "orderId", o."createdAt",
+        c.id AS "caseId", c.number AS "caseNumber", c."doctorUserId", c."doctorName",
+        p.id AS "patientId", p.mrn, p."fullName",
+        ii.number AS "orderNumber",
+        (ii.status::text IN ('CANCELLED', 'REFUNDED') OR v.status::text = 'CANCELLED') AS "orderCancelled",
+        o."ambulatoryUziPercent"::text AS "uziPercent",
+        o."ambulatoryEchoPercent"::text AS "echoPercent",
+        i.id AS "invoiceId", i.number AS "invoiceNumber", i.status::text AS "invoiceStatus",
+        i.total::text AS "invoiceTotal", i."paidTotal"::text AS "paidTotal",
+        COALESCE(r.refunded, 0)::text AS refunded,
+        COALESCE(l.all_total, 0)::text AS "linesTotal",
+        COALESCE(l.uzi_total, 0)::text AS "uziLinesTotal",
+        COALESCE(l.echo_total, 0)::text AS "echoLinesTotal",
+        COALESCE(l.uzi_titles, '[]'::jsonb) AS "uziTitles",
+        COALESCE(l.echo_titles, '[]'::jsonb) AS "echoTitles"
+      FROM "ClinicalOrder" o
+      JOIN "AmbulatoryCase" c ON c.id = o."ambulatoryCaseId" AND c."clinicId" = ${clinicId}
+      JOIN "Patient" p ON p.id = o."patientId" AND p."clinicId" = ${clinicId}
+      JOIN "Invoice" ii ON ii.id = o."initialInvoiceId" AND ii."clinicId" = ${clinicId}
+      LEFT JOIN "Visit" v ON v.id = o."visitId" AND v."clinicId" = ${clinicId}
+      JOIN "Invoice" i ON (i."clinicalOrderId" = o.id OR i.id = o."initialInvoiceId") AND i."clinicId" = ${clinicId}
+      LEFT JOIN LATERAL (
+        SELECT SUM(rf.amount) AS refunded FROM "Refund" rf
+        WHERE rf."invoiceId" = i.id AND rf."clinicId" = ${clinicId}
+      ) r ON true
+      LEFT JOIN LATERAL (
+        SELECT SUM(il."lineTotal") AS all_total,
+          SUM(il."lineTotal") FILTER (WHERE sc.kind::text = 'ULTRASOUND' AND NOT s."isEcho") AS uzi_total,
+          SUM(il."lineTotal") FILTER (WHERE sc.kind::text = 'ULTRASOUND' AND s."isEcho") AS echo_total,
+          jsonb_agg(il.title ORDER BY il.id) FILTER (WHERE sc.kind::text = 'ULTRASOUND' AND NOT s."isEcho") AS uzi_titles,
+          jsonb_agg(il.title ORDER BY il.id) FILTER (WHERE sc.kind::text = 'ULTRASOUND' AND s."isEcho") AS echo_titles
+        FROM "InvoiceLine" il
+        LEFT JOIN "Service" s ON s.id = il."serviceId" AND s."clinicId" = ${clinicId}
+        LEFT JOIN "ServiceCategory" sc ON sc.id = s."categoryId" AND sc."clinicId" = ${clinicId}
+        WHERE il."invoiceId" = i.id AND il."clinicId" = ${clinicId}
+      ) l ON true
+      WHERE o."clinicId" = ${clinicId} AND o."branchId" = ${branchId} AND o.kind = 'ULTRASOUND' ${filter}
+      ORDER BY o."createdAt" DESC, i."createdAt" ASC
+    `);
   }
 
   private async labRows(branchId: string, filter: Prisma.Sql): Promise<LabRow[]> {
@@ -346,7 +300,7 @@ export class AmbulatoryService {
           }
         : {}),
     };
-    const [rows, total, fallback] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.db.ambulatoryCase.findMany({
         where,
         orderBy: [{ status: 'asc' }, { openedAt: 'desc' }],
@@ -362,24 +316,20 @@ export class AmbulatoryService {
         },
       }),
       this.prisma.db.ambulatoryCase.count({ where }),
-      this.defaultPercent(),
     ]);
     const ids = rows.map((row) => row.id);
     const shares = ids.length
-      ? (await this.labRows(branchId, Prisma.sql`AND c.id IN (${Prisma.join(ids)})`)).map((row) =>
-          labShare(row, fallback),
-        )
+      ? (await this.shares(branchId, Prisma.sql`AND c.id IN (${Prisma.join(ids)})`)).filter(earning)
       : [];
     return paginated(
       rows.map((row) => {
-        const own = shares.filter((share) => share.row.caseId === row.id && !share.cancelled);
-        const totals = totalsOf(own);
+        const totals = totalsOf(shares.filter((share) => share.caseId === row.id));
         return {
           ...this.map(row),
           patient: row.patient,
           labOrders: row._count.labOrders,
           uziOrders: row._count.clinicalOrders,
-          labAmount: totals.labAmount,
+          amount: totals.amount,
           paidAmount: totals.paidAmount,
           commission: totals.commission,
           pendingCommission: totals.pendingCommission,
@@ -544,11 +494,12 @@ export class AmbulatoryService {
     const found = await this.requireCase(id, user, branchId);
     await this.prisma.db.$transaction(async (tx) => {
       await this.lockCase(tx, id);
-      const [lab, uzi] = await Promise.all([
+      const [lab, uzi, services] = await Promise.all([
         tx.labOrder.count({ where: { ambulatoryCaseId: id } }),
         tx.clinicalOrder.count({ where: { ambulatoryCaseId: id } }),
+        tx.chargeItem.count({ where: { ambulatoryCaseId: id } }),
       ]);
-      if (lab + uzi > 0)
+      if (lab + uzi + services > 0)
         throw new AppException(
           ErrorCode.VALIDATION_ERROR,
           'Kartadan yo‘llanma yuborilgan — o‘chirib bo‘lmaydi, yakunlang.',
@@ -567,7 +518,7 @@ export class AmbulatoryService {
 
   async getById(id: string, user: AuthUser, branchId: string): Promise<Record<string, unknown>> {
     const found = await this.requireCase(id, user, branchId);
-    const [patient, fallback, clinicalOrders, labOrders, stay] = await Promise.all([
+    const [patient, clinicalOrders, labOrders, stay, services, shares, currentPercents] = await Promise.all([
       this.prisma.db.patient.findFirst({
         where: { id: found.patientId },
         select: {
@@ -580,7 +531,6 @@ export class AmbulatoryService {
           address: true,
         },
       }),
-      this.defaultPercent(),
       this.clinicalOrders.listForAmbulatoryCase(id, branchId),
       this.prisma.db.labOrder.findMany({
         where: { ambulatoryCaseId: id },
@@ -590,25 +540,90 @@ export class AmbulatoryService {
         where: { patientId: found.patientId, branchId, status: 'ACTIVE' },
         select: { id: true, historyNumber: true },
       }),
+      this.caseServices(id),
+      this.shares(branchId, Prisma.sql`AND c.id = ${id}`),
+      this.percentsFor(found.doctorUserId),
     ]);
     const statusById = new Map(labOrders.map((order) => [order.id, order.status]));
-    const shares = (await this.labRows(branchId, Prisma.sql`AND c.id = ${id}`)).map((row) =>
-      labShare(row, fallback),
-    );
+    const uziSharesByOrder = new Map<string, Share[]>();
+    for (const share of shares)
+      if (share.group !== 'LAB')
+        uziSharesByOrder.set(share.orderId, [...(uziSharesByOrder.get(share.orderId) ?? []), share]);
     return {
       ...this.map(found),
       patient,
-      currentPercent: await this.percentFor(found.doctorUserId),
+      currentPercents,
       activeStay: stay,
-      totals: totalsOf(shares.filter((share) => !share.cancelled)),
-      labOrders: shares.map((share) => ({
-        ...orderOf(share),
-        status: statusById.get(share.row.orderId) ?? share.row.orderStatus,
-        cancelled: share.cancelled,
-      })),
-      uziOrders: clinicalOrders.filter((order) => order.kind === 'ULTRASOUND'),
+      totals: totalsOf(shares.filter(earning)),
+      labOrders: shares
+        .filter((share) => share.group === 'LAB')
+        .map((share) => ({
+          ...orderOf(share),
+          status: statusById.get(share.orderId) ?? 'ORDERED',
+          cancelled: share.cancelled,
+        })),
+      uziOrders: clinicalOrders
+        .filter((order) => order.kind === 'ULTRASOUND')
+        .map((order) => ({
+          ...order,
+          shares: (uziSharesByOrder.get(order.id) ?? []).map((share) => ({
+            group: share.group,
+            percent: share.percent.toNumber(),
+            amount: money(share.amount),
+            commission: money(share.commission),
+            pendingCommission: money(share.pendingCommission),
+          })),
+        })),
       consultations: clinicalOrders.filter((order) => order.kind === 'CONSULTATION'),
+      services,
     };
+  }
+
+  /** Lines added to the card by hand, with the state of the bill each one went on. */
+  private async caseServices(id: string): Promise<Record<string, unknown>[]> {
+    const charges = await this.prisma.db.chargeItem.findMany({
+      where: { ambulatoryCaseId: id },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+    });
+    const lineIds = charges.flatMap((charge) => (charge.invoiceLineId ? [charge.invoiceLineId] : []));
+    const lines = lineIds.length
+      ? await this.prisma.db.invoiceLine.findMany({
+          where: { id: { in: lineIds } },
+          select: {
+            id: true,
+            invoice: { select: { id: true, number: true, status: true, total: true, paidTotal: true } },
+          },
+        })
+      : [];
+    const invoiceByLine = new Map(lines.map((line) => [line.id, line.invoice]));
+    return charges.map((charge) => {
+      const invoice = charge.invoiceLineId ? invoiceByLine.get(charge.invoiceLineId) : undefined;
+      const cancelled =
+        charge.status === 'CANCELLED' ||
+        !invoice ||
+        invoice.status === 'CANCELLED' ||
+        invoice.status === 'REFUNDED';
+      const paymentState: AmbulatoryPaymentState | null =
+        cancelled || !invoice
+        ? null
+        : invoice.paidTotal.gte(invoice.total)
+          ? 'PAID'
+          : invoice.paidTotal.gt(0)
+            ? 'PARTIAL'
+            : 'UNPAID';
+      return {
+        id: charge.id,
+        serviceId: charge.serviceId,
+        title: charge.title,
+        quantity: charge.quantity,
+        unitPrice: charge.unitPrice.toFixed(2),
+        lineTotal: charge.unitPrice.mul(charge.quantity).toFixed(2),
+        createdAt: charge.createdAt.toISOString(),
+        invoiceNumber: invoice?.number ?? null,
+        cancelled,
+        paymentState,
+      };
+    });
   }
 
   // ------------------------------------------------------------ referrals
@@ -655,7 +670,7 @@ export class AmbulatoryService {
         'Tanlangan laboratoriya xizmati lab-katalogga bog‘lanmagan',
         400,
       );
-    const percent = await this.percentFor(found.doctorUserId);
+    const percent = (await this.percentsFor(found.doctorUserId)).LAB;
     const clinicId = TenantContext.requireClinicId();
     const order = await this.prisma.db.$transaction(
       async (tx) => {
@@ -718,10 +733,7 @@ export class AmbulatoryService {
           },
           tx,
         );
-        await tx.clinicalOrder.update({
-          where: { id: created.id },
-          data: { ambulatoryCaseId: id },
-        });
+        await linkUziOrderToCase(tx, TenantContext.requireClinicId(), created.id, locked);
         const visitId = await openVisitForCase(tx, locked);
         if (visitId)
           await tx.referral.create({
@@ -748,6 +760,106 @@ export class AmbulatoryService {
     return this.getById(id, user, branchId);
   }
 
+  /** Procedures, diagnostics (EKG…) or free-text lines, issued to the cashier as one bill. */
+  async addServices(
+    id: string,
+    dto: AmbulatoryServiceOrderInput,
+    user: AuthUser,
+    branchId: string,
+  ): Promise<Record<string, unknown>> {
+    const found = await this.requireCase(id, user, branchId);
+    await this.assertCanSend(found);
+    const serviceIds = [...new Set(dto.items.flatMap((item) => (item.serviceId ? [item.serviceId] : [])))];
+    const services = serviceIds.length
+      ? await this.prisma.db.service.findMany({
+          where: {
+            id: { in: serviceIds },
+            isActive: true,
+            category: { kind: { in: [...CARD_SERVICE_KINDS] } },
+          },
+          select: { id: true, name: true },
+        })
+      : [];
+    if (services.length !== serviceIds.length)
+      throw new AppException(
+        ErrorCode.VALIDATION_ERROR,
+        'Tahlil, UZI, shifokor qabuli va operatsiya o‘z bo‘limidan yuboriladi',
+        400,
+      );
+    const prices = await this.pricing.getCurrentPrices(serviceIds, branchId);
+    if (serviceIds.some((serviceId) => !prices.has(serviceId)))
+      throw new AppException(ErrorCode.VALIDATION_ERROR, 'Xizmat narxi belgilanmagan', 400);
+    const nameById = new Map(services.map((service) => [service.id, service.name]));
+    const clinicId = TenantContext.requireClinicId();
+    const date = new Date(`${new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10)}T00:00:00.000Z`);
+
+    const invoice = await this.prisma.db.$transaction(
+      async (tx) => {
+        const locked = await this.lockCase(tx, id);
+        if (locked.status !== 'OPEN')
+          throw new AppException(ErrorCode.VALIDATION_ERROR, 'Karta yakunlangan', 409);
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${clinicId + ':charge:' + dto.idempotencyKey}, 0))`;
+        const replay = await tx.chargeItem.findFirst({
+          where: { requestKey: `${dto.idempotencyKey}:0` },
+          select: { ambulatoryCaseId: true },
+        });
+        if (replay) {
+          if (replay.ambulatoryCaseId !== id)
+            throw new AppException(ErrorCode.VALIDATION_ERROR, 'Bu so‘rov kaliti boshqa karta uchun ishlatilgan', 409);
+          return null;
+        }
+        const visitId = await openVisitForCase(tx, locked);
+        const chargeIds: string[] = [];
+        for (const [index, item] of dto.items.entries()) {
+          const charge = await tx.chargeItem.create({
+            data: {
+              clinicId,
+              branchId,
+              patientId: locked.patientId,
+              ambulatoryCaseId: id,
+              visitId,
+              serviceId: item.serviceId ?? null,
+              title: item.serviceId
+                ? (nameById.get(item.serviceId) as Prisma.InputJsonValue)
+                : { uz: item.title! },
+              date,
+              quantity: item.quantity,
+              unitPrice: new Prisma.Decimal(
+                item.serviceId ? prices.get(item.serviceId)! : item.unitPrice!,
+              ),
+              createdById: user.id,
+              requestKey: `${dto.idempotencyKey}:${index}`,
+            },
+            select: { id: true },
+          });
+          chargeIds.push(charge.id);
+        }
+        return this.invoices.issueChargesInTransaction(tx, chargeIds, user, branchId, {
+          skipLab: true,
+        });
+      },
+      { timeout: 30_000 },
+    );
+    if (invoice)
+      await this.audit.log({
+        action: AuditAction.CREATE,
+        entity: 'AmbulatoryServiceReferral',
+        entityId: invoice.id,
+        after: {
+          caseId: id,
+          invoiceNumber: invoice.number,
+          total: invoice.total.toFixed(2),
+          items: dto.items.map((item) => ({
+            serviceId: item.serviceId ?? null,
+            title: item.serviceId ? null : item.title,
+            quantity: item.quantity,
+            unitPrice: item.serviceId ? prices.get(item.serviceId) : item.unitPrice,
+          })),
+        },
+      });
+    return this.getById(id, user, branchId);
+  }
+
   // ------------------------------------------------------------ doctor share
 
   async commissions(
@@ -760,18 +872,16 @@ export class AmbulatoryService {
       throw new AppException(ErrorCode.FORBIDDEN, 'Shifokor faqat o‘z ulushini ko‘radi', 403);
     const doctorUserId = this.isDoctor(user) ? user.id : (q.doctorUserId ?? null);
     const { start, end } = cashflowRangeUtc(q.from, q.to);
-    const fallback = await this.defaultPercent();
-    const shares = (
-      await this.labRows(
+    const [shares, defaults] = await Promise.all([
+      this.shares(
         branchId,
         Prisma.sql`AND o."createdAt" >= ${start} AND o."createdAt" < ${end}
           ${doctorUserId ? Prisma.sql`AND c."doctorUserId" = ${doctorUserId}` : Prisma.empty}`,
-      )
-    )
-      .map((row) => labShare(row, fallback))
-      .filter((share) => !share.cancelled);
+      ).then((all) => all.filter(earning)),
+      this.defaultPercents(),
+    ]);
 
-    const doctorIds = [...new Set(shares.map((share) => share.row.doctorUserId))];
+    const doctorIds = [...new Set(shares.map((share) => share.doctorUserId))];
     const [profiles, overrides] = await Promise.all([
       doctorIds.length
         ? this.prisma.unscoped.user.findMany({
@@ -786,19 +896,22 @@ export class AmbulatoryService {
         : [],
     ]);
     const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
-    const overrideById = new Map(
-      overrides.map((rate) => [rate.doctorUserId, rate.percent.toNumber()]),
-    );
+    const overrideById = new Map(overrides.map((rate) => [rate.doctorUserId, overridePercents(rate)]));
     const doctors: AmbulatoryCommissionDoctor[] = doctorIds
       .map((id) => {
-        const own = shares.filter((share) => share.row.doctorUserId === id);
+        const own = shares.filter((share) => share.doctorUserId === id);
         const profile = profileById.get(id);
+        const override = overrideById.get(id);
         return {
           ...totalsOf(own),
           doctorUserId: id,
-          doctorName: profile?.fullName ?? own[0]!.row.doctorName,
+          doctorName: profile?.fullName ?? own[0]!.doctorName,
           specialty: profile?.staffProfile?.specialty ?? null,
-          currentPercent: overrideById.get(id) ?? fallback,
+          currentPercents: {
+            LAB: override?.LAB ?? defaults.LAB,
+            UZI: override?.UZI ?? defaults.UZI,
+            EXO: override?.EXO ?? defaults.EXO,
+          },
         };
       })
       .sort(
@@ -809,7 +922,7 @@ export class AmbulatoryService {
       from: q.from,
       to: q.to,
       doctorUserId,
-      defaultPercent: fallback,
+      defaultPercents: defaults,
       totals: totalsOf(shares),
       doctors,
       orders: shares.map(orderOf),
@@ -832,27 +945,37 @@ export class AmbulatoryService {
           { header: 'Mutaxassislik', key: 'specialty', width: 22 },
           { header: 'Bemorlar', key: 'patients', width: 12 },
           { header: 'Yo‘llanmalar', key: 'orders', width: 14 },
-          { header: 'Lab summasi', key: 'labAmount', money: true },
+          { header: 'Yo‘llanma summasi', key: 'amount', money: true },
           { header: 'To‘langan', key: 'paidAmount', money: true },
-          { header: 'Shifokor ulushi', key: 'commission', money: true, width: 20 },
+          { header: 'Lab ulushi', key: 'labCommission', money: true },
+          { header: 'UZI ulushi', key: 'uziCommission', money: true },
+          { header: 'EXO ulushi', key: 'echoCommission', money: true },
+          { header: 'Jami ulush', key: 'commission', money: true, width: 20 },
           { header: 'Kutilmoqda', key: 'pendingCommission', money: true },
-          { header: 'Joriy foiz', key: 'currentPercent', width: 12 },
+          { header: 'Joriy foizlar', key: 'percents', width: 28 },
         ],
         rows: report.doctors.map((doctor) => ({
           ...doctor,
           specialty: doctor.specialty ?? '',
+          labCommission: doctor.byGroup.LAB.commission,
+          uziCommission: doctor.byGroup.UZI.commission,
+          echoCommission: doctor.byGroup.EXO.commission,
+          percents: AMBULATORY_SHARE_GROUPS.map(
+            (group) => `${GROUP_LABEL[group]} ${doctor.currentPercents[group]}%`,
+          ).join(' · '),
         })),
       },
       {
         name: 'Yo‘llanmalar',
         columns: [
           { header: 'Sana', key: 'createdAt', width: 18 },
+          { header: 'Yo‘nalish', key: 'group', width: 14 },
           { header: 'Karta', key: 'caseNumber', width: 14 },
-          { header: 'Lab №', key: 'orderNumber', width: 16 },
+          { header: 'Yo‘llanma №', key: 'orderNumber', width: 18 },
           { header: 'Bemor', key: 'patient', width: 30 },
           { header: 'Shifokor', key: 'doctorName', width: 28 },
-          { header: 'Tahlillar', key: 'tests', width: 50 },
-          { header: 'Lab summasi', key: 'labAmount', money: true },
+          { header: 'Tekshiruvlar', key: 'tests', width: 50 },
+          { header: 'Summa', key: 'amount', money: true },
           { header: 'To‘langan', key: 'paidAmount', money: true },
           { header: 'Foiz', key: 'percent', width: 8 },
           { header: 'Ulush', key: 'commission', money: true },
@@ -860,6 +983,7 @@ export class AmbulatoryService {
         ],
         rows: report.orders.map((order) => ({
           ...order,
+          group: GROUP_LABEL[order.group],
           createdAt: new Date(order.createdAt)
             .toLocaleString('sv-SE', { timeZone: 'Asia/Tashkent' })
             .slice(0, 16),
@@ -876,11 +1000,16 @@ export class AmbulatoryService {
         ],
         rows: [
           { key: 'Davr', value: `${report.from} — ${report.to} (Toshkent vaqti, yo‘llanma sanasi)` },
-          { key: 'Standart foiz', value: `${report.defaultPercent}%` },
+          {
+            key: 'Standart foizlar',
+            value: AMBULATORY_SHARE_GROUPS.map(
+              (group) => `${GROUP_LABEL[group]} ${report.defaultPercents[group]}%`,
+            ).join(' · '),
+          },
           {
             key: 'Hisoblash',
             value:
-              'Faqat ambulator kartadan yuborilgan laboratoriya. Ulush = to‘langan lab summasi × yo‘llanma paytidagi foiz. Chegirma va qaytarishlar ayiriladi; bekor qilinganlar kiritilmaydi.',
+              'Faqat ambulator kartadan yuborilgan laboratoriya, UZI va EXO. Ulush = kassada to‘langan summa × yo‘llanma paytidagi foiz (laboratoriya, UZI va EXO uchun alohida). Chegirma va qaytarishlar ayiriladi; bekor qilinganlar va foizi 0% bo‘lganlar kiritilmaydi.',
           },
         ],
       },
@@ -896,7 +1025,7 @@ export class AmbulatoryService {
 
   async rates(user: AuthUser, branchId: string): Promise<AmbulatoryRates> {
     this.assertBranch(user, branchId);
-    const [doctors, overrides, fallback] = await Promise.all([
+    const [doctors, overrides, defaults, ultrasound] = await Promise.all([
       this.prisma.unscoped.user.findMany({
         where: {
           clinicId: TenantContext.requireClinicId(),
@@ -909,19 +1038,41 @@ export class AmbulatoryService {
         orderBy: { fullName: 'asc' },
       }),
       this.prisma.db.ambulatoryCommissionRate.findMany(),
-      this.defaultPercent(),
+      this.defaultPercents(),
+      this.prisma.db.service.findMany({
+        where: { category: { kind: 'ULTRASOUND' }, OR: [{ isActive: true }, { isEcho: true }] },
+        select: { id: true, code: true, name: true, isEcho: true, category: { select: { name: true } } },
+        orderBy: [{ category: { sortOrder: 'asc' } }, { code: 'asc' }],
+      }),
     ]);
-    const overrideById = new Map(
-      overrides.map((rate) => [rate.doctorUserId, rate.percent.toNumber()]),
-    );
+    const overrideById = new Map(overrides.map((rate) => [rate.doctorUserId, overridePercents(rate)]));
     return {
-      defaultPercent: fallback,
+      defaults,
       doctors: doctors.map((doctor) => ({
         doctorUserId: doctor.id,
         fullName: doctor.fullName,
         specialty: doctor.staffProfile?.specialty ?? null,
-        percent: overrideById.get(doctor.id) ?? null,
+        percents: overrideById.get(doctor.id) ?? { LAB: null, UZI: null, EXO: null },
       })),
+      ultrasoundServices: ultrasound.map((service) => ({
+        id: service.id,
+        code: service.code,
+        name: service.name as Record<string, string> | string,
+        category: service.category.name,
+        isEcho: service.isEcho,
+      })),
+    };
+  }
+
+  private auditRates(rates: AmbulatoryRates) {
+    return {
+      defaults: rates.defaults,
+      doctors: rates.doctors.filter((doctor) =>
+        AMBULATORY_SHARE_GROUPS.some((group) => doctor.percents[group] !== null),
+      ),
+      echoServices: rates.ultrasoundServices
+        .filter((service) => service.isEcho)
+        .map((service) => service.code),
     };
   }
 
@@ -936,37 +1087,48 @@ export class AmbulatoryService {
     const known = new Set(before.doctors.map((doctor) => doctor.doctorUserId));
     if (dto.doctors.some((doctor) => !known.has(doctor.doctorUserId)))
       throw new AppException(ErrorCode.VALIDATION_ERROR, 'Shifokor topilmadi', 400);
+    const echoIds = [...new Set(dto.echoServiceIds)];
+    const ultrasoundIds = new Set(before.ultrasoundServices.map((service) => service.id));
+    if (echoIds.some((serviceId) => !ultrasoundIds.has(serviceId)))
+      throw new AppException(ErrorCode.VALIDATION_ERROR, 'EXO ro‘yxatida faqat UZI tekshiruvlari bo‘ladi', 400);
+    const decimal = (value: number | null) => (value === null ? null : new Prisma.Decimal(value));
     await this.prisma.db.$transaction(async (tx) => {
       const clinic = await tx.$queryRaw<{ settings: Prisma.JsonValue }[]>`
         SELECT "settings" FROM "Clinic" WHERE "id" = ${clinicId} FOR UPDATE`;
       const settings = (clinic[0]?.settings ?? {}) as Record<string, unknown>;
+      const next = { ...settings };
+      for (const group of AMBULATORY_SHARE_GROUPS)
+        next[AMBULATORY_PERCENT_SETTINGS[group]] = dto.defaults[group];
       await tx.$executeRaw`
-        UPDATE "Clinic" SET "settings" = ${JSON.stringify({ ...settings, [SETTINGS_KEY]: dto.defaultPercent })}::jsonb
+        UPDATE "Clinic" SET "settings" = ${JSON.stringify(next)}::jsonb
         WHERE "id" = ${clinicId}`;
       for (const row of dto.doctors) {
-        if (row.percent === null) {
+        const { LAB, UZI, EXO } = row.percents;
+        if (LAB === null && UZI === null && EXO === null) {
           await tx.ambulatoryCommissionRate.deleteMany({ where: { doctorUserId: row.doctorUserId } });
           continue;
         }
+        const data = { percent: decimal(LAB), uziPercent: decimal(UZI), echoPercent: decimal(EXO), updatedById: user.id };
         await tx.ambulatoryCommissionRate.upsert({
           where: { clinicId_doctorUserId: { clinicId, doctorUserId: row.doctorUserId } },
-          create: {
-            clinicId,
-            doctorUserId: row.doctorUserId,
-            percent: new Prisma.Decimal(row.percent),
-            updatedById: user.id,
-          },
-          update: { percent: new Prisma.Decimal(row.percent), updatedById: user.id },
+          create: { clinicId, doctorUserId: row.doctorUserId, ...data },
+          update: data,
         });
       }
+      await tx.service.updateMany({
+        where: { id: { in: [...ultrasoundIds] }, isEcho: true, NOT: { id: { in: echoIds } } },
+        data: { isEcho: false },
+      });
+      if (echoIds.length)
+        await tx.service.updateMany({ where: { id: { in: echoIds } }, data: { isEcho: true } });
     });
     const after = await this.rates(user, branchId);
     await this.audit.log({
       action: AuditAction.UPDATE,
       entity: 'AmbulatoryCommissionRate',
       entityId: 'rates',
-      before,
-      after,
+      before: this.auditRates(before),
+      after: this.auditRates(after),
     });
     return after;
   }

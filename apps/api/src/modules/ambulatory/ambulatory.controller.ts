@@ -21,6 +21,7 @@ import {
   AmbulatoryCommissionQueryDto,
   AmbulatoryLabOrderDto,
   AmbulatoryRatesDto,
+  AmbulatoryServiceOrderDto,
   AmbulatoryUziOrderDto,
   OpenAmbulatoryCaseDto,
   UpdateAmbulatoryCaseDto,
@@ -154,5 +155,16 @@ export class AmbulatoryController {
     @ActiveBranch() branchId: string,
   ): Promise<Record<string, unknown>> {
     return this.ambulatory.sendUzi(id, dto, user, branchId);
+  }
+
+  @Post(':id/services')
+  @RequirePermissions('ambulatory.write')
+  addServices(
+    @Param('id') id: string,
+    @Body() dto: AmbulatoryServiceOrderDto,
+    @CurrentUser() user: AuthUser,
+    @ActiveBranch() branchId: string,
+  ): Promise<Record<string, unknown>> {
+    return this.ambulatory.addServices(id, dto, user, branchId);
   }
 }

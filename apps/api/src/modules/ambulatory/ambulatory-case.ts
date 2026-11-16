@@ -1,10 +1,67 @@
 import { Prisma } from '@prisma/client';
 import type { AmbulatoryCase } from '@prisma/client';
-import { AMBULATORY_DEFAULT_LAB_PERCENT } from '@avishifo/shared';
+import {
+  AMBULATORY_DEFAULT_PERCENTS,
+  AMBULATORY_SHARE_GROUPS,
+  type AmbulatorySharePercents,
+  type AmbulatoryShareGroup,
+} from '@avishifo/shared';
 import type { TenantTransactionClient } from '../../core/prisma/tenant-extension';
 
-/** Clinic.settings key holding the default lab share percent. */
-export const AMBULATORY_PERCENT_SETTING = 'ambulatoryLabPercent';
+/** Clinic.settings keys holding the default share percent of each group. */
+export const AMBULATORY_PERCENT_SETTINGS: Record<AmbulatoryShareGroup, string> = {
+  LAB: 'ambulatoryLabPercent',
+  UZI: 'ambulatoryUziPercent',
+  EXO: 'ambulatoryEchoPercent',
+};
+
+type PercentReader = Pick<TenantTransactionClient, 'ambulatoryCommissionRate' | 'clinic'>;
+
+function validPercent(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
+}
+
+export function defaultPercentsFrom(settings: unknown): AmbulatorySharePercents {
+  const values = (settings && typeof settings === 'object' ? settings : {}) as Record<string, unknown>;
+  const result = { ...AMBULATORY_DEFAULT_PERCENTS };
+  for (const group of AMBULATORY_SHARE_GROUPS) {
+    const value = values[AMBULATORY_PERCENT_SETTINGS[group]];
+    if (validPercent(value)) result[group] = value;
+  }
+  return result;
+}
+
+export function overridePercents(
+  rate: { percent: Prisma.Decimal | null; uziPercent: Prisma.Decimal | null; echoPercent: Prisma.Decimal | null } | null,
+): Record<AmbulatoryShareGroup, number | null> {
+  return {
+    LAB: rate?.percent?.toNumber() ?? null,
+    UZI: rate?.uziPercent?.toNumber() ?? null,
+    EXO: rate?.echoPercent?.toNumber() ?? null,
+  };
+}
+
+/** Doctor's override per group, else the clinic default of that group. */
+export async function ambulatoryPercents(
+  db: PercentReader,
+  clinicId: string,
+  doctorUserId: string,
+): Promise<AmbulatorySharePercents> {
+  const [rate, clinic] = await Promise.all([
+    db.ambulatoryCommissionRate.findFirst({
+      where: { doctorUserId },
+      select: { percent: true, uziPercent: true, echoPercent: true },
+    }),
+    db.clinic.findUnique({ where: { id: clinicId }, select: { settings: true } }),
+  ]);
+  const defaults = defaultPercentsFrom(clinic?.settings);
+  const overrides = overridePercents(rate);
+  return {
+    LAB: overrides.LAB ?? defaults.LAB,
+    UZI: overrides.UZI ?? defaults.UZI,
+    EXO: overrides.EXO ?? defaults.EXO,
+  };
+}
 
 /** "AK-2026-0001", sequential per clinic per year. */
 export async function nextAmbulatoryNumber(
@@ -20,24 +77,6 @@ export async function nextAmbulatoryNumber(
   });
   const n = last ? Number(last.number.slice(prefix.length)) + 1 : 1;
   return `${prefix}${String(n).padStart(4, '0')}`;
-}
-
-/** Doctor's override, else the clinic default, else 25%. */
-export async function ambulatoryLabPercent(
-  tx: TenantTransactionClient,
-  clinicId: string,
-  doctorUserId: string,
-): Promise<number> {
-  const override = await tx.ambulatoryCommissionRate.findFirst({
-    where: { doctorUserId },
-    select: { percent: true },
-  });
-  if (override) return override.percent.toNumber();
-  const clinic = await tx.clinic.findUnique({ where: { id: clinicId }, select: { settings: true } });
-  const value = ((clinic?.settings ?? {}) as Record<string, unknown>)[AMBULATORY_PERCENT_SETTING];
-  return typeof value === 'number' && value >= 0 && value <= 100
-    ? value
-    : AMBULATORY_DEFAULT_LAB_PERCENT;
 }
 
 async function hasActiveStay(
@@ -146,14 +185,32 @@ export async function linkLabOrderToCase(
   orderId: string,
   card: Pick<AmbulatoryCase, 'id' | 'doctorUserId' | 'doctorName'>,
 ): Promise<void> {
-  const percent = await ambulatoryLabPercent(tx, clinicId, card.doctorUserId);
+  const percents = await ambulatoryPercents(tx, clinicId, card.doctorUserId);
   await tx.labOrder.update({
     where: { id: orderId },
     data: {
       ambulatoryCaseId: card.id,
-      ambulatoryCommissionPercent: new Prisma.Decimal(percent),
+      ambulatoryCommissionPercent: new Prisma.Decimal(percents.LAB),
       referringDoctorUserId: card.doctorUserId,
       referringDoctorName: card.doctorName,
+    },
+  });
+}
+
+/** Puts a UZI order on a card with the card doctor's UZI and EXO share snapshot. */
+export async function linkUziOrderToCase(
+  tx: TenantTransactionClient,
+  clinicId: string,
+  orderId: string,
+  card: Pick<AmbulatoryCase, 'id' | 'doctorUserId'>,
+): Promise<void> {
+  const percents = await ambulatoryPercents(tx, clinicId, card.doctorUserId);
+  await tx.clinicalOrder.update({
+    where: { id: orderId },
+    data: {
+      ambulatoryCaseId: card.id,
+      ambulatoryUziPercent: new Prisma.Decimal(percents.UZI),
+      ambulatoryEchoPercent: new Prisma.Decimal(percents.EXO),
     },
   });
 }
@@ -186,8 +243,7 @@ export async function attachClinicalOrderToVisitCase(
   userId: string | null,
 ): Promise<void> {
   const card = await ambulatoryCaseForVisit(tx, clinicId, visitId, userId);
-  if (card)
-    await tx.clinicalOrder.update({ where: { id: orderId }, data: { ambulatoryCaseId: card.id } });
+  if (card) await linkUziOrderToCase(tx, clinicId, orderId, card);
 }
 
 /**
