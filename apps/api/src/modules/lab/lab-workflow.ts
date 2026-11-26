@@ -76,12 +76,23 @@ export async function lockLabOrder(
   });
   if (!order) throw new AppException(ErrorCode.LAB_ORDER_NOT_FOUND, 'Lab order not found', 404);
   if (requirePayment && !isLabInvoicePaid(order.invoice)) {
-    throw new AppException(
-      ErrorCode.CONFLICT,
-      'The invoice must be fully paid before laboratory work',
-      409,
-      [{ reason: 'LAB_PAYMENT_REQUIRED', invoiceId: order.invoiceId }],
-    );
+    // Statsionar: to‘lov chiqishda — natija yozish kassani kutmasin.
+    const stay = await tx.admission.findFirst({
+      where: {
+        patientId: order.patientId,
+        branchId: order.branchId,
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+    });
+    if (!stay) {
+      throw new AppException(
+        ErrorCode.CONFLICT,
+        'The invoice must be fully paid before laboratory work',
+        409,
+        [{ reason: 'LAB_PAYMENT_REQUIRED', invoiceId: order.invoiceId }],
+      );
+    }
   }
   return order;
 }

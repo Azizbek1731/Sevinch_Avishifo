@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { formatUZS, fromTiyin, toTiyin, type MoneyString } from '@avishifo/shared';
 import { todayTashkent } from '@/lib/dates';
 import { createId } from '@/lib/id';
@@ -30,7 +30,7 @@ import {
 import { ServiceCombobox, serviceName } from '@/features/billing/components/service-combobox';
 import { LabServicePicker } from '@/features/billing/components/lab-service-picker';
 import { UziServicePicker } from '@/features/billing/components/uzi-service-picker';
-import { sanitizeMoney, type ServiceOption } from '@/features/billing/api';
+import { billingApi, sanitizeMoney, type ServiceOption } from '@/features/billing/api';
 import { clinicalOrdersApi } from '@/features/clinical-orders/api';
 import { isUziSpecialty } from '@/features/clinical-orders/doctor-matching';
 import { useApiErrorToast } from '@/features/services/hooks';
@@ -120,6 +120,35 @@ export function AddChargeDialog({
   );
   const selectedDoctor =
     doctorOptions.find((doctor) => doctor.id === doctorUserId) ?? null;
+
+  /** Same quick chips as ambulatory: EKG, Holter, SMAD, ozone, hydrocolon… */
+  const diagnosticsQuick = useQuery({
+    queryKey: ['services', 'billing-search', 'DIAGNOSTICS', ''],
+    queryFn: async () => (await billingApi.searchServices('', 'DIAGNOSTICS')).data,
+    enabled: open && mode === 'procedures',
+    staleTime: 60_000,
+  });
+
+  const pushCatalogLine = (service: ServiceOption) => {
+    setLines((prev) => {
+      const existing = prev.find((line) => line.service.id === service.id);
+      if (existing)
+        return prev.map((line) =>
+          line.key === existing.key
+            ? { ...line, quantity: Math.min(999, line.quantity + 1) }
+            : line,
+        );
+      return [
+        ...prev,
+        {
+          key: createId(),
+          service,
+          quantity: 1,
+          unitPrice: service.currentPrice ?? '0',
+        },
+      ];
+    });
+  };
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ['charges', patientId] });
@@ -396,6 +425,31 @@ export function AddChargeDialog({
                 </div>
               ) : (
                 <>
+                  {mode === 'procedures' && diagnosticsQuick.data?.length ? (
+                    <div className="space-y-1.5">
+                      <Label>{t('add.quickAdd')}</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {diagnosticsQuick.data.map((service) => (
+                          <Button
+                            key={service.id}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={add.isPending}
+                            onClick={() => pushCatalogLine(service)}
+                          >
+                            <Plus className="mr-1 h-3.5 w-3.5" />
+                            {serviceName(service, locale)}
+                            {service.currentPrice ? (
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                {formatUZS(service.currentPrice)}
+                              </span>
+                            ) : null}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="space-y-2">
                     <Label>{t('add.service')}</Label>
                     <ServiceCombobox
@@ -408,17 +462,7 @@ export function AddChargeDialog({
                       doctor={null}
                       excludeIds={lines.map((line) => line.service.id)}
                       value={null}
-                      onChange={(service) => {
-                        setLines((prev) => [
-                          ...prev,
-                          {
-                            key: createId(),
-                            service,
-                            quantity: 1,
-                            unitPrice: service.currentPrice ?? '0',
-                          },
-                        ]);
-                      }}
+                      onChange={pushCatalogLine}
                     />
                     <p className="text-xs text-muted-foreground">{t(`add.modeHints.${mode}`)}</p>
                     <p className="text-xs text-muted-foreground">{t('add.multiHint')}</p>

@@ -6,11 +6,12 @@
   "refresh": "Refresh",
   "search": "Patient, MRN or invoice…",
   "allStatuses": "All",
-  "flowHint": "Unpaid orders are visible to the ultrasound doctor, but the exam can start only after full payment.",
+  "flowHint": "Outpatient: exam starts after full payment. Inpatient: work can start now — payment at discharge.",
   "empty": "No ultrasound orders",
   "emptyHint": "Create a new order from reception or change the filter.",
   "loadError": "Could not load the list",
   "unpaid": "Due: {amount}",
+  "settleAtDischarge": "Inpatient — pay at discharge",
   "paid": "Paid",
   "awaitPayment": "Waiting for cashier payment",
   "openInvoice": "Open invoice",
@@ -29,7 +30,7 @@
   "download": "Download",
   "status": {
     "WAITING_PAYMENT": "Awaiting payment",
-    "READY": "Paid · Ready",
+    "READY": "Ready",
     "IN_PROGRESS": "In progress",
     "COMPLETED": "Completed",
     "CANCELLED": "Cancelled"

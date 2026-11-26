@@ -100,3 +100,22 @@ export type TelegramLoginVerifyInput = VerifyTwoFactorInput;
 export const AUTH_2FA_TTL_SECONDS = 300;
 /** Wrong codes tolerated before the challenge is burned. */
 export const AUTH_2FA_MAX_ATTEMPTS = 5;
+/**
+ * After a doctor enters their pay PIN, share / pay screens stay open this long
+ * without asking again (desk assistants still need the PIN).
+ */
+export const AUTH_DOCTOR_PAY_UNLOCK_TTL_SECONDS = 30 * 60;
+
+/** Default PIN for every doctor until they change it. */
+export const AUTH_DOCTOR_PAY_DEFAULT_PIN = '7777';
+
+export const doctorPayVerifySchema = z.object({
+  code: z.string().regex(/^\d{4}$/, { message: 'Code must be 4 digits' }),
+});
+export type DoctorPayVerifyInput = z.infer<typeof doctorPayVerifySchema>;
+
+export const doctorPayChangePinSchema = z.object({
+  currentCode: z.string().regex(/^\d{4}$/, { message: 'Code must be 4 digits' }),
+  newCode: z.string().regex(/^\d{4}$/, { message: 'Code must be 4 digits' }),
+});
+export type DoctorPayChangePinInput = z.infer<typeof doctorPayChangePinSchema>;

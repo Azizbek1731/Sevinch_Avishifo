@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { labShare, totalsOf, uziShares, type UziRow } from './ambulatory-share';
+import { labShare, therapyShare, totalsOf, uziShares, type UziRow } from './ambulatory-share';
 
 const row = (over: Partial<Parameters<typeof labShare>[0]> = {}): Parameters<typeof labShare>[0] => ({
   orderId: 'order',
@@ -61,6 +61,12 @@ describe('ambulatory lab share', () => {
     expect(share.commission.toFixed(2)).toBe('50000.00');
     expect(share.pendingCommission.toFixed(2)).toBe('0.00');
     expect(share.paymentState).toBe('PAID');
+  });
+
+  it('gives 20% therapy share for ozone / hydrocolon charges', () => {
+    const share = therapyShare(row({ percent: '20.00', tests: [{ uz: 'Ozon terapiya' }] }), 20);
+    expect(share.group).toBe('THERAPY');
+    expect(share.commission.toFixed(2)).toBe('40000.00');
   });
 
   it('earns only on what the cashier took and keeps the rest as pending', () => {

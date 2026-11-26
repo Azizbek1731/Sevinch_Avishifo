@@ -154,6 +154,10 @@ export class ClinicalOrdersService {
       .filter((i) => i.id !== order.initialInvoiceId && i.status !== 'CANCELLED')
       .reduce((sum, i) => sum.add(Prisma.Decimal.max(0, i.total.sub(netPaid(i)))), zero());
     const detail = order as DetailOrder;
+    const settleAtDischarge =
+      inpatient &&
+      !paid(order.initialInvoice) &&
+      ['ISSUED', 'PARTIALLY_PAID', 'DRAFT'].includes(order.initialInvoice.status);
     return {
       id: order.id,
       kind: order.kind,
@@ -161,6 +165,7 @@ export class ClinicalOrdersService {
       doctor: order.doctor,
       status,
       visitId: order.visitId,
+      settleAtDischarge,
       invoice: this.bill(order.initialInvoice),
       additionalDue: additionalDue.toFixed(2),
       invoices: order.invoices.map((invoice) => this.bill(invoice)),
@@ -336,8 +341,11 @@ export class ClinicalOrdersService {
     kind: ClinicalOrderKind,
     branchId: string,
   ): Promise<ServicePlan[]> {
+    // Cardiologist consults often bill EKG (DIAGNOSTICS) on the same ticket.
+    const allowedKinds =
+      kind === 'CONSULTATION' ? (['CONSULTATION', 'DIAGNOSTICS'] as const) : ([kind] as const);
     const services = await this.prisma.db.service.findMany({
-      where: { id: { in: ids }, isActive: true, category: { kind } },
+      where: { id: { in: ids }, isActive: true, category: { kind: { in: [...allowedKinds] } } },
     });
     if (services.length !== ids.length)
       throw new AppException(

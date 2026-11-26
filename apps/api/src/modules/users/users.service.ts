@@ -166,6 +166,7 @@ export class UsersService {
         email: input.email ?? null,
         passwordHash,
         role: input.role,
+        ...(input.role === UserRole.DOCTOR ? { payPin: '7777' } : {}),
         status: UserStatus.ACTIVE,
         ...(input.locale ? { locale: toDbLocale(input.locale) } : {}),
         branches: {
@@ -242,6 +243,7 @@ export class UsersService {
       ...(input.phone !== undefined ? { phone: input.phone } : {}),
       ...(input.email !== undefined ? { email: input.email } : {}),
       ...(input.role !== undefined ? { role: input.role } : {}),
+      ...(input.role === UserRole.DOCTOR && !existing.payPin ? { payPin: '7777' } : {}),
       ...(input.status !== undefined ? { status: input.status } : {}),
       ...(input.locale !== undefined ? { locale: toDbLocale(input.locale) } : {}),
       ...(passwordHash !== undefined ? { passwordHash } : {}),

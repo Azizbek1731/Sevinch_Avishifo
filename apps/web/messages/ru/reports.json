@@ -7,12 +7,18 @@
     "week": "Неделя",
     "month": "Месяц",
     "custom": "Выбрать период",
+    "period": "Период",
     "groupBy": "Группировка",
     "groupByOptions": {
       "day": "По дням",
       "week": "По неделям",
       "month": "По месяцам"
     }
+  },
+  "navGroups": {
+    "finance": "Финансы",
+    "doctor": "Врач",
+    "analytics": "Аналитика"
   },
   "export": {
     "xlsx": "XLSX",
@@ -22,14 +28,35 @@
     "revenue": "Выручка",
     "flow": "Поток пациентов",
     "doctors": "Врачи",
-    "services": "Услуги",
+    "services": "Услуги (Lab/UZI/EXO)",
     "queue": "Очередь",
     "lab": "Лаборатория",
     "shifts": "Смены",
     "cashflow": "Движение денег",
     "consumables": "Лекарства и материалы",
     "lab-referrals": "Направления по врачам",
-    "doctor-activity": "Мой отчёт"
+    "doctor-activity": "Мой отчёт",
+    "doctor-pay": "Зарплата врача",
+    "ambulatory-share": "Амбулаторная доля"
+  },
+  "doctorPayGate": {
+    "title": "Открыть долю и зарплату",
+    "hint": "Введите 4-значный код, чтобы открыть процентные суммы (по умолчанию: 7777). После открытия раздел доступен {minutes} мин.",
+    "checking": "Проверка…",
+    "sessionHint": "После верного кода раздел открыт на {minutes} мин. В любой момент можно нажать «Закрыть».",
+    "codeLabel": "4-значный код",
+    "unlock": "Открыть",
+    "lock": "Закрыть",
+    "unlockedUntil": "Открыто: осталось {time} (всего {minutes} мин.)",
+    "changePin": "Изменить код",
+    "changePinTitle": "Изменить код доли",
+    "currentPin": "Текущий код",
+    "newPin": "Новый код",
+    "confirmPin": "Подтвердите новый код",
+    "pinMismatch": "Новые коды не совпадают",
+    "savePin": "Сохранить",
+    "cancel": "Отмена",
+    "pinChanged": "Код обновлён"
   },
   "empty": {
     "title": "Нет данных",
@@ -94,17 +121,36 @@
       "revenue": "Выручка",
       "avgDuration": "Средняя длительность",
       "noShow": "Неявки %",
-      "returning": "Повторные %"
+      "returning": "Повторные %",
+      "payPercent": "Зарплата %",
+      "earnings": "Доля зарплаты"
     }
   },
   "services": {
-    "chartTitle": "Топ услуг по выручке",
+    "chartTitle": "Список услуг",
+    "groupsTitle": "По группам (Lab, UZI, EXO и др.)",
+    "groupsTable": "Таблица групп",
+    "patientsTitle": "По пациентам — кому что выписано",
+    "truncatedHint": "Список сокращён. Скачайте полный Excel.",
+    "allGroups": "Все",
     "series": "Выручка",
+    "kpi": {
+      "count": "Всего услуг",
+      "patients": "Пациенты",
+      "revenue": "Сумма"
+    },
     "columns": {
+      "group": "Группа",
+      "serviceTypes": "Виды",
       "code": "Код",
       "name": "Услуга",
       "count": "Кол-во",
-      "revenue": "Выручка"
+      "patients": "Пациенты",
+      "revenue": "Сумма",
+      "date": "Дата",
+      "qty": "Кол-во",
+      "patient": "Пациент",
+      "performer": "Исполнитель"
     }
   },
   "queue": {
@@ -267,6 +313,22 @@
     "statusInProgress": "В работе",
     "statusCancelled": "Отменён",
     "loadError": "Не удалось загрузить отчёт.",
-    "retry": "Повторить"
+    "retry": "Повторить",
+    "echoTitle": "Направления на ЭХО",
+    "echoEmpty": "За период нет направлений на ЭХО.",
+    "performedUziTitle": "Выполненные УЗИ (этот врач)",
+    "performedUziEmpty": "За период нет выполненных УЗИ.",
+    "performedEchoTitle": "Выполненные ЭХО (этот врач)",
+    "performedEchoEmpty": "За период нет выполненных ЭХО.",
+    "patients": "Пациенты",
+    "colEcho": "Услуги ЭХО",
+    "pickDoctor": "Выберите врача",
+    "payTitle": "Доля зарплаты",
+    "payRule": "{percent}% — {label}",
+    "payPercent": "Процент",
+    "payBasis": "Оплаченная база",
+    "payEarnings": "К получению",
+    "payPending": "Ожидает оплаты",
+    "payPendingHint": "Ещё не оплачено: {amount}"
   }
 }

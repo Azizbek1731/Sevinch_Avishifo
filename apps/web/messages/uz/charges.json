@@ -48,6 +48,7 @@
     "doctorEmpty": "UZI mutaxassisi topilmadi. Xodimlar bo‘limida mutaxassislikni tekshiring.",
     "doctorUziHint": "Tanlangan UZI vrachi buyurtmani o‘z navbatida ko‘radi.",
     "doctorConsultHint": "Tanlangan shifokor qabulni o‘z navbatida ko‘radi.",
+    "quickAdd": "Tez qo‘shish (EKG, Xolter, SMAD…)",
     "service": "Xizmat",
     "name": "Xarajat nomi",
     "date": "Sana",

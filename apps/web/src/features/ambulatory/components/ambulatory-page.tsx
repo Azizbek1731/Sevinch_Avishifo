@@ -46,40 +46,49 @@ const ALL = '__all__';
 function MonthSummary() {
   const t = useTranslations('ambulatory');
   const branchId = useAuthStore((s) => s.activeBranchId);
+  const isDoctor = useAuthStore((s) => s.user?.role === 'DOCTOR');
   const today = todayTashkent();
   const filters = { from: `${today.slice(0, 8)}01`, to: today };
+  // Share totals moved to Reports (Telegram OTP). Doctors must not see them here.
   const report = useQuery({
     queryKey: ['ambulatory', 'commissions', branchId, filters],
     queryFn: async () => (await ambulatoryApi.commissions(filters)).data,
     refetchInterval: 30_000,
+    enabled: !isDoctor,
   });
   const open = useQuery({
     queryKey: ['ambulatory', 'open-count', branchId],
     queryFn: async () => (await ambulatoryApi.list({ status: 'OPEN', limit: 1 })).meta?.total ?? 0,
     refetchInterval: 30_000,
   });
-  const items = [
-    {
-      key: 'monthCommission',
-      value: report.data ? formatUZS(report.data.totals.commission) : null,
-      accent: true,
-    },
-    {
-      key: 'monthPending',
-      value: report.data ? formatUZS(report.data.totals.pendingCommission) : null,
-    },
-    {
-      key: 'monthPatients',
-      value: report.data ? String(report.data.totals.patients) : null,
-    },
-    { key: 'openCards', value: open.data === undefined ? null : String(open.data) },
-  ];
+  const items = isDoctor
+    ? [{ key: 'openCards', value: open.data === undefined ? null : String(open.data) }]
+    : [
+        {
+          key: 'monthCommission',
+          value: report.data ? formatUZS(report.data.totals.commission) : null,
+          accent: true,
+        },
+        {
+          key: 'monthPending',
+          value: report.data ? formatUZS(report.data.totals.pendingCommission) : null,
+        },
+        {
+          key: 'monthPatients',
+          value: report.data ? String(report.data.totals.patients) : null,
+        },
+        { key: 'openCards', value: open.data === undefined ? null : String(open.data) },
+      ];
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className={`grid gap-3 ${isDoctor ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2 lg:grid-cols-4'}`}>
       {items.map((item) => (
         <Card
           key={item.key}
-          className={item.accent ? 'border-primary/40 bg-gradient-to-br from-primary/10 to-transparent' : undefined}
+          className={
+            'accent' in item && item.accent
+              ? 'border-primary/40 bg-gradient-to-br from-primary/10 to-transparent'
+              : undefined
+          }
         >
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">{t(`summary.${item.key}`)}</p>
@@ -87,7 +96,9 @@ function MonthSummary() {
               <Skeleton className="mt-2 h-7 w-24" />
             ) : (
               <p
-                className={`mt-2 text-xl font-semibold tabular-nums ${item.accent ? 'text-primary' : ''}`}
+                className={`mt-2 text-xl font-semibold tabular-nums ${
+                  'accent' in item && item.accent ? 'text-primary' : ''
+                }`}
               >
                 {item.value}
               </p>
@@ -248,8 +259,12 @@ function CasesTab({ onOpen }: { onOpen: (() => void) | null }) {
                   {!isDoctor ? <TableHead>{t('table.doctor')}</TableHead> : null}
                   <TableHead>{t('table.opened')}</TableHead>
                   <TableHead className="text-center">{t('table.referrals')}</TableHead>
-                  <TableHead className="text-right">{t('table.labPaid')}</TableHead>
-                  <TableHead className="text-right">{t('table.commission')}</TableHead>
+                  {!isDoctor ? (
+                    <>
+                      <TableHead className="text-right">{t('table.labPaid')}</TableHead>
+                      <TableHead className="text-right">{t('table.commission')}</TableHead>
+                    </>
+                  ) : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -297,19 +312,23 @@ function CasesTab({ onOpen }: { onOpen: (() => void) | null }) {
                         </Badge>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatUZS(row.paidAmount ?? '0')}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      <span className="font-semibold text-primary">
-                        {formatUZS(row.commission ?? '0')}
-                      </span>
-                      {row.pendingCommission && Number(row.pendingCommission) > 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                          +{formatUZS(row.pendingCommission)} {t('table.pending')}
-                        </p>
-                      ) : null}
-                    </TableCell>
+                    {!isDoctor ? (
+                      <>
+                        <TableCell className="text-right tabular-nums">
+                          {formatUZS(row.paidAmount ?? '0')}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          <span className="font-semibold text-primary">
+                            {formatUZS(row.commission ?? '0')}
+                          </span>
+                          {row.pendingCommission && Number(row.pendingCommission) > 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                              +{formatUZS(row.pendingCommission)} {t('table.pending')}
+                            </p>
+                          ) : null}
+                        </TableCell>
+                      </>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>
@@ -359,20 +378,22 @@ export function AmbulatoryPage() {
 
       <MonthSummary />
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="cases">{t('tabs.cases')}</TabsTrigger>
-          <TabsTrigger value="commissions">
-            {isDoctor ? t('tabs.myCommission') : t('tabs.commissions')}
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="cases" className="mt-4">
-          <CasesTab onOpen={canWrite ? () => setPickerOpen(true) : null} />
-        </TabsContent>
-        <TabsContent value="commissions" className="mt-4">
-          <CommissionsTab />
-        </TabsContent>
-      </Tabs>
+      {isDoctor ? (
+        <CasesTab onOpen={canWrite ? () => setPickerOpen(true) : null} />
+      ) : (
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="cases">{t('tabs.cases')}</TabsTrigger>
+            <TabsTrigger value="commissions">{t('tabs.commissions')}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="cases" className="mt-4">
+            <CasesTab onOpen={canWrite ? () => setPickerOpen(true) : null} />
+          </TabsContent>
+          <TabsContent value="commissions" className="mt-4">
+            <CommissionsTab />
+          </TabsContent>
+        </Tabs>
+      )}
 
       <AdmitPickerDialog
         open={pickerOpen}

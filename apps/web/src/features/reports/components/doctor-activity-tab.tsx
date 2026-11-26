@@ -1,10 +1,22 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
-import { formatUZS } from '@avishifo/shared';
+import { formatUZS, type DoctorActivityMoneyCounts, type DoctorActivityReferralLine } from '@avishifo/shared';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useAuthStore } from '@/stores/auth-store';
+import { clinicalOrdersApi } from '@/features/clinical-orders/api';
+import { isUziSpecialty } from '@/features/clinical-orders/doctor-matching';
 import type { ReportFilters } from '../api';
 import { useDoctorActivityReport } from '../hooks';
 
@@ -18,31 +30,78 @@ function Stat({
   hint?: string;
 }) {
   return (
-    <Card>
-      <CardContent className="p-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
-        {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
-      </CardContent>
-    </Card>
+    <div className="rounded-xl border bg-card/80 px-4 py-3 shadow-sm">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
+      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+    </div>
   );
 }
 
-export function DoctorActivityTab({ filters }: { filters: ReportFilters }) {
+export function DoctorActivityTab({
+  filters,
+  pickDoctor = false,
+}: {
+  filters: ReportFilters;
+  /** Clinic analytics: choose any doctor (Mohira, Sherzod, …). */
+  pickDoctor?: boolean;
+}) {
   const t = useTranslations('reports.doctorActivity');
   const locale = useLocale();
-  const query = useDoctorActivityReport(filters);
+  const selfId = useAuthStore((s) => s.user?.id);
+  const branchId = useAuthStore((s) => s.activeBranchId);
+  const [doctorUserId, setDoctorUserId] = useState<string>(selfId ?? '');
+
+  const doctors = useQuery({
+    queryKey: ['clinical-orders', 'doctors', branchId],
+    enabled: pickDoctor && Boolean(branchId),
+    queryFn: async () => (await clinicalOrdersApi.doctors()).data,
+  });
+  const doctorOptions = useMemo(() => doctors.data ?? [], [doctors.data]);
+
+  useEffect(() => {
+    if (!pickDoctor || doctorUserId || !doctorOptions.length) return;
+    const uzi = doctorOptions.find((doctor) => isUziSpecialty(doctor.specialty));
+    setDoctorUserId(uzi?.id ?? doctorOptions[0]!.id);
+  }, [pickDoctor, doctorUserId, doctorOptions]);
+
+  const selectedId = pickDoctor ? doctorUserId || undefined : undefined;
+  const query = useDoctorActivityReport(
+    filters,
+    selectedId,
+    pickDoctor ? Boolean(selectedId) : true,
+  );
   const report = query.data;
 
   return (
     <div className="space-y-6">
-      <div className="max-w-3xl space-y-1">
-        <h2 className="text-lg font-semibold">{t('title')}</h2>
-        <p className="text-sm text-muted-foreground">{t('description')}</p>
-        {report ? (
-          <p className="text-sm font-medium">
-            {t('doctor', { name: report.doctorName })}
-          </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="max-w-3xl space-y-1">
+          <h2 className="text-lg font-semibold">{t('title')}</h2>
+          <p className="text-sm text-muted-foreground">{t('description')}</p>
+          {report ? (
+            <p className="text-sm font-medium">
+              {t('doctor', { name: report.doctorName })}
+            </p>
+          ) : null}
+        </div>
+        {pickDoctor ? (
+          <Select
+            value={selectedId || undefined}
+            onValueChange={setDoctorUserId}
+          >
+            <SelectTrigger className="w-72">
+              <SelectValue placeholder={t('pickDoctor')} />
+            </SelectTrigger>
+            <SelectContent>
+              {doctorOptions.map((doctor) => (
+                <SelectItem key={doctor.id} value={doctor.id}>
+                  {doctor.fullName}
+                  {doctor.specialty ? ` · ${doctor.specialty}` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : null}
       </div>
 
@@ -78,6 +137,42 @@ export function DoctorActivityTab({ filters }: { filters: ReportFilters }) {
             </div>
           </section>
 
+          {report.compensation.rules.length > 0 ? (
+            <section className="space-y-3">
+              <h3 className="text-base font-semibold">{t('payTitle')}</h3>
+              <p className="text-sm text-muted-foreground">
+                {report.compensation.rules
+                  .map((rule) => t('payRule', { percent: rule.percent, label: rule.label }))
+                  .join(' · ')}
+              </p>
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <Stat
+                  label={t('payPercent')}
+                  value={
+                    report.compensation.percent === null
+                      ? '—'
+                      : `${report.compensation.percent}%`
+                  }
+                />
+                <Stat
+                  label={t('payBasis')}
+                  value={formatUZS(report.compensation.paidBasis)}
+                />
+                <Stat
+                  label={t('payEarnings')}
+                  value={formatUZS(report.compensation.earnings)}
+                />
+                <Stat
+                  label={t('payPending')}
+                  value={formatUZS(report.compensation.pendingEarnings)}
+                  hint={t('payPendingHint', {
+                    amount: formatUZS(report.compensation.pendingBasis),
+                  })}
+                />
+              </div>
+            </section>
+          ) : null}
+
           <section className="space-y-3">
             <h3 className="text-base font-semibold">{t('labTitle')}</h3>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -105,32 +200,44 @@ export function DoctorActivityTab({ filters }: { filters: ReportFilters }) {
             />
           </section>
 
-          <section className="space-y-3">
-            <h3 className="text-base font-semibold">{t('uziTitle')}</h3>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Stat label={t('orders')} value={report.ultrasound.orders.toLocaleString(locale)} />
-              <Stat label={t('items')} value={report.ultrasound.items.toLocaleString(locale)} />
-              <Stat label={t('amount')} value={formatUZS(report.ultrasound.amount)} />
-              <Stat
-                label={t('paidAmount')}
-                value={formatUZS(report.ultrasound.paidAmount)}
-                hint={t('unpaidHint', { amount: formatUZS(report.ultrasound.unpaidAmount) })}
-              />
-            </div>
-            <ReferralTable
-              empty={t('uziEmpty')}
-              lines={report.ultrasoundLines}
-              paidLabel={t('paid')}
-              unpaidLabel={t('unpaid')}
-              columns={{
-                date: t('colDate'),
-                patient: t('colPatient'),
-                title: t('colUzi'),
-                amount: t('colAmount'),
-                status: t('colStatus'),
-              }}
-            />
-          </section>
+          <MoneyBlock
+            title={t('uziTitle')}
+            empty={t('uziEmpty')}
+            titleCol={t('colUzi')}
+            counts={report.ultrasound}
+            lines={report.ultrasoundLines}
+            t={t}
+            locale={locale}
+          />
+          <MoneyBlock
+            title={t('echoTitle')}
+            empty={t('echoEmpty')}
+            titleCol={t('colEcho')}
+            counts={report.echo}
+            lines={report.echoLines}
+            t={t}
+            locale={locale}
+          />
+          <MoneyBlock
+            title={t('performedUziTitle')}
+            empty={t('performedUziEmpty')}
+            titleCol={t('colUzi')}
+            counts={report.performedUltrasound}
+            lines={report.performedUltrasoundLines}
+            patientsLabel={t('patients')}
+            t={t}
+            locale={locale}
+          />
+          <MoneyBlock
+            title={t('performedEchoTitle')}
+            empty={t('performedEchoEmpty')}
+            titleCol={t('colEcho')}
+            counts={report.performedEcho}
+            lines={report.performedEchoLines}
+            patientsLabel={t('patients')}
+            t={t}
+            locale={locale}
+          />
 
           <Card>
             <CardHeader className="pb-2">
@@ -176,6 +283,66 @@ export function DoctorActivityTab({ filters }: { filters: ReportFilters }) {
   );
 }
 
+function MoneyBlock({
+  title,
+  empty,
+  titleCol,
+  counts,
+  lines,
+  patientsLabel,
+  t,
+  locale,
+}: {
+  title: string;
+  empty: string;
+  titleCol: string;
+  counts: DoctorActivityMoneyCounts;
+  lines: DoctorActivityReferralLine[];
+  patientsLabel?: string;
+  t: ReturnType<typeof useTranslations<'reports.doctorActivity'>>;
+  locale: string;
+}) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-base font-semibold">{title}</h3>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {patientsLabel ? (
+          <Stat label={patientsLabel} value={counts.patients.toLocaleString(locale)} />
+        ) : null}
+        <Stat label={t('orders')} value={counts.orders.toLocaleString(locale)} />
+        <Stat label={t('items')} value={counts.items.toLocaleString(locale)} />
+        <Stat label={t('amount')} value={formatUZS(counts.amount)} />
+        {!patientsLabel ? (
+          <Stat
+            label={t('paidAmount')}
+            value={formatUZS(counts.paidAmount)}
+            hint={t('unpaidHint', { amount: formatUZS(counts.unpaidAmount) })}
+          />
+        ) : (
+          <Stat
+            label={t('paidAmount')}
+            value={formatUZS(counts.paidAmount)}
+            hint={t('unpaidHint', { amount: formatUZS(counts.unpaidAmount) })}
+          />
+        )}
+      </div>
+      <ReferralTable
+        empty={empty}
+        lines={lines}
+        paidLabel={t('paid')}
+        unpaidLabel={t('unpaid')}
+        columns={{
+          date: t('colDate'),
+          patient: t('colPatient'),
+          title: titleCol,
+          amount: t('colAmount'),
+          status: t('colStatus'),
+        }}
+      />
+    </section>
+  );
+}
+
 function ReferralTable({
   lines,
   empty,
@@ -183,15 +350,7 @@ function ReferralTable({
   unpaidLabel,
   columns,
 }: {
-  lines: Array<{
-    id: string;
-    date: string;
-    patientName: string;
-    patientMrn: string;
-    title: string;
-    amount: string;
-    paid: boolean;
-  }>;
+  lines: DoctorActivityReferralLine[];
   empty: string;
   paidLabel: string;
   unpaidLabel: string;

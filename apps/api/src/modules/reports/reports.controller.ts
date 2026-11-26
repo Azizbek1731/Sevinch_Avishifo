@@ -1,9 +1,15 @@
 import { LabReferralReportService } from './lab-referral-report.service';
 import { DoctorActivityService } from './doctor-activity.service';
-import { Controller, Get, Query, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, StreamableFile } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import type { AuthUser } from '@avishifo/shared';
+import { createZodDto } from 'nestjs-zod';
+import {
+  doctorPayChangePinSchema,
+  doctorPayVerifySchema,
+  type AuthUser,
+} from '@avishifo/shared';
 import { ActiveBranch, CurrentUser, RequirePermissions } from '../../common/decorators';
+import { DoctorPayGateService } from '../auth/doctor-pay-gate.service';
 import { ConsumablesService } from './consumables.service';
 import { CashflowService } from './cashflow.service';
 import { ReportsService } from './reports.service';
@@ -18,6 +24,9 @@ import {
   RevenueQueryDto,
 } from './dto';
 
+class DoctorPayVerifyDto extends createZodDto(doctorPayVerifySchema) {}
+class DoctorPayChangePinDto extends createZodDto(doctorPayChangePinSchema) {}
+
 @ApiTags('reports')
 @Controller('reports')
 export class ReportsController {
@@ -27,7 +36,29 @@ export class ReportsController {
     private readonly doctorActivity: DoctorActivityService,
     private readonly cashflow: CashflowService,
     private readonly consumables: ConsumablesService,
+    private readonly doctorPayGate: DoctorPayGateService,
   ) {}
+
+  /** Whether the signed-in doctor must enter their pay PIN before pay screens. */
+  @Get('doctor-pay/status')
+  doctorPayStatus(@CurrentUser() user: AuthUser) {
+    return this.doctorPayGate.status(user);
+  }
+
+  @Post('doctor-pay/verify')
+  verifyDoctorPayCode(@CurrentUser() user: AuthUser, @Body() body: DoctorPayVerifyDto) {
+    return this.doctorPayGate.verify(user, body.code);
+  }
+
+  @Post('doctor-pay/change-pin')
+  changeDoctorPayPin(@CurrentUser() user: AuthUser, @Body() body: DoctorPayChangePinDto) {
+    return this.doctorPayGate.changePin(user, body.currentCode, body.newCode);
+  }
+
+  @Post('doctor-pay/lock')
+  lockDoctorPay(@CurrentUser() user: AuthUser) {
+    return this.doctorPayGate.lock(user);
+  }
 
   @Get('lab-referrals')
   // Lab staff and report readers may view this; the service enforces either permission.
@@ -50,6 +81,7 @@ export class ReportsController {
     @CurrentUser() user: AuthUser,
     @ActiveBranch() branchId: string,
   ) {
+    await this.doctorPayGate.assertUnlocked(user);
     return this.doctorActivity.report(query, user, branchId);
   }
 
@@ -121,6 +153,15 @@ export class ReportsController {
     const data = await this.reports.services(query);
     if (query.export !== 'xlsx') return data;
     return this.exportFile(user, 'services', this.reports.servicesSheets(data));
+  }
+
+  /** Lab / UZI / EXO / other groups + every billed line with patient. */
+  @Get('service-detail')
+  @RequirePermissions('reports.read')
+  async serviceDetail(@Query() query: ReportRangeQueryDto, @CurrentUser() user: AuthUser) {
+    const data = await this.reports.serviceDetail(query);
+    if (query.export !== 'xlsx') return this.reports.capServiceDetailLines(data);
+    return this.exportFile(user, 'service-detail', this.reports.serviceDetailSheets(data));
   }
 
   @Get('queue')

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { VisitVitals } from '../api';
 import { useUpsertVitals } from '../hooks';
+import { clearVisitDraft, useVisitAutosave } from '../use-visit-autosave';
 
 const NUMERIC_FIELDS = [
   { name: 'heightCm', unit: 'cm' },
@@ -58,16 +59,51 @@ export function VitalsForm({
   });
 
   const dirty = form.formState.isDirty;
+  const watched = form.watch();
   useEffect(() => {
     onUnsavedChange?.(dirty || upsert.isPending);
   }, [dirty, upsert.isPending, onUnsavedChange]);
+
+  const baselineKey = useMemo(
+    () =>
+      JSON.stringify({
+        heightCm: vitals?.heightCm ?? null,
+        weightKg: vitals?.weightKg ?? null,
+        bpSystolic: vitals?.bpSystolic ?? null,
+        bpDiastolic: vitals?.bpDiastolic ?? null,
+        pulseBpm: vitals?.pulseBpm ?? null,
+        temperatureC: vitals?.temperatureC ?? null,
+        spo2: vitals?.spo2 ?? null,
+        note: vitals?.note ?? null,
+      }),
+    [vitals],
+  );
+
+  const getSnapshot = useCallback(() => form.getValues(), [form]);
+
+  const { clearDraft } = useVisitAutosave<UpsertVitalsInput>({
+    visitId,
+    scope: 'vitals',
+    baselineKey,
+    getSnapshot,
+    watchKey: JSON.stringify(watched),
+    isDirty: dirty,
+    enabled: !disabled,
+    onRestore: (data) => {
+      form.reset(data, { keepDefaultValues: true });
+    },
+  });
 
   /** Auto-save when leaving a field, but only when something actually changed. */
   const saveOnBlur = () => {
     if (disabled || !form.formState.isDirty) return;
     void form.handleSubmit((values) => {
       upsert.mutate(values, {
-        onSuccess: () => form.reset(values),
+        onSuccess: () => {
+          form.reset(values);
+          clearDraft();
+          clearVisitDraft(visitId, 'vitals');
+        },
       });
     })();
   };

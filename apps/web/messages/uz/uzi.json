@@ -1,16 +1,17 @@
 {
   "title": "UZI tekshiruvlari",
-  "subtitle": "Qabulxona buyurtma beradi → bemor kassada to‘laydi → UZI vrachi tekshiruvni o‘tkazadi, natijani yozadi va chop etadi.",
+  "subtitle": "Qabulxona buyurtma beradi → bemor kassada to‘laydi → UZI vrachi tekshiruvni o‘tkazadi, natijani yozadi va chop etadi. Statsionarda to‘lov chiqishda.",
   "badge": "UZI",
   "newOrder": "Yangi UZI buyurtmasi",
   "refresh": "Yangilash",
   "search": "Bemor, MRN yoki hisob raqami…",
   "allStatuses": "Barchasi",
-  "flowHint": "To‘lov kutilayotgan buyurtmalar UZI vrachiga ko‘rinadi, lekin tekshiruv faqat to‘liq to‘lovdan keyin boshlanadi.",
+  "flowHint": "Ambulator: tekshiruv to‘liq to‘lovdan keyin. Statsionar: ishni darhol boshlash mumkin — to‘lov chiqishda.",
   "empty": "UZI buyurtmalari yo‘q",
   "emptyHint": "Qabulxonadan yangi UZI buyurtmasi yarating yoki filtrni o‘zgartiring.",
   "loadError": "Ro‘yxat yuklanmadi",
   "unpaid": "Qarz: {amount}",
+  "settleAtDischarge": "Statsionar — to‘lov chiqishda",
   "paid": "To‘langan",
   "awaitPayment": "Kassada to‘lov kutilmoqda",
   "openInvoice": "Hisobni ochish",
@@ -29,7 +30,7 @@
   "download": "Yuklab olish",
   "status": {
     "WAITING_PAYMENT": "To‘lov kutilmoqda",
-    "READY": "To‘langan · Tayyor",
+    "READY": "Tayyor",
     "IN_PROGRESS": "Tekshiruvda",
     "COMPLETED": "Yakunlangan",
     "CANCELLED": "Bekor qilingan"

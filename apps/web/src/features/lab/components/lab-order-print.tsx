@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/empty-state';
+import { markPdfPrinted, usePdfPrinted } from '@/lib/pdf-printed';
 import { LabPdfDocument } from './lab-pdf-document';
 
 export function LabOrderPrint({ id }: { id: string }) {
@@ -21,6 +22,7 @@ export function LabOrderPrint({ id }: { id: string }) {
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
   const [previewErrorUrl, setPreviewErrorUrl] = useState<string | null>(null);
   const [printFailed, setPrintFailed] = useState(false);
+  const pdfPrinted = usePdfPrinted('lab', id);
   const pdfQuery = useQuery({
     queryKey: ['lab', 'order', id, 'pdf', locale, branchId],
     queryFn: async () => (await api.get<Blob>(`/lab-orders/${id}/pdf`, { locale })).data,
@@ -63,6 +65,7 @@ export function LabOrderPrint({ id }: { id: string }) {
       setPrintFailed(false);
       // The named A4 print surface contains only the rendered PDF pages.
       window.print();
+      markPdfPrinted('lab', id);
     } catch {
       setPrintFailed(true);
     }
@@ -86,7 +89,13 @@ export function LabOrderPrint({ id }: { id: string }) {
               </a>
             </Button>
           ) : null}
-          <Button disabled={!ready} onClick={print}>
+          <Button
+            disabled={!ready}
+            onClick={print}
+            variant={pdfPrinted.printed ? 'default' : undefined}
+            className={pdfPrinted.className}
+            title={pdfPrinted.printed ? t('pdfPrinted') : undefined}
+          >
             <Printer className="h-4 w-4" />
             {tc('print')}
           </Button>

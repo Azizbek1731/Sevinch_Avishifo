@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Trash2, Receipt } from 'lucide-react';
+import { Trash2, Receipt, Plus } from 'lucide-react';
 import {
   createClinicalOrderSchema,
   addClinicalServicesSchema,
@@ -55,7 +55,9 @@ import { ambulatoryApi } from '@/features/ambulatory/api';
 import { clinicalOrdersApi, type ClinicalKind } from '../api';
 import {
   consultationSearchQueries,
+  doctorSuggestsEkg,
   findDoctorConsultationService,
+  isEkgService,
   isUziSpecialty,
   manualConsultationTitle,
   type DoctorOption,
@@ -71,6 +73,7 @@ function ServiceSelection({
   emptyHint,
   doctor = null,
   requireDoctor = false,
+  ekgOffer = null,
 }: {
   kind: ClinicalKind;
   services: ServiceOption[];
@@ -82,12 +85,16 @@ function ServiceSelection({
   doctor?: DoctorOption | null;
   /** Ultrasound catalogues are scoped to the selected doctor. */
   requireDoctor?: boolean;
+  /** Cardiologist consult: optional resting EKG on the same ticket. */
+  ekgOffer?: ServiceOption | null;
 }) {
   const t = useTranslations('doctor.clinical');
   const locale = useLocale();
   const total = services.reduce((sum, service) => sum + toTiyin(service.currentPrice ?? '0'), 0n);
   const pickerDisabled = requireDoctor && !doctor;
   const isUzi = kind === 'ULTRASOUND';
+  const ekgSelected = Boolean(ekgOffer && services.some((s) => s.id === ekgOffer.id));
+  const consultLockedRow = locked && !isUzi;
 
   if (isUzi) {
     return (
@@ -125,34 +132,57 @@ function ServiceSelection({
         />
       ) : null}
       <ul className="divide-y rounded-lg border">
-        {services.map((service) => (
-          <li key={service.id} className="flex items-center justify-between gap-3 p-3 text-sm">
-            <div className="min-w-0">
-              <p className="font-medium">{serviceName(service, locale)}</p>
-              <p className="text-muted-foreground">{service.code}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <span>{service.currentPrice ? formatUZS(service.currentPrice) : '—'}</span>
-              {!locked ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={t('removeService')}
-                  onClick={() => onChange(services.filter((item) => item.id !== service.id))}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              ) : null}
-            </div>
-          </li>
-        ))}
+        {services.map((service) => {
+          const isEkg = isEkgService(service);
+          const canRemove = !consultLockedRow || isEkg;
+          return (
+            <li key={service.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+              <div className="min-w-0">
+                <p className="font-medium">{serviceName(service, locale)}</p>
+                <p className="text-muted-foreground">{service.code}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span>{service.currentPrice ? formatUZS(service.currentPrice) : '—'}</span>
+                {canRemove ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t('removeService')}
+                    onClick={() => onChange(services.filter((item) => item.id !== service.id))}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
         {!services.length ? (
           <li className="p-4 text-sm text-muted-foreground">
             {emptyHint ?? t('chooseServices')}
           </li>
         ) : null}
       </ul>
+      {ekgOffer && !ekgSelected ? (
+        <Button
+          type="button"
+          variant="secondary"
+          className="w-full justify-start"
+          onClick={() => {
+            if (!services.some((s) => s.id === ekgOffer.id)) onChange([...services, ekgOffer]);
+          }}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          {t('addEkg')}
+          {ekgOffer.currentPrice ? (
+            <span className="ml-auto tabular-nums text-muted-foreground">
+              {formatUZS(ekgOffer.currentPrice)}
+            </span>
+          ) : null}
+        </Button>
+      ) : null}
+      {ekgOffer ? <p className="text-xs text-muted-foreground">{t('addEkgHint')}</p> : null}
       <div className="flex justify-between rounded-lg bg-muted/40 p-3">
         <span>{t('total')}</span>
         <strong className="tabular-nums">{formatUZS(fromTiyin(total))}</strong>
@@ -182,6 +212,7 @@ export function ClinicalOrderDialog({
   const userId = useAuthStore((s) => s.user?.id);
   const [patient, setPatient] = useState<PatientBrief | null>(fixedPatient ?? null);
   const [services, setServices] = useState<ServiceOption[]>([]);
+  const [ekgOffer, setEkgOffer] = useState<ServiceOption | null>(null);
   const [manualTitle, setManualTitle] = useState('');
   const [manualPrice, setManualPrice] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
@@ -225,6 +256,7 @@ export function ClinicalOrderDialog({
     // Switching UZI doctor must drop the previous doctor's examinations.
     if (kind === 'ULTRASOUND') {
       applyServices([]);
+      setEkgOffer(null);
       clearManual();
       return;
     }
@@ -232,9 +264,20 @@ export function ClinicalOrderDialog({
     const doctor = doctorOptions.find((item) => item.id === doctorId) as DoctorOption | undefined;
     if (!doctor) {
       applyServices([]);
+      setEkgOffer(null);
       clearManual();
       return;
     }
+    let ekg: ServiceOption | null = null;
+    if (doctorSuggestsEkg(doctor)) {
+      try {
+        const diag = await billingApi.searchServices('', 'DIAGNOSTICS');
+        ekg = diag.data.find(isEkgService) ?? null;
+      } catch {
+        ekg = null;
+      }
+    }
+    setEkgOffer(ekg);
     try {
       const seen = new Set<string>();
       const catalogue: ServiceOption[] = [];
@@ -250,17 +293,18 @@ export function ClinicalOrderDialog({
       }
       const match = findDoctorConsultationService(catalogue, doctor, locale);
       if (match) {
-        applyServices([match]);
+        // Default ON: cardiologist consults almost always include resting EKG.
+        applyServices(ekg ? [match, ekg] : [match]);
         clearManual();
         return;
       }
-      applyServices([]);
+      applyServices(ekg ? [ekg] : []);
       setManualOpen(true);
       setManualTitle(manualConsultationTitle(doctor));
       setManualPrice('');
       toast.message(t('doctorServiceMissing'), { description: t('manualFallbackHint') });
     } catch {
-      applyServices([]);
+      applyServices(ekg ? [ekg] : []);
       setManualOpen(true);
       setManualTitle(manualConsultationTitle(doctor));
       setManualPrice('');
@@ -271,6 +315,7 @@ export function ClinicalOrderDialog({
     if (!open) return;
     setPatient(fixedPatient ?? null);
     setServices([]);
+    setEkgOffer(null);
     clearManual();
     identity.current = null;
     form.reset({
@@ -301,6 +346,19 @@ export function ClinicalOrderDialog({
       if (!title) throw new Error('title');
       if (toTiyin(unitPrice) <= 0n) throw new Error('price');
       const note = form.getValues('note')?.trim();
+      const ekgLines = services.filter(isEkgService).flatMap((service) =>
+        service.currentPrice
+          ? [
+              {
+                serviceId: service.id,
+                quantity: 1,
+                unitPrice: service.currentPrice as MoneyString,
+                discount: '0' as MoneyString,
+                performerUserId: selectedDoctor.id,
+              },
+            ]
+          : [],
+      );
       const payload = {
         patientId: patient.id,
         branchId,
@@ -315,6 +373,7 @@ export function ClinicalOrderDialog({
             discount: '0' as MoneyString,
             performerUserId: selectedDoctor.id,
           },
+          ...ekgLines,
         ],
       };
       manualIdentity.current = identifyInvoiceRequest(payload, manualIdentity.current);
@@ -462,34 +521,49 @@ export function ClinicalOrderDialog({
               ) : null}
             </div>
             {manualOpen && kind === 'CONSULTATION' ? (
-              <div className="space-y-3 rounded-lg border border-dashed bg-muted/20 p-4">
-                <div>
-                  <p className="text-sm font-medium">{t('manualFallbackTitle')}</p>
-                  <p className="text-xs text-muted-foreground">{t('manualFallbackHint')}</p>
+              <div className="space-y-3">
+                <div className="space-y-3 rounded-lg border border-dashed bg-muted/20 p-4">
+                  <div>
+                    <p className="text-sm font-medium">{t('manualFallbackTitle')}</p>
+                    <p className="text-xs text-muted-foreground">{t('manualFallbackHint')}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="consult-manual-title">{t('manualTitle')}</Label>
+                    <Input
+                      id="consult-manual-title"
+                      value={manualTitle}
+                      onChange={(e) => setManualTitle(e.target.value)}
+                      placeholder={t('manualTitlePlaceholder')}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="consult-manual-price">{t('manualPrice')}</Label>
+                    <Input
+                      id="consult-manual-price"
+                      inputMode="decimal"
+                      value={manualPrice}
+                      onChange={(e) => setManualPrice(e.target.value)}
+                      placeholder="50000"
+                      className="max-w-[12rem]"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t('total')}: {manualTotalLabel}
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="consult-manual-title">{t('manualTitle')}</Label>
-                  <Input
-                    id="consult-manual-title"
-                    value={manualTitle}
-                    onChange={(e) => setManualTitle(e.target.value)}
-                    placeholder={t('manualTitlePlaceholder')}
+                {ekgOffer ? (
+                  <ServiceSelection
+                    kind={kind}
+                    services={services.filter(isEkgService)}
+                    locked={false}
+                    doctor={selectedDoctor}
+                    ekgOffer={ekgOffer}
+                    onChange={(next) => {
+                      const withoutEkg = services.filter((s) => !isEkgService(s));
+                      applyServices([...withoutEkg, ...next.filter(isEkgService)]);
+                    }}
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="consult-manual-price">{t('manualPrice')}</Label>
-                  <Input
-                    id="consult-manual-price"
-                    inputMode="decimal"
-                    value={manualPrice}
-                    onChange={(e) => setManualPrice(e.target.value)}
-                    placeholder="50000"
-                    className="max-w-[12rem]"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t('total')}: {manualTotalLabel}
-                  </p>
-                </div>
+                ) : null}
               </div>
             ) : (
               <ServiceSelection
@@ -498,6 +572,7 @@ export function ClinicalOrderDialog({
                 locked={consultationLocked}
                 doctor={selectedDoctor}
                 requireDoctor={kind === 'ULTRASOUND'}
+                ekgOffer={kind === 'CONSULTATION' ? ekgOffer : null}
                 emptyHint={
                   consultationLocked || kind === 'ULTRASOUND'
                     ? form.watch('doctorUserId')

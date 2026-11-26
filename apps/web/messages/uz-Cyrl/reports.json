@@ -7,12 +7,18 @@
     "week": "Ҳафта",
     "month": "Ой",
     "custom": "Давр танлаш",
+    "period": "Давр",
     "groupBy": "Гуруҳлаш",
     "groupByOptions": {
       "day": "Кун бўйича",
       "week": "Ҳафта бўйича",
       "month": "Ой бўйича"
     }
+  },
+  "navGroups": {
+    "finance": "Молия",
+    "doctor": "Шифокор",
+    "analytics": "Таҳлил"
   },
   "export": {
     "xlsx": "XLSX",
@@ -22,14 +28,35 @@
     "revenue": "Тушум",
     "flow": "Беморлар оқими",
     "doctors": "Шифокорлар",
-    "services": "Хизматлар",
+    "services": "Хизматлар (Lab/UZI/EXO)",
     "queue": "Навбат",
     "lab": "Лаборатория",
     "shifts": "Сменалар",
     "cashflow": "Касса ҳисоботи",
     "consumables": "Дори ва материаллар",
     "lab-referrals": "Шифокорлар бўйича йўлланмалар",
-    "doctor-activity": "Менинг ҳисоботим"
+    "doctor-activity": "Менинг ҳисоботим",
+    "doctor-pay": "Шифокор маоши",
+    "ambulatory-share": "Амбулатор улуш"
+  },
+  "doctorPayGate": {
+    "title": "Улуш ва маошни очиш",
+    "hint": "Фоиз пулларни кўриш учун 4 хонали кодни киритинг (стандарт: 7777). Очилгач {minutes} дақиқа очиқ қолади.",
+    "checking": "Текширилмоқда…",
+    "sessionHint": "Код тўғри бўлса, бўлим {minutes} дақиқа очиқ қолади. Исталган пайт «Қулфлаш» билан ёпишингиз мумкин.",
+    "codeLabel": "4 хонали код",
+    "unlock": "Очиш",
+    "lock": "Қулфлаш",
+    "unlockedUntil": "Очиқ: {time} қолди (жами {minutes} дақиқа)",
+    "changePin": "Кодни ўзгартириш",
+    "changePinTitle": "Улуш кодини ўзгартириш",
+    "currentPin": "Жорий код",
+    "newPin": "Янги код",
+    "confirmPin": "Янги кодни тасдиқланг",
+    "pinMismatch": "Янги кодлар мос келмади",
+    "savePin": "Сақлаш",
+    "cancel": "Бекор қилиш",
+    "pinChanged": "Код янгиланди"
   },
   "empty": {
     "title": "Маълумот йўқ",
@@ -94,17 +121,36 @@
       "revenue": "Тушум",
       "avgDuration": "Ўртача қабул вақти",
       "noShow": "Келмаганлар %",
-      "returning": "Қайтганлар %"
+      "returning": "Қайтганлар %",
+      "payPercent": "Маош %",
+      "earnings": "Маош улуши"
     }
   },
   "services": {
-    "chartTitle": "Энг кўп тушум келтирган хизматлар",
+    "chartTitle": "Хизматлар рўйхати",
+    "groupsTitle": "Гуруҳлар бўйича (Lab, UZI, EXO ва бошқалар)",
+    "groupsTable": "Гуруҳлар жадвали",
+    "patientsTitle": "Беморлар бўйича — кимга нима ёзилган",
+    "truncatedHint": "Рўйхат қисқартирилган. Тўлиқ Excel юклаб олинг.",
+    "allGroups": "Ҳаммаси",
     "series": "Тушум",
+    "kpi": {
+      "count": "Жами хизматлар",
+      "patients": "Беморлар",
+      "revenue": "Жами сумма"
+    },
     "columns": {
+      "group": "Гуруҳ",
+      "serviceTypes": "Турлар",
       "code": "Код",
       "name": "Хизмат",
       "count": "Сони",
-      "revenue": "Тушум"
+      "patients": "Беморлар",
+      "revenue": "Сумма",
+      "date": "Сана",
+      "qty": "Миқдор",
+      "patient": "Бемор",
+      "performer": "Бажарувчи"
     }
   },
   "queue": {
@@ -267,6 +313,22 @@
     "statusInProgress": "Давом этмоқда",
     "statusCancelled": "Бекор қилинган",
     "loadError": "Ҳисоботни юклаб бўлмади.",
-    "retry": "Қайта юклаш"
+    "retry": "Қайта юклаш",
+    "echoTitle": "ЭХО йўлланмалари",
+    "echoEmpty": "Бу даврда ЭХО йўлланмаси йўқ.",
+    "performedUziTitle": "Бажарилган УЗИ (шу шифокор)",
+    "performedUziEmpty": "Бу даврда бажарилган УЗИ йўқ.",
+    "performedEchoTitle": "Бажарилган ЭХО (шу шифокор)",
+    "performedEchoEmpty": "Бу даврда бажарилган ЭХО йўқ.",
+    "patients": "Беморлар",
+    "colEcho": "ЭХО хизматлари",
+    "pickDoctor": "Шифокорни танланг",
+    "payTitle": "Маош улуши",
+    "payRule": "{percent}% — {label}",
+    "payPercent": "Фоиз",
+    "payBasis": "Тўланган асос",
+    "payEarnings": "Оладиган сумма",
+    "payPending": "Кутилаётган маош",
+    "payPendingHint": "Ҳали тўланмаган асос: {amount}"
   }
 }

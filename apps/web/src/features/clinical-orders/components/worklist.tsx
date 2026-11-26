@@ -191,7 +191,9 @@ export function ClinicalWorklist({ reception = false }: { reception?: boolean })
                     <p>
                       {order.invoice.number} · {formatUZS(order.invoice.total)}
                     </p>
-                    {unpaid > 0n ? (
+                    {order.settleAtDischarge ? (
+                      <p className="font-semibold text-sky-700">{t('settleAtDischarge')}</p>
+                    ) : unpaid > 0n ? (
                       <p className="font-semibold text-amber-700">
                         {t('unpaid', { amount: formatUZS(fromTiyin(unpaid)) })}
                       </p>

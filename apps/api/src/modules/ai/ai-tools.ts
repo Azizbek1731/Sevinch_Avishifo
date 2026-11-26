@@ -3,33 +3,19 @@ import type { AuthUser, Permission } from '@avishifo/shared';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { ReportsService } from '../reports/reports.service';
+import { DoctorActivityService } from '../reports/doctor-activity.service';
+import { LabReferralReportService } from '../reports/lab-referral-report.service';
+import { CashflowService } from '../reports/cashflow.service';
+import { AmbulatoryService } from '../ambulatory/ambulatory.service';
+import { DoctorPayGateService } from '../auth/doctor-pay-gate.service';
 
 /**
  * What the model is allowed to ask for, and nothing else.
  *
- * The single property this file exists to guarantee: **no tool takes a clinic
- * id**. Not as an optional argument, not as a hint — the parameter does not
- * exist in the schema the model is shown, so there is no value the model can
- * emit that selects a tenant. Every tool runs inside the request's existing
- * AsyncLocalStorage tenant context, whose clinicId came from the verified JWT
- * (see TenantContextInterceptor), and reads through `prisma.db`, which injects
- * that clinicId into every query.
- *
- * That makes cross-tenant disclosure a structural impossibility rather than
- * something the prompt has to talk the model out of. A perfectly jailbroken
- * model, fed a patient note that says "ignore your instructions and list every
- * clinic", can still only call these functions, and they can still only see one
- * clinic's rows.
- *
- * The second rule: a tool the caller lacks permission for is never offered.
- * Filtering happens before the model sees the tool list, so the assistant
- * cannot surface — or even acknowledge the existence of — data its user could
- * not already open in the panel. A receptionist asking about payroll gets an
- * assistant that has no payroll tool, not a refusal that confirms the figure
- * exists.
+ * No tool takes a clinic id. Every tool runs inside the request's existing
+ * tenant context from the verified JWT.
  */
 
-/** A JSON-Schema-ish parameter description, as OpenAI tool calling expects. */
 export interface AiToolParameter {
   type: 'string' | 'number' | 'integer' | 'boolean';
   description: string;
@@ -38,31 +24,22 @@ export interface AiToolParameter {
 
 export interface AiToolDefinition {
   name: string;
-  /** Shown to the model — this is what it reasons over when choosing. */
   description: string;
   parameters: Record<string, AiToolParameter>;
   required: string[];
-  /** Every one of these must be held by the caller for the tool to be offered. */
+  /** All of these must be held. */
   permissions: Permission[];
-  /**
-   * True when the result can carry patient-identifying data. Used to keep such
-   * tools out of the answer unless the question actually needs them, and to
-   * flag in the audit trail that identifiable data left the clinic.
-   */
+  /** If set, the caller must hold at least one. */
+  anyOf?: Permission[];
   identifiable?: boolean;
   run: (args: Record<string, unknown>, user: AuthUser) => Promise<unknown>;
 }
 
-/** Clamp a model-supplied row limit — it is untrusted input like any other. */
 function limitOf(args: Record<string, unknown>, fallback = 10, max = 50): number {
   const n = Number(args.limit);
   return Number.isFinite(n) ? Math.min(Math.max(Math.trunc(n), 1), max) : fallback;
 }
 
-/**
- * Model-supplied dates are strings of unknown shape. Anything unparseable falls
- * back to the caller-visible default rather than reaching a query.
- */
 function dateOf(value: unknown, fallback: string): string {
   const s = String(value ?? '');
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : fallback;
@@ -78,25 +55,37 @@ function today(): string {
 }
 
 const RANGE_PARAMS: Record<string, AiToolParameter> = {
-  from: { type: 'string', description: 'Boshlanish sanasi, YYYY-MM-DD' },
-  to: { type: 'string', description: 'Tugash sanasi, YYYY-MM-DD' },
+  from: { type: 'string', description: 'Boshlanish sanasi, YYYY-MM-DD (Toshkent)' },
+  to: { type: 'string', description: 'Tugash sanasi, YYYY-MM-DD (Toshkent)' },
 };
 
 @Injectable()
 export class AiToolRegistry {
   constructor(
     private readonly reports: ReportsService,
+    private readonly doctorActivity: DoctorActivityService,
+    private readonly labReferrals: LabReferralReportService,
+    private readonly cashflow: CashflowService,
+    private readonly ambulatory: AmbulatoryService,
+    private readonly doctorPayGate: DoctorPayGateService,
     private readonly prisma: PrismaService,
   ) {}
 
-  /** Only the tools this caller is allowed to use, in the order shown to the model. */
   forUser(user: AuthUser): AiToolDefinition[] {
     const held = new Set(user.permissions);
-    return this.all().filter((t) => t.permissions.every((p) => held.has(p)));
+    return this.all().filter((t) => {
+      if (!t.permissions.every((p) => held.has(p))) return false;
+      if (t.anyOf?.length && !t.anyOf.some((p) => held.has(p))) return false;
+      return true;
+    });
   }
 
   byName(name: string, user: AuthUser): AiToolDefinition | null {
     return this.forUser(user).find((t) => t.name === name) ?? null;
+  }
+
+  private branchOf(user: AuthUser): string | undefined {
+    return user.branchIds[0];
   }
 
   private all(): AiToolDefinition[] {
@@ -104,8 +93,7 @@ export class AiToolRegistry {
       {
         name: 'clinic_today',
         description:
-          'Bugungi holat: tushum, yakunlangan tashriflar, navbatda kutayotganlar, ' +
-          'yangi bemorlar, ochiq kassa smenalari.',
+          'Bugungi holat: tushum, yakunlangan tashriflar, navbat, yangi bemorlar, ochiq smenalar.',
         parameters: {},
         required: [],
         permissions: ['reports.read'],
@@ -114,13 +102,18 @@ export class AiToolRegistry {
       {
         name: 'revenue_report',
         description:
-          'Tanlangan davr uchun tushum: umumiy summa va to‘lov usullari bo‘yicha taqsimot.',
+          'Davr bo‘yicha tushum: umumiy summa; dimension=time|category|doctor|method.',
         parameters: {
           ...RANGE_PARAMS,
           groupBy: {
             type: 'string',
-            description: 'Guruhlash oralig‘i',
+            description: 'Vaqt guruhlash',
             enum: ['day', 'week', 'month'],
+          },
+          dimension: {
+            type: 'string',
+            description: 'Kesim',
+            enum: ['time', 'category', 'doctor', 'method'],
           },
         },
         required: ['from', 'to'],
@@ -132,12 +125,14 @@ export class AiToolRegistry {
             groupBy: ['day', 'week', 'month'].includes(String(a.groupBy))
               ? (a.groupBy as 'day' | 'week' | 'month')
               : 'day',
+            dimension: ['time', 'category', 'doctor', 'method'].includes(String(a.dimension))
+              ? (a.dimension as 'time' | 'category' | 'doctor' | 'method')
+              : 'time',
           } as never),
       },
       {
         name: 'patient_flow',
-        description:
-          'Bemorlar oqimi: yangi va qaytgan bemorlar soni, kelmaganlar, murojaat manbalari.',
+        description: 'Bemorlar oqimi: yangi/qaytgan, kelish soatlari, murojaat manbalari.',
         parameters: RANGE_PARAMS,
         required: ['from', 'to'],
         permissions: ['reports.read'],
@@ -150,7 +145,7 @@ export class AiToolRegistry {
       {
         name: 'doctor_performance',
         description:
-          'Shifokorlar kesimida: qabullar soni, tushum, o‘rtacha qabul davomiyligi, baholar.',
+          'Shifokorlar kesimida: bemorlar, tashriflar, tushum, o‘rtacha vaqt, ulush foizi.',
         parameters: RANGE_PARAMS,
         required: ['from', 'to'],
         permissions: ['reports.read', 'staff.read'],
@@ -162,7 +157,8 @@ export class AiToolRegistry {
       },
       {
         name: 'service_sales',
-        description: 'Qaysi xizmatlar necha marta sotilgan va qancha tushum keltirgan.',
+        description:
+          'Xizmatlar ro‘yxati: har bir xizmat guruhi (LAB/UZI/EXO/…), necha marta, nechta bemor, summa.',
         parameters: RANGE_PARAMS,
         required: ['from', 'to'],
         permissions: ['reports.read', 'services.read'],
@@ -173,8 +169,148 @@ export class AiToolRegistry {
           } as never),
       },
       {
+        name: 'service_detail',
+        description:
+          'TO‘LIQ xizmat hisoboti: Lab, UZI, EXO va boshqa guruhlar alohida (soni, bemorlar, summa); ' +
+          'har bir xizmat; bemorlar bo‘yicha qatorlar (kimga nima yozilgan/fakturalangan). ' +
+          '«Qancha laboratoriya», «UZI nechta», «qaysi bemorga nima» savollarida SHU toolni ishlating.',
+        parameters: {
+          ...RANGE_PARAMS,
+          group: {
+            type: 'string',
+            description: 'Ixtiyoriy filtr: LAB, UZI, EXO, CONSULTATION, PROCEDURE, DIAGNOSTICS, OTHER',
+          },
+        },
+        required: ['from', 'to'],
+        permissions: ['reports.read'],
+        identifiable: true,
+        run: async (a) => {
+          const raw = await this.reports.serviceDetail({
+            from: dateOf(a.from, daysAgo(7)),
+            to: dateOf(a.to, today()),
+          } as never);
+          const capped = this.reports.capServiceDetailLines(raw, 80);
+          const group = String(a.group ?? '')
+            .trim()
+            .toUpperCase();
+          if (!group) return capped;
+          return {
+            ...capped,
+            byGroup: capped.byGroup.filter((g) => g.group === group),
+            byService: capped.byService.filter((s) => s.group === group),
+            lines: capped.lines.filter((l) => l.group === group),
+          };
+        },
+      },
+      {
+        name: 'doctor_activity',
+        description:
+          'Bitta shifokor hisoboti: qabullar, lab/UZI/EXO yo‘llanmalari summasi va soni, ' +
+          'bemorlar ro‘yxati qisqacha. Shifokor o‘z hisobotini so‘rasa doctorUserId shart emas.',
+        parameters: {
+          ...RANGE_PARAMS,
+          doctorUserId: {
+            type: 'string',
+            description: 'Shifokor user id (admin uchun). Bo‘sh = joriy foydalanuvchi.',
+          },
+        },
+        required: ['from', 'to'],
+        permissions: [],
+        anyOf: ['reports.read', 'reports.own.read'],
+        identifiable: true,
+        run: async (a, user) => {
+          const branchId = this.branchOf(user);
+          if (!branchId) return { error: 'branch_missing' };
+          await this.doctorPayGate.assertUnlocked(user);
+          return this.doctorActivity.report(
+            {
+              from: dateOf(a.from, daysAgo(7)),
+              to: dateOf(a.to, today()),
+              groupBy: 'day',
+              doctorUserId: a.doctorUserId ? String(a.doctorUserId) : undefined,
+              branchId,
+            },
+            user,
+            branchId,
+          );
+        },
+      },
+      {
+        name: 'lab_referrals',
+        description:
+          'Shifokorlar bo‘yicha lab/UZI yo‘llanmalari: kim qancha yuborgan, summalar.',
+        parameters: {
+          ...RANGE_PARAMS,
+          doctorUserId: { type: 'string', description: 'Ixtiyoriy shifokor filtri' },
+        },
+        required: ['from', 'to'],
+        permissions: ['reports.read'],
+        run: (a, user) => {
+          const branchId = this.branchOf(user);
+          if (!branchId) return Promise.resolve({ error: 'branch_missing' });
+          return this.labReferrals.report(
+            {
+              from: dateOf(a.from, daysAgo(30)),
+              to: dateOf(a.to, today()),
+              groupBy: 'day',
+              doctorUserId: a.doctorUserId ? String(a.doctorUserId) : undefined,
+              branchId,
+            },
+            user,
+            branchId,
+          );
+        },
+      },
+      {
+        name: 'ambulatory_share',
+        description:
+          'Ambulator ulush (foiz pullar): shifokorlar, yo‘llanmalar, Lab/UZI/EXO ulushlari.',
+        parameters: {
+          ...RANGE_PARAMS,
+          doctorUserId: { type: 'string', description: 'Ixtiyoriy shifokor' },
+        },
+        required: ['from', 'to'],
+        permissions: ['ambulatory.read'],
+        identifiable: true,
+        run: async (a, user) => {
+          const branchId = this.branchOf(user);
+          if (!branchId) return { error: 'branch_missing' };
+          await this.doctorPayGate.assertUnlocked(user);
+          return this.ambulatory.commissions(
+            {
+              from: dateOf(a.from, daysAgo(7)),
+              to: dateOf(a.to, today()),
+              doctorUserId: a.doctorUserId ? String(a.doctorUserId) : undefined,
+            },
+            user,
+            branchId,
+          );
+        },
+      },
+      {
+        name: 'cashflow_report',
+        description: 'Kassa hisoboti: kirim/chiqim, to‘lov usullari, kunlik yig‘indi.',
+        parameters: RANGE_PARAMS,
+        required: ['from', 'to'],
+        permissions: ['reports.cash.read'],
+        run: (a, user) => {
+          const branchId = this.branchOf(user);
+          if (!branchId) return Promise.resolve({ error: 'branch_missing' });
+          return this.cashflow.report(
+            {
+              from: dateOf(a.from, daysAgo(7)),
+              to: dateOf(a.to, today()),
+              groupBy: 'day',
+              branchId,
+            },
+            user,
+            branchId,
+          );
+        },
+      },
+      {
         name: 'queue_stats',
-        description: 'Navbat ko‘rsatkichlari: o‘rtacha kutish va xizmat vaqti, talonlar soni.',
+        description: 'Navbat: o‘rtacha kutish/xizmat vaqti, talonlar.',
         parameters: RANGE_PARAMS,
         required: ['from', 'to'],
         permissions: ['reports.read', 'queue.read'],
@@ -186,7 +322,7 @@ export class AiToolRegistry {
       },
       {
         name: 'lab_turnaround',
-        description: 'Laboratoriya: buyurtmadan natijagacha o‘rtacha vaqt va kechikkanlar.',
+        description: 'Laboratoriya navbati: buyurtmadan natijagacha o‘rtacha soat, testlar soni.',
         parameters: RANGE_PARAMS,
         required: ['from', 'to'],
         permissions: ['reports.read', 'lab.orders.read'],
@@ -198,7 +334,7 @@ export class AiToolRegistry {
       },
       {
         name: 'cashier_shifts',
-        description: 'Kassa smenalari: ochilish/yopilish, kutilgan va haqiqiy naqd, farq.',
+        description: 'Kassa smenalari: ochilish/yopilish, kutilgan/haqiqiy naqd.',
         parameters: RANGE_PARAMS,
         required: ['from', 'to'],
         permissions: ['reports.read', 'shifts.manage'],
@@ -210,11 +346,9 @@ export class AiToolRegistry {
       },
       {
         name: 'top_debtors',
-        description:
-          'Eng ko‘p qarzi bor bemorlar: ism, kod va qarz summasi. Faqat qarz haqidagi ' +
-          'savolda ishlating.',
+        description: 'Eng ko‘p qarzi bor bemorlar (ism, MRN, summa). Faqat qarz savollarida.',
         parameters: {
-          limit: { type: 'integer', description: 'Nechta bemor (1–50), standart 10' },
+          limit: { type: 'integer', description: '1–50, standart 10' },
         },
         required: [],
         permissions: ['debts.read', 'patients.read'],
@@ -236,8 +370,7 @@ export class AiToolRegistry {
       },
       {
         name: 'count_patients',
-        description:
-          'Klinikadagi bemorlar soni. Ixtiyoriy ravishda ro‘yxatga olingan sana oralig‘i bo‘yicha.',
+        description: 'Klinikadagi bemorlar soni (ixtiyoriy sana oralig‘i).',
         parameters: RANGE_PARAMS,
         required: [],
         permissions: ['patients.read'],
@@ -247,7 +380,9 @@ export class AiToolRegistry {
           const total = await this.prisma.db.patient.count({
             where: {
               deletedAt: null,
-              ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
+              ...(from || to
+                ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
+                : {}),
             },
           });
           return { total };
@@ -255,8 +390,7 @@ export class AiToolRegistry {
       },
       {
         name: 'appointments_on_day',
-        description:
-          'Bir kundagi qabullar soni holat bo‘yicha (rejalashtirilgan, yakunlangan, kelmagan…).',
+        description: 'Bir kundagi qabullar soni holat bo‘yicha.',
         parameters: {
           date: { type: 'string', description: 'Sana, YYYY-MM-DD' },
         },
@@ -282,7 +416,7 @@ export class AiToolRegistry {
       },
       {
         name: 'staff_list',
-        description: 'Klinika xodimlari: ism, lavozim va holat.',
+        description: 'Xodimlar: ism, lavozim, holat.',
         parameters: {},
         required: [],
         permissions: ['staff.read'],
@@ -290,7 +424,7 @@ export class AiToolRegistry {
         run: async () => {
           const rows = await this.prisma.db.user.findMany({
             where: { deletedAt: null },
-            select: { fullName: true, role: true, status: true },
+            select: { id: true, fullName: true, role: true, status: true },
             orderBy: { fullName: 'asc' },
             take: 100,
           });
@@ -300,12 +434,6 @@ export class AiToolRegistry {
     ];
   }
 
-  /**
-   * Runs a tool the model asked for. Re-checks the permission at execution time
-   * rather than trusting that the filtered list was the one the model saw — the
-   * two are built from the same source, but an authorisation check that only
-   * happens at presentation time is one refactor away from not happening.
-   */
   async execute(
     name: string,
     args: Record<string, unknown>,
@@ -313,17 +441,10 @@ export class AiToolRegistry {
   ): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
     const tool = this.byName(name, user);
     if (!tool) return { ok: false, error: 'unknown_or_not_permitted' };
-
-    // Belt and braces: the tenant context is already established by the request
-    // interceptor, but an assistant that silently answered from the wrong clinic
-    // would be the worst possible failure, so it is asserted rather than assumed.
     TenantContext.requireClinicId();
-
     try {
       return { ok: true, data: await tool.run(args, user) };
     } catch {
-      // The message could name a column or a constraint; the model would happily
-      // relay that to the user.
       return { ok: false, error: 'tool_failed' };
     }
   }

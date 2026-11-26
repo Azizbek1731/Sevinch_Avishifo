@@ -20,6 +20,8 @@ export interface ClinicalOrder {
   doctor: { id: string; fullName: string };
   status: ClinicalStatus;
   visitId: string | null;
+  /** Statsionar: to‘lov chiqishda — ishni boshlash mumkin. */
+  settleAtDischarge?: boolean;
   invoice: {
     id: string;
     number: string;

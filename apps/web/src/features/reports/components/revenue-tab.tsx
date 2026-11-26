@@ -61,14 +61,14 @@ export function RevenueTab({ filters }: { filters: ReportFilters }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1 rounded-xl border bg-muted/40 p-1">
           {DIMENSIONS.map((d) => (
             <Button
               key={d}
               size="sm"
               variant={dimension === d ? 'default' : 'ghost'}
-              className="h-7 px-3"
+              className="h-8 rounded-lg px-3"
               onClick={() => setDimension(d)}
             >
               {t(`revenue.dimensions.${d}`)}
@@ -83,12 +83,20 @@ export function RevenueTab({ filters }: { filters: ReportFilters }) {
         />
       </div>
 
-      <Card>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border bg-card/80 px-4 py-3 shadow-sm sm:col-span-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {t('revenue.total')}
+          </p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight">
+            {formatUZS(total)}
+          </p>
+        </div>
+      </div>
+
+      <Card className="rounded-xl shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">{t('revenue.chartTitle')}</CardTitle>
-          <p className="text-sm font-semibold">
-            {t('revenue.total')}: {formatUZS(total)}
-          </p>
         </CardHeader>
         <CardContent>
           {query.isPending ? (

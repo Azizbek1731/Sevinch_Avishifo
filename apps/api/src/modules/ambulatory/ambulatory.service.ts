@@ -19,6 +19,7 @@ import {
   type AmbulatoryServiceOrderInput,
   type AmbulatoryUziOrderInput,
   type AuthUser,
+  isAmbulatoryTherapyService,
   type OpenAmbulatoryCaseInput,
   type UpdateAmbulatoryCaseInput,
 } from '@avishifo/shared';
@@ -32,6 +33,7 @@ import { LabService } from '../lab/lab.service';
 import { ClinicalOrdersService } from '../clinical-orders/clinical-orders.service';
 import { InvoicesService } from '../billing/invoices.service';
 import { PricingService } from '../services/pricing.service';
+import { VisitsService } from '../visits/visits.service';
 import {
   AMBULATORY_PERCENT_SETTINGS,
   ambulatoryPercents,
@@ -47,6 +49,7 @@ import {
   labShare,
   money,
   orderOf,
+  therapyShare,
   totalsOf,
   uziShares,
   type LabRow,
@@ -58,7 +61,12 @@ import { XlsxService, type SheetSpec } from '../reports/xlsx.service';
 
 /** Lab, UZI and consultations have their own referral flows; surgery is inpatient-only. */
 const CARD_SERVICE_KINDS = ['PROCEDURE', 'DIAGNOSTICS', 'OTHER', 'MATERIAL', 'MEDICINE'] as const;
-const GROUP_LABEL: Record<AmbulatoryShareGroup, string> = { LAB: 'Laboratoriya', UZI: 'UZI', EXO: 'EXO' };
+const GROUP_LABEL: Record<AmbulatoryShareGroup, string> = {
+  LAB: 'Laboratoriya',
+  UZI: 'UZI',
+  EXO: 'EXO',
+  THERAPY: 'Ozon/Gidro',
+};
 
 /** Tashkent calendar day bounds (+05:00), inclusive. */
 function dayRange(from?: string, to?: string): { gte?: Date; lt?: Date } {
@@ -81,6 +89,7 @@ export class AmbulatoryService {
     private readonly xlsx: XlsxService,
     private readonly invoices: InvoicesService,
     private readonly pricing: PricingService,
+    private readonly visits: VisitsService,
   ) {}
 
   // ------------------------------------------------------------ helpers
@@ -149,6 +158,49 @@ export class AmbulatoryService {
     return found;
   }
 
+  /**
+   * Doctor desks are often shared with assistants — strip share / percent money
+   * from ambulatory payloads. Full figures live behind Telegram OTP on Reports.
+   */
+  private redactDoctorPay(
+    user: AuthUser,
+    payload: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (!this.isDoctor(user) || user.permissions.includes('reports.read')) return payload;
+    const next: Record<string, unknown> = { ...payload };
+    for (const key of [
+      'commission',
+      'pendingCommission',
+      'amount',
+      'paidAmount',
+      'currentPercents',
+      'totals',
+    ]) {
+      delete next[key];
+    }
+    if (Array.isArray(next.labOrders)) {
+      next.labOrders = (next.labOrders as unknown[]).map((order) => {
+        if (!order || typeof order !== 'object') return order;
+        const row = { ...(order as Record<string, unknown>) };
+        delete row.commission;
+        delete row.pendingCommission;
+        delete row.percent;
+        delete row.amount;
+        delete row.paidAmount;
+        return row;
+      });
+    }
+    if (Array.isArray(next.uziOrders)) {
+      next.uziOrders = (next.uziOrders as unknown[]).map((order) => {
+        if (!order || typeof order !== 'object') return order;
+        const row = { ...(order as Record<string, unknown>) };
+        delete row.shares;
+        return row;
+      });
+    }
+    return next;
+  }
+
   private async lockCase(tx: TenantTransactionClient, id: string): Promise<AmbulatoryCase> {
     const clinicId = TenantContext.requireClinicId();
     await tx.$queryRaw`SELECT "id" FROM "AmbulatoryCase" WHERE "id" = ${id} AND "clinicId" = ${clinicId} FOR UPDATE`;
@@ -171,15 +223,84 @@ export class AmbulatoryService {
 
   /** Lab and UZI/EXO shares of the cards matched by `filter` (aliases: c = card, o = order). */
   private async shares(branchId: string, filter: Prisma.Sql): Promise<Share[]> {
-    const [labs, uzis, defaults] = await Promise.all([
+    const [labs, uzis, therapies, defaults] = await Promise.all([
       this.labRows(branchId, filter),
       this.uziRows(branchId, filter),
+      this.therapyRows(branchId, filter),
       this.defaultPercents(),
     ]);
     return [
       ...labs.map((row) => labShare(row, defaults.LAB)),
       ...uziShares(uzis),
+      ...therapies.map((row) => therapyShare(row, defaults.THERAPY)),
     ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  /** Ozon / gidrokolonoterapiya charges billed from an ambulatory card. */
+  private async therapyRows(branchId: string, filter: Prisma.Sql): Promise<LabRow[]> {
+    const clinicId = TenantContext.requireClinicId();
+    return this.prisma.db.$queryRaw<LabRow[]>(Prisma.sql`
+      SELECT i.id AS "orderId", i.number AS "orderNumber",
+        MIN(o."createdAt") AS "createdAt",
+        'ORDERED' AS "orderStatus",
+        c.id AS "caseId", c.number AS "caseNumber", c."doctorUserId", c."doctorName",
+        p.id AS "patientId", p.mrn, p."fullName",
+        MAX(o."ambulatoryCommissionPercent")::text AS percent,
+        i.id AS "invoiceId", i.number AS "invoiceNumber", i.status::text AS "invoiceStatus",
+        i.total::text AS "invoiceTotal", i."paidTotal"::text AS "paidTotal",
+        COALESCE(r.refunded, 0)::text AS refunded,
+        COALESCE(l.all_total, 0)::text AS "linesTotal",
+        COALESCE(l.therapy_total, 0)::text AS "labLinesTotal",
+        COALESCE(l.therapy_titles, '[]'::jsonb) AS tests
+      FROM "ChargeItem" o
+      JOIN "AmbulatoryCase" c ON c.id = o."ambulatoryCaseId" AND c."clinicId" = ${clinicId}
+      JOIN "Patient" p ON p.id = o."patientId" AND p."clinicId" = ${clinicId}
+      JOIN "Service" s ON s.id = o."serviceId" AND s."clinicId" = ${clinicId}
+      JOIN "InvoiceLine" il ON il.id = o."invoiceLineId" AND il."clinicId" = ${clinicId}
+      JOIN "Invoice" i ON i.id = il."invoiceId" AND i."clinicId" = ${clinicId}
+      LEFT JOIN LATERAL (
+        SELECT SUM(rf.amount) AS refunded FROM "Refund" rf
+        WHERE rf."invoiceId" = i.id AND rf."clinicId" = ${clinicId}
+      ) r ON true
+      LEFT JOIN LATERAL (
+        SELECT SUM(xil."lineTotal") AS all_total,
+          SUM(xil."lineTotal") FILTER (
+            WHERE xs.code IN ('DIAG-04', 'DIAG-05')
+              OR xs.name::text ILIKE '%ozon terapi%'
+              OR xs.name::text ILIKE '%озонотерап%'
+              OR xs.name::text ILIKE '%gidrokolon%'
+              OR xs.name::text ILIKE '%гидроколонотерап%'
+              OR xs.name::text ILIKE '%hydrocolon%'
+          ) AS therapy_total,
+          jsonb_agg(xil.title ORDER BY xil.id) FILTER (
+            WHERE xs.code IN ('DIAG-04', 'DIAG-05')
+              OR xs.name::text ILIKE '%ozon terapi%'
+              OR xs.name::text ILIKE '%озонотерап%'
+              OR xs.name::text ILIKE '%gidrokolon%'
+              OR xs.name::text ILIKE '%гидроколонотерап%'
+              OR xs.name::text ILIKE '%hydrocolon%'
+          ) AS therapy_titles
+        FROM "InvoiceLine" xil
+        LEFT JOIN "Service" xs ON xs.id = xil."serviceId" AND xs."clinicId" = ${clinicId}
+        WHERE xil."invoiceId" = i.id AND xil."clinicId" = ${clinicId}
+      ) l ON true
+      WHERE o."clinicId" = ${clinicId}
+        AND o."branchId" = ${branchId}
+        AND o."ambulatoryCaseId" IS NOT NULL
+        AND (
+          s.code IN ('DIAG-04', 'DIAG-05')
+          OR s.name::text ILIKE '%ozon terapi%'
+          OR s.name::text ILIKE '%озонотерап%'
+          OR s.name::text ILIKE '%gidrokolon%'
+          OR s.name::text ILIKE '%гидроколонотерап%'
+          OR s.name::text ILIKE '%hydrocolon%'
+        )
+        ${filter}
+      GROUP BY i.id, i.number, i.status, i.total, i."paidTotal",
+        c.id, c.number, c."doctorUserId", c."doctorName",
+        p.id, p.mrn, p."fullName", r.refunded, l.all_total, l.therapy_total, l.therapy_titles
+      ORDER BY MIN(o."createdAt") DESC
+    `);
   }
 
   private async uziRows(branchId: string, filter: Prisma.Sql): Promise<UziRow[]> {
@@ -213,10 +334,22 @@ export class AmbulatoryService {
       ) r ON true
       LEFT JOIN LATERAL (
         SELECT SUM(il."lineTotal") AS all_total,
-          SUM(il."lineTotal") FILTER (WHERE sc.kind::text = 'ULTRASOUND' AND NOT s."isEcho") AS uzi_total,
-          SUM(il."lineTotal") FILTER (WHERE sc.kind::text = 'ULTRASOUND' AND s."isEcho") AS echo_total,
-          jsonb_agg(il.title ORDER BY il.id) FILTER (WHERE sc.kind::text = 'ULTRASOUND' AND NOT s."isEcho") AS uzi_titles,
-          jsonb_agg(il.title ORDER BY il.id) FILTER (WHERE sc.kind::text = 'ULTRASOUND' AND s."isEcho") AS echo_titles
+          SUM(il."lineTotal") FILTER (
+            WHERE sc.kind::text = 'ULTRASOUND'
+              AND NOT (COALESCE(s."isEcho", false) OR sc.name ILIKE '%exo%' OR sc.name ILIKE '%echo%' OR sc.name ILIKE '%эхо%')
+          ) AS uzi_total,
+          SUM(il."lineTotal") FILTER (
+            WHERE sc.kind::text = 'ULTRASOUND'
+              AND (COALESCE(s."isEcho", false) OR sc.name ILIKE '%exo%' OR sc.name ILIKE '%echo%' OR sc.name ILIKE '%эхо%')
+          ) AS echo_total,
+          jsonb_agg(il.title ORDER BY il.id) FILTER (
+            WHERE sc.kind::text = 'ULTRASOUND'
+              AND NOT (COALESCE(s."isEcho", false) OR sc.name ILIKE '%exo%' OR sc.name ILIKE '%echo%' OR sc.name ILIKE '%эхо%')
+          ) AS uzi_titles,
+          jsonb_agg(il.title ORDER BY il.id) FILTER (
+            WHERE sc.kind::text = 'ULTRASOUND'
+              AND (COALESCE(s."isEcho", false) OR sc.name ILIKE '%exo%' OR sc.name ILIKE '%echo%' OR sc.name ILIKE '%эхо%')
+          ) AS echo_titles
         FROM "InvoiceLine" il
         LEFT JOIN "Service" s ON s.id = il."serviceId" AND s."clinicId" = ${clinicId}
         LEFT JOIN "ServiceCategory" sc ON sc.id = s."categoryId" AND sc."clinicId" = ${clinicId}
@@ -324,7 +457,7 @@ export class AmbulatoryService {
     return paginated(
       rows.map((row) => {
         const totals = totalsOf(shares.filter((share) => share.caseId === row.id));
-        return {
+        return this.redactDoctorPay(user, {
           ...this.map(row),
           patient: row.patient,
           labOrders: row._count.labOrders,
@@ -333,7 +466,7 @@ export class AmbulatoryService {
           paidAmount: totals.paidAmount,
           commission: totals.commission,
           pendingCommission: totals.pendingCommission,
-        };
+        });
       }),
       { page: q.page, limit: q.limit, total },
     );
@@ -549,7 +682,7 @@ export class AmbulatoryService {
     for (const share of shares)
       if (share.group !== 'LAB')
         uziSharesByOrder.set(share.orderId, [...(uziSharesByOrder.get(share.orderId) ?? []), share]);
-    return {
+    return this.redactDoctorPay(user, {
       ...this.map(found),
       patient,
       currentPercents,
@@ -576,7 +709,34 @@ export class AmbulatoryService {
         })),
       consultations: clinicalOrders.filter((order) => order.kind === 'CONSULTATION'),
       services,
-    };
+    });
+  }
+
+  /**
+   * Confirmed UZI or consultation report of this card. The desk has no
+   * visits.read, so access is limited to reports of the card's own referrals.
+   */
+  async visitPdf(
+    id: string,
+    visitId: string,
+    mode: 'summary' | 'prescription',
+    user: AuthUser,
+    branchId: string,
+  ): Promise<{ buffer: Buffer; disposition: string; filename: string }> {
+    await this.requireCase(id, user, branchId);
+    const order = await this.prisma.db.clinicalOrder.findFirst({
+      where: { ambulatoryCaseId: id, branchId, visitId, visit: { status: 'COMPLETED' } },
+      select: { id: true, kind: true },
+    });
+    if (!order) throw new AppException(ErrorCode.NOT_FOUND, 'Tasdiqlangan xulosa topilmadi', 404);
+    const pdf = await this.visits.pdf(visitId, user, mode);
+    await this.audit.log({
+      action: AuditAction.EXPORT,
+      entity: 'Visit',
+      entityId: visitId,
+      after: { ambulatoryCaseId: id, clinicalOrderId: order.id, kind: order.kind, mode },
+    });
+    return pdf;
   }
 
   /** Lines added to the card by hand, with the state of the bill each one went on. */
@@ -777,7 +937,7 @@ export class AmbulatoryService {
             isActive: true,
             category: { kind: { in: [...CARD_SERVICE_KINDS] } },
           },
-          select: { id: true, name: true },
+          select: { id: true, name: true, code: true },
         })
       : [];
     if (services.length !== serviceIds.length)
@@ -790,7 +950,9 @@ export class AmbulatoryService {
     if (serviceIds.some((serviceId) => !prices.has(serviceId)))
       throw new AppException(ErrorCode.VALIDATION_ERROR, 'Xizmat narxi belgilanmagan', 400);
     const nameById = new Map(services.map((service) => [service.id, service.name]));
+    const serviceById = new Map(services.map((service) => [service.id, service]));
     const clinicId = TenantContext.requireClinicId();
+    const therapyPercent = (await this.percentsFor(found.doctorUserId)).THERAPY;
     const date = new Date(`${new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10)}T00:00:00.000Z`);
 
     const invoice = await this.prisma.db.$transaction(
@@ -811,6 +973,7 @@ export class AmbulatoryService {
         const visitId = await openVisitForCase(tx, locked);
         const chargeIds: string[] = [];
         for (const [index, item] of dto.items.entries()) {
+          const catalog = item.serviceId ? serviceById.get(item.serviceId) : null;
           const charge = await tx.chargeItem.create({
             data: {
               clinicId,
@@ -827,6 +990,10 @@ export class AmbulatoryService {
               unitPrice: new Prisma.Decimal(
                 item.serviceId ? prices.get(item.serviceId)! : item.unitPrice!,
               ),
+              ambulatoryCommissionPercent:
+                catalog && isAmbulatoryTherapyService(catalog)
+                  ? new Prisma.Decimal(therapyPercent)
+                  : null,
               createdById: user.id,
               requestKey: `${dto.idempotencyKey}:${index}`,
             },
@@ -911,6 +1078,7 @@ export class AmbulatoryService {
             LAB: override?.LAB ?? defaults.LAB,
             UZI: override?.UZI ?? defaults.UZI,
             EXO: override?.EXO ?? defaults.EXO,
+            THERAPY: override?.THERAPY ?? defaults.THERAPY,
           },
         };
       })
@@ -930,8 +1098,14 @@ export class AmbulatoryService {
   }
 
   async exportCommissions(report: AmbulatoryCommissionReport, user: AuthUser): Promise<Buffer> {
-    if (!user.permissions.includes('reports.export') && !this.isDoctor(user))
-      throw new AppException(ErrorCode.FORBIDDEN, 'Missing permission: reports.export', 403);
+    // Same people who can open the on-screen share report may download it —
+    // reception included (ambulatory.read). reports.export remains for admins.
+    if (
+      !user.permissions.includes('ambulatory.read') &&
+      !user.permissions.includes('reports.export') &&
+      !this.isDoctor(user)
+    )
+      throw new AppException(ErrorCode.FORBIDDEN, 'Missing permission: ambulatory.read', 403);
     const state: Record<AmbulatoryPaymentState, string> = {
       PAID: 'To‘langan',
       PARTIAL: 'Qisman',
@@ -950,9 +1124,10 @@ export class AmbulatoryService {
           { header: 'Lab ulushi', key: 'labCommission', money: true },
           { header: 'UZI ulushi', key: 'uziCommission', money: true },
           { header: 'EXO ulushi', key: 'echoCommission', money: true },
+          { header: 'Ozon/Gidro ulushi', key: 'therapyCommission', money: true },
           { header: 'Jami ulush', key: 'commission', money: true, width: 20 },
           { header: 'Kutilmoqda', key: 'pendingCommission', money: true },
-          { header: 'Joriy foizlar', key: 'percents', width: 28 },
+          { header: 'Joriy foizlar', key: 'percents', width: 36 },
         ],
         rows: report.doctors.map((doctor) => ({
           ...doctor,
@@ -960,6 +1135,7 @@ export class AmbulatoryService {
           labCommission: doctor.byGroup.LAB.commission,
           uziCommission: doctor.byGroup.UZI.commission,
           echoCommission: doctor.byGroup.EXO.commission,
+          therapyCommission: doctor.byGroup.THERAPY.commission,
           percents: AMBULATORY_SHARE_GROUPS.map(
             (group) => `${GROUP_LABEL[group]} ${doctor.currentPercents[group]}%`,
           ).join(' · '),
@@ -1009,7 +1185,7 @@ export class AmbulatoryService {
           {
             key: 'Hisoblash',
             value:
-              'Faqat ambulator kartadan yuborilgan laboratoriya, UZI va EXO. Ulush = kassada to‘langan summa × yo‘llanma paytidagi foiz (laboratoriya, UZI va EXO uchun alohida). Chegirma va qaytarishlar ayiriladi; bekor qilinganlar va foizi 0% bo‘lganlar kiritilmaydi.',
+              'Faqat ambulator kartadan yuborilgan laboratoriya, UZI, EXO va Ozon/Gidrokolonoterapiya. Ulush = kassada to‘langan summa × yo‘llanma paytidagi foiz. Chegirma va qaytarishlar ayiriladi; bekor qilinganlar va foizi 0% bo‘lganlar kiritilmaydi.',
           },
         ],
       },
@@ -1052,7 +1228,12 @@ export class AmbulatoryService {
         doctorUserId: doctor.id,
         fullName: doctor.fullName,
         specialty: doctor.staffProfile?.specialty ?? null,
-        percents: overrideById.get(doctor.id) ?? { LAB: null, UZI: null, EXO: null },
+        percents: overrideById.get(doctor.id) ?? {
+          LAB: null,
+          UZI: null,
+          EXO: null,
+          THERAPY: null,
+        },
       })),
       ultrasoundServices: ultrasound.map((service) => ({
         id: service.id,
@@ -1103,12 +1284,18 @@ export class AmbulatoryService {
         UPDATE "Clinic" SET "settings" = ${JSON.stringify(next)}::jsonb
         WHERE "id" = ${clinicId}`;
       for (const row of dto.doctors) {
-        const { LAB, UZI, EXO } = row.percents;
-        if (LAB === null && UZI === null && EXO === null) {
+        const { LAB, UZI, EXO, THERAPY } = row.percents;
+        if (LAB === null && UZI === null && EXO === null && THERAPY === null) {
           await tx.ambulatoryCommissionRate.deleteMany({ where: { doctorUserId: row.doctorUserId } });
           continue;
         }
-        const data = { percent: decimal(LAB), uziPercent: decimal(UZI), echoPercent: decimal(EXO), updatedById: user.id };
+        const data = {
+          percent: decimal(LAB),
+          uziPercent: decimal(UZI),
+          echoPercent: decimal(EXO),
+          therapyPercent: decimal(THERAPY),
+          updatedById: user.id,
+        };
         await tx.ambulatoryCommissionRate.upsert({
           where: { clinicId_doctorUserId: { clinicId, doctorUserId: row.doctorUserId } },
           create: { clinicId, doctorUserId: row.doctorUserId, ...data },
@@ -1131,5 +1318,101 @@ export class AmbulatoryService {
       after: this.auditRates(after),
     });
     return after;
+  }
+
+  /**
+   * Telegram admin bot: ambulatory share Excel for a date range / optional doctor.
+   * Runs its own TenantContext — safe from the pre-tenant bot process.
+   */
+  async buildTelegramShareReport(input: {
+    clinicId: string;
+    from: string;
+    to: string;
+    doctorUserId?: string | null;
+  }): Promise<{
+    buffer: Buffer;
+    filename: string;
+    caption: string;
+    doctorCount: number;
+    orderCount: number;
+  } | null> {
+    return TenantContext.run({ clinicId: input.clinicId }, async () => {
+      const branch = await this.prisma.db.branch.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (!branch) return null;
+      const botUser: AuthUser = {
+        id: 'telegram-admin-bot',
+        clinicId: input.clinicId,
+        role: 'CLINIC_ADMIN',
+        fullName: 'Telegram bot',
+        locale: 'uz',
+        branchIds: [branch.id],
+        permissions: ['ambulatory.read', 'reports.export'],
+        specialty: null,
+        sessionId: 'telegram-admin-bot',
+      };
+      const report = await this.commissions(
+        {
+          from: input.from,
+          to: input.to,
+          doctorUserId: input.doctorUserId ?? undefined,
+        },
+        botUser,
+        branch.id,
+      );
+      const buffer = await this.exportCommissions(report, botUser);
+      const doctorLabel = input.doctorUserId
+        ? (report.doctors[0]?.doctorName ?? 'shifokor')
+        : 'barcha shifokorlar';
+      const caption =
+        `💰 Ambulator ulush\n` +
+        `Davr: ${input.from} — ${input.to}\n` +
+        `Shifokor: ${doctorLabel}\n` +
+        `Yo‘llanmalar: ${report.orders.length}\n` +
+        `To‘langan ulush: ${report.totals.commission}\n` +
+        `Kutilmoqda: ${report.totals.pendingCommission}`;
+      return {
+        buffer,
+        filename: `ambulator-ulush_${input.from}_${input.to}.xlsx`,
+        caption,
+        doctorCount: report.doctors.length,
+        orderCount: report.orders.length,
+      };
+    });
+  }
+
+  /** Active doctors with ambulatory cards — for Telegram share picker. */
+  async listTelegramShareDoctors(
+    clinicId: string,
+  ): Promise<Array<{ id: string; fullName: string; specialty: string | null }>> {
+    return TenantContext.run({ clinicId }, async () => {
+      const rows = await this.prisma.unscoped.user.findMany({
+        where: {
+          clinicId,
+          role: 'DOCTOR',
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          fullName: true,
+          staffProfile: { select: { specialty: true } },
+        },
+        orderBy: { fullName: 'asc' },
+      });
+      return rows
+        .filter((row) => {
+          const specialty = (row.staffProfile?.specialty ?? '').toLowerCase();
+          return !/uzi|utt|ultrasound|exo|эхо|узи/.test(specialty);
+        })
+        .map((row) => ({
+          id: row.id,
+          fullName: row.fullName,
+          specialty: row.staffProfile?.specialty ?? null,
+        }));
+    });
   }
 }

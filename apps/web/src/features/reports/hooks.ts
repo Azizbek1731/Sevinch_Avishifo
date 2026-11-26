@@ -133,6 +133,14 @@ export function useServicesReport(filters: ReportFilters) {
   });
 }
 
+export function useServiceDetailReport(filters: ReportFilters) {
+  return useQuery({
+    queryKey: ['reports', 'service-detail', filters],
+    queryFn: () => reportsApi.serviceDetail(filters),
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function useQueueReport(filters: ReportFilters) {
   return useQuery({
     queryKey: ['reports', 'queue', filters],
@@ -196,10 +204,15 @@ export function useLabReferralReport(filters: ReportFilters, doctorUserId?: stri
   });
 }
 
-export function useDoctorActivityReport(filters: ReportFilters, doctorUserId?: string) {
+export function useDoctorActivityReport(
+  filters: ReportFilters,
+  doctorUserId?: string,
+  enabled = true,
+) {
   return useQuery({
     queryKey: ['reports', 'doctor-activity', { ...filters, doctorUserId }],
     queryFn: () => reportsApi.doctorActivity(filters, doctorUserId),
+    enabled,
     refetchInterval: 30_000,
   });
 }

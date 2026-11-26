@@ -48,6 +48,7 @@
     "doctorEmpty": "No ultrasound specialist found. Check specialties in Staff.",
     "doctorUziHint": "The selected ultrasound doctor will see the order on their worklist.",
     "doctorConsultHint": "The selected doctor will see the consultation on their worklist.",
+    "quickAdd": "Quick add (ECG, Holter, ABPM…)",
     "service": "Service",
     "name": "Charge description",
     "date": "Date",

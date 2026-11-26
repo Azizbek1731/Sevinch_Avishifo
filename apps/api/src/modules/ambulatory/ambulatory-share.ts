@@ -129,17 +129,31 @@ function finish(
 
 /** The doctor's lab share: only the lab part of the bill, only what the cashier actually took. */
 export function labShare(row: LabRow, fallbackPercent: number): Share {
+  return referralShare(row, 'LAB', row.labLinesTotal, fallbackPercent);
+}
+
+/** Ozon / gidrokolonoterapiya share from ambulatory card charges. */
+export function therapyShare(row: LabRow, fallbackPercent: number): Share {
+  return referralShare(row, 'THERAPY', row.labLinesTotal, fallbackPercent);
+}
+
+function referralShare(
+  row: LabRow,
+  group: AmbulatoryShareGroup,
+  groupLinesTotal: string,
+  fallbackPercent: number,
+): Share {
   const cancelled = row.orderStatus === 'CANCELLED' || !row.invoiceId || deadInvoice(row.invoiceStatus);
   const part = slice({
     total: row.invoiceTotal,
     paidTotal: row.paidTotal,
     refunded: row.refunded,
     linesTotal: row.linesTotal,
-    groupLinesTotal: row.labLinesTotal,
+    groupLinesTotal,
   });
   return finish(
     {
-      group: 'LAB',
+      group,
       orderId: row.orderId,
       orderNumber: row.orderNumber,
       createdAt: row.createdAt,

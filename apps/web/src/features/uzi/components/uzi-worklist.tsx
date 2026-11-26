@@ -180,6 +180,7 @@ export function UziWorklist() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {orders.data.data.map((order) => {
             const unpaid = toTiyin(order.invoice.due) + toTiyin(order.additionalDue);
+            const waitingCashier = order.status === 'WAITING_PAYMENT';
             return (
               <Card key={order.id} className="overflow-hidden">
                 <CardContent className="space-y-4 p-5">
@@ -224,7 +225,9 @@ export function UziWorklist() {
                     <p>
                       {order.invoice.number} · {formatUZS(order.invoice.total)}
                     </p>
-                    {unpaid > 0n ? (
+                    {order.settleAtDischarge ? (
+                      <p className="font-semibold text-sky-700">{t('settleAtDischarge')}</p>
+                    ) : unpaid > 0n ? (
                       <p className="font-semibold text-amber-700">
                         {t('unpaid', { amount: formatUZS(fromTiyin(unpaid)) })}
                       </p>
@@ -232,7 +235,7 @@ export function UziWorklist() {
                       <p className="font-medium text-emerald-700">{t('paid')}</p>
                     )}
                   </div>
-                  {order.status === 'WAITING_PAYMENT' || unpaid > 0n ? (
+                  {waitingCashier ? (
                     canCreate ? (
                       <Button variant="outline" className="w-full" asChild>
                         <Link href={`/invoices/${order.invoice.id}`}>

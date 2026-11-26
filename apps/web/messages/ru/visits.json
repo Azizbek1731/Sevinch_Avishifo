@@ -126,6 +126,7 @@
   "printSummaryTitle": "Заключение врача",
   "printPrescriptionTitle": "Рецепт",
   "pdfFailed": "Не удалось подготовить PDF",
+  "pdfPrinted": "Распечатано / PDF скачан",
   "printPdfHint": "Печатается тот же A4 PDF, что и для лаборатории: шапка клиники сверху, Made with AviShifo.uz снизу. Выберите принтер A4 и бумагу A4.",
   "printPreparing": "Готовится отчёт A4…",
   "printOpenPdf": "Открыть PDF",

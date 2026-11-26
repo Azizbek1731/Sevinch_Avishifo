@@ -229,7 +229,32 @@ export class LabService {
     };
   }
 
-  private toOrderListItem(o: LabOrderListRow): Record<string, unknown> {
+  /** Active ward patients settle lab/UZI at discharge — clinical work stays open. */
+  private async inpatientPatientIds(
+    patientIds: string[],
+    branchId?: string | null,
+  ): Promise<Set<string>> {
+    if (patientIds.length === 0) return new Set();
+    const stays = await this.prisma.db.admission.findMany({
+      where: {
+        patientId: { in: [...new Set(patientIds)] },
+        status: 'ACTIVE',
+        ...(branchId ? { branchId } : {}),
+      },
+      select: { patientId: true },
+    });
+    return new Set(stays.map((stay) => stay.patientId));
+  }
+
+  private labCanWork(
+    invoice: LabOrderListRow['invoice'],
+    inpatient: boolean,
+  ): boolean {
+    return isLabInvoicePaid(invoice) || inpatient;
+  }
+
+  private toOrderListItem(o: LabOrderListRow, inpatient = false): Record<string, unknown> {
+    const canWork = this.labCanWork(o.invoice, inpatient);
     return {
       id: o.id,
       branchId: o.branchId,
@@ -240,7 +265,8 @@ export class LabService {
         ? { id: o.referringDoctorUserId, fullName: o.referringDoctorName }
         : null,
       status: o.status,
-      canWork: isLabInvoicePaid(o.invoice),
+      canWork,
+      settleAtDischarge: inpatient && !isLabInvoicePaid(o.invoice),
       billing: o.invoice
         ? {
             invoiceId: o.invoice.id,
@@ -264,6 +290,9 @@ export class LabService {
 
   private async toOrderDetail(o: LabOrderDetailRow): Promise<Record<string, unknown>> {
     const labels = await this.catalogLabels();
+    const onWard = await this.inpatientPatientIds([o.patientId], o.branchId);
+    const inpatient = onWard.has(o.patientId);
+    const canWork = this.labCanWork(o.invoice, inpatient);
     const ctx: PatientContext = {
       gender: o.patient.gender,
       ageDays: ageInDays(o.patient.dob, o.collectedAt ?? o.createdAt),
@@ -279,7 +308,8 @@ export class LabService {
         ? { id: o.referringDoctorUserId, fullName: o.referringDoctorName }
         : null,
       status: o.status,
-      canWork: isLabInvoicePaid(o.invoice),
+      canWork,
+      settleAtDischarge: inpatient && !isLabInvoicePaid(o.invoice),
       billing: o.invoice
         ? {
             invoiceId: o.invoice.id,
@@ -1029,11 +1059,21 @@ export class LabService {
     if (query.visitId) where.visitId = query.visitId;
     if (!query.includeUnpaid && !query.patientId) {
       // Cashier payments cannot exceed the total: any refund reopens the clinical gate.
+      // Active inpatients stay visible — they settle the bill at discharge.
       where.AND = [
         {
           OR: [
             { invoiceId: null },
             { invoice: { status: 'PAID', refunds: { none: { amount: { gt: 0 } } } } },
+            ...(branchId
+              ? [
+                  {
+                    patient: {
+                      admissions: { some: { status: 'ACTIVE' as const, branchId } },
+                    },
+                  },
+                ]
+              : []),
           ],
         },
       ];
@@ -1068,8 +1108,12 @@ export class LabService {
       }),
       this.prisma.db.labOrder.count({ where }),
     ]);
+    const onWard = await this.inpatientPatientIds(
+      rows.map((row) => row.patientId),
+      branchId,
+    );
     return paginated(
-      rows.map((o) => this.toOrderListItem(o)),
+      rows.map((o) => this.toOrderListItem(o, onWard.has(o.patientId))),
       { page: query.page, limit: query.limit, total },
     );
   }

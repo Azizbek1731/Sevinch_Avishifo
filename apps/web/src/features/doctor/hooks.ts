@@ -222,6 +222,13 @@ export function useUpdateVisit(visitId: string) {
   );
 }
 
+/** Same as useUpdateVisit but without a success toast (for background autosave). */
+export function useSilentUpdateVisit(visitId: string) {
+  return useVisitMutation(visitId, (body: UpdateVisitInput) =>
+    doctorApi.updateVisit(visitId, body),
+  );
+}
+
 export function useAmendVisit(visitId: string, onDone?: () => void) {
   const t = useTranslations('visits');
   return useVisitMutation(visitId, (body: AmendVisitInput) => doctorApi.amendVisit(visitId, body), {

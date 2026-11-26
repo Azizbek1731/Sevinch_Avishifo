@@ -509,6 +509,8 @@ model User {
   /// Telegram chat. Ignored while telegramChatId is null — a user can never be
   /// locked out by enabling this before linking.
   twoFactorEnabled    Boolean    @default(false)
+  /// Doctor pay / ambulatory-share PIN (4 digits). Null → default 7777.
+  payPin              String?    @db.VarChar(4)
   failedLoginCount    Int        @default(0)
   lockedUntil         DateTime?  @db.Timestamptz(6)
   createdAt           DateTime   @default(now()) @db.Timestamptz(6)
@@ -873,6 +875,8 @@ model ChargeItem {
   unitPrice        Decimal      @db.Decimal(14, 2)
   status           ChargeStatus @default(PENDING)
   invoiceLineId    String?
+  /// Referring doctor THERAPY share % snapshot (ozone / hydrocolon on ambulatory cards).
+  ambulatoryCommissionPercent Decimal? @db.Decimal(5, 2)
   createdById      String?
   requestKey       String?
   requestFingerprint String?
@@ -2249,6 +2253,8 @@ model AmbulatoryCommissionRate {
   percent      Decimal? @db.Decimal(5, 2)
   uziPercent   Decimal? @db.Decimal(5, 2)
   echoPercent  Decimal? @db.Decimal(5, 2)
+  /// Ozon / gidrokolonoterapiya share; null falls back to the clinic default.
+  therapyPercent Decimal? @db.Decimal(5, 2)
   updatedById  String?
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @db.Timestamptz(6)

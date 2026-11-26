@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
@@ -26,6 +26,7 @@ import {
   type PrescriptionDraft,
   type PrescriptionDraftItem,
 } from '../prescription-draft';
+import { useVisitAutosave } from '../use-visit-autosave';
 import { PrescriptionMedicationCard } from './prescription-medication-card';
 import { PrescriptionPreview } from './prescription-preview';
 
@@ -62,6 +63,8 @@ export function PrescriptionsSection({
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'items' });
   const dirty = form.formState.isDirty;
   const items = form.watch('items');
+  const physioWatch = form.watch('physiotherapy');
+  const clearDraftRef = useRef<() => void>(() => undefined);
   const hydrate = (data: {
     prescriptions: VisitPrescription[];
     prescriptionRevision: number;
@@ -71,7 +74,26 @@ export function PrescriptionsSection({
     setLoadedRevision(data.prescriptionRevision);
     setConflict(false);
     setAction(null);
+    clearDraftRef.current();
   };
+  const baselineKey = useMemo(
+    () => JSON.stringify({ revision: prescriptionRevision, physiotherapy: physiotherapy ?? '' }),
+    [prescriptionRevision, physiotherapy],
+  );
+  const getSnapshot = useCallback(() => form.getValues(), [form]);
+  const { clearDraft } = useVisitAutosave<PrescriptionDraft>({
+    visitId,
+    scope: 'prescriptions',
+    baselineKey,
+    getSnapshot,
+    watchKey: JSON.stringify({ items, physioWatch }),
+    isDirty: dirty,
+    enabled: !disabled,
+    onRestore: (data) => {
+      form.reset(data, { keepDefaultValues: true });
+    },
+  });
+  clearDraftRef.current = clearDraft;
   const reload = useMutation({
     mutationKey: ['visits', visitId],
     mutationFn: () => doctorApi.getVisit(visitId),

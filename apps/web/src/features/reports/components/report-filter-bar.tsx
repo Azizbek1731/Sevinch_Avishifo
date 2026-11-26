@@ -50,14 +50,14 @@ export function ReportFilterBar({ state, onChange }: ReportFilterBarProps) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-1 rounded-xl border bg-muted/50 p-1">
         {PRESETS.map((preset) => (
           <Button
             key={preset}
             size="sm"
             variant={state.preset === preset ? 'default' : 'ghost'}
-            className="h-7 px-3"
+            className="h-8 rounded-lg px-3"
             onClick={() => applyPreset(preset)}
           >
             {t(`filters.${preset}`)}
@@ -68,7 +68,7 @@ export function ReportFilterBar({ state, onChange }: ReportFilterBarProps) {
             <Button
               size="sm"
               variant={state.preset === 'custom' ? 'default' : 'ghost'}
-              className="h-7 gap-1.5 px-3"
+              className="h-8 gap-1.5 rounded-lg px-3"
             >
               <CalendarRange className="h-3.5 w-3.5" />
               {state.preset === 'custom'
@@ -88,21 +88,24 @@ export function ReportFilterBar({ state, onChange }: ReportFilterBarProps) {
         </Popover>
       </div>
 
-      <Select
-        value={state.groupBy}
-        onValueChange={(v) => onChange({ ...state, groupBy: v as ReportGroupBy })}
-      >
-        <SelectTrigger className="h-9 w-[140px]">
-          <SelectValue placeholder={t('filters.groupBy')} />
-        </SelectTrigger>
-        <SelectContent>
-          {GROUP_BY_OPTIONS.map((g) => (
-            <SelectItem key={g} value={g}>
-              {t(`filters.groupByOptions.${g}`)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="flex items-center gap-2">
+        <span className="hidden text-xs text-muted-foreground sm:inline">{t('filters.groupBy')}</span>
+        <Select
+          value={state.groupBy}
+          onValueChange={(v) => onChange({ ...state, groupBy: v as ReportGroupBy })}
+        >
+          <SelectTrigger className="h-9 w-[150px] rounded-xl">
+            <SelectValue placeholder={t('filters.groupBy')} />
+          </SelectTrigger>
+          <SelectContent>
+            {GROUP_BY_OPTIONS.map((g) => (
+              <SelectItem key={g} value={g}>
+                {t(`filters.groupByOptions.${g}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }

@@ -11,7 +11,7 @@ import { TelegramChannel } from '../notifications/channels/telegram.channel';
  * asked for it: `second-factor` follows a correct password, `passwordless` is
  * the whole of the authentication on its own.
  */
-export type ChallengePurpose = 'second-factor' | 'passwordless';
+export type ChallengePurpose = 'second-factor' | 'passwordless' | 'doctor-pay';
 
 interface Challenge {
   userId: string;
@@ -237,6 +237,15 @@ export class TwoFactorService {
         `${fullName}, bu kod AviShifo paneliga parolsiz kirish uchun va ${minutes} daqiqa amal qiladi.\n` +
         `Kodni HECH KIMGA bermang — uni bilgan odam sizning nomingizdan tizimga kira oladi.\n` +
         `Agar kirishni siz so‘ramagan bo‘lsangiz, bu kodni e'tiborsiz qoldiring.`
+      );
+    }
+    if (purpose === 'doctor-pay') {
+      return (
+        `💰 AviShifo — ulush / maoshni ochish kodi\n\n` +
+        `Kod: ${code}\n\n` +
+        `${fullName}, bu kod Hisobotlar bo‘limidagi foiz pullarni ko‘rish uchun.\n` +
+        `${minutes} daqiqa amal qiladi. Kodni boshqalarga bermang.\n` +
+        `Agar so‘ramagan bo‘lsangiz — e'tiborsiz qoldiring.`
       );
     }
     return (

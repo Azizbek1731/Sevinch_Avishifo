@@ -1,18 +1,24 @@
 {
   "title": "Hisobotlar",
-  "description": "Klinika faoliyati bo'yicha tahliliy hisobotlar",
+  "description": "Tushum, xizmatlar (Lab/UZI/EXO), bemorlar va shifokor kesimida to‘liq hisobotlar",
   "noAccess": "Hisobotlarni ko'rish uchun ruxsat yo'q",
   "filters": {
     "today": "Bugun",
     "week": "Hafta",
     "month": "Oy",
     "custom": "Davr tanlash",
+    "period": "Davr",
     "groupBy": "Guruhlash",
     "groupByOptions": {
       "day": "Kun bo'yicha",
       "week": "Hafta bo'yicha",
       "month": "Oy bo'yicha"
     }
+  },
+  "navGroups": {
+    "finance": "Moliya",
+    "doctor": "Shifokor",
+    "analytics": "Tahlil"
   },
   "export": {
     "xlsx": "XLSX",
@@ -22,14 +28,35 @@
     "revenue": "Tushum",
     "flow": "Bemorlar oqimi",
     "doctors": "Shifokorlar",
-    "services": "Xizmatlar",
+    "services": "Xizmatlar (Lab/UZI/EXO)",
     "queue": "Navbat",
     "lab": "Laboratoriya",
     "shifts": "Smenalar",
     "cashflow": "Kassa hisoboti",
     "consumables": "Dori va materiallar",
     "lab-referrals": "Shifokorlar bo‘yicha yo‘llanmalar",
-    "doctor-activity": "Mening hisobotim"
+    "doctor-activity": "Mening hisobotim",
+    "doctor-pay": "Shifokor maoshi",
+    "ambulatory-share": "Ambulator ulush"
+  },
+  "doctorPayGate": {
+    "title": "Ulush va maoshni ochish",
+    "hint": "Foiz pullarni ko‘rish uchun 4 xonali kodni kiriting (standart: 7777). Ochilgach {minutes} daqiqa ochiq qoladi.",
+    "checking": "Tekshirilmoqda…",
+    "sessionHint": "Kod to‘g‘ri bo‘lsa, bo‘lim {minutes} daqiqa ochiq qoladi. Istalgan payt «Qulflash» bilan yopishingiz mumkin.",
+    "codeLabel": "4 xonali kod",
+    "unlock": "Ochish",
+    "lock": "Qulflash",
+    "unlockedUntil": "Ochiq: {time} qoldi (jami {minutes} daqiqa)",
+    "changePin": "Kodni o‘zgartirish",
+    "changePinTitle": "Ulush kodini o‘zgartirish",
+    "currentPin": "Joriy kod",
+    "newPin": "Yangi kod",
+    "confirmPin": "Yangi kodni tasdiqlang",
+    "pinMismatch": "Yangi kodlar mos kelmadi",
+    "savePin": "Saqlash",
+    "cancel": "Bekor qilish",
+    "pinChanged": "Kod yangilandi"
   },
   "empty": {
     "title": "Ma'lumot yo'q",
@@ -94,17 +121,36 @@
       "revenue": "Tushum",
       "avgDuration": "O'rtacha qabul vaqti",
       "noShow": "Kelmaganlar %",
-      "returning": "Qaytganlar %"
+      "returning": "Qaytganlar %",
+      "payPercent": "Maosh %",
+      "earnings": "Maosh ulushi"
     }
   },
   "services": {
-    "chartTitle": "Eng ko'p tushum keltirgan xizmatlar",
+    "chartTitle": "Xizmatlar ro‘yxati",
+    "groupsTitle": "Guruhlar bo‘yicha (Lab, UZI, EXO va boshqalar)",
+    "groupsTable": "Guruhlar jadvali",
+    "patientsTitle": "Bemorlar bo‘yicha — kimga nima yozilgan",
+    "truncatedHint": "Ro‘yxat qisqartirilgan. To‘liq Excel yuklab oling.",
+    "allGroups": "Hammasi",
     "series": "Tushum",
+    "kpi": {
+      "count": "Jami xizmatlar",
+      "patients": "Bemorlar",
+      "revenue": "Jami summa"
+    },
     "columns": {
+      "group": "Guruh",
+      "serviceTypes": "Turlar",
       "code": "Kod",
       "name": "Xizmat",
       "count": "Soni",
-      "revenue": "Tushum"
+      "patients": "Bemorlar",
+      "revenue": "Summa",
+      "date": "Sana",
+      "qty": "Miqdor",
+      "patient": "Bemor",
+      "performer": "Bajaruvchi"
     }
   },
   "queue": {
@@ -267,6 +313,22 @@
     "statusInProgress": "Davom etmoqda",
     "statusCancelled": "Bekor qilingan",
     "loadError": "Hisobotni yuklab bo‘lmadi.",
-    "retry": "Qayta yuklash"
+    "retry": "Qayta yuklash",
+    "echoTitle": "EXO yo‘llanmalari",
+    "echoEmpty": "Bu davrda EXO yo‘llanmasi yo‘q.",
+    "performedUziTitle": "Bajarilgan UZI (shu shifokor)",
+    "performedUziEmpty": "Bu davrda bajarilgan UZI yo‘q.",
+    "performedEchoTitle": "Bajarilgan EXO (shu shifokor)",
+    "performedEchoEmpty": "Bu davrda bajarilgan EXO yo‘q.",
+    "patients": "Bemorlar",
+    "colEcho": "EXO xizmatlari",
+    "pickDoctor": "Shifokorni tanlang",
+    "payTitle": "Maosh ulushi",
+    "payRule": "{percent}% — {label}",
+    "payPercent": "Foiz",
+    "payBasis": "To‘langan asos",
+    "payEarnings": "Oladigan summa",
+    "payPending": "Kutilayotgan maosh",
+    "payPendingHint": "Hali to‘lanmagan asos: {amount}"
   }
 }

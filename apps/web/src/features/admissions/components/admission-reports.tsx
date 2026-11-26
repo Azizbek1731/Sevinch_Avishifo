@@ -3,12 +3,12 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
-import { toast } from 'sonner';
-import { Activity, FileDown, FlaskConical, Stethoscope, type LucideIcon } from 'lucide-react';
+import { Activity, FlaskConical, Stethoscope, type LucideIcon } from 'lucide-react';
 import { LabOrderStatus } from '@avishifo/shared';
 import { api } from '@/lib/api-client';
 import { formatTz } from '@/lib/dates';
 import { localizedText } from '@/lib/localized';
+import { usePdfPrinted } from '@/lib/pdf-printed';
 import { Link } from '@/i18n/routing';
 import { usePermissions } from '@/hooks/use-permissions';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/status-badge';
 import { clinicalOrdersApi, type ClinicalOrder } from '@/features/clinical-orders/api';
+import { LabPdfButton } from '@/features/lab/components/lab-pdf-button';
 import { patientsApi, type PatientVisit } from '@/features/patients/api';
 import { AddChargeDialog } from './add-charge-dialog';
 
@@ -78,7 +79,6 @@ export function AdmissionReportsPanel({
   const tClinical = useTranslations('doctor.clinical');
   const locale = useLocale();
   const can = usePermissions();
-  const [downloading, setDownloading] = useState<string | null>(null);
   const [orderOpen, setOrderOpen] = useState(false);
   const [orderMode, setOrderMode] = useState<'lab' | 'uzi'>('lab');
 
@@ -164,23 +164,6 @@ export function AdmissionReportsPanel({
 
   const loading =
     visits.isLoading || consultations.isLoading || ultrasound.isLoading || labOrders.isLoading;
-
-  const downloadLab = async (order: PatientLabOrder) => {
-    setDownloading(order.id);
-    try {
-      const blob = await api.get<Blob>(`/lab-orders/${order.id}/pdf`, { locale });
-      const url = URL.createObjectURL(blob.data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `natija-${order.orderNumber}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error(t('labDownloadFailed'));
-    } finally {
-      setDownloading(null);
-    }
-  };
 
   if (loading) return <Skeleton className="h-64 w-full" />;
 
@@ -279,15 +262,12 @@ export function AdmissionReportsPanel({
             <div className="flex items-center gap-2">
               <StatusBadge status={order.status} />
               {READY_LAB.includes(order.status) ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={downloading === order.id}
-                  onClick={() => void downloadLab(order)}
-                >
-                  <FileDown className="mr-1 h-4 w-4" />
-                  {t('pdf')}
-                </Button>
+                <LabPdfButton
+                  orderId={order.id}
+                  orderNumber={order.orderNumber}
+                  label={t('pdf')}
+                  failMessage={t('labDownloadFailed')}
+                />
               ) : null}
               <Button size="sm" variant="ghost" asChild>
                 <Link href={`/lab/${order.id}`}>{t('openLab')}</Link>
@@ -316,6 +296,7 @@ export function AdmissionReportsPanel({
             status={order.status}
             href={order.visitId ? `/doctor/visits/${order.visitId}` : '/uzi'}
             openLabel={order.visitId ? t('openVisit') : t('openUzi')}
+            visitId={order.visitId ?? undefined}
           />
         ))}
         {stayVisits
@@ -373,13 +354,18 @@ function ReportRow({
   status,
   href,
   openLabel,
+  visitId,
 }: {
   title: string;
   meta: string;
   status: string;
   href?: string;
   openLabel: string;
+  visitId?: string;
 }) {
+  const tv = useTranslations('visits');
+  const printed = usePdfPrinted('visit', visitId ?? '');
+  const showPrinted = Boolean(visitId) && printed.printed;
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
       <div className="min-w-0">
@@ -389,7 +375,13 @@ function ReportRow({
       <div className="flex items-center gap-2">
         <StatusBadge status={status} />
         {href ? (
-          <Button size="sm" variant="ghost" asChild>
+          <Button
+            size="sm"
+            variant={showPrinted ? 'default' : 'ghost'}
+            className={showPrinted ? printed.className : undefined}
+            title={showPrinted ? tv('pdfPrinted') : undefined}
+            asChild
+          >
             <Link href={href}>{openLabel}</Link>
           </Button>
         ) : null}
@@ -419,6 +411,7 @@ function VisitRow({
       status={visit.status}
       href={`/doctor/visits/${visit.id}`}
       openLabel={openLabel}
+      visitId={visit.id}
     />
   );
 }

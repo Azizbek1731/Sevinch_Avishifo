@@ -1,13 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { VisitDetail } from '../api';
-import { useAmendVisit, useUpdateVisit } from '../hooks';
+import { useAmendVisit, useSilentUpdateVisit, useUpdateVisit } from '../hooks';
+import { clearVisitDraft, useVisitAutosave } from '../use-visit-autosave';
+
+type DxDraft = {
+  primary: string;
+  secondary: string;
+};
 
 /** Free-text ASOSIY / YONDOSH diagnosis — matches the clinic tavsiya sheet. */
 export function DiagnosesSection({
@@ -23,6 +29,7 @@ export function DiagnosesSection({
   const tCommon = useTranslations('common');
   const locked = visit.status === 'COMPLETED';
   const updateVisit = useUpdateVisit(visit.id);
+  const silentUpdate = useSilentUpdateVisit(visit.id);
   const amendVisit = useAmendVisit(visit.id);
 
   const [primary, setPrimary] = useState(visit.diagnosisPrimary ?? '');
@@ -31,20 +38,70 @@ export function DiagnosesSection({
   const [savedPrimary, setSavedPrimary] = useState(visit.diagnosisPrimary ?? '');
   const [savedSecondary, setSavedSecondary] = useState(visit.diagnosisSecondary ?? '');
 
+  const dirty = primary !== savedPrimary || secondary !== savedSecondary;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+
   useEffect(() => {
+    if (dirtyRef.current) return;
     setPrimary(visit.diagnosisPrimary ?? '');
     setSecondary(visit.diagnosisSecondary ?? '');
     setSavedPrimary(visit.diagnosisPrimary ?? '');
     setSavedSecondary(visit.diagnosisSecondary ?? '');
   }, [visit.diagnosisPrimary, visit.diagnosisSecondary, visit.id]);
 
-  const dirty = primary !== savedPrimary || secondary !== savedSecondary;
-  const pending = updateVisit.isPending || amendVisit.isPending;
+  const pending = updateVisit.isPending || amendVisit.isPending || silentUpdate.isPending;
   useEffect(() => {
     onUnsavedChange?.(dirty || pending);
   }, [dirty, pending, onUnsavedChange]);
 
-  const persist = (onDone?: () => void) => {
+  const baselineKey = useMemo(
+    () =>
+      JSON.stringify({
+        primary: visit.diagnosisPrimary ?? '',
+        secondary: visit.diagnosisSecondary ?? '',
+      }),
+    [visit.diagnosisPrimary, visit.diagnosisSecondary],
+  );
+
+  const getSnapshot = useCallback(
+    (): DxDraft => ({ primary, secondary }),
+    [primary, secondary],
+  );
+
+  const { clearDraft } = useVisitAutosave<DxDraft>({
+    visitId: visit.id,
+    scope: 'diagnoses',
+    baselineKey,
+    getSnapshot,
+    watchKey: JSON.stringify({ primary, secondary }),
+    isDirty: dirty,
+    enabled: !disabled && !locked,
+    onRestore: (data) => {
+      setPrimary(data.primary ?? '');
+      setSecondary(data.secondary ?? '');
+    },
+    onPersistServer: (data) => {
+      if (disabled || locked || silentUpdate.isPending || updateVisit.isPending) return;
+      silentUpdate.mutate(
+        {
+          diagnosisPrimary: data.primary,
+          diagnosisSecondary: data.secondary,
+        },
+        {
+          onSuccess: () => {
+            const still = getSnapshot();
+            if (still.primary !== data.primary || still.secondary !== data.secondary) return;
+            setSavedPrimary(data.primary);
+            setSavedSecondary(data.secondary);
+            clearVisitDraft(visit.id, 'diagnoses');
+          },
+        },
+      );
+    },
+  });
+
+  const persist = () => {
     const body = {
       diagnosisPrimary: primary,
       diagnosisSecondary: secondary,
@@ -59,7 +116,7 @@ export function DiagnosesSection({
             setSavedPrimary(primary);
             setSavedSecondary(secondary);
             setReason('');
-            onDone?.();
+            clearDraft();
           },
         },
       );
@@ -69,14 +126,9 @@ export function DiagnosesSection({
       onSuccess: () => {
         setSavedPrimary(primary);
         setSavedSecondary(secondary);
-        onDone?.();
+        clearDraft();
       },
     });
-  };
-
-  const saveOnBlur = () => {
-    if (disabled || locked || !dirty || pending) return;
-    persist();
   };
 
   return (
@@ -94,7 +146,6 @@ export function DiagnosesSection({
             disabled={disabled || pending}
             value={primary}
             onChange={(e) => setPrimary(e.target.value)}
-            onBlur={saveOnBlur}
             placeholder={t('diagnosisPrimaryPlaceholder')}
           />
         </div>
@@ -106,7 +157,6 @@ export function DiagnosesSection({
             disabled={disabled || pending}
             value={secondary}
             onChange={(e) => setSecondary(e.target.value)}
-            onBlur={saveOnBlur}
             placeholder={t('diagnosisSecondaryPlaceholder')}
           />
         </div>

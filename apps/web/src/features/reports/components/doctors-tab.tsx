@@ -32,6 +32,19 @@ export function DoctorsTab({ filters }: { filters: ReportFilters }) {
         cell: ({ row }) => formatUZS(row.original.revenue),
       },
       {
+        accessorKey: 'payPercent',
+        header: t('doctors.columns.payPercent'),
+        cell: ({ row }) =>
+          row.original.payPercent === null ? '—' : `${row.original.payPercent}%`,
+      },
+      {
+        accessorKey: 'earnings',
+        header: t('doctors.columns.earnings'),
+        cell: ({ row }) => (
+          <span className="font-semibold text-primary">{formatUZS(row.original.earnings)}</span>
+        ),
+      },
+      {
         accessorKey: 'avgVisitMin',
         header: t('doctors.columns.avgDuration'),
         cell: ({ row }) =>

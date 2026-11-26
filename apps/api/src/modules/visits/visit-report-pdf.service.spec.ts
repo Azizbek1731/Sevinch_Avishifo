@@ -30,6 +30,59 @@ describe('confirmed clinical report PDF', () => {
     expect(result.toString('latin1')).toContain('/FontFile2');
   });
 
+  it('keeps UZI rich-text paragraph order and skips empty HTML shells', async () => {
+    const text = vi.spyOn(PDFDocument.prototype, 'text');
+    try {
+      await new VisitReportPdfService().render({
+        ...report,
+        body: '<p>Birinchi</p><p><strong>Ikkinchi</strong></p><p>Uchinchi</p>',
+        subjective: '<p></p>',
+        plan: '<p><br></p>',
+      });
+      const rendered = text.mock.calls.map(([value]) => String(value)).join('\n');
+      expect(rendered.indexOf('Birinchi')).toBeGreaterThan(-1);
+      expect(rendered.indexOf('Ikkinchi')).toBeGreaterThan(rendered.indexOf('Birinchi'));
+      expect(rendered.indexOf('Uchinchi')).toBeGreaterThan(rendered.indexOf('Ikkinchi'));
+      expect(rendered).not.toContain('Shikoyatlar / anamnez:');
+      expect(rendered).not.toContain('Tavsiyalar:');
+    } finally {
+      text.mockRestore();
+    }
+  });
+
+  it('continues mid-sentence bold/span text on the same line (no flush per tag)', async () => {
+    const text = vi.spyOn(PDFDocument.prototype, 'text');
+    try {
+      await new VisitReportPdfService().render({
+        ...report,
+        body:
+          '<p>Расположение <strong>обычное</strong>, дыхательная <span style="font-weight:700">экскурсия</span> сохранена.</p>',
+      });
+      const calls = text.mock.calls.filter(([value]) => {
+        const s = String(value);
+        return (
+          s.includes('Расположение') ||
+          s.includes('обычное') ||
+          s.includes('экскурсия') ||
+          s.includes('сохранена')
+        );
+      });
+      // PDFKit: text(str, x, y, opts) — continued lives on the last argument.
+      const continued = calls.some((args) => {
+        const opts = args[args.length - 1] as { continued?: boolean } | undefined;
+        return Boolean(opts && typeof opts === 'object' && opts.continued);
+      });
+      expect(continued).toBe(true);
+      expect(calls.length).toBeGreaterThan(1);
+      const joined = calls.map(([value]) => String(value)).join('');
+      expect(joined).toContain('Расположение');
+      expect(joined).toContain('обычное');
+      expect(joined).toContain('сохранена');
+    } finally {
+      text.mockRestore();
+    }
+  });
+
   it('puts Made with AviShifo.uz in the page footer, not a document id', async () => {
     const text = vi.spyOn(PDFDocument.prototype, 'text');
     try {

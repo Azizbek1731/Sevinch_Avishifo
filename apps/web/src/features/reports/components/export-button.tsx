@@ -35,13 +35,14 @@ export function ExportButton({
     <Button
       variant="outline"
       size="sm"
+      className="h-8 gap-1.5 rounded-lg"
       disabled={exportXlsx.isPending}
       onClick={() => exportXlsx.mutate()}
     >
       {exportXlsx.isPending ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
       ) : (
-        <Download className="h-4 w-4" />
+        <Download className="h-3.5 w-3.5" />
       )}
       {t('export.xlsx')}
     </Button>

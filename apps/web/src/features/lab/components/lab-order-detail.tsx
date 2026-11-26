@@ -50,6 +50,7 @@ import { OrderItemCard } from './order-item-card';
 import { OrderAttachments } from './order-attachments';
 import { toast } from 'sonner';
 import { api } from '@/lib/api-client';
+import { usePdfPrinted } from '@/lib/pdf-printed';
 
 const LOCKED_STATUSES: readonly LabOrderStatus[] = [
   LabOrderStatus.APPROVED,
@@ -76,6 +77,7 @@ export function LabOrderDetail({ id }: { id: string }) {
   const [approveOpen, setApproveOpen] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [deliverOpen, setDeliverOpen] = useState(false);
+  const pdfPrinted = usePdfPrinted('lab', id);
 
   useSocketEvent('lab.order.updated', (p) => {
     if (p.order.id === id) {
@@ -167,7 +169,11 @@ export function LabOrderDetail({ id }: { id: string }) {
             {t('deliver')}
           </Button>
         ) : null}
-        <Button variant="outline" asChild>
+        <Button
+          variant={pdfPrinted.printed ? 'default' : 'outline'}
+          className={pdfPrinted.className}
+          asChild
+        >
           <Link href={`/lab/${id}/print`}>
             <Printer className="h-4 w-4" />
             {tc('print')}
@@ -183,8 +189,10 @@ export function LabOrderDetail({ id }: { id: string }) {
           ] as LabOrderStatus[]
         ).includes(order.status) ? (
           <Button
-            variant="outline"
+            variant={pdfPrinted.printed ? 'default' : 'outline'}
+            className={pdfPrinted.className}
             disabled={pdfBusy}
+            title={pdfPrinted.printed ? t('pdfPrinted') : undefined}
             onClick={async () => {
               setPdfBusy(true);
               try {
@@ -195,6 +203,7 @@ export function LabOrderDetail({ id }: { id: string }) {
                 a.download = `natija-${order.orderNumber}.pdf`;
                 a.click();
                 URL.revokeObjectURL(url);
+                pdfPrinted.markPrinted();
               } catch {
                 toast.error(t('pdfFailed'));
               } finally {
@@ -208,7 +217,14 @@ export function LabOrderDetail({ id }: { id: string }) {
         ) : null}
       </PageHeader>
 
-      {order.billing && hasUnpaidLabWork(order) ? (
+      {order.settleAtDischarge ? (
+        <Card className="border-sky-500/40 bg-sky-500/5">
+          <CardContent className="py-4">
+            <p className="font-semibold">{t('settleAtDischarge')}</p>
+            <p className="text-sm text-muted-foreground">{t('settleAtDischargeHint')}</p>
+          </CardContent>
+        </Card>
+      ) : order.billing && hasUnpaidLabWork(order) ? (
         <Card className="border-warning/50 bg-warning/5">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
             <div>

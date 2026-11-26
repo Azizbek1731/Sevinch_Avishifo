@@ -69,7 +69,11 @@ import {
 } from '@/components/ui/table';
 import { useApiErrorToast } from '@/features/services/hooks';
 import { clinicalOrdersApi } from '@/features/clinical-orders/api';
-import { isUziSpecialty } from '@/features/clinical-orders/doctor-matching';
+import {
+  doctorSuggestsEkg,
+  isEkgService,
+  isUziSpecialty,
+} from '@/features/clinical-orders/doctor-matching';
 import { LabServicePicker } from '@/features/billing/components/lab-service-picker';
 import { UziServicePicker } from '@/features/billing/components/uzi-service-picker';
 import { ServiceCombobox, serviceName } from '@/features/billing/components/service-combobox';
@@ -200,9 +204,11 @@ function SendLabCard({ data }: { data: AmbulatoryCaseDetail }) {
   const t = useTranslations('ambulatory');
   const queryClient = useQueryClient();
   const errorToast = useApiErrorToast();
+  const hideShare = data.currentPercents == null;
   const [services, setServices] = useState<ServiceOption[]>([]);
   const total = services.reduce((sum, service) => sum + Number(service.currentPrice ?? 0), 0);
-  const share = Math.round(total * data.currentPercents.LAB) / 100;
+  const labPercent = data.currentPercents?.LAB ?? 0;
+  const share = Math.round(total * labPercent) / 100;
 
   const send = useMutation({
     mutationFn: () => ambulatoryApi.sendLab(data.id, { serviceIds: services.map((s) => s.id) }),
@@ -223,17 +229,21 @@ function SendLabCard({ data }: { data: AmbulatoryCaseDetail }) {
           <FlaskConical className="h-4 w-4 text-primary" />
           {t('detail.sendLab')}
         </CardTitle>
-        <Badge variant="secondary">{t('detail.shareBadge', { percent: data.currentPercents.LAB })}</Badge>
+        {!hideShare ? (
+          <Badge variant="secondary">{t('detail.shareBadge', { percent: labPercent })}</Badge>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-3">
         <LabServicePicker selected={services} onChange={setServices} disabled={send.isPending} />
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2 text-sm">
           <span className="text-muted-foreground">
-            {t('detail.labPreview', {
-              count: services.length,
-              total: formatUZS(total.toFixed(2)),
-              share: formatUZS(share.toFixed(2)),
-            })}
+            {hideShare
+              ? t('detail.labPreviewCount', { count: services.length })
+              : t('detail.labPreview', {
+                  count: services.length,
+                  total: formatUZS(total.toFixed(2)),
+                  share: formatUZS(share.toFixed(2)),
+                })}
           </span>
           <Button
             disabled={services.length === 0 || send.isPending}
@@ -343,9 +353,14 @@ function SendUziCard({ data }: { data: AmbulatoryCaseDetail }) {
         />
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2 text-sm">
           <span className="text-muted-foreground">
-            {data.currentPercents.UZI > 0 || data.currentPercents.EXO > 0
-              ? t('detail.uziShare', { uzi: data.currentPercents.UZI, exo: data.currentPercents.EXO })
-              : t('detail.uziNoShare')}
+            {data.currentPercents == null
+              ? t('detail.uziPickHint')
+              : data.currentPercents.UZI > 0 || data.currentPercents.EXO > 0
+                ? t('detail.uziShare', {
+                    uzi: data.currentPercents.UZI,
+                    exo: data.currentPercents.EXO,
+                  })
+                : t('detail.uziNoShare')}
           </span>
           <Button
             disabled={!doctorId || services.length === 0 || send.isPending}
@@ -392,12 +407,24 @@ function AddServicesCard({ data }: { data: AmbulatoryCaseDetail }) {
   const [manualPrice, setManualPrice] = useState('');
   const [manualQty, setManualQty] = useState(1);
   const requestKey = useRef<string | null>(null);
+  const suggestEkg = doctorSuggestsEkg({
+    fullName: data.doctorName,
+    specialty: null,
+  });
 
   const quick = useQuery({
     queryKey: ['services', 'billing-search', 'DIAGNOSTICS', ''],
     queryFn: async () => (await billingApi.searchServices('', 'DIAGNOSTICS')).data,
     staleTime: 60_000,
   });
+  const ekgService = (quick.data ?? []).find(isEkgService) ?? null;
+  const ekgAlready = Boolean(ekgService && lines.some((line) => line.serviceId === ekgService.id));
+  const quickSorted = useMemo(() => {
+    const rows = [...(quick.data ?? [])];
+    if (!suggestEkg) return rows;
+    rows.sort((a, b) => Number(isEkgService(b)) - Number(isEkgService(a)));
+    return rows;
+  }, [quick.data, suggestEkg]);
 
   const addService = (service: ServiceOption) => {
     requestKey.current = null;
@@ -473,15 +500,35 @@ function AddServicesCard({ data }: { data: AmbulatoryCaseDetail }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <fieldset disabled={send.isPending} className="space-y-4">
-          {quick.data?.length ? (
+          {suggestEkg && ekgService && !ekgAlready ? (
+            <div className="space-y-1.5 rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <Label>{t('detail.addEkg')}</Label>
+              <p className="text-xs text-muted-foreground">{t('detail.addEkgHint')}</p>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => addService(ekgService)}
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                {serviceName(ekgService, locale)}
+                {ekgService.currentPrice ? (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {formatUZS(ekgService.currentPrice)}
+                  </span>
+                ) : null}
+              </Button>
+            </div>
+          ) : null}
+          {quickSorted.length ? (
             <div className="space-y-1.5">
               <Label>{t('detail.quickAdd')}</Label>
               <div className="flex flex-wrap gap-2">
-                {quick.data.slice(0, 8).map((service) => (
+                {quickSorted.slice(0, 8).map((service) => (
                   <Button
                     key={service.id}
                     type="button"
-                    variant="outline"
+                    variant={suggestEkg && isEkgService(service) ? 'secondary' : 'outline'}
                     size="sm"
                     onClick={() => addService(service)}
                   >
@@ -666,12 +713,15 @@ export function CaseDetail({ caseId }: { caseId: string }) {
     data.uziOrders.length === 0 &&
     data.consultations.length === 0 &&
     data.services.length === 0;
-  const stats = [
-    { key: 'commission', value: formatUZS(data.totals.commission), accent: true },
-    { key: 'pendingCommission', value: formatUZS(data.totals.pendingCommission) },
-    { key: 'paidAmount', value: formatUZS(data.totals.paidAmount) },
-    { key: 'amount', value: formatUZS(data.totals.amount) },
-  ];
+  const hidePay = isDoctor || data.totals == null;
+  const stats = hidePay
+    ? []
+    : [
+        { key: 'commission', value: formatUZS(data.totals!.commission), accent: true },
+        { key: 'pendingCommission', value: formatUZS(data.totals!.pendingCommission) },
+        { key: 'paidAmount', value: formatUZS(data.totals!.paidAmount) },
+        { key: 'amount', value: formatUZS(data.totals!.amount) },
+      ];
 
   return (
     <div className="space-y-4">
@@ -739,25 +789,29 @@ export function CaseDetail({ caseId }: { caseId: string }) {
         ) : null}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card
-            key={stat.key}
-            className={
-              stat.accent ? 'border-primary/40 bg-gradient-to-br from-primary/10 to-transparent' : undefined
-            }
-          >
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">{t(`commissions.${stat.key}`)}</p>
-              <p
-                className={`mt-2 text-xl font-semibold tabular-nums ${stat.accent ? 'text-primary' : ''}`}
-              >
-                {stat.value}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {stats.length ? (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {stats.map((stat) => (
+            <Card
+              key={stat.key}
+              className={
+                stat.accent
+                  ? 'border-primary/40 bg-gradient-to-br from-primary/10 to-transparent'
+                  : undefined
+              }
+            >
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">{t(`commissions.${stat.key}`)}</p>
+                <p
+                  className={`mt-2 text-xl font-semibold tabular-nums ${stat.accent ? 'text-primary' : ''}`}
+                >
+                  {stat.value}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : null}
 
       {data.complaint || data.diagnosis || data.note ? (
         <Card>
@@ -841,6 +895,14 @@ export function CaseDetail({ caseId }: { caseId: string }) {
                           <FileText className="h-3 w-3" />
                           {order.status === 'COMPLETED' ? t('detail.openResult') : t('detail.openVisit')}
                         </Link>
+                      ) : order.visitId && order.status === 'COMPLETED' ? (
+                        <Link
+                          href={`/ambulatory/${caseId}/visits/${order.visitId}/print`}
+                          className="mt-1 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                        >
+                          <FileText className="h-3 w-3" />
+                          {t('detail.openConclusion')}
+                        </Link>
                       ) : null}
                     </TableCell>
                   </TableRow>
@@ -879,10 +941,14 @@ export function CaseDetail({ caseId }: { caseId: string }) {
                   <TableHead>{t('commissions.date')}</TableHead>
                   <TableHead>{t('commissions.tests')}</TableHead>
                   <TableHead>{t('detail.labStatus')}</TableHead>
-                  <TableHead className="text-right">{t('commissions.labAmount')}</TableHead>
-                  <TableHead className="text-right">{t('commissions.paidAmount')}</TableHead>
-                  <TableHead className="text-right">{t('commissions.commission')}</TableHead>
-                  <TableHead>{t('commissions.payment')}</TableHead>
+                  {!hidePay ? (
+                    <>
+                      <TableHead className="text-right">{t('commissions.labAmount')}</TableHead>
+                      <TableHead className="text-right">{t('commissions.paidAmount')}</TableHead>
+                      <TableHead className="text-right">{t('commissions.commission')}</TableHead>
+                      <TableHead>{t('commissions.payment')}</TableHead>
+                    </>
+                  ) : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -901,7 +967,7 @@ export function CaseDetail({ caseId }: { caseId: string }) {
                       <p className="line-clamp-2">
                         {order.tests.map((name) => localizedText(name, locale)).join(', ')}
                       </p>
-                      {order.invoiceNumber ? (
+                      {!hidePay && order.invoiceNumber ? (
                         <p className="font-mono text-xs text-muted-foreground">
                           {order.invoiceNumber}
                         </p>
@@ -925,25 +991,29 @@ export function CaseDetail({ caseId }: { caseId: string }) {
                         </Link>
                       ) : null}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatUZS(order.amount)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatUZS(order.paidAmount)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      <span className="font-semibold text-primary">
-                        {formatUZS(order.commission)}
-                      </span>
-                      <p className="text-xs text-muted-foreground">{order.percent}%</p>
-                    </TableCell>
-                    <TableCell>
-                      {order.cancelled ? null : (
-                        <Badge variant={paymentBadge[order.paymentState]}>
-                          {t(`payment.${order.paymentState}`)}
-                        </Badge>
-                      )}
-                    </TableCell>
+                    {!hidePay ? (
+                      <>
+                        <TableCell className="text-right tabular-nums">
+                          {formatUZS(order.amount)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatUZS(order.paidAmount)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          <span className="font-semibold text-primary">
+                            {formatUZS(order.commission)}
+                          </span>
+                          <p className="text-xs text-muted-foreground">{order.percent}%</p>
+                        </TableCell>
+                        <TableCell>
+                          {order.cancelled ? null : (
+                            <Badge variant={paymentBadge[order.paymentState]}>
+                              {t(`payment.${order.paymentState}`)}
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>
@@ -966,8 +1036,12 @@ export function CaseDetail({ caseId }: { caseId: string }) {
                   <TableHead>{t('commissions.date')}</TableHead>
                   <TableHead>{t('detail.uziServices')}</TableHead>
                   <TableHead>{t('detail.uziDoctor')}</TableHead>
-                  <TableHead className="text-right">{t('detail.uziTotal')}</TableHead>
-                  <TableHead className="text-right">{t('commissions.commission')}</TableHead>
+                  {!hidePay ? (
+                    <>
+                      <TableHead className="text-right">{t('detail.uziTotal')}</TableHead>
+                      <TableHead className="text-right">{t('commissions.commission')}</TableHead>
+                    </>
+                  ) : null}
                   <TableHead>{t('detail.labStatus')}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -983,39 +1057,49 @@ export function CaseDetail({ caseId }: { caseId: string }) {
                           .map((service) => localizedText(service.title, locale))
                           .join(', ')}
                       </p>
-                      <p className="font-mono text-xs text-muted-foreground">
-                        {order.invoice.number}
-                      </p>
+                      {!hidePay ? (
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {order.invoice.number}
+                        </p>
+                      ) : null}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{order.doctor.fullName}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatUZS(order.invoice.total)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {(order.shares ?? []).filter((part) => part.percent > 0).length ? (
-                        (order.shares ?? [])
-                          .filter((part) => part.percent > 0)
-                          .map((part) => (
-                            <div key={part.group}>
-                              <span className="font-semibold text-primary">
-                                {formatUZS(part.commission)}
-                              </span>
-                              <p className="text-xs text-muted-foreground">
-                                {t(`groups.${part.group}`)} · {part.percent}%
-                              </p>
-                            </div>
-                          ))
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
+                    {!hidePay ? (
+                      <>
+                        <TableCell className="text-right tabular-nums">
+                          {formatUZS(order.invoice.total)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {(order.shares ?? []).filter((part) => part.percent > 0).length ? (
+                            (order.shares ?? [])
+                              .filter((part) => part.percent > 0)
+                              .map((part) => (
+                                <div key={part.group}>
+                                  <span className="font-semibold text-primary">
+                                    {formatUZS(part.commission)}
+                                  </span>
+                                  <p className="text-xs text-muted-foreground">
+                                    {t(`groups.${part.group}`)} · {part.percent}%
+                                  </p>
+                                </div>
+                              ))
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      </>
+                    ) : null}
                     <TableCell>
                       <Badge variant={order.status === 'COMPLETED' ? 'default' : 'outline'}>
                         {t(`uziStatus.${order.status}`)}
                       </Badge>
-                      {order.status === 'COMPLETED' && order.visitId && can('visits.read') ? (
+                      {order.status === 'COMPLETED' && order.visitId ? (
                         <Link
-                          href={`/doctor/visits/${order.visitId}/print`}
+                          href={
+                            can('visits.read')
+                              ? `/doctor/visits/${order.visitId}/print`
+                              : `/ambulatory/${caseId}/visits/${order.visitId}/print`
+                          }
                           className="mt-1 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                         >
                           <FileText className="h-3 w-3" />

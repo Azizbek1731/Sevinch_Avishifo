@@ -69,6 +69,10 @@ export interface DoctorReportRow {
   noShowRate: number | null;
   /** Fraction 0..1. */
   returningRate: number | null;
+  /** Active salary percent from compensation rules (null if none / mixed). */
+  payPercent: number | null;
+  /** Doctor's salary share of paid performed revenue. */
+  earnings: MoneyString;
 }
 
 export interface ServiceReportRow {
@@ -77,6 +81,45 @@ export interface ServiceReportRow {
   name: string;
   count: number;
   revenue: MoneyString;
+  group?: string;
+  patients?: number;
+}
+
+export interface ServiceDetailGroupRow {
+  group: string;
+  label: string;
+  services: number;
+  count: number;
+  patients: number;
+  revenue: MoneyString;
+}
+
+export interface ServiceDetailLineRow {
+  issuedAt: string;
+  invoiceNumber: string;
+  group: string;
+  serviceCode: string;
+  serviceName: string;
+  quantity: number;
+  lineTotal: MoneyString;
+  patientMrn: string;
+  patientName: string;
+  performerName: string | null;
+}
+
+export interface ServiceDetailReport {
+  from: string;
+  to: string;
+  totals: {
+    count: number;
+    patients: number;
+    revenue: MoneyString;
+    lines: number;
+  };
+  byGroup: ServiceDetailGroupRow[];
+  byService: ServiceReportRow[];
+  lines: ServiceDetailLineRow[];
+  linesTruncated: boolean;
 }
 
 export interface QueueReport {
@@ -177,6 +220,10 @@ export const reportsApi = {
     const res = await api.get<ServiceReportRow[]>('/reports/services', rangeQuery(f));
     return res.data;
   },
+  serviceDetail: async (f: ReportFilters): Promise<ServiceDetailReport> => {
+    const res = await api.get<ServiceDetailReport>('/reports/service-detail', rangeQuery(f));
+    return res.data;
+  },
   queue: async (f: ReportFilters): Promise<QueueReport> => {
     const res = await api.get<QueueReport>('/reports/queue', rangeQuery(f));
     return res.data;
@@ -200,6 +247,31 @@ export const reportsApi = {
       ...extra,
       export: 'xlsx',
     });
+    return res.data;
+  },
+
+  doctorPayStatus: async () => {
+    const res = await api.get<{
+      required: boolean;
+      unlocked: boolean;
+      expiresInSeconds: number | null;
+      unlockTtlSeconds: number;
+    }>('/reports/doctor-pay/status');
+    return res.data;
+  },
+  verifyDoctorPayCode: async (body: { code: string }) => {
+    const res = await api.post<{ unlocked: boolean; expiresInSeconds: number }>(
+      '/reports/doctor-pay/verify',
+      body,
+    );
+    return res.data;
+  },
+  changeDoctorPayPin: async (body: { currentCode: string; newCode: string }) => {
+    const res = await api.post<{ changed: boolean }>('/reports/doctor-pay/change-pin', body);
+    return res.data;
+  },
+  lockDoctorPay: async () => {
+    const res = await api.post<{ locked: boolean }>('/reports/doctor-pay/lock');
     return res.data;
   },
 };

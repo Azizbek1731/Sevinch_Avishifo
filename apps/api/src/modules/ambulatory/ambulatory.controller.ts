@@ -8,12 +8,15 @@ import {
   Post,
   Put,
   Query,
+  Res,
   StreamableFile,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import type { AmbulatoryCommissionReport, AmbulatoryRates, AuthUser } from '@avishifo/shared';
 import { ActiveBranch, CurrentUser, RequirePermissions } from '../../common/decorators';
 import type { PaginatedResult } from '../../common/pagination';
+import { DoctorPayGateService } from '../auth/doctor-pay-gate.service';
 import { XLSX_MIME_TYPE } from '../reports/xlsx.service';
 import { AmbulatoryService } from './ambulatory.service';
 import {
@@ -31,7 +34,10 @@ import {
 @ApiTags('ambulatory')
 @Controller('ambulatory')
 export class AmbulatoryController {
-  constructor(private readonly ambulatory: AmbulatoryService) {}
+  constructor(
+    private readonly ambulatory: AmbulatoryService,
+    private readonly doctorPayGate: DoctorPayGateService,
+  ) {}
 
   @Get()
   @RequirePermissions('ambulatory.read')
@@ -50,6 +56,8 @@ export class AmbulatoryController {
     @CurrentUser() user: AuthUser,
     @ActiveBranch() branchId: string,
   ): Promise<AmbulatoryCommissionReport | StreamableFile> {
+    // Assistants on a doctor's account must not pull share totals without OTP.
+    await this.doctorPayGate.assertUnlocked(user);
     const report = await this.ambulatory.commissions(query, user, branchId);
     if (query.export !== 'xlsx') return report;
     return new StreamableFile(await this.ambulatory.exportCommissions(report, user), {
@@ -72,6 +80,30 @@ export class AmbulatoryController {
     @ActiveBranch() branchId: string,
   ): Promise<AmbulatoryRates> {
     return this.ambulatory.saveRates(dto, user, branchId);
+  }
+
+  @Get(':id/visits/:visitId/pdf')
+  @RequirePermissions('ambulatory.read')
+  async visitPdf(
+    @Param('id') id: string,
+    @Param('visitId') visitId: string,
+    @Query('mode') mode: string | undefined,
+    @CurrentUser() user: AuthUser,
+    @ActiveBranch() branchId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const reportMode = mode === 'prescription' ? 'prescription' : 'summary';
+    const { buffer, disposition } = await this.ambulatory.visitPdf(
+      id,
+      visitId,
+      reportMode,
+      user,
+      branchId,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', disposition);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(buffer);
   }
 
   @Get(':id')

@@ -13,7 +13,8 @@ export async function searchServiceCatalogue(
   const kinds: readonly (CatalogueKind | undefined)[] = options.kind
     ? [options.kind]
     : options.proceduresOnly
-      ? ['PROCEDURE', 'DIAGNOSTICS', 'OTHER']
+      ? // DIAGNOSTICS (EKG, Holter, SMAD…) first — same prominence as ambulatory quick-add.
+        ['DIAGNOSTICS', 'PROCEDURE', 'OTHER']
       : options.excludeSurgery
         ? Object.values(ServiceKind).filter((kind) => kind !== 'SURGERY')
         : [undefined];

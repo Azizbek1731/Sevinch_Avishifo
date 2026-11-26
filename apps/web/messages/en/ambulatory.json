@@ -66,7 +66,7 @@
     "labAmount": "Lab amount",
     "patients": "Patients",
     "orders": "Referrals",
-    "calculation": "Calculation: only lab, ultrasound and echo referred from an outpatient card. Share = amount paid at the cashier × percent at referral time (default: lab {lab}%, ultrasound {uzi}%, echo {exo}%). Discounts and refunds are deducted, cancelled work is excluded. Referrals at 0% are not shown.",
+    "calculation": "Calculation: only lab, ultrasound, echo and ozone/hydrocolonotherapy referred from an outpatient card. Share = amount paid at the cashier × percent at referral time (default: lab {lab}%, ultrasound {uzi}%, echo {exo}%, therapy {therapy}%). Discounts and refunds are deducted, cancelled work is excluded. Referrals at 0% are not shown.",
     "emptyTitle": "No outpatient referrals with a doctor share in this period",
     "emptyDescription": "They appear here once a card refers a patient to the lab or ultrasound.",
     "byDoctor": "By doctor",
@@ -96,7 +96,7 @@
   "rates": {
     "button": "Percentages",
     "title": "Doctor shares (percent)",
-    "description": "Percent of lab, ultrasound and echo payments credited to the referring doctor of an outpatient card. Each direction is separate.",
+    "description": "Percent of lab, ultrasound, echo and ozone/hydrocolonotherapy payments credited to the referring doctor of an outpatient card. Each direction is separate.",
     "default": "Default percent (all doctors)",
     "defaultHelp": "Applies to doctors without their own percent. For example, if only some doctors earn on ultrasound, set ultrasound to 0% by default and give those doctors their own percent.",
     "perDoctor": "Per doctor",
@@ -129,6 +129,10 @@
     "sendLab": "Send to lab",
     "shareBadge": "Doctor's share {percent}%",
     "labPreview": "{count} tests · {total} · doctor's share ≈ {share}",
+    "labPreviewCount": "{count} tests selected",
+    "uziPickHint": "Pick an ultrasound doctor and select services",
+    "addEkg": "Add ECG",
+    "addEkgHint": "Most cardiology (Abdullayev Arslon) patients also need ECG.",
     "sendToCashier": "Send to cashier",
     "labSent": "Lab referral sent to the cashier",
     "sendUzi": "Send to ultrasound",
@@ -152,6 +156,7 @@
     "consultationService": "Service",
     "openResult": "Open result",
     "openVisit": "Open visit",
+    "openConclusion": "Doctor's report",
     "addServices": "Add services",
     "servicesHint": "Pick ECG, procedures and other services from the catalogue or enter a name and price by hand. The bill goes to the cashier at once.",
     "quickAdd": "Quick add",
@@ -171,6 +176,7 @@
   "groups": {
     "LAB": "Lab",
     "UZI": "Ultrasound",
-    "EXO": "Echo"
+    "EXO": "Echo",
+    "THERAPY": "Ozone/Hydro"
   }
 }

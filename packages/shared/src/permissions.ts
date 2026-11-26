@@ -235,10 +235,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   [UserRole.RECEPTIONIST]: [
     'surgery.read', 'surgery.schedule',
     'patients.read',
-    // The desk answers "tahlil tayyormi?" from the patient card's lab tab and
-    // downloads the ready PDF for the patient standing in front of them.
+    // The desk answers "tahlil tayyormi?" / "xulosa tayyormi?" from the patient
+    // card, ambulatory card and inpatient reports, and prints the ready PDF.
     'lab.orders.read',
     'lab.orders.write',
+    'visits.read',
     'admissions.read',
     'admissions.write',
     'admissions.export',
@@ -351,6 +352,16 @@ export function isUltrasoundSpecialty(specialty: string | null | undefined): boo
     value.includes('exo') ||
     value.includes('эхо')
   );
+}
+
+/**
+ * Ultrasound catalogue folders named for echo (EXO) — their services count as EXO,
+ * not regular UZI, for referring-doctor shares and performer reports.
+ */
+export function categoryNameLooksLikeEcho(name: string | null | undefined): boolean {
+  if (!name) return false;
+  const value = name.toLowerCase();
+  return value.includes('exo') || value.includes('echo') || value.includes('эхо');
 }
 
 export function permissionsForRole(

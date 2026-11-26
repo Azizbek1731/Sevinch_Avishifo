@@ -15,6 +15,10 @@ import {
   preparePdfClinicLogo,
   type PdfClinicProfile,
 } from '../../common/pdf/clinic-letterhead';
+import {
+  drawClinicalRichText,
+  hasClinicalText,
+} from './clinical-rich-pdf';
 
 export interface VisitReportPdfData {
   id: string;
@@ -170,23 +174,25 @@ export class VisitReportPdfService {
     doc.moveDown(0.2);
   }
 
-  private bodyText(doc: PDFKit.PDFDocument, text: string): void {
-    doc.font('body').fontSize(10).fillColor(CLINIC_PDF_COLORS.ink).text(text.trim(), {
+  private bodyText(doc: PDFKit.PDFDocument, text: string, size = 10.5): void {
+    drawClinicalRichText(doc, text, {
       width: CONTENT_WIDTH,
-      lineGap: 2.5,
-      paragraphGap: 4,
+      x: MARGIN,
+      ink: CLINIC_PDF_COLORS.ink,
+      defaultSize: size,
+      ensureSpace: (needed) => this.ensureSpace(doc, needed),
     });
   }
 
   private labeledBlock(doc: PDFKit.PDFDocument, label: string, body: string | null): void {
-    if (!body?.trim()) return;
+    if (!hasClinicalText(body)) return;
     this.ensureSpace(doc, 100);
     doc.moveDown(0.45);
     doc.font('bold').fontSize(10).fillColor(CLINIC_PDF_COLORS.ink).text(label, {
       width: CONTENT_WIDTH,
       continued: false,
     });
-    this.bodyText(doc, body);
+    this.bodyText(doc, body!);
   }
 
   private renderConsultationTavsiya(
@@ -271,14 +277,18 @@ export class VisitReportPdfService {
     this.labeledBlock(doc, 'Shikoyatlari / anamnezi:', data.subjective);
     this.labeledBlock(doc, 'Obyektiv holat:', data.objective);
     this.labeledBlock(doc, 'Laborator-instrumental / xulosa:', data.assessmentNote);
-    this.labeledBlock(doc, 'Xulosa:', data.body);
+    if (hasClinicalText(data.body)) {
+      this.ensureSpace(doc, 100);
+      doc.moveDown(0.45);
+      this.bodyText(doc, data.body!);
+    }
 
     const groups = groupPrescriptionItems(data.prescriptions);
     const hasTavsiya =
-      Boolean(data.plan?.trim()) || groups.length > 0 || Boolean(data.physiotherapy?.trim());
+      hasClinicalText(data.plan) || groups.length > 0 || Boolean(data.physiotherapy?.trim());
     if (hasTavsiya) {
       this.heading(doc, 'TAVSIYA:');
-      if (data.plan?.trim()) this.bodyText(doc, data.plan);
+      if (hasClinicalText(data.plan)) this.bodyText(doc, data.plan!);
       for (const group of groups) {
         const line = formatTavsiyaMedicine(group, prescriptionLabels);
         if (!line) continue;
@@ -321,31 +331,45 @@ export class VisitReportPdfService {
   ): void {
     doc
       .font('bold')
-      .fontSize(13)
+      .fontSize(14)
       .fillColor(CLINIC_PDF_COLORS.ink)
-      .text(reportTitle, MARGIN, doc.y, { width: CONTENT_WIDTH });
-    doc.moveDown(0.6);
+      .text(reportTitle, MARGIN, doc.y, { width: CONTENT_WIDTH, align: 'center' });
+    doc.moveDown(0.55);
     const birth = birthYearLabel(data.patient.dob);
     doc
       .font('bold')
-      .fontSize(10.5)
-      .text(`FISH:   ${data.patient.fullName}${birth ? `, ${birth}` : ''}`, {
+      .fontSize(11)
+      .fillColor(CLINIC_PDF_COLORS.ink)
+      .text(`${data.patient.fullName}${birth ? `  ·  ${birth}` : ''}`, {
         width: CONTENT_WIDTH,
+        align: 'center',
       });
     doc
       .font('body')
-      .fontSize(8.5)
+      .fontSize(9)
       .fillColor(CLINIC_PDF_COLORS.muted)
       .text(
         [
           `Karta: ${data.patient.mrn}`,
           `Shifokor: ${data.doctorName}`,
           `Tasdiqlangan: ${formatInTimeZone(data.confirmedAt, TIMEZONE, 'dd.MM.yyyy HH:mm')}`,
-        ].join(' · '),
-        { width: CONTENT_WIDTH },
+        ].join('  ·  '),
+        { width: CONTENT_WIDTH, align: 'center' },
       );
-    doc.moveDown(0.5);
-    this.labeledBlock(doc, 'Xulosa:', data.body);
+    doc.moveDown(0.35);
+    const ruleY = doc.y;
+    doc
+      .moveTo(MARGIN, ruleY)
+      .lineTo(MARGIN + CONTENT_WIDTH, ruleY)
+      .strokeColor(CLINIC_PDF_COLORS.rule)
+      .lineWidth(0.6)
+      .stroke();
+    doc.y = ruleY + 10;
+    // UZI: main narrative first, exactly as typed in the editor (order + formatting).
+    if (hasClinicalText(data.body)) {
+      this.bodyText(doc, data.body!, 11);
+      doc.moveDown(0.35);
+    }
     this.labeledBlock(doc, 'Shikoyatlar / anamnez:', data.subjective);
     this.labeledBlock(doc, 'Ko‘rik va tekshiruv:', data.objective);
     this.labeledBlock(doc, 'Baholash:', data.assessmentNote);

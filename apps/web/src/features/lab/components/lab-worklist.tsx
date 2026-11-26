@@ -135,9 +135,11 @@ export function LabWorklist() {
           <StatusBadge
             status={row.original.status}
             label={
-              hasUnpaidLabWork(row.original)
-                ? t('paymentWaiting')
-                : t(`status.${row.original.status}` as never)
+              row.original.settleAtDischarge
+                ? t('settleAtDischarge')
+                : hasUnpaidLabWork(row.original)
+                  ? t('paymentWaiting')
+                  : t(`status.${row.original.status}` as never)
             }
           />
         ),

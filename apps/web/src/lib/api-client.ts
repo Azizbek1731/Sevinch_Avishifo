@@ -33,6 +33,8 @@ export class ApiError extends Error {
 export interface ApiResult<T> {
   data: T;
   meta?: ApiMeta;
+  /** Present for binary downloads (PDF/xlsx) when the server sets them. */
+  headers?: Headers;
 }
 
 type Query = Record<string, string | number | boolean | undefined | null>;
@@ -141,7 +143,7 @@ async function doFetch<T>(path: string, opts: FetchOptions, retried: boolean): P
   // Binary responses (xlsx exports, file downloads)
   const contentType = res.headers.get('content-type') ?? '';
   if (res.ok && !contentType.includes('application/json')) {
-    return { data: (await res.blob()) as unknown as T };
+    return { data: (await res.blob()) as unknown as T, headers: res.headers };
   }
 
   const json = (await res.json().catch(() => null)) as ApiResponse<T> | null;

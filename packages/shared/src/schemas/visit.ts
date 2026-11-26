@@ -5,11 +5,11 @@ import { idSchema, isoDateTimeSchema, paginationQuerySchema } from './common';
 /** SOAP fields of an open (unlocked) visit. */
 export const updateVisitSchema = z.object({
   reportTitle: z.string().trim().max(200).optional(),
-  reportBody: z.string().max(50000).optional(),
-  subjective: z.string().optional(),
-  objective: z.string().optional(),
-  assessmentNote: z.string().optional(),
-  plan: z.string().optional(),
+  reportBody: z.string().max(200000).optional(),
+  subjective: z.string().max(100000).optional(),
+  objective: z.string().max(100000).optional(),
+  assessmentNote: z.string().max(100000).optional(),
+  plan: z.string().max(100000).optional(),
   diagnosisPrimary: z.string().max(10000).optional(),
   diagnosisSecondary: z.string().max(10000).optional(),
   nextVisitAt: isoDateTimeSchema.optional(),

@@ -62,6 +62,7 @@ function harness(state: TelegramPatientAccessResult = { status: 'UNLINKED', pati
       buildReportNow: vi.fn(),
       sendDocument: vi.fn(),
     } as never,
+    { get: vi.fn() } as never,
   ) as unknown as PatientHandlers;
   const reply = vi.fn().mockResolvedValue({});
   const ctx = {

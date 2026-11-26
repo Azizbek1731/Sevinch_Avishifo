@@ -1,17 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { Eye, FileText, Save } from 'lucide-react';
 import { updateVisitSchema, type UpdateVisitInput } from '@avishifo/shared';
+import { ClinicalHtmlView } from '@/components/clinical-html-view';
+import { ClinicalRichEditor } from '@/components/clinical-rich-editor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { stripClinicalHtml } from '@/lib/clinical-html';
 import type { VisitDetail } from '../api';
-import { useUpdateVisit } from '../hooks';
+import { useSilentUpdateVisit, useUpdateVisit } from '../hooks';
+import { clearVisitDraft, useVisitAutosave } from '../use-visit-autosave';
+
+type UziDraft = {
+  reportTitle: string;
+  reportBody: string;
+};
 
 export function UltrasoundReport({
   visit,
@@ -25,6 +33,7 @@ export function UltrasoundReport({
   const t = useTranslations('doctor.clinical');
   const [preview, setPreview] = useState(disabled);
   const save = useUpdateVisit(visit.id);
+  const silentSave = useSilentUpdateVisit(visit.id);
   const form = useForm<UpdateVisitInput>({
     resolver: zodResolver(updateVisitSchema),
     defaultValues: {
@@ -34,12 +43,61 @@ export function UltrasoundReport({
   });
   const title = form.watch('reportTitle') ?? '';
   const body = form.watch('reportBody') ?? '';
+  const plainLen = stripClinicalHtml(body).length;
   const dirty = form.formState.isDirty;
   useEffect(() => {
-    onUnsavedChange(dirty || save.isPending);
-  }, [dirty, save.isPending, onUnsavedChange]);
+    onUnsavedChange(dirty || save.isPending || silentSave.isPending);
+  }, [dirty, save.isPending, silentSave.isPending, onUnsavedChange]);
+
+  const baselineKey = useMemo(
+    () =>
+      JSON.stringify({
+        reportTitle: visit.reportTitle ?? t('ultrasoundReport'),
+        reportBody: visit.reportBody ?? '',
+      }),
+    [visit.reportTitle, visit.reportBody, t],
+  );
+
+  const getSnapshot = useCallback((): UziDraft => {
+    const values = form.getValues();
+    return {
+      reportTitle: values.reportTitle ?? '',
+      reportBody: values.reportBody ?? '',
+    };
+  }, [form]);
+
+  const { clearDraft } = useVisitAutosave<UziDraft>({
+    visitId: visit.id,
+    scope: 'uzi',
+    baselineKey,
+    getSnapshot,
+    watchKey: JSON.stringify({ title, body }),
+    isDirty: dirty,
+    enabled: !disabled,
+    onRestore: (data) => {
+      form.setValue('reportTitle', data.reportTitle ?? '', { shouldDirty: true });
+      form.setValue('reportBody', data.reportBody ?? '', { shouldDirty: true });
+    },
+    onPersistServer: (data) => {
+      if (disabled || silentSave.isPending || save.isPending) return;
+      silentSave.mutate(data, {
+        onSuccess: () => {
+          const still = getSnapshot();
+          if (JSON.stringify(still) !== JSON.stringify(data)) return;
+          form.reset(data);
+          clearVisitDraft(visit.id, 'uzi');
+        },
+      });
+    },
+  });
+
   const submit = form.handleSubmit((values) =>
-    save.mutate(values, { onSuccess: () => form.reset(values) }),
+    save.mutate(values, {
+      onSuccess: () => {
+        form.reset(values);
+        clearDraft();
+      },
+    }),
   );
   return (
     <form onSubmit={submit} className="rounded-xl border bg-muted/30">
@@ -74,9 +132,16 @@ export function UltrasoundReport({
           {preview || disabled ? (
             <>
               <h3 className="mb-6 text-center text-xl font-bold">{title}</h3>
-              <div className="whitespace-pre-wrap break-words font-serif text-[16px] leading-7">
-                {body || t('reportPlaceholder')}
-              </div>
+              {plainLen ? (
+                <ClinicalHtmlView
+                  value={body}
+                  className="font-serif text-[16px] leading-7 text-slate-900"
+                />
+              ) : (
+                <p className="font-serif text-[16px] leading-7 text-slate-400">
+                  {t('reportPlaceholder')}
+                </p>
+              )}
             </>
           ) : (
             <div className="space-y-5">
@@ -91,15 +156,20 @@ export function UltrasoundReport({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="uzi-body">{t('reportBody')}</Label>
-                <Textarea
-                  id="uzi-body"
-                  rows={24}
-                  maxLength={50000}
-                  disabled={save.isPending}
-                  className="min-h-[520px] resize-y border-slate-200 bg-white font-serif text-base leading-7 text-slate-900"
-                  placeholder={t('reportPlaceholder')}
-                  {...form.register('reportBody')}
+                <Label>{t('reportBody')}</Label>
+                <Controller
+                  control={form.control}
+                  name="reportBody"
+                  render={({ field }) => (
+                    <ClinicalRichEditor
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      disabled={save.isPending}
+                      placeholder={t('reportPlaceholder')}
+                      minHeightClass="min-h-[480px]"
+                      className="border-slate-200 bg-white font-serif text-base text-slate-900"
+                    />
+                  )}
                 />
               </div>
             </div>
@@ -113,7 +183,7 @@ export function UltrasoundReport({
       ) : null}
       <div className="flex flex-wrap justify-between gap-2 border-t px-5 py-3 text-xs text-muted-foreground">
         <span>{t(dirty ? 'unsaved' : 'saved')}</span>
-        <span>{t('characters', { count: body.length })}</span>
+        <span>{t('characters', { count: plainLen })}</span>
       </div>
     </form>
   );

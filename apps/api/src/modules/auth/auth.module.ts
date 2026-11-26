@@ -3,6 +3,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { TokenService } from './token.service';
 import { TwoFactorService } from './two-factor.service';
+import { DoctorPayGateService } from './doctor-pay-gate.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 /**
@@ -15,7 +16,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
   // NotificationsModule supplies TelegramChannel for delivering 2FA codes.
   imports: [NotificationsModule],
   controllers: [AuthController],
-  providers: [AuthService, TokenService, TwoFactorService],
-  exports: [AuthService, TokenService],
+  providers: [AuthService, TokenService, TwoFactorService, DoctorPayGateService],
+  exports: [AuthService, TokenService, TwoFactorService, DoctorPayGateService],
 })
 export class AuthModule {}

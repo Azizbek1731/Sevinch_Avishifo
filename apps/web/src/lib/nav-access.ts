@@ -112,7 +112,8 @@ export const NAV_RULES: NavRule[] = [
     key: 'invoices',
     href: '/invoices',
     permissions: ['invoices.read'],
-    hideForRoles: ['LAB_TECH'],
+    // Reception creates bills from the desk; the invoices roster is for cashier/admin.
+    hideForRoles: ['LAB_TECH', 'RECEPTIONIST'],
     hideForUltrasound: true,
   },
   {

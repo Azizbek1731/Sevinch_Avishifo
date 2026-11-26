@@ -29,13 +29,17 @@ import {
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ClinicalHtmlView } from '@/components/clinical-html-view';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
 import { Link } from '@/i18n/routing';
 import { api } from '@/lib/api-client';
+import { stripClinicalHtml } from '@/lib/clinical-html';
 import { formatDate, formatTz } from '@/lib/dates';
+import { filenameFromContentDisposition } from '@/lib/download-filename';
 import { localizedText } from '@/lib/localized';
+import { usePdfPrinted } from '@/lib/pdf-printed';
 import { useAuthStore } from '@/stores/auth-store';
 import { useClinicalOrder } from '@/features/clinical-orders/hooks';
 import { ExtraClinicalServicesDialog } from '@/features/clinical-orders/components/order-dialog';
@@ -89,6 +93,7 @@ export function VisitForm({ visitId }: { visitId: string }) {
   const [referralDirty, setReferralDirty] = useState(false);
   const [reportDirty, setReportDirty] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const pdfPrinted = usePdfPrinted('visit', visitId);
   const examFileRef = useRef<HTMLInputElement>(null);
   const confirmFileRef = useRef<HTMLInputElement>(null);
   const pendingMutations = useIsMutating({ mutationKey: ['visits', visitId] });
@@ -130,12 +135,19 @@ export function VisitForm({ visitId }: { visitId: string }) {
     setDownloading(true);
     try {
       const response = await api.get<Blob>(`/visits/${visitId}/pdf`);
+      const fallbackName =
+        visit?.kind === 'ULTRASOUND' ? 'UZI_xulosa.pdf' : 'Klinik_xulosa.pdf';
+      const filename = filenameFromContentDisposition(
+        response.headers?.get('content-disposition'),
+        fallbackName,
+      );
       const url = URL.createObjectURL(response.data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'clinical-report.pdf';
+      a.download = filename;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+      pdfPrinted.markPrinted();
     } catch (error) {
       onError(error);
     } finally {
@@ -196,7 +208,11 @@ export function VisitForm({ visitId }: { visitId: string }) {
         </Button>
         {locked ? (
           <>
-            <Button variant="outline" asChild>
+            <Button
+              variant={pdfPrinted.printed ? 'default' : 'outline'}
+              className={pdfPrinted.className}
+              asChild
+            >
               <Link href={`/doctor/visits/${visit.id}/print`}>
                 <Printer className="mr-2 h-4 w-4" />
                 {t('printSummary')}
@@ -210,7 +226,13 @@ export function VisitForm({ visitId }: { visitId: string }) {
                 </Link>
               </Button>
             ) : null}
-            <Button variant="outline" disabled={downloading} onClick={() => void downloadPdf()}>
+            <Button
+              variant={pdfPrinted.printed ? 'default' : 'outline'}
+              className={pdfPrinted.className}
+              disabled={downloading}
+              title={pdfPrinted.printed ? t('pdfPrinted') : undefined}
+              onClick={() => void downloadPdf()}
+            >
               <FileDown className="mr-2 h-4 w-4" />
               PDF
             </Button>
@@ -348,10 +370,10 @@ export function VisitForm({ visitId }: { visitId: string }) {
               <Card>
                 <CardContent className="space-y-4 p-4">
                   {(['subjective', 'objective', 'assessmentNote', 'plan'] as const).map((field) =>
-                    visit[field] ? (
+                    visit[field] && stripClinicalHtml(visit[field]!) ? (
                       <section key={field}>
                         <h3 className="font-semibold">{t(`soapFields.${field}`)}</h3>
-                        <p className="whitespace-pre-wrap text-sm">{visit[field]}</p>
+                        <ClinicalHtmlView value={visit[field]!} className="text-sm" />
                       </section>
                     ) : null,
                   )}

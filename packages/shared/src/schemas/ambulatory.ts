@@ -3,6 +3,8 @@ import { dateOnlySchema, idSchema, moneySchema, paginationQuerySchema } from './
 
 /** Clinic default when no per-doctor override exists. */
 export const AMBULATORY_DEFAULT_LAB_PERCENT = 25;
+/** Ozon / gidrokolonoterapiya (DIAG-04 / DIAG-05) referring-doctor share. */
+export const AMBULATORY_DEFAULT_THERAPY_PERCENT = 20;
 
 const optionalText = (max: number) =>
   z.preprocess(
@@ -102,7 +104,7 @@ export const ambulatoryCommissionQuerySchema = z
 export type AmbulatoryCommissionQueryInput = z.infer<typeof ambulatoryCommissionQuerySchema>;
 
 /** Referral directions a doctor can earn a share on; EXO is a marked subset of ultrasound. */
-export const AMBULATORY_SHARE_GROUPS = ['LAB', 'UZI', 'EXO'] as const;
+export const AMBULATORY_SHARE_GROUPS = ['LAB', 'UZI', 'EXO', 'THERAPY'] as const;
 export type AmbulatoryShareGroup = (typeof AMBULATORY_SHARE_GROUPS)[number];
 export type AmbulatorySharePercents = Record<AmbulatoryShareGroup, number>;
 
@@ -111,12 +113,18 @@ export const AMBULATORY_DEFAULT_PERCENTS: AmbulatorySharePercents = {
   LAB: AMBULATORY_DEFAULT_LAB_PERCENT,
   UZI: 0,
   EXO: 0,
+  THERAPY: AMBULATORY_DEFAULT_THERAPY_PERCENT,
 };
 
 const percentSchema = z.coerce.number().min(0).max(100).multipleOf(0.01);
 
 export const ambulatoryRatesSchema = z.object({
-  defaults: z.object({ LAB: percentSchema, UZI: percentSchema, EXO: percentSchema }),
+  defaults: z.object({
+    LAB: percentSchema,
+    UZI: percentSchema,
+    EXO: percentSchema,
+    THERAPY: percentSchema,
+  }),
   /** null removes the override, so the doctor falls back to the default of that group. */
   doctors: z
     .array(
@@ -126,6 +134,7 @@ export const ambulatoryRatesSchema = z.object({
           LAB: percentSchema.nullable(),
           UZI: percentSchema.nullable(),
           EXO: percentSchema.nullable(),
+          THERAPY: percentSchema.nullable(),
         }),
       }),
     )
@@ -134,6 +143,22 @@ export const ambulatoryRatesSchema = z.object({
   echoServiceIds: z.array(idSchema).max(1000),
 });
 export type AmbulatoryRatesInput = z.infer<typeof ambulatoryRatesSchema>;
+
+/**
+ * Ozon terapiya / Gidrokolonoterapiya catalogue rows that earn the THERAPY share
+ * when ordered from an ambulatory card (same idea as lab / UZI referrals).
+ */
+export function isAmbulatoryTherapyService(service: {
+  code?: string | null;
+  name?: unknown;
+}): boolean {
+  const code = (service.code ?? '').toUpperCase();
+  if (code === 'DIAG-04' || code === 'DIAG-05') return true;
+  const hay = (
+    typeof service.name === 'string' ? service.name : JSON.stringify(service.name ?? '')
+  ).toLowerCase();
+  return /ozon\s*terap|озонотерап|gidrokolon|гидроколонотерап|hydrocolon/.test(hay);
+}
 
 /** Money values are decimal strings with 2 places. */
 export interface AmbulatoryCommissionAmounts {

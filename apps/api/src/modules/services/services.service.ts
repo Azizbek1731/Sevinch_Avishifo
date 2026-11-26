@@ -9,7 +9,7 @@ import type {
   ServicePackage,
   ServicePrice,
 } from '@prisma/client';
-import { AuditAction, DiscountType, ErrorCode } from '@avishifo/shared';
+import { AuditAction, categoryNameLooksLikeEcho, DiscountType, ErrorCode } from '@avishifo/shared';
 import { AppException } from '../../common/app.exception';
 import { paginated, skipTake, type PaginatedResult } from '../../common/pagination';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -314,6 +314,8 @@ export class ServicesService {
             durationMin: dto.durationMin,
             unit: dto.unit,
             vatIncluded: dto.vatIncluded,
+            isEcho:
+              category.kind === 'ULTRASOUND' && categoryNameLooksLikeEcho(category.name),
             prices: {
               create: {
                 // Nested creates are NOT auto-stamped by the tenant extension.
@@ -371,7 +373,8 @@ export class ServicesService {
   ): Promise<ServiceResponse> {
     const before = await this.prisma.db.service.findFirst({ where: { id } });
     if (!before) throw new AppException(ErrorCode.NOT_FOUND, 'Service not found', 404);
-    if (dto.categoryId !== undefined) await this.requireCategory(dto.categoryId);
+    const nextCategory =
+      dto.categoryId !== undefined ? await this.requireCategory(dto.categoryId) : null;
 
     // Note: `price`/`branchId` in the update payload are ignored here —
     // price changes go through POST /services/:id/prices (effective-dated history).
@@ -386,6 +389,13 @@ export class ServicesService {
           ...(dto.unit !== undefined ? { unit: dto.unit } : {}),
           ...(dto.durationMin !== undefined ? { durationMin: dto.durationMin } : {}),
           ...(dto.vatIncluded !== undefined ? { vatIncluded: dto.vatIncluded } : {}),
+          ...(nextCategory
+            ? {
+                isEcho:
+                  nextCategory.kind === 'ULTRASOUND' &&
+                  categoryNameLooksLikeEcho(nextCategory.name),
+              }
+            : {}),
         },
         include: { category: true },
       });

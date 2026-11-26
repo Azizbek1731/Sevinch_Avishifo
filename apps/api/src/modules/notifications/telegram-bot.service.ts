@@ -1,4 +1,5 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Bot, InlineKeyboard, InputFile, Keyboard, type Context } from 'grammy';
 import { formatInTimeZone } from 'date-fns-tz';
 import {
@@ -15,6 +16,7 @@ import { AuditService } from '../../core/audit/audit.service';
 import { StorageService } from '../../core/storage/storage.service';
 import { RESULT_PDF_INCLUDE, buildResultPdfData } from '../lab/result-pdf.data';
 import { ResultPdfService } from '../lab/result-pdf.service';
+import { AmbulatoryService } from '../ambulatory/ambulatory.service';
 import { NotificationsService } from './notifications.service';
 import {
   TelegramPatientAccessService,
@@ -59,6 +61,8 @@ const PATIENT_BUTTONS = [
 ];
 /** Buttons a clinic owner/admin sees. */
 const STAFF_BUTTONS = ['📊 Bugungi holat', '👥 Navbat holati'];
+/** Buttons a linked doctor sees (no percentage money — that stays in the panel OTP gate). */
+const DOCTOR_BUTTONS = ['🩺 Bugungi bemorlarim', '📋 Ochilgan kartalar', 'ℹ️ Shifokor yordami'];
 /** Buttons the platform super-admin sees. */
 const PLATFORM_BUTTONS = ['🏥 Klinikalar', '🆕 Yangi ro‘yxatdan o‘tganlar'];
 
@@ -81,6 +85,11 @@ function keyboardFor(identity: ChatIdentity): Keyboard {
   }
   const role = identity.staff?.role;
   if (role === 'CLINIC_OWNER' || role === 'CLINIC_ADMIN') rows.push(STAFF_BUTTONS);
+  if (role === 'DOCTOR') {
+    for (let i = 0; i < DOCTOR_BUTTONS.length; i += 2) {
+      rows.push(DOCTOR_BUTTONS.slice(i, i + 2));
+    }
+  }
   if (role === 'SUPER_ADMIN') rows.push(PLATFORM_BUTTONS);
   for (const row of rows) {
     for (const label of row) kb.text(label);
@@ -105,6 +114,9 @@ const SWITCH_TO_PATIENT = '👤 Bemor menyusi';
 const awaitingStatsionarDate = new Set<number>();
 /** Chats waiting for a typed date for invoices / payments / pack exports. */
 const awaitingAdminExportDate = new Map<number, 'invoices' | 'payments' | 'pack'>();
+/** Admin ambulatory-share wizard: waiting for a custom day, then doctor pick. */
+const awaitingAmbShareDate = new Set<number>();
+const awaitingAmbShareDoctor = new Map<number, { from: string; to: string }>();
 
 function tashkentYmd(offsetDays = 0): string {
   const p = zonedParts(new Date());
@@ -133,7 +145,23 @@ function adminReportsKeyboard(): InlineKeyboard {
     .text('💰 Kunlik to‘lovlar', 'admxlsx:payments')
     .row()
     .text('📦 Bugungi to‘liq paket', 'admxlsx:pack')
+    .text('💰 Ambulator ulush', 'admxlsx:ambshare')
+    .row()
     .text('✖️ Yopish', 'admxlsx:cancel');
+}
+
+function ambulatorySharePeriodKeyboard(): InlineKeyboard {
+  const today = tashkentYmd(0);
+  const yesterday = tashkentYmd(-1);
+  const monthStart = `${today.slice(0, 8)}01`;
+  return new InlineKeyboard()
+    .text(`Bugun (${formatStatsionarReportDateUz(today)})`, `ambshare:p:day:${today}`)
+    .text(`Kecha (${formatStatsionarReportDateUz(yesterday)})`, `ambshare:p:day:${yesterday}`)
+    .row()
+    .text('📅 Shu oy', `ambshare:p:range:${monthStart}:${today}`)
+    .text('📅 Boshqa sana', 'ambshare:p:ask')
+    .row()
+    .text('✖️ Bekor', 'ambshare:cancel');
 }
 
 function adminDatedExportKeyboard(kind: 'invoices' | 'payments' | 'pack'): InlineKeyboard {
@@ -260,7 +288,27 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     private readonly visitReportPdf: VisitReportPdfService,
     private readonly treatmentSheetPdf: TreatmentSheetPdfService,
     private readonly statsionarDaily: StatsionarDailyTelegramService,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  private ambulatoryService(): AmbulatoryService | null {
+    try {
+      return this.moduleRef.get(AmbulatoryService, { strict: false });
+    } catch {
+      return null;
+    }
+  }
+
+  private async resolveTelegramClinicId(): Promise<string | null> {
+    const configured = this.config.env.TELEGRAM_CLINIC_ID;
+    if (configured) return configured;
+    const clinics = await this.prisma.unscoped.clinic.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true },
+      take: 2,
+    });
+    return clinics.length === 1 ? clinics[0]!.id : null;
+  }
 
   private get patientOnly(): boolean {
     return this.config.env?.SINGLE_CLINIC_MODE === true;
@@ -425,6 +473,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       bot.callbackQuery(/^(invxlsx|payxlsx|packxlsx):(.+)$/, (ctx) =>
         this.handleAdminDatedExportCallback(ctx),
       );
+      bot.callbackQuery(/^ambshare:(.+)$/, (ctx) => this.handleAmbulatoryShareCallback(ctx));
     }
     if (!this.patientOnly) {
       bot.hears('📅 Qabullarim', (ctx) => this.handleMyAppointments(ctx));
@@ -433,6 +482,10 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       // Clinic owner / admin
       bot.hears('📊 Bugungi holat', (ctx) => this.handleClinicToday(ctx));
       bot.hears('👥 Navbat holati', (ctx) => this.handleClinicQueue(ctx));
+      // Doctor desk
+      bot.hears('🩺 Bugungi bemorlarim', (ctx) => this.handleDoctorToday(ctx));
+      bot.hears('📋 Ochilgan kartalar', (ctx) => this.handleDoctorOpenCards(ctx));
+      bot.hears('ℹ️ Shifokor yordami', (ctx) => this.handleDoctorHelp(ctx));
       // Platform super-admin
       bot.hears('🏥 Klinikalar', (ctx) => this.handlePlatformClinics(ctx));
       bot.hears('🆕 Yangi ro‘yxatdan o‘tganlar', (ctx) => this.handlePlatformSignups(ctx));
@@ -472,7 +525,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
           data.startsWith('admxlsx:') ||
           data.startsWith('invxlsx:') ||
           data.startsWith('payxlsx:') ||
-          data.startsWith('packxlsx:')
+          data.startsWith('packxlsx:') ||
+          data.startsWith('ambshare:')
         ) {
           return;
         }
@@ -487,6 +541,10 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         }
         if (awaitingAdminExportDate.has(chatId)) {
           await this.handleAdminExportDateText(ctx, text);
+          return;
+        }
+        if (awaitingAmbShareDate.has(chatId)) {
+          await this.handleAmbulatoryShareDateText(ctx, text);
           return;
         }
         if (
@@ -575,7 +633,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     setOpsMenuMode(chatId, mode);
     if (mode === 'admin') {
       await ctx.reply(
-        '🛠 Admin menyusi\n\nHolat — server / loyiha\nTarmoq — Wi‑Fi / LAN\nZaxira — oxirgi dump\n📊 Statsionar Excel — yotgan bemorlar\n📥 Hisobotlar — bemorlar, fakturalar, to‘lovlar',
+        '🛠 Admin menyusi\n\nHolat — server / loyiha\nTarmoq — Wi‑Fi / LAN\nZaxira — oxirgi dump\n📊 Statsionar Excel — yotgan bemorlar\n📥 Hisobotlar — bemorlar, fakturalar, to‘lovlar, ambulator ulush',
         { reply_markup: await this.menuKeyboardFor(chatId) },
       );
       return;
@@ -733,7 +791,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         '🏥 Statsionar — sana bo‘yicha\n' +
         '🧾 Kunlik fakturalar — tanlangan kun\n' +
         '💰 Kunlik to‘lovlar — tanlangan kun\n' +
-        '📦 Bugungi to‘liq paket — hammasi birga',
+        '📦 Bugungi to‘liq paket — hammasi birga\n' +
+        '💰 Ambulator ulush — sana / shifokor bo‘yicha foizlar',
       { reply_markup: adminReportsKeyboard() },
     );
   }
@@ -749,6 +808,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     setOpsMenuMode(chatId, 'admin');
     if (raw === 'cancel') {
       awaitingAdminExportDate.delete(chatId);
+      awaitingAmbShareDate.delete(chatId);
+      awaitingAmbShareDoctor.delete(chatId);
       await ctx.answerCallbackQuery({ text: 'Yopildi' });
       await ctx.editMessageText('Hisobotlar menyusi yopildi.').catch(() => undefined);
       return;
@@ -764,6 +825,16 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
       await ctx.reply(
         '📊 Statsionar hisobot\n\nQaysi kun uchun Excel kerak?',
         { reply_markup: statsionarDatePickerKeyboard() },
+      );
+      return;
+    }
+    if (raw === 'ambshare') {
+      await ctx.answerCallbackQuery();
+      awaitingAmbShareDate.delete(chatId);
+      awaitingAmbShareDoctor.delete(chatId);
+      await ctx.reply(
+        '💰 Ambulator ulush\n\nAvval davrni tanlang, keyin shifokorni (yoki barchasini).',
+        { reply_markup: ambulatorySharePeriodKeyboard() },
       );
       return;
     }
@@ -866,6 +937,175 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       this.logger.warn(`patients excel failed: ${detail}`);
+      await ctx
+        .reply(`Excel tayyorlanmadi.\n${detail.slice(0, 160)}`, { reply_markup: markup })
+        .catch(() => undefined);
+    }
+  }
+
+  private async handleAmbulatoryShareCallback(ctx: Context): Promise<void> {
+    const chatId = ctx.chat?.id;
+    const raw = ctx.match?.[1] ?? '';
+    if (chatId === undefined) return;
+    if (!isOpsAdminChat(chatId)) {
+      await ctx.answerCallbackQuery({ text: 'Ruxsat yo‘q' });
+      return;
+    }
+    setOpsMenuMode(chatId, 'admin');
+    if (raw === 'cancel') {
+      awaitingAmbShareDate.delete(chatId);
+      awaitingAmbShareDoctor.delete(chatId);
+      await ctx.answerCallbackQuery({ text: 'Bekor' });
+      await ctx.editMessageText('Ambulator ulush bekor qilindi.').catch(() => undefined);
+      return;
+    }
+    if (raw === 'p:ask') {
+      awaitingAmbShareDate.add(chatId);
+      awaitingAmbShareDoctor.delete(chatId);
+      await ctx.answerCallbackQuery();
+      await ctx.reply(
+        'Sanani kiriting (masalan: 03.11.2026).\nBir kun uchun hisobot chiqadi.\nBekor: /menu',
+        { reply_markup: await this.menuKeyboardFor(chatId) },
+      );
+      return;
+    }
+    if (raw.startsWith('p:day:')) {
+      const day = raw.slice('p:day:'.length);
+      const ymd = parseStatsionarReportDate(day);
+      if (!ymd) {
+        await ctx.answerCallbackQuery({ text: 'Noto‘g‘ri sana' });
+        return;
+      }
+      await ctx.answerCallbackQuery();
+      await this.promptAmbulatoryShareDoctor(ctx, chatId, ymd, ymd);
+      return;
+    }
+    if (raw.startsWith('p:range:')) {
+      const parts = raw.slice('p:range:'.length).split(':');
+      const from = parseStatsionarReportDate(parts[0] ?? '');
+      const to = parseStatsionarReportDate(parts[1] ?? '');
+      if (!from || !to) {
+        await ctx.answerCallbackQuery({ text: 'Noto‘g‘ri davr' });
+        return;
+      }
+      await ctx.answerCallbackQuery();
+      await this.promptAmbulatoryShareDoctor(ctx, chatId, from, to);
+      return;
+    }
+    if (raw.startsWith('doc:')) {
+      const draft = awaitingAmbShareDoctor.get(chatId);
+      if (!draft) {
+        await ctx.answerCallbackQuery({ text: 'Avval davrni tanlang' });
+        return;
+      }
+      const doctorUserId = raw.slice('doc:'.length);
+      awaitingAmbShareDoctor.delete(chatId);
+      await ctx.answerCallbackQuery({ text: 'Tayyorlanmoqda…' });
+      await this.deliverAmbulatoryShareExcel(
+        ctx,
+        chatId,
+        draft.from,
+        draft.to,
+        doctorUserId === 'all' ? null : doctorUserId,
+      );
+      return;
+    }
+    await ctx.answerCallbackQuery({ text: 'Noma’lum buyruq' });
+  }
+
+  private async handleAmbulatoryShareDateText(ctx: Context, text: string): Promise<void> {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+    if (!isOpsAdminChat(chatId)) {
+      awaitingAmbShareDate.delete(chatId);
+      return;
+    }
+    if (text === '/menu' || text === '🔄 Yangilash' || text === '✖️ Bekor') {
+      awaitingAmbShareDate.delete(chatId);
+      await this.handleMenu(ctx);
+      return;
+    }
+    const ymd = parseStatsionarReportDate(text);
+    if (!ymd) {
+      await ctx.reply(
+        'Sana formati noto‘g‘ri. Masalan: 03.11.2026 yoki 2026-11-03\nBekor: /menu',
+        { reply_markup: await this.menuKeyboardFor(chatId) },
+      );
+      return;
+    }
+    awaitingAmbShareDate.delete(chatId);
+    await this.promptAmbulatoryShareDoctor(ctx, chatId, ymd, ymd);
+  }
+
+  private async promptAmbulatoryShareDoctor(
+    ctx: Context,
+    chatId: number,
+    from: string,
+    to: string,
+  ): Promise<void> {
+    awaitingAmbShareDoctor.set(chatId, { from, to });
+    const ambulatory = this.ambulatoryService();
+    const clinicId = await this.resolveTelegramClinicId();
+    const doctors =
+      ambulatory && clinicId ? await ambulatory.listTelegramShareDoctors(clinicId) : [];
+    const kb = new InlineKeyboard().text('👥 Barcha shifokorlar', 'ambshare:doc:all').row();
+    for (const doctor of doctors.slice(0, 28)) {
+      const label = doctor.specialty
+        ? `${doctor.fullName} · ${doctor.specialty}`.slice(0, 60)
+        : doctor.fullName.slice(0, 60);
+      kb.text(label, `ambshare:doc:${doctor.id}`).row();
+    }
+    kb.text('✖️ Bekor', 'ambshare:cancel');
+    const period =
+      from === to
+        ? formatStatsionarReportDateUz(from)
+        : `${formatStatsionarReportDateUz(from)} — ${formatStatsionarReportDateUz(to)}`;
+    await ctx.reply(
+      `💰 Ambulator ulush\nDavr: ${period}\n\nShifokorni tanlang (yoki barchasi):`,
+      { reply_markup: kb },
+    );
+  }
+
+  private async deliverAmbulatoryShareExcel(
+    ctx: Context,
+    chatId: number,
+    from: string,
+    to: string,
+    doctorUserId: string | null,
+  ): Promise<void> {
+    const markup = await this.menuKeyboardFor(chatId);
+    const ambulatory = this.ambulatoryService();
+    if (!ambulatory) {
+      await ctx.reply('Ambulator ulush moduli topilmadi.', { reply_markup: markup });
+      return;
+    }
+    const clinicId = await this.resolveTelegramClinicId();
+    if (!clinicId) {
+      await ctx.reply('Klinika aniqlanmadi.', { reply_markup: markup });
+      return;
+    }
+    await ctx.reply('Ambulator ulush Excel tayyorlanmoqda…', { reply_markup: markup });
+    try {
+      const report = await ambulatory.buildTelegramShareReport({
+        clinicId,
+        from,
+        to,
+        doctorUserId,
+      });
+      if (!report) {
+        await ctx.reply('Hisobot bo‘sh yoki filial topilmadi.', { reply_markup: markup });
+        return;
+      }
+      const ok = await this.statsionarDaily.sendDocument(
+        chatId,
+        report.buffer,
+        report.filename,
+        report.caption,
+      );
+      if (!ok) await ctx.reply('Excel yuborib bo‘lmadi.', { reply_markup: markup });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`ambulatory share excel failed: ${detail}`);
       await ctx
         .reply(`Excel tayyorlanmadi.\n${detail.slice(0, 160)}`, { reply_markup: markup })
         .catch(() => undefined);
@@ -1048,6 +1288,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     if (this.patientOnly) return this.replyPatientHome(ctx);
     const chatId = ctx.chat?.id;
     if (chatId === undefined) return;
+    awaitingAmbShareDate.delete(chatId);
+    awaitingAmbShareDoctor.delete(chatId);
     const identity = await this.identify(chatId);
     if (identity.patientIds.length === 0 && !identity.staff) {
       await ctx.reply('Avval /start orqali telefon raqamingizni yuboring.', {
@@ -1096,6 +1338,12 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     const parts: string[] = [];
     if (identity.staff) {
       parts.push(`${identity.staff.fullName} — ${this.roleLabel(identity.staff.role)}`);
+      if (identity.staff.role === 'DOCTOR') {
+        parts.push(
+          'Shifokor menyusi: bugungi bemorlar, ochiq ambulator kartalar.',
+          'Ulush / maosh — panelda Hisobotlar → Telegram kodi.',
+        );
+      }
     }
     if (identity.patientIds.length > 0) {
       parts.push(`Bemor kartalari: ${identity.patientIds.length} ta klinikada`);
@@ -1111,6 +1359,8 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     if (ctx.chat?.id === undefined) return;
     const chatId = ctx.chat.id;
+    // Heal staff Telegram bind for doctors who only linked as patients earlier.
+    await this.ensureStaffBoundFromPortal(chatId);
     const admin = isOpsAdminChat(chatId);
     const accountant = isOpsAccountantChat(chatId);
     const access = resolved ?? (await this.patientAccess.resolve(chatId));
@@ -1312,6 +1562,9 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
         rememberOpsAccountantChat(chatId, phone);
         setOpsMenuMode(chatId, 'accountant');
       }
+      // Single-clinic bot is patient-first, but doctors still need User.telegramChatId
+      // for Hisobotlar OTP (ulush / maosh). PortalAccount alone is not enough.
+      await this.bindStaffChat(chatId, phone, ctx.from?.username ?? null);
       const access = await this.patientAccess.linkContact(
         chatId,
         phone,
@@ -1338,6 +1591,57 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Attach this chat to the staff/super-admin User row for `phone` (not PATIENT).
+   * Required for doctor-pay OTP even in single-clinic patient bot mode.
+   */
+  private async bindStaffChat(
+    chatId: number,
+    rawPhone: string,
+    username: string | null,
+  ): Promise<boolean> {
+    const phone = normalizePhone(rawPhone) ?? rawPhone;
+    const chat = String(chatId);
+    const now = new Date();
+
+    // Release the chat from any other user first (telegramChatId is unique).
+    await this.prisma.unscoped.user.updateMany({
+      where: { telegramChatId: chat, phone: { not: phone } },
+      data: { telegramChatId: null, telegramUsername: null, telegramLinkedAt: null },
+    });
+    const staff = await this.prisma.unscoped.user.findFirst({
+      where: { phone, deletedAt: null, status: 'ACTIVE', role: { not: 'PATIENT' } },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!staff) return false;
+    await this.prisma.unscoped.user.update({
+      where: { id: staff.id },
+      data: { telegramChatId: chat, telegramUsername: username, telegramLinkedAt: now },
+    });
+    return true;
+  }
+
+  /**
+   * If the chat is already a linked PortalAccount, also bind any staff User with
+   * the same phone. Doctors who linked before staff-binding existed get healed
+   * on the next /start or /menu without re-sending contact.
+   */
+  private async ensureStaffBoundFromPortal(chatId: number): Promise<void> {
+    const chat = String(chatId);
+    const already = await this.prisma.unscoped.user.findFirst({
+      where: { telegramChatId: chat, deletedAt: null, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    if (already) return;
+    const account = await this.prisma.unscoped.portalAccount.findUnique({
+      where: { telegramChatId: chat },
+      select: { phone: true, telegramUsername: true },
+    });
+    if (!account?.phone) return;
+    await this.bindStaffChat(chatId, account.phone, account.telegramUsername);
+  }
+
+  /**
    * Bind a Telegram chat to a phone across EVERY identity that phone holds:
    * the durable PortalAccount link, per-clinic TelegramLink routing rows for
    * patient cards, and the staff/super-admin User row. A phone can be both a
@@ -1352,29 +1656,7 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     username: string | null,
   ): Promise<number> {
     const phone = normalizePhone(rawPhone) ?? rawPhone;
-    const chat = String(chatId);
-    const now = new Date();
-
-    // Staff / super-admin: release the chat from any other user first (the
-    // telegramChatId unique index would otherwise reject the bind), then attach
-    // it to whoever owns this phone. PATIENT-role users are excluded — they go
-    // through the patient path below.
-    await this.prisma.unscoped.user.updateMany({
-      where: { telegramChatId: chat, phone: { not: phone } },
-      data: { telegramChatId: null, telegramUsername: null, telegramLinkedAt: null },
-    });
-    const staff = await this.prisma.unscoped.user.findFirst({
-      where: { phone, deletedAt: null, status: 'ACTIVE', role: { not: 'PATIENT' } },
-      select: { id: true },
-      orderBy: { createdAt: 'asc' },
-    });
-    if (staff) {
-      await this.prisma.unscoped.user.update({
-        where: { id: staff.id },
-        data: { telegramChatId: chat, telegramUsername: username, telegramLinkedAt: now },
-      });
-    }
-
+    await this.bindStaffChat(chatId, phone, username);
     const access = await this.patientAccess.linkContact(chatId, phone, username);
     return access.patients.length;
   }
@@ -2195,6 +2477,92 @@ export class TelegramBotService implements OnModuleInit, OnModuleDestroy {
     // Asia/Tashkent is UTC+5 year-round (no DST), so the day starts at 19:00 UTC.
     const from = new Date(`${day}T00:00:00.000+05:00`);
     return { from, to: new Date(from.getTime() + 86_400_000) };
+  }
+
+  private async handleDoctorToday(ctx: Context): Promise<void> {
+    const staff = await this.requireStaff(ctx, ['DOCTOR']);
+    if (!staff?.clinicId) return;
+    const clinicId = staff.clinicId;
+    const { from, to } = this.todayRange();
+    const [visits, ambulatory] = await Promise.all([
+      this.prisma.unscoped.visit.findMany({
+        where: {
+          clinicId,
+          doctorUserId: staff.id,
+          OR: [
+            { startedAt: { gte: from, lt: to } },
+            { completedAt: { gte: from, lt: to } },
+            { createdAt: { gte: from, lt: to } },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 15,
+        select: {
+          status: true,
+          patient: { select: { fullName: true, mrn: true } },
+        },
+      }),
+      this.prisma.unscoped.ambulatoryCase.count({
+        where: {
+          clinicId,
+          doctorUserId: staff.id,
+          openedAt: { gte: from, lt: to },
+        },
+      }),
+    ]);
+    if (!visits.length && ambulatory === 0) {
+      await ctx.reply('Bugun sizga biriktirilgan tashrif / yangi ambulator karta yo‘q.');
+      return;
+    }
+    const lines = visits.map(
+      (v, i) =>
+        `${i + 1}. ${v.patient.fullName} (${v.patient.mrn}) — ${v.status === 'COMPLETED' ? 'yakunlangan' : v.status === 'IN_PROGRESS' ? 'qabulda' : v.status}`,
+    );
+    await ctx.reply(
+      `🩺 Bugungi bemorlarim — ${formatInTimeZone(new Date(), TIMEZONE, 'dd.MM.yyyy')}\n\n` +
+        `Yangi ambulator kartalar: ${ambulatory}\n` +
+        `Tashriflar (oxirgi ${visits.length}):\n` +
+        (lines.length ? lines.join('\n') : '—'),
+    );
+  }
+
+  private async handleDoctorOpenCards(ctx: Context): Promise<void> {
+    const staff = await this.requireStaff(ctx, ['DOCTOR']);
+    if (!staff?.clinicId) return;
+    const rows = await this.prisma.unscoped.ambulatoryCase.findMany({
+      where: { clinicId: staff.clinicId, doctorUserId: staff.id, status: 'OPEN' },
+      orderBy: { openedAt: 'desc' },
+      take: 20,
+      select: {
+        number: true,
+        openedAt: true,
+        patient: { select: { fullName: true, mrn: true } },
+      },
+    });
+    if (!rows.length) {
+      await ctx.reply('Hozir ochiq ambulator kartangiz yo‘q.');
+      return;
+    }
+    const lines = rows.map(
+      (row, i) =>
+        `${i + 1}. ${row.number} — ${row.patient.fullName} (${row.patient.mrn})\n` +
+        `   ochilgan: ${formatInTimeZone(row.openedAt, TIMEZONE, 'dd.MM.yyyy HH:mm')}`,
+    );
+    await ctx.reply(`📋 Ochilgan ambulator kartalar (${rows.length})\n\n${lines.join('\n')}`);
+  }
+
+  private async handleDoctorHelp(ctx: Context): Promise<void> {
+    const staff = await this.requireStaff(ctx, ['DOCTOR']);
+    if (!staff) return;
+    await ctx.reply(
+      `ℹ️ Shifokor yordami\n\n` +
+        `Assalomu alaykum, ${staff.fullName}.\n\n` +
+        `1) Bu chat xodim telefoningizga ulangan — kirish va ulush kodlari shu yerga keladi.\n` +
+        `2) Panelda foiz pullar: Hisobotlar → «Ambulator ulush» / «Mening hisobotim».\n` +
+        `   Bo‘limni ochganda shu botga 6 xonali kod keladi; kodni boshqalarga bermang.\n` +
+        `3) Ambulator bo‘limida faqat klinik ish (kartalar, yo‘llanmalar) — ulush yashirin.\n` +
+        `4) /menu — menyu · /unlink — chatni uzish · /help — umumiy yordam.`,
+    );
   }
 
   private async handleClinicToday(ctx: Context): Promise<void> {

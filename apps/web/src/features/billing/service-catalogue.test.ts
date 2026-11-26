@@ -35,7 +35,7 @@ describe('reception service catalogues', () => {
       proceduresOnly: true,
       excludeSurgery: true,
     });
-    expect(result.map((service) => service.id)).toEqual(['PROCEDURE', 'DIAGNOSTICS', 'OTHER']);
+    expect(result.map((service) => service.id)).toEqual(['DIAGNOSTICS', 'PROCEDURE', 'OTHER']);
     expect(
       fetchServices.mock.calls.every(([search, kind]) => search === 'search' && kind !== undefined),
     ).toBe(true);

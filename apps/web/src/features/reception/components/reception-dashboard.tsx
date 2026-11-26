@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import {
-  ArrowRight,
   Banknote,
   BedDouble,
   ClipboardList,
@@ -185,18 +184,6 @@ export function ReceptionDashboard() {
           </Link>
         ) : null}
       </div>
-
-      {canSell ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-3">
-          <p className="max-w-3xl text-sm text-muted-foreground">{t('workflow.handoff')}</p>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/invoices">
-              {t('workflow.invoices')}
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-      ) : null}
 
       {canSell ? <ClinicalWorklist reception /> : null}
 

@@ -70,6 +70,8 @@ export const groupTone: Record<AmbulatoryShareGroup, string> = {
   LAB: 'border-sky-300 bg-sky-50 text-sky-800 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-200',
   UZI: 'border-violet-300 bg-violet-50 text-violet-800 dark:border-violet-500/40 dark:bg-violet-500/10 dark:text-violet-200',
   EXO: 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200',
+  THERAPY:
+    'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200',
 };
 
 export function CommissionsTab() {
@@ -202,7 +204,7 @@ export function CommissionsTab() {
               </Card>
             ))}
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {AMBULATORY_SHARE_GROUPS.map((group) => {
               const part = data.totals.byGroup[group];
               return (
@@ -232,6 +234,7 @@ export function CommissionsTab() {
               lab: data.defaultPercents.LAB,
               uzi: data.defaultPercents.UZI,
               exo: data.defaultPercents.EXO,
+              therapy: data.defaultPercents.THERAPY,
             })}
           </p>
 

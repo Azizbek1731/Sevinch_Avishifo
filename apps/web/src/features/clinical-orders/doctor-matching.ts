@@ -199,3 +199,24 @@ export function manualConsultationTitle(doctor: DoctorOption): string {
   if (name) return `Shifokor qabuli — ${name}`;
   return 'Shifokor qabuli';
 }
+
+/**
+ * Cardiologist desks (e.g. Abdullayev Arslon): ~90% of consults also need EKG,
+ * so the reception / ambulatory UI offers it next to the consultation.
+ */
+export function doctorSuggestsEkg(doctor: Pick<DoctorOption, 'fullName' | 'specialty'> | null | undefined): boolean {
+  if (!doctor) return false;
+  const specialty = (doctor.specialty ?? '').toLowerCase();
+  if (/kardiolog|кардиолог|cardiolog/.test(specialty)) return true;
+  const name = doctor.fullName.toLowerCase();
+  return /arslon|арслон/.test(name) && /abdullayev|абдуллаев|абдуллаев/.test(name);
+}
+
+/** Catalogue row for resting ECG (not Holter). */
+export function isEkgService(service: ServiceOption): boolean {
+  const code = (service.code ?? '').toUpperCase();
+  if (code === 'DIAG-01' || /^EKG\b/.test(code)) return true;
+  const hay = serviceNameHaystack(service).toLowerCase();
+  if (/холтер|holter|xolter/.test(hay)) return false;
+  return /\bekg\b|\becg\b|электрокардиограф|elektrokardiograf/.test(hay);
+}

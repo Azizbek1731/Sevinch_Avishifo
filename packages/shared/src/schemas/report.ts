@@ -215,10 +215,37 @@ export interface DoctorActivityReport {
     patients: number;
   };
   lab: DoctorActivityMoneyCounts;
+  /** Outbound ultrasound referrals this doctor sent (non-EXO lines). */
   ultrasound: DoctorActivityMoneyCounts;
+  /** Outbound EXO referrals this doctor sent. */
+  echo: DoctorActivityMoneyCounts;
+  /**
+   * Ultrasound / EXO exams this doctor performed (ClinicalOrder.doctorUserId).
+   * Empty for ordinary clinicians; filled for UZI and EXO specialists.
+   */
+  performedUltrasound: DoctorActivityMoneyCounts;
+  performedEcho: DoctorActivityMoneyCounts;
   visitLines: DoctorActivityVisitLine[];
   labLines: DoctorActivityReferralLine[];
   ultrasoundLines: DoctorActivityReferralLine[];
+  echoLines: DoctorActivityReferralLine[];
+  performedUltrasoundLines: DoctorActivityReferralLine[];
+  performedEchoLines: DoctorActivityReferralLine[];
+  /**
+   * Salary share from compensation rules (e.g. Mohira 40% UZI, Sherzod 45% EXO)
+   * on paid work this doctor performed in the period.
+   */
+  compensation: {
+    /** Primary revenue-percent rule, if exactly one; otherwise null. */
+    percent: number | null;
+    rules: Array<{ percent: number; label: string }>;
+    /** Paid invoice lines that match the doctor's pay rules. */
+    paidBasis: string;
+    earnings: string;
+    /** Issued but not yet fully paid — future earnings once the cashier settles. */
+    pendingBasis: string;
+    pendingEarnings: string;
+  };
   periods: Array<{
     bucket: string;
     visits: number;
@@ -226,5 +253,7 @@ export interface DoctorActivityReport {
     labAmount: string;
     ultrasoundOrders: number;
     ultrasoundAmount: string;
+    echoOrders: number;
+    echoAmount: string;
   }>;
 }

@@ -90,11 +90,9 @@ export class VisitsController {
     @Res() res: Response,
   ) {
     const reportMode = mode === 'prescription' ? 'prescription' : 'summary';
-    const buffer = await this.visits.pdf(id, user, reportMode);
-    const filename =
-      reportMode === 'prescription' ? 'prescription.pdf' : 'clinical-report.pdf';
+    const { buffer, disposition } = await this.visits.pdf(id, user, reportMode);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', disposition);
     res.setHeader('Cache-Control', 'private, no-store');
     res.send(buffer);
   }

@@ -11,10 +11,23 @@ import { EmptyState } from '@/components/empty-state';
 import { PdfDocument } from '@/components/print/pdf-document';
 import { Link } from '@/i18n/routing';
 import { api } from '@/lib/api-client';
+import { filenameFromContentDisposition } from '@/lib/download-filename';
+import { markPdfPrinted, usePdfPrinted } from '@/lib/pdf-printed';
 import { useAuthStore } from '@/stores/auth-store';
 
-/** Same A4 PDF the lab uses — letterhead + Made with AviShifo.uz footer. */
-export function VisitPrint({ visitId }: { visitId: string }) {
+/**
+ * Same A4 PDF the lab uses — letterhead + Made with AviShifo.uz footer.
+ * `pdfPath` / `backHref` let the ambulatory card serve the report to desks without visits.read.
+ */
+export function VisitPrint({
+  visitId,
+  pdfPath = `/visits/${visitId}/pdf`,
+  backHref = `/doctor/visits/${visitId}`,
+}: {
+  visitId: string;
+  pdfPath?: string;
+  backHref?: string;
+}) {
   const t = useTranslations('visits');
   const tCommon = useTranslations('common');
   const tr = useTranslations('doctor.clinical');
@@ -22,20 +35,31 @@ export function VisitPrint({ visitId }: { visitId: string }) {
   const mode = searchParams.get('mode') === 'prescription' ? 'prescription' : 'summary';
   const auto = searchParams.get('auto') === '1';
   const branchId = useAuthStore((state) => state.activeBranchId);
-  const [preview, setPreview] = useState<{ blob: Blob; url: string } | null>(null);
+  const [preview, setPreview] = useState<{ blob: Blob; url: string; filename: string } | null>(
+    null,
+  );
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
   const [previewErrorUrl, setPreviewErrorUrl] = useState<string | null>(null);
   const [printFailed, setPrintFailed] = useState(false);
   const [autoPrinted, setAutoPrinted] = useState(false);
+  const pdfPrinted = usePdfPrinted('visit', visitId);
 
   const pdfQuery = useQuery({
-    queryKey: ['visits', visitId, 'pdf', mode, branchId],
-    queryFn: async () =>
-      (
-        await api.get<Blob>(`/visits/${visitId}/pdf`, {
-          mode: mode === 'prescription' ? 'prescription' : undefined,
-        })
-      ).data,
+    queryKey: ['visits', visitId, 'pdf', mode, branchId, pdfPath],
+    queryFn: async () => {
+      const response = await api.get<Blob>(pdfPath, {
+        mode: mode === 'prescription' ? 'prescription' : undefined,
+      });
+      const fallback =
+        mode === 'prescription' ? 'Retsept.pdf' : 'Klinik_xulosa.pdf';
+      return {
+        blob: response.data,
+        filename: filenameFromContentDisposition(
+          response.headers?.get('content-disposition'),
+          fallback,
+        ),
+      };
+    },
     staleTime: 0,
     gcTime: 0,
     refetchOnMount: 'always',
@@ -46,14 +70,14 @@ export function VisitPrint({ visitId }: { visitId: string }) {
 
   useEffect(() => {
     if (!pdfQuery.data || pdfQuery.isFetching || pdfQuery.isError) return;
-    const url = URL.createObjectURL(pdfQuery.data);
-    setPreview({ blob: pdfQuery.data, url });
+    const url = URL.createObjectURL(pdfQuery.data.blob);
+    setPreview({ blob: pdfQuery.data.blob, url, filename: pdfQuery.data.filename });
     setPrintFailed(false);
     return () => URL.revokeObjectURL(url);
   }, [pdfQuery.data, pdfQuery.isFetching, pdfQuery.isError]);
 
   const pdfUrl =
-    !pdfQuery.isFetching && !pdfQuery.isError && preview?.blob === pdfQuery.data
+    !pdfQuery.isFetching && !pdfQuery.isError && preview?.blob === pdfQuery.data?.blob
       ? preview?.url
       : undefined;
   const ready = Boolean(pdfUrl && loadedUrl === pdfUrl && previewErrorUrl !== pdfUrl);
@@ -70,6 +94,7 @@ export function VisitPrint({ visitId }: { visitId: string }) {
     try {
       setPrintFailed(false);
       window.print();
+      if (mode === 'summary') markPdfPrinted('visit', visitId);
     } catch {
       setPrintFailed(true);
     }
@@ -92,21 +117,27 @@ export function VisitPrint({ visitId }: { visitId: string }) {
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <Button variant="ghost" asChild>
-          <Link href={`/doctor/visits/${visitId}`}>
+          <Link href={backHref}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             {tCommon('back')}
           </Link>
         </Button>
         <div className="flex flex-wrap gap-2">
-          {pdfUrl ? (
+          {pdfUrl && preview ? (
             <Button variant="outline" asChild>
-              <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+              <a href={pdfUrl} download={preview.filename}>
                 <ExternalLink className="mr-2 h-4 w-4" />
                 {t('printOpenPdf')}
               </a>
             </Button>
           ) : null}
-          <Button disabled={!ready} onClick={print}>
+          <Button
+            disabled={!ready}
+            onClick={print}
+            variant={mode === 'summary' && pdfPrinted.printed ? 'default' : undefined}
+            className={mode === 'summary' ? pdfPrinted.className : undefined}
+            title={mode === 'summary' && pdfPrinted.printed ? t('pdfPrinted') : undefined}
+          >
             <Printer className="mr-2 h-4 w-4" />
             {tCommon('print')}
           </Button>
@@ -127,7 +158,7 @@ export function VisitPrint({ visitId }: { visitId: string }) {
                 {t('printRetry')}
               </Button>
               <Button variant="outline" asChild>
-                <Link href={`/doctor/visits/${visitId}`}>{tCommon('back')}</Link>
+                <Link href={backHref}>{tCommon('back')}</Link>
               </Button>
             </div>
           }
@@ -153,7 +184,7 @@ export function VisitPrint({ visitId }: { visitId: string }) {
           ) : null}
           <PdfDocument
             key={pdfUrl}
-            blob={pdfQuery.data!}
+            blob={pdfQuery.data!.blob}
             title={title}
             onReady={onDocumentReady}
             onError={onDocumentError}

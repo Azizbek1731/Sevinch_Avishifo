@@ -1,6 +1,7 @@
 import { LabReferralReportService } from './lab-referral-report.service';
 import { DoctorActivityService } from './doctor-activity.service';
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
 import { ReportsController } from './reports.controller';
 import { ReportsService } from './reports.service';
 import { ConsumablesService } from './consumables.service';
@@ -15,6 +16,7 @@ import { XlsxService } from './xlsx.service';
  * Core providers (Prisma, Audit) are global modules.
  */
 @Module({
+  imports: [AuthModule],
   controllers: [ReportsController],
   providers: [
     LabReferralReportService,
@@ -26,6 +28,12 @@ import { XlsxService } from './xlsx.service';
   ],
   // AviShifo AI's tools are thin wrappers over these, so the assistant reuses
   // the same tenant-scoped code the panel's reports run on.
-  exports: [ReportsService],
+  exports: [
+    ReportsService,
+    DoctorActivityService,
+    LabReferralReportService,
+    CashflowService,
+    ConsumablesService,
+  ],
 })
 export class ReportsModule {}

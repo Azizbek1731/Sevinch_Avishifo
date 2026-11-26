@@ -90,9 +90,10 @@ export interface AmbulatoryCaseService {
 export interface AmbulatoryCaseDetail
   extends Omit<AmbulatoryCaseRow, 'labOrders' | 'uziOrders' | 'patient'> {
   patient: NonNullable<AmbulatoryCaseRow['patient']> & { address: string | null };
-  currentPercents: AmbulatorySharePercents;
+  /** Omitted for DOCTOR desks — share money lives behind Reports + Telegram OTP. */
+  currentPercents?: AmbulatorySharePercents;
   activeStay: { id: string; historyNumber: string } | null;
-  totals: AmbulatoryCommissionTotals;
+  totals?: AmbulatoryCommissionTotals;
   labOrders: AmbulatoryLabOrder[];
   uziOrders: AmbulatoryUziOrder[];
   consultations: AmbulatoryUziOrder[];

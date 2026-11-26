@@ -10,6 +10,9 @@ describe('single clinic desk responsibilities', () => {
       'admissions.write',
       'charges.write',
       'lab.orders.write',
+      'lab.orders.read',
+      'visits.read',
+      'ambulatory.read',
       'invoices.write',
     ])
       expect(permissions).toContain(permission);

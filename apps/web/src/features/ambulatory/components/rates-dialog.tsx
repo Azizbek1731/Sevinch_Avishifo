@@ -29,7 +29,7 @@ import { groupTone } from './commissions-tab';
 
 type PercentDraft = Record<AmbulatoryShareGroup, string>;
 
-const emptyDraft: PercentDraft = { LAB: '', UZI: '', EXO: '' };
+const emptyDraft: PercentDraft = { LAB: '', UZI: '', EXO: '', THERAPY: '' };
 
 const validPercent = (value: string) => {
   const n = Number(value.replace(',', '.'));
@@ -43,10 +43,11 @@ const draftOf = (percents: Record<AmbulatoryShareGroup, number | null>): Percent
   LAB: percents.LAB === null ? '' : String(percents.LAB),
   UZI: percents.UZI === null ? '' : String(percents.UZI),
   EXO: percents.EXO === null ? '' : String(percents.EXO),
+  THERAPY: percents.THERAPY === null ? '' : String(percents.THERAPY),
 });
 
 /**
- * Referring-doctor shares per direction (lab, UZI, EXO): clinic defaults,
+ * Referring-doctor shares per direction (lab, UZI, EXO, therapy): clinic defaults,
  * per-doctor overrides and the list of ultrasound examinations counted as EXO.
  */
 export function RatesDialog({
@@ -123,6 +124,7 @@ export function RatesDialog({
           LAB: Number(defaults.LAB.replace(',', '.')),
           UZI: Number(defaults.UZI.replace(',', '.')),
           EXO: Number(defaults.EXO.replace(',', '.')),
+          THERAPY: Number(defaults.THERAPY.replace(',', '.')),
         },
         doctors: Object.entries(overrides).map(([doctorUserId, draft]) => ({
           doctorUserId,
@@ -130,6 +132,7 @@ export function RatesDialog({
             LAB: parsePercent(draft.LAB),
             UZI: parsePercent(draft.UZI),
             EXO: parsePercent(draft.EXO),
+            THERAPY: parsePercent(draft.THERAPY),
           },
         })),
         echoServiceIds: [...echoIds],
@@ -158,7 +161,7 @@ export function RatesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{t('title')}</DialogTitle>
           <DialogDescription>{t('description')}</DialogDescription>
@@ -169,7 +172,7 @@ export function RatesDialog({
           <div className="space-y-4">
             <div className="space-y-2 rounded-lg border bg-muted/25 p-3">
               <p className="text-sm font-medium">{t('default')}</p>
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {AMBULATORY_SHARE_GROUPS.map((group) => (
                   <div key={group} className="space-y-1">
                     <Label htmlFor={`amb-default-${group}`}>{tGroups(group)}</Label>
@@ -213,7 +216,7 @@ export function RatesDialog({
                   />
                 </div>
                 <div className="divide-y rounded-lg border">
-                  <div className="hidden grid-cols-[1fr_repeat(3,5.5rem)] gap-2 bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:grid">
+                  <div className="hidden grid-cols-[1fr_repeat(4,4.75rem)] gap-2 bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:grid">
                     <span>{t('doctor')}</span>
                     {AMBULATORY_SHARE_GROUPS.map((group) => (
                       <span key={group} className="text-center">
@@ -226,7 +229,7 @@ export function RatesDialog({
                     return (
                       <div
                         key={doctor.doctorUserId}
-                        className="grid gap-2 px-3 py-2 sm:grid-cols-[1fr_repeat(3,5.5rem)] sm:items-center"
+                        className="grid gap-2 px-3 py-2 sm:grid-cols-[1fr_repeat(4,4.75rem)] sm:items-center"
                       >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{doctor.fullName}</p>
@@ -236,7 +239,7 @@ export function RatesDialog({
                             </p>
                           ) : null}
                         </div>
-                        <div className="grid grid-cols-3 gap-2 sm:contents">
+                        <div className="grid grid-cols-4 gap-2 sm:contents">
                           {AMBULATORY_SHARE_GROUPS.map((group) => (
                             <Input
                               key={group}

@@ -1,6 +1,6 @@
 {
   "title": "Ambulator",
-  "description": "Ambulator bemorlar kartalari: shifokor bemorni laboratoriya va UZI ga yuboradi, to‘lovdan shifokor ulushi (lab, UZI, EXO bo‘yicha alohida) avtomatik hisoblanadi.",
+  "description": "Ambulator bemorlar kartalari: shifokor bemorni laboratoriya, UZI va terapiyaga yuboradi, to‘lovdan shifokor ulushi (lab, UZI, EXO, Ozon/Gidro bo‘yicha alohida) avtomatik hisoblanadi.",
   "descriptionDoctor": "Sizning ambulator bemorlaringiz va yo‘llanmalar to‘lovidan tushgan ulushingiz.",
   "open": "Ambulator karta ochish",
   "export": "Excel",
@@ -66,9 +66,9 @@
     "labAmount": "Lab summasi",
     "patients": "Bemorlar",
     "orders": "Yo‘llanmalar",
-    "calculation": "Hisoblash: faqat ambulator kartadan yuborilgan laboratoriya, UZI va EXO. Ulush = kassada to‘langan summa × yo‘llanma paytidagi foiz (standart: lab {lab}%, UZI {uzi}%, EXO {exo}%). Chegirma va qaytarilgan pul ayiriladi, bekor qilinganlar hisoblanmaydi. Foizi 0% bo‘lgan yo‘llanmalar ko‘rsatilmaydi.",
+    "calculation": "Hisoblash: faqat ambulator kartadan yuborilgan laboratoriya, UZI, EXO va Ozon/Gidrokolonoterapiya. Ulush = kassada to‘langan summa × yo‘llanma paytidagi foiz (standart: lab {lab}%, UZI {uzi}%, EXO {exo}%, terapiya {therapy}%). Chegirma va qaytarilgan pul ayiriladi, bekor qilinganlar hisoblanmaydi. Foizi 0% bo‘lgan yo‘llanmalar ko‘rsatilmaydi.",
     "emptyTitle": "Bu davrda ulush tushadigan ambulator yo‘llanmalar yo‘q",
-    "emptyDescription": "Ambulator kartadan laboratoriya yoki UZI ga yuborilganda bu yerda ko‘rinadi.",
+    "emptyDescription": "Ambulator kartadan laboratoriya, UZI yoki Ozon/Gidro ga yuborilganda bu yerda ko‘rinadi.",
     "byDoctor": "Shifokorlar bo‘yicha",
     "byOrder": "Yo‘llanmalar bo‘yicha",
     "total": "Jami",
@@ -96,9 +96,9 @@
   "rates": {
     "button": "Foizlar",
     "title": "Shifokorlar ulushi (foiz)",
-    "description": "Ambulator kartadan yuborilgan laboratoriya, UZI va EXO to‘lovidan shifokorga tegadigan foiz. Har bir yo‘nalish alohida.",
+    "description": "Ambulator kartadan yuborilgan laboratoriya, UZI, EXO va Ozon/Gidrokolonoterapiya to‘lovidan shifokorga tegadigan foiz. Har bir yo‘nalish alohida.",
     "default": "Standart foiz (barcha shifokorlar)",
-    "defaultHelp": "Alohida foiz qo‘yilmagan shifokorga shu foizlar qo‘llanadi. Masalan, UZI uchun faqat ayrim shifokorlar foiz olsa, standart UZI = 0% qilib, o‘sha shifokorlarga alohida foiz yozing.",
+    "defaultHelp": "Alohida foiz qo‘yilmagan shifokorga shu foizlar qo‘llanadi. Ozon va Gidrokolonoterapiya uchun standart 20%. UZI uchun faqat ayrim shifokorlar foiz olsa, standart UZI = 0% qilib, o‘sha shifokorlarga alohida foiz yozing.",
     "perDoctor": "Shifokorlar bo‘yicha",
     "perDoctorHelp": "Bo‘sh katak standart foizni oladi. O‘zgarish faqat yangi yo‘llanmalarga ta’sir qiladi — oldingilari o‘z foizida qoladi.",
     "save": "Saqlash",
@@ -129,6 +129,10 @@
     "sendLab": "Laboratoriyaga yuborish",
     "shareBadge": "Shifokor ulushi {percent}%",
     "labPreview": "{count} ta tahlil · {total} · shifokor ulushi ≈ {share}",
+    "labPreviewCount": "{count} ta tahlil tanlandi",
+    "uziPickHint": "UZI mutaxassisini tanlang va xizmatlarni belgilang",
+    "addEkg": "EKG qo‘shish",
+    "addEkgHint": "Kardiolog (Abdullayev Arslon) bemorlarining ko‘pida EKG ham yoziladi.",
     "sendToCashier": "Kassaga yuborish",
     "labSent": "Laboratoriya yo‘llanmasi kassaga yuborildi",
     "sendUzi": "UZI ga yuborish",
@@ -152,6 +156,7 @@
     "consultationService": "Xizmat",
     "openResult": "Natijani ko‘rish",
     "openVisit": "Qabul oynasi",
+    "openConclusion": "Shifokor xulosasi",
     "addServices": "Xizmat qo‘shish",
     "servicesHint": "EKG, muolaja va boshqa xizmatlarni katalogdan tanlang yoki nomi va narxini qo‘lda kiriting. Hisob darhol kassaga tushadi.",
     "quickAdd": "Tez qo‘shish",
@@ -171,6 +176,7 @@
   "groups": {
     "LAB": "Laboratoriya",
     "UZI": "UZI",
-    "EXO": "EXO"
+    "EXO": "EXO",
+    "THERAPY": "Ozon/Gidro"
   }
 }

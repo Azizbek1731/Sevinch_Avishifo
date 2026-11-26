@@ -126,6 +126,7 @@
   "printSummaryTitle": "Врач хулосаси",
   "printPrescriptionTitle": "Рецепт",
   "pdfFailed": "PDF тайёрлашда хатолик",
+  "pdfPrinted": "Чоп этилган / PDF олинган",
   "printPdfHint": "Лаб натижаси билан бир хил A4 PDF чоп этилади: юқорида клиника шапкаси, пастда Made with AviShifo.uz. A4 принтер ва A4 қоғозни танланг.",
   "printPreparing": "A4 ҳисобот тайёрланмоқда…",
   "printOpenPdf": "PDFни очиш",

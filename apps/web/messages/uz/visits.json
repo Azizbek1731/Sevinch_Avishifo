@@ -126,6 +126,7 @@
   "printSummaryTitle": "Vrach xulosasi",
   "printPrescriptionTitle": "Retsept",
   "pdfFailed": "PDF tayyorlashda xatolik",
+  "pdfPrinted": "Chop etilgan / PDF olingan",
   "printPdfHint": "Lab natijasi bilan bir xil A4 PDF chop etiladi: yuqorida klinika shapkasi, pastda Made with AviShifo.uz. A4 printer va A4 qog‘ozni tanlang.",
   "printPreparing": "A4 hisobot tayyorlanmoqda…",
   "printOpenPdf": "PDFni ochish",

@@ -1,15 +1,17 @@
 'use client';
 
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { FileDown, History } from 'lucide-react';
+import { History } from 'lucide-react';
+import { ClinicalHtmlView } from '@/components/clinical-html-view';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api-client';
 import { formatTz } from '@/lib/dates';
+import { stripClinicalHtml } from '@/lib/clinical-html';
 import { Link } from '@/i18n/routing';
-import { useApiErrorToast } from '../hooks';
+import { LabPdfButton } from '@/features/lab/components/lab-pdf-button';
+import { usePdfPrinted } from '@/lib/pdf-printed';
 
 interface ClinicalHistory {
   visits: Array<{
@@ -37,29 +39,11 @@ interface ClinicalHistory {
 export function ClinicalHistoryPanel({ visitId }: { visitId: string }) {
   const t = useTranslations('doctor.clinical');
   const tv = useTranslations('visits');
-  const onError = useApiErrorToast();
-  const [downloading, setDownloading] = useState<string | null>(null);
   const history = useQuery({
     queryKey: ['visits', visitId, 'history'],
     refetchInterval: 10_000,
     queryFn: async () => (await api.get<ClinicalHistory>(`/visits/${visitId}/history`)).data,
   });
-  const downloadLab = async (id: string) => {
-    setDownloading(id);
-    try {
-      const res = await api.get<Blob>(`/lab-orders/${id}/pdf`);
-      const url = URL.createObjectURL(res.data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'laboratory-result.pdf';
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (error) {
-      onError(error);
-    } finally {
-      setDownloading(null);
-    }
-  };
   const count =
     (history.data?.visits.length ?? 0) + (history.data?.labOrders.length ?? 0);
 
@@ -108,14 +92,14 @@ export function ClinicalHistoryPanel({ visitId }: { visitId: string }) {
                         .join('; ')}
                     </p>
                   ) : null}
-                  {visit.reportBody ? (
-                    <p className="whitespace-pre-wrap break-words">{visit.reportBody}</p>
+                  {visit.reportBody && stripClinicalHtml(visit.reportBody) ? (
+                    <ClinicalHtmlView value={visit.reportBody} />
                   ) : null}
                   {(['subjective', 'objective', 'assessmentNote', 'plan'] as const).map((field) =>
-                    visit[field] ? (
+                    visit[field] && stripClinicalHtml(visit[field]!) ? (
                       <div key={field}>
                         <p className="font-medium">{tv(`soapFields.${field}`)}</p>
-                        <p className="whitespace-pre-wrap break-words">{visit[field]}</p>
+                        <ClinicalHtmlView value={visit[field]!} />
                       </div>
                     ) : null,
                   )}
@@ -125,9 +109,7 @@ export function ClinicalHistoryPanel({ visitId }: { visitId: string }) {
                       {rx.instructions ? ` · ${rx.instructions}` : ''}
                     </p>
                   ))}
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/doctor/visits/${visit.id}/print`}>{t('viewReport')}</Link>
-                  </Button>
+                  <HistoryVisitPrintLink visitId={visit.id} label={t('viewReport')} />
                 </div>
               </details>
             ))}
@@ -148,15 +130,7 @@ export function ClinicalHistoryPanel({ visitId }: { visitId: string }) {
                       {t('viewReport')}
                     </Link>
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={downloading === order.id}
-                    onClick={() => void downloadLab(order.id)}
-                  >
-                    <FileDown className="mr-2 h-4 w-4" />
-                    PDF
-                  </Button>
+                  <LabPdfButton orderId={order.id} orderNumber={order.orderNumber} />
                 </div>
               </div>
             ))}
@@ -164,5 +138,21 @@ export function ClinicalHistoryPanel({ visitId }: { visitId: string }) {
         )}
       </div>
     </details>
+  );
+}
+
+function HistoryVisitPrintLink({ visitId, label }: { visitId: string; label: string }) {
+  const tv = useTranslations('visits');
+  const printed = usePdfPrinted('visit', visitId);
+  return (
+    <Button
+      variant={printed.printed ? 'default' : 'outline'}
+      size="sm"
+      className={printed.className}
+      title={printed.printed ? tv('pdfPrinted') : undefined}
+      asChild
+    >
+      <Link href={`/doctor/visits/${visitId}/print`}>{label}</Link>
+    </Button>
   );
 }

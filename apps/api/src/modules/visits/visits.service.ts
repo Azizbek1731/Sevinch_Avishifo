@@ -2,6 +2,8 @@ import type { TenantTransactionClient } from '../../core/prisma/tenant-extension
 import { AppConfigService } from '../../core/config/app-config.service';
 import { VisitReportPdfService } from './visit-report-pdf.service';
 import { buildVisitReportPdfData } from './visit-report.data';
+import { hasClinicalText } from './clinical-rich-pdf';
+import { visitPdfFilename } from './visit-pdf-filename';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
@@ -74,12 +76,12 @@ function hasClinicalContent(visit: {
   return Boolean(
     visit.diagnosisPrimary?.trim() ||
       visit.diagnosisSecondary?.trim() ||
-      visit.subjective?.trim() ||
-      visit.objective?.trim() ||
-      visit.assessmentNote?.trim() ||
-      visit.plan?.trim() ||
+      hasClinicalText(visit.subjective) ||
+      hasClinicalText(visit.objective) ||
+      hasClinicalText(visit.assessmentNote) ||
+      hasClinicalText(visit.plan) ||
       visit.reportTitle?.trim() ||
-      visit.reportBody?.trim() ||
+      hasClinicalText(visit.reportBody) ||
       visit.physiotherapy?.trim() ||
       (visit.diagnoses?.length ?? 0) > 0 ||
       (visit.prescriptions?.length ?? 0) > 0 ||
@@ -1468,7 +1470,7 @@ export class VisitsService {
     id: string,
     user: AuthUser,
     mode: 'summary' | 'prescription' = 'summary',
-  ): Promise<Buffer> {
+  ): Promise<{ buffer: Buffer; disposition: string; filename: string }> {
     const visit = await this.requireVisit(id, user);
     if (visit.status !== 'COMPLETED')
       throw new AppException(
@@ -1488,7 +1490,16 @@ export class VisitsService {
           select: { fullName: true },
         })
       : null;
-    return this.reportPdf.render(buildVisitReportPdfData(visit, clinic, author), 'uz', mode);
+    const data = buildVisitReportPdfData(visit, clinic, author);
+    const buffer = await this.reportPdf.render(data, 'uz', mode);
+    const named = visitPdfFilename({
+      patientFullName: data.patient.fullName,
+      patientMrn: data.patient.mrn,
+      confirmedAt: data.confirmedAt,
+      kind: data.kind,
+      mode,
+    });
+    return { buffer, disposition: named.header, filename: named.utf8 };
   }
 
   // ------------------------------------------------------------ visit templates

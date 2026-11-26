@@ -102,6 +102,8 @@ export interface LabOrderListItem {
   referringDoctor: { id: string; fullName: string | null } | null;
   status: LabOrderStatus;
   canWork: boolean;
+  /** Statsionar: natija yozish mumkin, to‘lov chiqishda. */
+  settleAtDischarge?: boolean;
   billing: LabBilling | null;
   itemCount: number;
   tests: Array<{ id: string; code: string; name: Record<string, string> }>;
@@ -148,6 +150,7 @@ export interface LabOrderItem {
 
 export interface LabOrderDetail {
   canWork: boolean;
+  settleAtDischarge?: boolean;
   billing: LabBilling | null;
   id: string;
   branchId: string;

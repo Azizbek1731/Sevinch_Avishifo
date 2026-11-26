@@ -11,6 +11,7 @@ import { AppException } from '../../common/app.exception';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TenantContext } from '../../core/prisma/tenant-context';
 import { AuditService } from '../../core/audit/audit.service';
+import { calcAccrual, type AccrualLine, type AccrualRule } from '../staff/payroll.calc';
 import { XlsxService } from './xlsx.service';
 import { type SheetSpec } from './xlsx.service';
 import type { DashboardQuery, ReportRangeQuery, RevenueQuery } from './dto';
@@ -109,6 +110,10 @@ export interface DoctorReportRow {
   avgVisitMin: number | null;
   noShowRate: number | null;
   returningRate: number | null;
+  /** Active REVENUE_PERCENT for this doctor in the range (null if none / mixed). */
+  payPercent: number | null;
+  /** Salary share from compensation rules on paid performed revenue. */
+  earnings: MoneyString;
 }
 
 export interface ServiceReportRow {
@@ -117,6 +122,47 @@ export interface ServiceReportRow {
   name: string;
   count: number;
   revenue: MoneyString;
+  /** LAB | UZI | EXO | CONSULTATION | PROCEDURE | … */
+  group?: string;
+  patients?: number;
+}
+
+export interface ServiceDetailGroupRow {
+  group: string;
+  label: string;
+  services: number;
+  count: number;
+  patients: number;
+  revenue: MoneyString;
+}
+
+export interface ServiceDetailLineRow {
+  issuedAt: string;
+  invoiceNumber: string;
+  group: string;
+  serviceCode: string;
+  serviceName: string;
+  quantity: number;
+  lineTotal: MoneyString;
+  patientMrn: string;
+  patientName: string;
+  performerName: string | null;
+}
+
+export interface ServiceDetailResponse {
+  from: string;
+  to: string;
+  totals: {
+    count: number;
+    patients: number;
+    revenue: MoneyString;
+    lines: number;
+  };
+  byGroup: ServiceDetailGroupRow[];
+  byService: ServiceReportRow[];
+  /** Newest first; capped for JSON. Full list is in XLSX. */
+  lines: ServiceDetailLineRow[];
+  linesTruncated: boolean;
 }
 
 export interface QueueReportResponse {
@@ -533,6 +579,8 @@ export class ReportsService {
           avgVisitMin: null,
           noShowRate: null,
           returningRate: null,
+          payPercent: null,
+          earnings: '0.00',
         };
         byDoctor.set(doctorUserId, row);
       }
@@ -555,7 +603,81 @@ export class ReportsService {
       row.noShowRate = r.total > 0 ? round(r.noShow / r.total, 3) : null;
     }
 
-    return [...byDoctor.values()].sort((a, b) => Number(b.revenue) - Number(a.revenue));
+    // Salary share from CompensationRule (e.g. UZI 40% / EXO 45%) on paid performed lines.
+    const doctorIds = [...byDoctor.keys()];
+    if (doctorIds.length) {
+      const rules = await this.prisma.db.compensationRule.findMany({
+        where: {
+          doctorUserId: { in: doctorIds },
+          type: 'REVENUE_PERCENT',
+          effectiveFrom: { lt: end },
+          OR: [{ effectiveTo: null }, { effectiveTo: { gt: start } }],
+        },
+      });
+      const payDoctorIds = [...new Set(rules.map((rule) => rule.doctorUserId))];
+      if (payDoctorIds.length) {
+        const scopedPayIds = q.doctorUserId
+          ? payDoctorIds.filter((id) => id === q.doctorUserId)
+          : payDoctorIds;
+        const lines = scopedPayIds.length
+          ? await this.prisma.db.invoiceLine.findMany({
+              where: {
+                performerUserId: { in: scopedPayIds },
+                invoice: {
+                  status: { in: ['PAID', 'PARTIALLY_PAID'] },
+                  issuedAt: { gte: start, lt: end },
+                  ...(q.branchId ? { branchId: q.branchId } : {}),
+                },
+              },
+              select: {
+                performerUserId: true,
+                serviceId: true,
+                quantity: true,
+                lineTotal: true,
+                service: { select: { categoryId: true } },
+              },
+            })
+          : [];
+        const linesByDoctor = new Map<string, AccrualLine[]>();
+        for (const line of lines) {
+          if (!line.performerUserId) continue;
+          const list = linesByDoctor.get(line.performerUserId) ?? [];
+          list.push({
+            serviceId: line.serviceId,
+            serviceCategoryId: line.service?.categoryId ?? null,
+            quantity: line.quantity,
+            lineTotal: line.lineTotal,
+          });
+          linesByDoctor.set(line.performerUserId, list);
+        }
+        for (const doctorUserId of scopedPayIds) {
+          const row = byDoctor.get(doctorUserId);
+          if (!row) continue;
+          const doctorRules: AccrualRule[] = rules
+            .filter((rule) => rule.doctorUserId === doctorUserId)
+            .map((rule) => ({
+              type: rule.type,
+              value: rule.value,
+              serviceId: rule.serviceId,
+              serviceCategoryId: rule.serviceCategoryId,
+            }));
+          const { bonus } = calcAccrual(doctorRules, linesByDoctor.get(doctorUserId) ?? []);
+          row.earnings = bonus.toFixed(2);
+          const percents = [
+            ...new Set(
+              doctorRules
+                .filter((rule) => rule.type === 'REVENUE_PERCENT')
+                .map((rule) => new Prisma.Decimal(rule.value).toNumber()),
+            ),
+          ];
+          row.payPercent = percents.length === 1 ? percents[0]! : null;
+        }
+      }
+    }
+
+    return [...byDoctor.values()].sort(
+      (a, b) => Number(b.earnings) - Number(a.earnings) || Number(b.revenue) - Number(a.revenue),
+    );
   }
 
   doctorsSheets(rows: DoctorReportRow[]): SheetSpec[] {
@@ -567,6 +689,8 @@ export class ReportsService {
           { header: 'Patients seen', key: 'patientsSeen', width: 14 },
           { header: 'Visits', key: 'visits', width: 10 },
           { header: 'Revenue', key: 'revenue', width: 18, money: true },
+          { header: 'Pay %', key: 'payPercent', width: 10 },
+          { header: 'Earnings', key: 'earnings', width: 18, money: true },
           { header: 'Avg visit (min)', key: 'avgVisitMin', width: 15 },
           { header: 'No-show rate', key: 'noShowRate', width: 14 },
           { header: 'Returning rate', key: 'returningRate', width: 15 },
@@ -579,52 +703,263 @@ export class ReportsService {
   // ------------------------------------------------------------- services
 
   async services(q: ReportRangeQuery): Promise<ServiceReportRow[]> {
+    const detail = await this.serviceDetail(q);
+    return detail.byService;
+  }
+
+  /**
+   * Full service ledger for the period: Lab / UZI / EXO / other groups,
+   * per-service counts, and every billed line with patient identity.
+   */
+  async serviceDetail(q: ReportRangeQuery): Promise<ServiceDetailResponse> {
     const clinicId = TenantContext.requireClinicId();
     const { start, end } = rangeUtc(q.from, q.to);
     const branch = q.branchId ? Prisma.sql`AND i."branchId" = ${q.branchId}` : Prisma.empty;
     const doctor = q.doctorUserId
       ? Prisma.sql`AND il."performerUserId" = ${q.doctorUserId}`
       : Prisma.empty;
+    const groupExpr = Prisma.sql`
+      CASE
+        WHEN sc."kind"::text = 'LAB' THEN 'LAB'
+        WHEN COALESCE(s."isEcho", false)
+          OR sc.name ILIKE '%exo%' OR sc.name ILIKE '%echo%' OR sc.name ILIKE '%эхо%'
+          THEN 'EXO'
+        WHEN sc."kind"::text = 'ULTRASOUND' THEN 'UZI'
+        ELSE sc."kind"::text
+      END`;
 
-    const rows = await this.prisma.db.$queryRaw<
-      Array<{ serviceId: string; code: string; name: unknown; count: number; revenue: string }>
-    >(Prisma.sql`
-      SELECT il."serviceId" AS "serviceId",
-             s."code" AS "code",
-             s."name" AS "name",
-             COALESCE(SUM(il."quantity"), 0)::int AS "count",
-             COALESCE(SUM(il."lineTotal"), 0)::numeric(14,2)::text AS "revenue"
-      FROM "InvoiceLine" il
-      JOIN "Invoice" i ON i."id" = il."invoiceId"
-      JOIN "Service" s ON s."id" = il."serviceId"
-      WHERE il."clinicId" = ${clinicId}
-        AND i."issuedAt" >= ${start} AND i."issuedAt" < ${end}
-        AND i."status"::text IN ('PAID', 'PARTIALLY_PAID')
-        ${branch} ${doctor}
-      GROUP BY 1, 2, 3
-      ORDER BY SUM(il."lineTotal") DESC
-    `);
+    const [byService, byGroup, lines, totals] = await Promise.all([
+      this.prisma.db.$queryRaw<
+        Array<{
+          serviceId: string;
+          code: string;
+          name: unknown;
+          group: string;
+          count: number;
+          patients: number;
+          revenue: string;
+        }>
+      >(Prisma.sql`
+        SELECT il."serviceId" AS "serviceId",
+               COALESCE(s."code", '') AS "code",
+               COALESCE(s."name", il."title") AS "name",
+               ${groupExpr} AS "group",
+               COALESCE(SUM(il."quantity"), 0)::int AS "count",
+               COUNT(DISTINCT i."patientId")::int AS "patients",
+               COALESCE(SUM(il."lineTotal"), 0)::numeric(14,2)::text AS "revenue"
+        FROM "InvoiceLine" il
+        JOIN "Invoice" i ON i."id" = il."invoiceId"
+        LEFT JOIN "Service" s ON s."id" = il."serviceId"
+        LEFT JOIN "ServiceCategory" sc ON sc."id" = s."categoryId"
+        WHERE il."clinicId" = ${clinicId}
+          AND i."issuedAt" >= ${start} AND i."issuedAt" < ${end}
+          AND i."status"::text IN ('PAID', 'PARTIALLY_PAID', 'ISSUED')
+          ${branch} ${doctor}
+        GROUP BY 1, 2, 3, 4
+        ORDER BY SUM(il."lineTotal") DESC
+      `),
+      this.prisma.db.$queryRaw<
+        Array<{
+          group: string;
+          services: number;
+          count: number;
+          patients: number;
+          revenue: string;
+        }>
+      >(Prisma.sql`
+        SELECT ${groupExpr} AS "group",
+               COUNT(DISTINCT il."serviceId")::int AS "services",
+               COALESCE(SUM(il."quantity"), 0)::int AS "count",
+               COUNT(DISTINCT i."patientId")::int AS "patients",
+               COALESCE(SUM(il."lineTotal"), 0)::numeric(14,2)::text AS "revenue"
+        FROM "InvoiceLine" il
+        JOIN "Invoice" i ON i."id" = il."invoiceId"
+        LEFT JOIN "Service" s ON s."id" = il."serviceId"
+        LEFT JOIN "ServiceCategory" sc ON sc."id" = s."categoryId"
+        WHERE il."clinicId" = ${clinicId}
+          AND i."issuedAt" >= ${start} AND i."issuedAt" < ${end}
+          AND i."status"::text IN ('PAID', 'PARTIALLY_PAID', 'ISSUED')
+          ${branch} ${doctor}
+        GROUP BY 1
+        ORDER BY SUM(il."lineTotal") DESC
+      `),
+      this.prisma.db.$queryRaw<
+        Array<{
+          issuedAt: Date;
+          invoiceNumber: string;
+          group: string;
+          serviceCode: string;
+          serviceName: unknown;
+          quantity: number;
+          lineTotal: string;
+          patientMrn: string;
+          patientName: string;
+          performerName: string | null;
+        }>
+      >(Prisma.sql`
+        SELECT i."issuedAt" AS "issuedAt",
+               i."number" AS "invoiceNumber",
+               ${groupExpr} AS "group",
+               COALESCE(s."code", '') AS "serviceCode",
+               COALESCE(s."name", il."title") AS "serviceName",
+               il."quantity"::int AS "quantity",
+               il."lineTotal"::numeric(14,2)::text AS "lineTotal",
+               p."mrn" AS "patientMrn",
+               p."fullName" AS "patientName",
+               u."fullName" AS "performerName"
+        FROM "InvoiceLine" il
+        JOIN "Invoice" i ON i."id" = il."invoiceId"
+        JOIN "Patient" p ON p."id" = i."patientId"
+        LEFT JOIN "Service" s ON s."id" = il."serviceId"
+        LEFT JOIN "ServiceCategory" sc ON sc."id" = s."categoryId"
+        LEFT JOIN "User" u ON u."id" = il."performerUserId"
+        WHERE il."clinicId" = ${clinicId}
+          AND i."issuedAt" >= ${start} AND i."issuedAt" < ${end}
+          AND i."status"::text IN ('PAID', 'PARTIALLY_PAID', 'ISSUED')
+          ${branch} ${doctor}
+        ORDER BY i."issuedAt" DESC, i."number" DESC
+        LIMIT 10000
+      `),
+      this.prisma.db.$queryRaw<
+        Array<{ count: number; patients: number; revenue: string; lines: number }>
+      >(Prisma.sql`
+        SELECT COALESCE(SUM(il."quantity"), 0)::int AS "count",
+               COUNT(DISTINCT i."patientId")::int AS "patients",
+               COALESCE(SUM(il."lineTotal"), 0)::numeric(14,2)::text AS "revenue",
+               COUNT(*)::int AS "lines"
+        FROM "InvoiceLine" il
+        JOIN "Invoice" i ON i."id" = il."invoiceId"
+        LEFT JOIN "Service" s ON s."id" = il."serviceId"
+        LEFT JOIN "ServiceCategory" sc ON sc."id" = s."categoryId"
+        WHERE il."clinicId" = ${clinicId}
+          AND i."issuedAt" >= ${start} AND i."issuedAt" < ${end}
+          AND i."status"::text IN ('PAID', 'PARTIALLY_PAID', 'ISSUED')
+          ${branch} ${doctor}
+      `),
+    ]);
 
-    return rows.map((r) => ({
-      serviceId: r.serviceId,
-      code: r.code,
-      name: labelOf(r.name),
-      count: r.count,
-      revenue: r.revenue,
+    const groupLabel: Record<string, string> = {
+      LAB: 'Laboratoriya',
+      UZI: 'UZI',
+      EXO: 'EXO',
+      CONSULTATION: 'Ko‘rik',
+      PROCEDURE: 'Muolaja',
+      DIAGNOSTICS: 'Diagnostika',
+      SURGERY: 'Jarrohlik',
+      MATERIAL: 'Material',
+      MEDICINE: 'Dori',
+      OTHER: 'Boshqa',
+    };
+    const mappedLines = lines.map((r) => ({
+      issuedAt: r.issuedAt.toISOString(),
+      invoiceNumber: r.invoiceNumber,
+      group: r.group,
+      serviceCode: r.serviceCode,
+      serviceName: labelOf(r.serviceName),
+      quantity: r.quantity,
+      lineTotal: r.lineTotal,
+      patientMrn: r.patientMrn,
+      patientName: r.patientName,
+      performerName: r.performerName,
     }));
+    const t = totals[0] ?? { count: 0, patients: 0, revenue: '0.00', lines: 0 };
+
+    return {
+      from: q.from,
+      to: q.to,
+      totals: {
+        count: t.count,
+        patients: t.patients,
+        revenue: t.revenue,
+        lines: t.lines,
+      },
+      byGroup: byGroup.map((r) => ({
+        group: r.group,
+        label: groupLabel[r.group] ?? r.group,
+        services: r.services,
+        count: r.count,
+        patients: r.patients,
+        revenue: r.revenue,
+      })),
+      byService: byService.map((r) => ({
+        serviceId: r.serviceId ?? '',
+        code: r.code,
+        name: labelOf(r.name),
+        group: r.group,
+        count: r.count,
+        patients: r.patients,
+        revenue: r.revenue,
+      })),
+      lines: mappedLines,
+      linesTruncated: t.lines > mappedLines.length,
+    };
+  }
+
+  /** JSON responses keep a short patient ledger; XLSX keeps the full pull. */
+  capServiceDetailLines(
+    data: ServiceDetailResponse,
+    cap = 400,
+  ): ServiceDetailResponse {
+    if (data.lines.length <= cap) return data;
+    return {
+      ...data,
+      lines: data.lines.slice(0, cap),
+      linesTruncated: true,
+    };
   }
 
   servicesSheets(rows: ServiceReportRow[]): SheetSpec[] {
     return [
       {
-        name: 'Services',
+        name: 'Xizmatlar',
         columns: [
-          { header: 'Code', key: 'code', width: 12 },
-          { header: 'Service', key: 'name', width: 32 },
-          { header: 'Count', key: 'count', width: 10 },
-          { header: 'Revenue', key: 'revenue', width: 18, money: true },
+          { header: 'Guruh', key: 'group', width: 14 },
+          { header: 'Kod', key: 'code', width: 12 },
+          { header: 'Xizmat', key: 'name', width: 32 },
+          { header: 'Soni', key: 'count', width: 10 },
+          { header: 'Bemorlar', key: 'patients', width: 12 },
+          { header: 'Summa', key: 'revenue', width: 18, money: true },
         ],
-        rows: rows.map((r) => ({ ...r })),
+        rows: rows.map((r) => ({ ...r, group: r.group ?? '', patients: r.patients ?? '' })),
+      },
+    ];
+  }
+
+  serviceDetailSheets(data: ServiceDetailResponse): SheetSpec[] {
+    return [
+      {
+        name: 'Guruhlar',
+        columns: [
+          { header: 'Guruh', key: 'label', width: 18 },
+          { header: 'Xizmat turlari', key: 'services', width: 14 },
+          { header: 'Soni', key: 'count', width: 10 },
+          { header: 'Bemorlar', key: 'patients', width: 12 },
+          { header: 'Summa', key: 'revenue', width: 18, money: true },
+        ],
+        rows: data.byGroup.map((r) => ({ ...r })),
+      },
+      ...this.servicesSheets(data.byService),
+      {
+        name: 'Bemorlar bo‘yicha',
+        columns: [
+          { header: 'Sana', key: 'issuedAt', width: 18 },
+          { header: 'Faktura', key: 'invoiceNumber', width: 16 },
+          { header: 'Guruh', key: 'group', width: 12 },
+          { header: 'Kod', key: 'serviceCode', width: 12 },
+          { header: 'Xizmat', key: 'serviceName', width: 36 },
+          { header: 'Miqdor', key: 'quantity', width: 10 },
+          { header: 'Summa', key: 'lineTotal', width: 16, money: true },
+          { header: 'MRN', key: 'patientMrn', width: 14 },
+          { header: 'Bemor', key: 'patientName', width: 28 },
+          { header: 'Bajaruvchi', key: 'performerName', width: 28 },
+        ],
+        rows: data.lines.map((r) => ({
+          ...r,
+          issuedAt: new Date(r.issuedAt)
+            .toLocaleString('sv-SE', { timeZone: TIMEZONE })
+            .slice(0, 16),
+          performerName: r.performerName ?? '',
+        })),
       },
     ];
   }

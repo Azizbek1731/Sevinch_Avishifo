@@ -13,6 +13,7 @@ export const AMBULATORY_PERCENT_SETTINGS: Record<AmbulatoryShareGroup, string> =
   LAB: 'ambulatoryLabPercent',
   UZI: 'ambulatoryUziPercent',
   EXO: 'ambulatoryEchoPercent',
+  THERAPY: 'ambulatoryTherapyPercent',
 };
 
 type PercentReader = Pick<TenantTransactionClient, 'ambulatoryCommissionRate' | 'clinic'>;
@@ -32,12 +33,18 @@ export function defaultPercentsFrom(settings: unknown): AmbulatorySharePercents 
 }
 
 export function overridePercents(
-  rate: { percent: Prisma.Decimal | null; uziPercent: Prisma.Decimal | null; echoPercent: Prisma.Decimal | null } | null,
+  rate: {
+    percent: Prisma.Decimal | null;
+    uziPercent: Prisma.Decimal | null;
+    echoPercent: Prisma.Decimal | null;
+    therapyPercent?: Prisma.Decimal | null;
+  } | null,
 ): Record<AmbulatoryShareGroup, number | null> {
   return {
     LAB: rate?.percent?.toNumber() ?? null,
     UZI: rate?.uziPercent?.toNumber() ?? null,
     EXO: rate?.echoPercent?.toNumber() ?? null,
+    THERAPY: rate?.therapyPercent?.toNumber() ?? null,
   };
 }
 
@@ -50,7 +57,7 @@ export async function ambulatoryPercents(
   const [rate, clinic] = await Promise.all([
     db.ambulatoryCommissionRate.findFirst({
       where: { doctorUserId },
-      select: { percent: true, uziPercent: true, echoPercent: true },
+      select: { percent: true, uziPercent: true, echoPercent: true, therapyPercent: true },
     }),
     db.clinic.findUnique({ where: { id: clinicId }, select: { settings: true } }),
   ]);
@@ -60,6 +67,7 @@ export async function ambulatoryPercents(
     LAB: overrides.LAB ?? defaults.LAB,
     UZI: overrides.UZI ?? defaults.UZI,
     EXO: overrides.EXO ?? defaults.EXO,
+    THERAPY: overrides.THERAPY ?? defaults.THERAPY,
   };
 }
 
